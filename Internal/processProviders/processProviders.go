@@ -467,7 +467,7 @@ func matchXpath(nodes Node) {
 			} else {
 				// It is a container. add structure for it.
 				val_ := s.ReplaceAll(node_last_elemt_2.Key, "-", "__")
-				val_ = s.ReplaceAll(node_last_elemt_2.Key, ".", "__")
+				val_ = s.ReplaceAll(val_, ".", "__")
 				id := check_element_name(node_last_elemt_2.Key)
 				if id != 0 {
 					val_ += "__" + strconv.Itoa(int(id)) //string(id)
@@ -547,7 +547,7 @@ func setListXpathMatch(nodeCheck Node, schemaTab string, structXpath string, str
 
 	// Assign values for list and its key values.
 	val_ := s.ReplaceAll(nodeCheck.Key, "-", "__")
-	val_ = s.ReplaceAll(nodeCheck.Key, ".", "__")
+	val_ = s.ReplaceAll(val_, ".", "__")
 	// Duplicate name check for list.
 	id := check_element_name(nodeCheck.Key)
 	if id != 0 {
@@ -559,7 +559,7 @@ func setListXpathMatch(nodeCheck Node, schemaTab string, structXpath string, str
 	schemaTab += "\t"
 
 	val_ = s.ReplaceAll(keyValue, "-", "__")
-	val_ = s.ReplaceAll(keyValue, ".", "__")
+	val_ = s.ReplaceAll(val_, ".", "__")
 	// Duplicate name check for key.
 	id = check_element_name(keyValue)
 	if id != 0 {
@@ -620,7 +620,7 @@ func initializeFunctionString(name string) {
 // Parent Node xpath needs to be handled with closing braces appended after parsing sub-elements
 func handleParentNodeXpath(nodes Node, strStructHierarchy string, schemaTab string) {
 	val_ := s.ReplaceAll(nodes.Key, "-", "__")
-	val_ = s.ReplaceAll(nodes.Key, ".", "__")
+	val_ = s.ReplaceAll(val_, ".", "__")
 	id := check_element_name(nodes.Key)
 	if id != 0 {
 		val_ += "__" + strconv.Itoa(int(id)) //string(id)
@@ -648,7 +648,7 @@ func handleParentNodeXpath(nodes Node, strStructHierarchy string, schemaTab stri
 // handle the structure creation for the 'container'/'list' defined in yang files
 func handleContainer(nodes Node, strStructHierarchy string, schemaTab string) {
 	val_ := s.ReplaceAll(nodes.Key, "-", "__")
-	val_ = s.ReplaceAll(nodes.Key, ".", "__")
+	val_ = s.ReplaceAll(val_, ".", "__")
 	id := check_element_name(nodes.Key)
 	if id != 0 {
 		val_ += "__" + strconv.Itoa(int(id)) //string(id)
@@ -687,7 +687,7 @@ func handleLeaf(nodes Node, strStructHierarchy string, schemaTab string) {
 	}
 
 	val_ := s.ReplaceAll(nodes.Key, "-", "__")
-	val_ = s.ReplaceAll(nodes.Key, ".", "__")
+	val_ = s.ReplaceAll(val_, ".", "__")
 	id := check_element_name(nodes.Key)
 	if id != 0 {
 		val_ += "__" + strconv.Itoa(int(id)) //string(id)
