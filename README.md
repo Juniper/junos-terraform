@@ -1,7 +1,18 @@
 ## JUNOS Terraform Automation Framework (JTAF)
 
 Notes contained herein are for the custom development of a Terraform automation framework for Junos.
-This is a work under development
+This is a work under development.
+
+For more information on the JTAF project, you can watch the videos below.
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/eH24eCZc7pE" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+Introduction: https://youtu.be/eH24eCZc7pE
+Installation: https://youtu.be/aTF7_Uscd9Q
+Generate: https://youtu.be/UgsFU7UplRE
+Execution: https://youtu.be/Lfkc38wzhNg
+Interface Configuration: https://youtu.be/iCnnkDodUgQ
+BGP Configuration: https://youtu.be/nQVNCNCJZRc
 
 ## PRE-REQUISITE Tools 
 
