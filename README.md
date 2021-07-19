@@ -66,9 +66,9 @@ Otherwise copy the files present in terraform_providers to the directory where m
 
 ### Step 5 : Create terraform binary 
 
-Create the terraform binary by executing below command at the terraform modules generated repository
+Create the terraform binary by executing below command at the terraform modules generated repository. The binary name must be same as below.
 
-``go build -o terraform-provider-junos-qfx``
+``go build -o terraform-provider-junos-device``
 
 
 ## CONTRIBUTORS
