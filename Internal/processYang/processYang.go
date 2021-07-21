@@ -318,7 +318,7 @@ func print_nodes(nodes []Node, itr int) {
 
 // Is the command available helper.
 func isCommandAvailable(name string) bool {
-	cmd := exec.Command("command", "-v", name)
+	cmd := exec.Command(name, "-v")
 	if err := cmd.Run(); err != nil {
 		return false
 	}

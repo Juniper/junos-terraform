@@ -196,7 +196,7 @@ func CreateProviders(jcfg cfg.Config) error {
 		}
 	}
 
-	providerFileData += `			"junos-qfx_commit": junosQFXCommit(),
+	providerFileData += `			"junos-device_commit": junosCommit(),
 		},
 		ConfigureFunc: returnProvider,
 	}
@@ -768,7 +768,7 @@ func check_element_name(text string) int {
 // Generate terraform Modules
 func createFile(moduleFilePath string) {
 
-	providerFileData += "\t\t\t\"junos-qfx_" + strModuleName + "\": junos" + strModuleName + "(),\n"
+	providerFileData += "\t\t\t\"junos-device_" + strModuleName + "\": junos" + strModuleName + "(),\n"
 
 	// Create go file with top container/module name.
 	var fileName string = s.Join([]string{"resource", strModuleName}, "_")

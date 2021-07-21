@@ -1,0 +1,9 @@
+<!-- this is a sample example. Modify it to your requirements -->
+<file-list>
+    <xpath name="/protocols/bgp/group/traceoptions/file">
+        <group-flag name="false"></group-flag>
+    </xpath>
+<!--    <xpath name="/system/services/netconf/traceoptions">-->
+<!--        <group-flag name="false"></group-flag>-->
+<!--    </xpath>-->
+</file-list>

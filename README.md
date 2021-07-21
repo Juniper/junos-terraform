@@ -21,7 +21,7 @@ BGP Configuration: https://youtu.be/nQVNCNCJZRc
 
 The following tools needs to be installed
 * [Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli)  
-* golang
+* golang >= 1.12
 * pyang
 
 ## Steps to Generate the Terraform Api's
@@ -36,7 +36,7 @@ Yang files for junos devices can be downloaded from the following github repo -
 
 Generate the yin file and xpath for the yangs. Execute the following processYang binary -
 
-`` cd cmd/processyang `` 
+`` cd cmd/processYang `` 
 
 `` go build ``
 
@@ -53,7 +53,7 @@ Step: 2 for the same.
 
 Generate the terraform api by executing the following command -
 
-`` cd cmd/processyang `` 
+`` cd cmd/processProviders `` 
 
 `` go build ``
 
@@ -66,9 +66,9 @@ Otherwise copy the files present in terraform_providers to the directory where m
 
 ### Step 5 : Create terraform binary 
 
-Create the terraform binary by executing below command at the terraform modules generated repository
+Create the terraform binary by executing below command at the terraform modules generated repository. The binary name must be same as below.
 
-``go build -o terraform-provider-junos-qfx``
+``go build -o terraform-provider-junos-device``
 
 
 ## CONTRIBUTORS
