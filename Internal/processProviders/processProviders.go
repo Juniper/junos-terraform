@@ -422,7 +422,11 @@ func matchXpath(nodes Node) {
 						}
 						// Handle for list and create parameter for key.
 						if nodeCheck.XMLName.Local == "list" {
-							strStructHierarchy, structXpath, schemaTab = setListXpathMatch(nodeCheck, schemaTab, structXpath, strStructHierarchy)
+						    if itr == (len(strParts) - 2) {
+						        // this is done to avoid duplication of key element when passed in xpath as end-element
+						        structXpath_last_elem = strParts[itr+1]
+						    }
+							strStructHierarchy, structXpath, schemaTab = setListXpathMatch(nodeCheck, schemaTab, structXpath, strStructHierarchy, structXpath_last_elem)
 						}
 
 						// For 2nd last element store the node.
@@ -521,8 +525,8 @@ func matchGroupingXpath(nodeName string, xpathElem string) (Node, bool) {
 	return nodeCheck, flag
 }
 
-// Handle xpath matching for list. Need to add key also in cae of list during xpath matching
-func setListXpathMatch(nodeCheck Node, schemaTab string, structXpath string, strStructHierarchy string) (string, string, string) {
+// Handle xpath matching for list. Need to add key also in case of list during xpath matching
+func setListXpathMatch(nodeCheck Node, schemaTab string, structXpath string, strStructHierarchy string, structXpath_last_elem string) (string, string, string) {
 	var keyValue string
 	for _, n1 := range nodeCheck.Nodes {
 		if n1.XMLName.Local == "key" {
@@ -544,21 +548,25 @@ func setListXpathMatch(nodeCheck Node, schemaTab string, structXpath string, str
 	strStructHierarchy += ".V_" + val_
 	schemaTab += "\t"
 
-	val_ = s.ReplaceAll(keyValue, "-", "__")
-	val_ = s.ReplaceAll(val_, ".", "__")
-	// Duplicate name check for key.
-	id = check_element_name(keyValue)
-	if id != 0 {
-		val_ += "__" + strconv.Itoa(int(id)) //string(id)
-	}
+    // this is done to avoid duplication of key element when passed in xpath as end-element
+    if(structXpath_last_elem != keyValue){
+        val_ = s.ReplaceAll(keyValue, "-", "__")
+        val_ = s.ReplaceAll(val_, ".", "__")
+        // Duplicate name check for key.
+        id = check_element_name(keyValue)
+        if id != 0 {
+            val_ += "__" + strconv.Itoa(int(id)) //string(id)
+        }
 
-	strSchema += "\n\t\t\t\"" + val_ + "\": &schema.Schema{\n\t\t\t\tType:    schema.TypeString,"
-	strSchema += "\n\t\t\t\tOptional: true,"
-	strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + "\",\n\t\t\t},"
-	strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + keyValue + "\"`"
-	strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
-	strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
-	strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
+        strSchema += "\n\t\t\t\"" + val_ + "\": &schema.Schema{\n\t\t\t\tType:    schema.TypeString,"
+        strSchema += "\n\t\t\t\tOptional: true,"
+        strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + "\",\n\t\t\t},"
+        strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + keyValue + "\"`"
+        strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
+        strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
+        strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
+
+    }
 
 	structXpath = ""
 
