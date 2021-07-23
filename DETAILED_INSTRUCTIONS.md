@@ -64,7 +64,7 @@ cd ../
 mv yang/20.3/20.3R1/junos-qfx/conf/junos-qfx-conf-protocols@2019-01-01.yang ./jtafwd
 ```
 
-If you wanted go clear up the YANG directory:
+If you wanted to remove the YANG directory, you can do it like this:
 
 ```bash
 cd /var/tmp
