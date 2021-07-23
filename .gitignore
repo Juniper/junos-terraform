@@ -1,0 +1,4 @@
+cmd/processProviders/processProviders
+cmd/processYang/processYang
+terraform_providers/terraform-provider-junos-device
+venv/
