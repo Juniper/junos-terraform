@@ -1,0 +1,12 @@
+<!-- this is a sample example. Modify it to your requirements -->
+<file-list>
+<!--    <xpath name="/security/nat/proxy-arp/interface/address">-->
+<!--        <group-flag name="false"></group-flag>-->
+<!--    </xpath>-->
+    <xpath name="/security/address-book/address-set/address/name">
+        <group-flag name="false"></group-flag>
+    </xpath>
+    <xpath name="/security/nat/source/pool/address/to/ipaddr">
+        <group-flag name="false"></group-flag>
+    </xpath>
+</file-list>
