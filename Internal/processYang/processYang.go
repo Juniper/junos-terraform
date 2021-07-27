@@ -230,6 +230,10 @@ func handleContainer(nodes Node, strXpath string, strTab string) {
 		if n.XMLName.Local == "uses" {
 			handleGrouping(n, strXpath, strTab)
 		}
+		//if choice handle cases
+		if n.XMLName.Local == "choice" {
+			handleChoices(n, strXpath, strTab)
+		}
 	}
 	startXML += strTabTmp + "</" + nodes.Key + ">\n"
 }
@@ -268,7 +272,43 @@ func handleGrouping(nodes Node, strXpath string, strTab string) {
 		if n2.XMLName.Local == "list" {
 			handleContainer(n2, strXpath, strTab)
 		}
+		//if choice handle cases
+		if n2.XMLName.Local == "choice" {
+			handleChoices(n2, strXpath, strTab)
+		}
 	}
+}
+
+// For choice defined in yang file, it needs to be resolved to corresponding elements
+func handleChoices(nodeChoice Node, strXpath string, strTab string) {
+
+    for _, nodeCase := range nodeChoice.Nodes {
+	    if nodeCase.XMLName.Local == "case" {
+            for _, n2 := range nodeCase.Nodes {
+                if n2.XMLName.Local == "uses" {
+                    handleGrouping(n2, strXpath, strTab)
+                }
+                if n2.XMLName.Local == "container" {
+                    handleContainer(n2, strXpath, strTab)
+                }
+                if n2.XMLName.Local == "leaf" {
+                    handleContainer(n2, strXpath, strTab)
+                }
+                // if leaf-list append it in the path.
+                if n2.XMLName.Local == "leaf-list" {
+                    handleContainer(n2, strXpath, strTab)
+                }
+                // if list append it in the path.
+                if n2.XMLName.Local == "list" {
+                    handleContainer(n2, strXpath, strTab)
+                }
+                //if choice handle cases
+                if n2.XMLName.Local == "choice" {
+                    handleChoices(n2, strXpath, strTab)
+                }
+            }
+        }
+    }
 }
 
 // Create file with the top container / module name.

@@ -49,6 +49,9 @@ type ElementName struct {
 // Create variable to append groups if the flag is set.
 var isGrpFlag bool = false
 
+// Create variable to check if xpath found or not.
+var isXpathFound bool = false
+
 // Create variable to store groups in the yin file.
 var grpNode []Node
 
@@ -187,12 +190,16 @@ func CreateProviders(jcfg cfg.Config) error {
 			// Process all the groups in yin file and store them
 			create_group_nodes([]Node{n})
 
+            isXpathFound = false
+
 			// Start processing of the file data
 			// Notes : "-" and "." is not allowed in go as variable name. need to replace it with "_"
 			start([]Node{n})
 
-			// After all the data processing is done, create the file.
-			createFile(moduleFilePath)
+            if isXpathFound == true {
+			    // After all the data processing is done, create the file.
+			    createFile(moduleFilePath)
+			}
 		}
 	}
 
@@ -409,10 +416,19 @@ func matchXpath(nodes Node) {
 						nodeCheck = nodeGrp
 						matchFound = true
 					}
+				} else if  n.XMLName.Local == "choice" {
+				    nodeGrp, flag := matchChoiceXpath(n, strParts[itr])
+				    if flag {
+						// If element matches, break the inner loop
+						// run next loop on sublements of this node.
+						nodeCheck = nodeGrp
+						matchFound = true
+					}
 				}
 
 				if matchFound {
 					if itr == (len(strParts) - 1) {
+					    isXpathFound = true
 						structXpath_last_elem = strParts[itr]
 					} else {
 						if structXpath == "" {
@@ -520,7 +536,55 @@ func matchGroupingXpath(nodeName string, xpathElem string) (Node, bool) {
 				// run next loop on sublements of this node.
 				return nodeGrp, flag
 			}
-		}
+		} else if  n.XMLName.Local == "choice" {
+            nodeGrp, flag := matchChoiceXpath(n, xpathElem)
+            if flag {
+                // If element matches, break the inner loop
+                // run next loop on sublements of this node.
+                return nodeGrp,flag
+            }
+        }
+	}
+	return nodeCheck, flag
+}
+
+// Match xpath for a choice, resolve for the corresponding structure
+func matchChoiceXpath(nodeChoice Node, xpathElem string) (Node, bool) {
+	// Iterate through the list of cases in the option choice.
+	// If it matches, handle it.
+	nodeCheck := nodeChoice
+	var flag bool = false
+	for _, nodeCase := range nodeChoice.Nodes {
+	    if nodeCase.XMLName.Local == "case" {
+            for _, n := range nodeCase.Nodes {
+                // If the next element is a container , list , leaf-list or leaf
+                // it can be a possible chance for xpath match.
+                if check_node_tag(n.XMLName.Local) {
+                    if n.Key == xpathElem {
+                        nodeCheck = n
+                        flag = true
+                        break
+                    }
+                } else if n.XMLName.Local == "uses" {
+                    nodeGrp, flag := matchGroupingXpath(n.Key, xpathElem)
+                    if flag {
+                        // If element matches, break the inner loop
+                        // run next loop on sublements of this node.
+                        return nodeGrp, flag
+                    }
+                } else if  n.XMLName.Local == "choice" {
+                    nodeGrp, flag := matchChoiceXpath(n, xpathElem)
+                    if flag {
+                        // If element matches, break the inner loop
+                        // run next loop on sublements of this node.
+                        return nodeGrp, flag
+                    }
+                }
+            }
+        }
+        if flag==true {
+            break
+        }
 	}
 	return nodeCheck, flag
 }
