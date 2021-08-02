@@ -18,7 +18,7 @@ Interface Configuration: https://youtu.be/iCnnkDodUgQ
 BGP Configuration: https://youtu.be/nQVNCNCJZRc
 
 There is a detailed README which takes you through building a complete example Provider from scratch. That can be found here:
-https://github.com/Juniper/junos-terraform/DETAILED_INSTRUCTIONS.md
+https://github.com/Juniper/junos-terraform/blob/master/DETAILED_INSTRUCTIONS.md
 
 ## Pre-Requisite Tools 
 
