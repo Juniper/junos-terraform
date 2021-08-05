@@ -612,25 +612,30 @@ func setListXpathMatch(nodeCheck Node, schemaTab string, structXpath string, str
 	strStructHierarchy += ".V_" + val_
 	schemaTab += "\t"
 
-    // this is done to avoid duplication of key element when passed in xpath as end-element
-    if(structXpath_last_elem != keyValue){
-        val_ = s.ReplaceAll(keyValue, "-", "__")
-        val_ = s.ReplaceAll(val_, ".", "__")
-        // Duplicate name check for key.
-        id = check_element_name(keyValue)
-        if id != 0 {
-            val_ += "__" + strconv.Itoa(int(id)) //string(id)
+    elements := s.Split(keyValue, " ")
+	for _, keyVar := range elements {
+
+        // this is done to avoid duplication of key element when passed in xpath as end-element
+        if(structXpath_last_elem != keyVar){
+            val_ = s.ReplaceAll(keyVar, "-", "__")
+            val_ = s.ReplaceAll(val_, ".", "__")
+            // Duplicate name check for key.
+            id = check_element_name(keyVar)
+            if id != 0 {
+                val_ += "__" + strconv.Itoa(int(id)) //string(id)
+            }
+
+            strSchema += "\n\t\t\t\"" + val_ + "\": &schema.Schema{\n\t\t\t\tType:    schema.TypeString,"
+            strSchema += "\n\t\t\t\tOptional: true,"
+            strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + "\",\n\t\t\t},"
+            strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + keyVar + "\"`"
+            strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
+            strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
+            strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
+
         }
-
-        strSchema += "\n\t\t\t\"" + val_ + "\": &schema.Schema{\n\t\t\t\tType:    schema.TypeString,"
-        strSchema += "\n\t\t\t\tOptional: true,"
-        strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + "\",\n\t\t\t},"
-        strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + keyValue + "\"`"
-        strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
-        strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
-        strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
-
     }
+
 
 	structXpath = ""
 
