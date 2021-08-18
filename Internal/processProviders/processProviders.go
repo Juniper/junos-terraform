@@ -190,22 +190,22 @@ func CreateProviders(jcfg cfg.Config) error {
 			// Process all the groups in yin file and store them
 			create_group_nodes([]Node{n})
 
-            isXpathFound = false
+			isXpathFound = false
 
 			// Start processing of the file data
 			// Notes : "-" and "." is not allowed in go as variable name. need to replace it with "_"
 			start([]Node{n})
 
-            if isXpathFound == true {
-			    // After all the data processing is done, create the file.
-			    createFile(moduleFilePath)
+			if isXpathFound == true {
+				// After all the data processing is done, create the file.
+				createFile(moduleFilePath)
 			}
 		}
 	}
 
 	providerFileData += `			"junos-device_commit": junosCommit(),
 		},
-		ConfigureFunc: returnProvider,
+		ConfigureFunc: providerConfigure,
 	}
 }
 `
@@ -261,9 +261,8 @@ import (
 
 	strClientInit = `(d *schema.ResourceData, m interface{}) error {
 
-    pcfg := m.(*ProviderConfig)
-    client, err := pcfg.Client()
-    check(err)
+	var err error
+    client := m.(*ProviderConfig)
 
     id := d.Get("resource_name").(string)
     `
@@ -279,12 +278,7 @@ import (
     `
 
 	strSetIdValue = `
-    d.SetId(fmt.Sprintf("%s_%s", pcfg.Cfg.Host, id))
-    `
-
-	strClientClose = `
-    err = client.Close()
-    check(err)
+    d.SetId(fmt.Sprintf("%s_%s", client.Cfg.Host, id))
     `
 
 	strGetFunc = " "
@@ -416,9 +410,9 @@ func matchXpath(nodes Node) {
 						nodeCheck = nodeGrp
 						matchFound = true
 					}
-				} else if  n.XMLName.Local == "choice" {
-				    nodeGrp, flag := matchChoiceXpath(n, strParts[itr])
-				    if flag {
+				} else if n.XMLName.Local == "choice" {
+					nodeGrp, flag := matchChoiceXpath(n, strParts[itr])
+					if flag {
 						// If element matches, break the inner loop
 						// run next loop on sublements of this node.
 						nodeCheck = nodeGrp
@@ -428,7 +422,7 @@ func matchXpath(nodes Node) {
 
 				if matchFound {
 					if itr == (len(strParts) - 1) {
-					    isXpathFound = true
+						isXpathFound = true
 						structXpath_last_elem = strParts[itr]
 					} else {
 						if structXpath == "" {
@@ -438,10 +432,10 @@ func matchXpath(nodes Node) {
 						}
 						// Handle for list and create parameter for key.
 						if nodeCheck.XMLName.Local == "list" {
-						    if itr == (len(strParts) - 2) {
-						        // this is done to avoid duplication of key element when passed in xpath as end-element
-						        structXpath_last_elem = strParts[itr+1]
-						    }
+							if itr == (len(strParts) - 2) {
+								// this is done to avoid duplication of key element when passed in xpath as end-element
+								structXpath_last_elem = strParts[itr+1]
+							}
 							strStructHierarchy, structXpath, schemaTab = setListXpathMatch(nodeCheck, schemaTab, structXpath, strStructHierarchy, structXpath_last_elem)
 						}
 
@@ -536,14 +530,14 @@ func matchGroupingXpath(nodeName string, xpathElem string) (Node, bool) {
 				// run next loop on sublements of this node.
 				return nodeGrp, flag
 			}
-		} else if  n.XMLName.Local == "choice" {
-            nodeGrp, flag := matchChoiceXpath(n, xpathElem)
-            if flag {
-                // If element matches, break the inner loop
-                // run next loop on sublements of this node.
-                return nodeGrp,flag
-            }
-        }
+		} else if n.XMLName.Local == "choice" {
+			nodeGrp, flag := matchChoiceXpath(n, xpathElem)
+			if flag {
+				// If element matches, break the inner loop
+				// run next loop on sublements of this node.
+				return nodeGrp, flag
+			}
+		}
 	}
 	return nodeCheck, flag
 }
@@ -555,36 +549,36 @@ func matchChoiceXpath(nodeChoice Node, xpathElem string) (Node, bool) {
 	nodeCheck := nodeChoice
 	var flag bool = false
 	for _, nodeCase := range nodeChoice.Nodes {
-	    if nodeCase.XMLName.Local == "case" {
-            for _, n := range nodeCase.Nodes {
-                // If the next element is a container , list , leaf-list or leaf
-                // it can be a possible chance for xpath match.
-                if check_node_tag(n.XMLName.Local) {
-                    if n.Key == xpathElem {
-                        nodeCheck = n
-                        flag = true
-                        break
-                    }
-                } else if n.XMLName.Local == "uses" {
-                    nodeGrp, flag := matchGroupingXpath(n.Key, xpathElem)
-                    if flag {
-                        // If element matches, break the inner loop
-                        // run next loop on sublements of this node.
-                        return nodeGrp, flag
-                    }
-                } else if  n.XMLName.Local == "choice" {
-                    nodeGrp, flag := matchChoiceXpath(n, xpathElem)
-                    if flag {
-                        // If element matches, break the inner loop
-                        // run next loop on sublements of this node.
-                        return nodeGrp, flag
-                    }
-                }
-            }
-        }
-        if flag==true {
-            break
-        }
+		if nodeCase.XMLName.Local == "case" {
+			for _, n := range nodeCase.Nodes {
+				// If the next element is a container , list , leaf-list or leaf
+				// it can be a possible chance for xpath match.
+				if check_node_tag(n.XMLName.Local) {
+					if n.Key == xpathElem {
+						nodeCheck = n
+						flag = true
+						break
+					}
+				} else if n.XMLName.Local == "uses" {
+					nodeGrp, flag := matchGroupingXpath(n.Key, xpathElem)
+					if flag {
+						// If element matches, break the inner loop
+						// run next loop on sublements of this node.
+						return nodeGrp, flag
+					}
+				} else if n.XMLName.Local == "choice" {
+					nodeGrp, flag := matchChoiceXpath(n, xpathElem)
+					if flag {
+						// If element matches, break the inner loop
+						// run next loop on sublements of this node.
+						return nodeGrp, flag
+					}
+				}
+			}
+		}
+		if flag == true {
+			break
+		}
 	}
 	return nodeCheck, flag
 }
@@ -612,30 +606,29 @@ func setListXpathMatch(nodeCheck Node, schemaTab string, structXpath string, str
 	strStructHierarchy += ".V_" + val_
 	schemaTab += "\t"
 
-    elements := s.Split(keyValue, " ")
+	elements := s.Split(keyValue, " ")
 	for _, keyVar := range elements {
 
-        // this is done to avoid duplication of key element when passed in xpath as end-element
-        if(structXpath_last_elem != keyVar){
-            val_ = s.ReplaceAll(keyVar, "-", "__")
-            val_ = s.ReplaceAll(val_, ".", "__")
-            // Duplicate name check for key.
-            id = check_element_name(keyVar)
-            if id != 0 {
-                val_ += "__" + strconv.Itoa(int(id)) //string(id)
-            }
+		// this is done to avoid duplication of key element when passed in xpath as end-element
+		if structXpath_last_elem != keyVar {
+			val_ = s.ReplaceAll(keyVar, "-", "__")
+			val_ = s.ReplaceAll(val_, ".", "__")
+			// Duplicate name check for key.
+			id = check_element_name(keyVar)
+			if id != 0 {
+				val_ += "__" + strconv.Itoa(int(id)) //string(id)
+			}
 
-            strSchema += "\n\t\t\t\"" + val_ + "\": &schema.Schema{\n\t\t\t\tType:    schema.TypeString,"
-            strSchema += "\n\t\t\t\tOptional: true,"
-            strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + "\",\n\t\t\t},"
-            strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + keyVar + "\"`"
-            strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
-            strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
-            strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
+			strSchema += "\n\t\t\t\"" + val_ + "\": &schema.Schema{\n\t\t\t\tType:    schema.TypeString,"
+			strSchema += "\n\t\t\t\tOptional: true,"
+			strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + "\",\n\t\t\t},"
+			strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + keyVar + "\"`"
+			strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
+			strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
+			strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
 
-        }
-    }
-
+		}
+	}
 
 	structXpath = ""
 
@@ -861,14 +854,14 @@ func createFile(moduleFilePath string) {
 	strStruct += "\n}"
 	// Append for the create function.
 	strCreate += strGetFunc + "\tcommit := true\n" + strVarAssign + strSendTrans + strSetIdValue +
-		strClientClose + "\n\treturn junos" + strModuleName + "Read(d,m)" + "\n}"
+		"\n\treturn junos" + strModuleName + "Read(d,m)" + "\n}"
 	// Append for the update function.
-	strUpdate += strGetFunc + "\tcommit := true\n" + strVarAssign + strSendTransId + strClientClose +
+	strUpdate += strGetFunc + "\tcommit := true\n" + strVarAssign + strSendTransId +
 		"\n\treturn junos" + strModuleName + "Read(d,m)" + "\n}"
 	// Append for the read function.
-	strRead += strSetFunc + strClientClose + "\n\treturn nil\n}"
+	strRead += strSetFunc + "\n\treturn nil\n}"
 	// Append for the delete function.
-	strDelete += strClientClose + "\n\treturn nil\n}"
+	strDelete += "\n\treturn nil\n}"
 
 	// Write to the file.
 	_, err = fPtr.WriteString(strImport)
@@ -928,7 +921,6 @@ func listFiles(yangFilePath string) {
 package main
 
 import (
-	"log"
 
 	gonetconf "github.com/davedotdev/go-netconf/helpers/junos_helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
@@ -936,6 +928,7 @@ import (
 
 // ProviderConfig is to hold client information
 type ProviderConfig struct {
+	*gonetconf.GoNCClient
 	Cfg Config
 }
 
@@ -945,19 +938,7 @@ func check(e error) {
     }
 }
 
-// Client Refreshes the client
-func (PC *ProviderConfig) Client() (*gonetconf.GoNCClient, error) {
-
-	client, err := PC.Cfg.Client()
-	if err != nil {
-		log.Fatal(err)
-		return nil, err
-	}
-
-	return client, nil
-}
-
-func returnProvider(d *schema.ResourceData) (interface{}, error) {
+func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	config := Config{
 		Host:     d.Get("host").(string),
 		Port:     d.Get("port").(int),
@@ -965,8 +946,12 @@ func returnProvider(d *schema.ResourceData) (interface{}, error) {
 		Password: d.Get("password").(string),
 		SSHKey:   d.Get("sshkey").(string),
 	}
+	client, err := config.Client()
+	if err != nil {
+		return nil, err
+	}
 
-	return &ProviderConfig{config}, nil
+	return &ProviderConfig{client, config}, nil
 }
 
 // Provider returns a Terraform ResourceProvider.

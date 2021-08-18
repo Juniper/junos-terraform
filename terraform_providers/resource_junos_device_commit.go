@@ -24,16 +24,10 @@ import (
 
 func junosCommitCreate(d *schema.ResourceData, m interface{}) error {
 
+        var err error
 	id := d.Get("resource_name").(string)
 
-	pcfg := m.(*ProviderConfig)
-	client, err := pcfg.Client()
-
-	if err != nil {
-		return err
-	}
-
-	//client := m.(*ProviderConfig)
+	client := m.(*ProviderConfig)
 
 	err = client.SendCommit()
 
@@ -41,7 +35,7 @@ func junosCommitCreate(d *schema.ResourceData, m interface{}) error {
 		return err
 	}
 
-	d.SetId(fmt.Sprintf("%s_%s", pcfg.Cfg.Host, id))
+	d.SetId(fmt.Sprintf("%s_%s", client.Cfg.Host, id))
 
 	err = client.Close()
 	if err != nil {
