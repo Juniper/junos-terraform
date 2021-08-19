@@ -35,7 +35,7 @@ func junosCommitCreate(d *schema.ResourceData, m interface{}) error {
 		return err
 	}
 
-	d.SetId(fmt.Sprintf("%s_%s", client.Cfg.Host, id))
+	d.SetId(fmt.Sprintf("%s_%s", client.Host, id))
 
 	err = client.Close()
 	if err != nil {

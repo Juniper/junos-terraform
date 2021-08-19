@@ -82,7 +82,6 @@ var strClientInit string
 var strSendTrans string
 var strSendTransId string
 var strSetIdValue string
-var strClientClose string
 
 // String variable for create and update function.
 var strGetFunc string
@@ -278,7 +277,7 @@ import (
     `
 
 	strSetIdValue = `
-    d.SetId(fmt.Sprintf("%s_%s", client.Cfg.Host, id))
+    d.SetId(fmt.Sprintf("%s_%s", client.Host, id))
     `
 
 	strGetFunc = " "
@@ -929,7 +928,7 @@ import (
 // ProviderConfig is to hold client information
 type ProviderConfig struct {
 	*gonetconf.GoNCClient
-	Cfg Config
+	Host string
 }
 
 func check(e error) {
@@ -951,7 +950,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		return nil, err
 	}
 
-	return &ProviderConfig{client, config}, nil
+	return &ProviderConfig{client, config.Host}, nil
 }
 
 // Provider returns a Terraform ResourceProvider.
