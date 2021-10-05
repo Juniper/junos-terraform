@@ -36,6 +36,6 @@ In this example we have three lists ``policy-statement`` , ``term`` and ``route-
 ``route-filter`` has three keys as mentioned in yang ``choice__ident``, ``choice__value`` and ``address`` . 
 Even though the hierarchy chosen here only sets ``address`` and ``choice-indent``, ``choice-value`` also needs to be set. We can set it as empty or leave it in test.tf so it will be sent as empty by terraform as default value. 
 * The variable resource_name helps to identify if it is a group based configuration and is required. 
-In this example in xpath_sample.xml we have mentioned ``group-flag`` as false so it will not be set in the database.
+
 
 

@@ -12,18 +12,23 @@ import (
 // with any keyword in golang. ex - interface is keyword in golang
 type xmlSecurityAddress__BookAddress__SetAddressName struct {
 	XMLName xml.Name `xml:"configuration"`
-	V_address__book  struct {
-		XMLName xml.Name `xml:"address-book"`
-		V_name  string  `xml:"name"`
-		V_address__set  struct {
-			XMLName xml.Name `xml:"address-set"`
-			V_name__1  string  `xml:"name"`
-			V_address  struct {
-				XMLName xml.Name `xml:"address"`
-				V_name__2  string  `xml:"name"`
-			} `xml:"address"`
-		} `xml:"address-set"`
-	} `xml:"security>address-book"`
+	Groups  struct {
+		XMLName	xml.Name	`xml:"groups"`
+		Name	string	`xml:"name"`
+		V_address__book  struct {
+			XMLName xml.Name `xml:"address-book"`
+			V_name  string  `xml:"name"`
+			V_address__set  struct {
+				XMLName xml.Name `xml:"address-set"`
+				V_name__1  string  `xml:"name"`
+				V_address  struct {
+					XMLName xml.Name `xml:"address"`
+					V_name__2  string  `xml:"name"`
+				} `xml:"address"`
+			} `xml:"address-set"`
+		} `xml:"security>address-book"`
+	} `xml:"groups"`
+	ApplyGroup string `xml:"apply-groups"`
 }
 
 // v_ is appended before every variable so it doesn't give any conflict
@@ -38,12 +43,14 @@ func junosSecurityAddress__BookAddress__SetAddressNameCreate(d *schema.ResourceD
      	V_name := d.Get("name").(string)
 	V_name__1 := d.Get("name__1").(string)
 	V_name__2 := d.Get("name__2").(string)
-	commit := true
+	commit := false
 
 	config := xmlSecurityAddress__BookAddress__SetAddressName{}
-	config.V_address__book.V_name = V_name
-	config.V_address__book.V_address__set.V_name__1 = V_name__1
-	config.V_address__book.V_address__set.V_address.V_name__2 = V_name__2
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_address__book.V_name = V_name
+	config.Groups.V_address__book.V_address__set.V_name__1 = V_name__1
+	config.Groups.V_address__book.V_address__set.V_address.V_name__2 = V_name__2
 
     err = client.SendTransaction("", config, commit)
     check(err)
@@ -68,9 +75,9 @@ func junosSecurityAddress__BookAddress__SetAddressNameRead(d *schema.ResourceDat
 
 	err = client.MarshalGroup(id, config)
 	check(err)
- 	d.Set("name", config.V_address__book.V_name)
-	d.Set("name__1", config.V_address__book.V_address__set.V_name__1)
-	d.Set("name__2", config.V_address__book.V_address__set.V_address.V_name__2)
+ 	d.Set("name", config.Groups.V_address__book.V_name)
+	d.Set("name__1", config.Groups.V_address__book.V_address__set.V_name__1)
+	d.Set("name__2", config.Groups.V_address__book.V_address__set.V_address.V_name__2)
 
     err = client.Close()
     check(err)
@@ -88,12 +95,14 @@ func junosSecurityAddress__BookAddress__SetAddressNameUpdate(d *schema.ResourceD
      	V_name := d.Get("name").(string)
 	V_name__1 := d.Get("name__1").(string)
 	V_name__2 := d.Get("name__2").(string)
-	commit := true
+	commit := false
 
 	config := xmlSecurityAddress__BookAddress__SetAddressName{}
-	config.V_address__book.V_name = V_name
-	config.V_address__book.V_address__set.V_name__1 = V_name__1
-	config.V_address__book.V_address__set.V_address.V_name__2 = V_name__2
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_address__book.V_name = V_name
+	config.Groups.V_address__book.V_address__set.V_name__1 = V_name__1
+	config.Groups.V_address__book.V_address__set.V_address.V_name__2 = V_name__2
 
     err = client.SendTransaction(id, config, commit)
     check(err)
@@ -138,17 +147,17 @@ func junosSecurityAddress__BookAddress__SetAddressName() *schema.Resource {
 			"name": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_address__book",
+				Description:    "xpath is: config.Groups.V_address__book",
 			},
 			"name__1": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_address__book.V_address__set",
+				Description:    "xpath is: config.Groups.V_address__book.V_address__set",
 			},
 			"name__2": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_address__book.V_address__set.V_address. Security address name",
+				Description:    "xpath is: config.Groups.V_address__book.V_address__set.V_address. Security address name",
 			},
 		},
 	}

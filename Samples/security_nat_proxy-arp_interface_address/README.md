@@ -38,6 +38,5 @@ In this example we have two lists ``interface`` and ``address`` in the hierarchy
 ``name`` is the variable assigned to both of its key element and they are differentiated by integers at the end and it needs to be mentioned in the test.tf
 * The variable ``ipaddr`` is assigned to leaf-element ``ipaddr`` and needs to be mentioned in the test.tf .
 * The variable resource_name helps to identify if it is a group based configuration and is required. 
-In this example in xpath_sample.xml we have mentioned ``group-flag`` as false so it will not be set in the database.
 
 

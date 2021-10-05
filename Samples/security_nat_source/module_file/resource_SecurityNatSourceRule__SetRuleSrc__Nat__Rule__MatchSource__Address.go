@@ -12,18 +12,23 @@ import (
 // with any keyword in golang. ex - interface is keyword in golang
 type xmlSecurityNatSourceRule__SetRuleSrc__Nat__Rule__MatchSource__Address struct {
 	XMLName xml.Name `xml:"configuration"`
-	V_rule__set  struct {
-		XMLName xml.Name `xml:"rule-set"`
-		V_name  string  `xml:"name"`
-		V_rule  struct {
-			XMLName xml.Name `xml:"rule"`
-			V_name__1  string  `xml:"name"`
-			V_src__nat__rule__match  struct {
-				XMLName xml.Name `xml:"src-nat-rule-match"`
-				V_source__address  string  `xml:"source-address"`
-			} `xml:"src-nat-rule-match"`
-		} `xml:"rule"`
-	} `xml:"security>nat>source>rule-set"`
+	Groups  struct {
+		XMLName	xml.Name	`xml:"groups"`
+		Name	string	`xml:"name"`
+		V_rule__set  struct {
+			XMLName xml.Name `xml:"rule-set"`
+			V_name  string  `xml:"name"`
+			V_rule  struct {
+				XMLName xml.Name `xml:"rule"`
+				V_name__1  string  `xml:"name"`
+				V_src__nat__rule__match  struct {
+					XMLName xml.Name `xml:"src-nat-rule-match"`
+					V_source__address  string  `xml:"source-address"`
+				} `xml:"src-nat-rule-match"`
+			} `xml:"rule"`
+		} `xml:"security>nat>source>rule-set"`
+	} `xml:"groups"`
+	ApplyGroup string `xml:"apply-groups"`
 }
 
 // v_ is appended before every variable so it doesn't give any conflict
@@ -38,12 +43,14 @@ func junosSecurityNatSourceRule__SetRuleSrc__Nat__Rule__MatchSource__AddressCrea
      	V_name := d.Get("name").(string)
 	V_name__1 := d.Get("name__1").(string)
 	V_source__address := d.Get("source__address").(string)
-	commit := true
+	commit := false
 
 	config := xmlSecurityNatSourceRule__SetRuleSrc__Nat__Rule__MatchSource__Address{}
-	config.V_rule__set.V_name = V_name
-	config.V_rule__set.V_rule.V_name__1 = V_name__1
-	config.V_rule__set.V_rule.V_src__nat__rule__match.V_source__address = V_source__address
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_rule__set.V_name = V_name
+	config.Groups.V_rule__set.V_rule.V_name__1 = V_name__1
+	config.Groups.V_rule__set.V_rule.V_src__nat__rule__match.V_source__address = V_source__address
 
     err = client.SendTransaction("", config, commit)
     check(err)
@@ -68,9 +75,9 @@ func junosSecurityNatSourceRule__SetRuleSrc__Nat__Rule__MatchSource__AddressRead
 
 	err = client.MarshalGroup(id, config)
 	check(err)
- 	d.Set("name", config.V_rule__set.V_name)
-	d.Set("name__1", config.V_rule__set.V_rule.V_name__1)
-	d.Set("source__address", config.V_rule__set.V_rule.V_src__nat__rule__match.V_source__address)
+ 	d.Set("name", config.Groups.V_rule__set.V_name)
+	d.Set("name__1", config.Groups.V_rule__set.V_rule.V_name__1)
+	d.Set("source__address", config.Groups.V_rule__set.V_rule.V_src__nat__rule__match.V_source__address)
 
     err = client.Close()
     check(err)
@@ -88,12 +95,14 @@ func junosSecurityNatSourceRule__SetRuleSrc__Nat__Rule__MatchSource__AddressUpda
      	V_name := d.Get("name").(string)
 	V_name__1 := d.Get("name__1").(string)
 	V_source__address := d.Get("source__address").(string)
-	commit := true
+	commit := false
 
 	config := xmlSecurityNatSourceRule__SetRuleSrc__Nat__Rule__MatchSource__Address{}
-	config.V_rule__set.V_name = V_name
-	config.V_rule__set.V_rule.V_name__1 = V_name__1
-	config.V_rule__set.V_rule.V_src__nat__rule__match.V_source__address = V_source__address
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_rule__set.V_name = V_name
+	config.Groups.V_rule__set.V_rule.V_name__1 = V_name__1
+	config.Groups.V_rule__set.V_rule.V_src__nat__rule__match.V_source__address = V_source__address
 
     err = client.SendTransaction(id, config, commit)
     check(err)
@@ -138,17 +147,17 @@ func junosSecurityNatSourceRule__SetRuleSrc__Nat__Rule__MatchSource__Address() *
 			"name": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_rule__set",
+				Description:    "xpath is: config.Groups.V_rule__set",
 			},
 			"name__1": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_rule__set.V_rule",
+				Description:    "xpath is: config.Groups.V_rule__set.V_rule",
 			},
 			"source__address": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_rule__set.V_rule.V_src__nat__rule__match. Source address",
+				Description:    "xpath is: config.Groups.V_rule__set.V_rule.V_src__nat__rule__match. Source address",
 			},
 		},
 	}

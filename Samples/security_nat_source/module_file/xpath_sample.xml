@@ -1,18 +1,8 @@
 <!-- this is a sample example. Modify it to your requirements -->
 <file-list>
-    <xpath name="/security/nat/source/pool/address/to/ipaddr">
-        <group-flag name="false"></group-flag>
-    </xpath>
-    <xpath name="/security/nat/source/rule-set/from/zone">
-        <group-flag name="false"></group-flag>
-    </xpath>
-    <xpath name="/security/nat/source/rule-set/to/zone">
-        <group-flag name="false"></group-flag>
-    </xpath>
-    <xpath name="/security/nat/source/rule-set/rule/src-nat-rule-match/source-address">
-        <group-flag name="false"></group-flag>
-    </xpath>
-    <xpath name="/security/nat/source/rule-set/rule/then/source-nat/pool/pool-name">
-        <group-flag name="false"></group-flag>
-    </xpath>
+    <xpath name="/security/nat/source/pool/address/to/ipaddr"/>
+    <xpath name="/security/nat/source/rule-set/from/zone"/>
+    <xpath name="/security/nat/source/rule-set/to/zone"/>
+    <xpath name="/security/nat/source/rule-set/rule/src-nat-rule-match/source-address"/>
+    <xpath name="/security/nat/source/rule-set/rule/then/source-nat/pool/pool-name"/>
 </file-list>

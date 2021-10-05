@@ -35,6 +35,5 @@ In this example we have two lists ``address-book`` and ``address`` in the hierar
 ``name`` is the variable assigned to both of its key element and they are differentiated by integers at the end and it needs to be mentioned in the test.tf
 * The variable ``ip__prefix`` is assigned to leaf-element ``ip-prefix`` and needs to be mentioned in the test.tf .
 * The variable resource_name helps to identify if it is a group based configuration and is required. 
-In this example in xpath_sample.xml we have mentioned ``group-flag`` as false so it will not be set in the database.
 
 
