@@ -613,7 +613,7 @@ func setListXpathMatch(nodeCheck Node, schemaTab string, structXpath string, str
 	schemaTab += "\t"
 
     elements := s.Split(keyValue, " ")
-	for _, keyVar := range elements {
+    for _, keyVar := range elements {
 
         // this is done to avoid duplication of key element when passed in xpath as end-element
         if(structXpath_last_elem != keyVar){
@@ -860,10 +860,10 @@ func createFile(moduleFilePath string) {
 	// Append at end of structure which is near the top of the created file.
 	strStruct += "\n}"
 	// Append for the create function.
-	strCreate += strGetFunc + "\tcommit := true\n" + strVarAssign + strSendTrans + strSetIdValue +
+	strCreate += strGetFunc + "\tcommit := false\n" + strVarAssign + strSendTrans + strSetIdValue +
 		strClientClose + "\n\treturn junos" + strModuleName + "Read(d,m)" + "\n}"
 	// Append for the update function.
-	strUpdate += strGetFunc + "\tcommit := true\n" + strVarAssign + strSendTransId + strClientClose +
+	strUpdate += strGetFunc + "\tcommit := false\n" + strVarAssign + strSendTransId + strClientClose +
 		"\n\treturn junos" + strModuleName + "Read(d,m)" + "\n}"
 	// Append for the read function.
 	strRead += strSetFunc + strClientClose + "\n\treturn nil\n}"
