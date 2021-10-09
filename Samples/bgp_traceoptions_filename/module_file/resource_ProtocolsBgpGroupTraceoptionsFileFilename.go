@@ -12,14 +12,19 @@ import (
 // with any keyword in golang. ex - interface is keyword in golang
 type xmlProtocolsBgpGroupTraceoptionsFileFilename struct {
 	XMLName xml.Name `xml:"configuration"`
-	V_group  struct {
-		XMLName xml.Name `xml:"group"`
-		V_name  string  `xml:"name"`
-		V_file  struct {
-			XMLName xml.Name `xml:"file"`
-			V_filename  string  `xml:"filename"`
-		} `xml:"traceoptions>file"`
-	} `xml:"protocols>bgp>group"`
+	Groups  struct {
+		XMLName	xml.Name	`xml:"groups"`
+		Name	string	`xml:"name"`
+		V_group  struct {
+			XMLName xml.Name `xml:"group"`
+			V_name  string  `xml:"name"`
+			V_file  struct {
+				XMLName xml.Name `xml:"file"`
+				V_filename  string  `xml:"filename"`
+			} `xml:"traceoptions>file"`
+		} `xml:"protocols>bgp>group"`
+	} `xml:"groups"`
+	ApplyGroup string `xml:"apply-groups"`
 }
 
 // v_ is appended before every variable so it doesn't give any conflict
@@ -33,11 +38,13 @@ func junosProtocolsBgpGroupTraceoptionsFileFilenameCreate(d *schema.ResourceData
     id := d.Get("resource_name").(string)
      	V_name := d.Get("name").(string)
 	V_filename := d.Get("filename").(string)
-	commit := true
+	commit := false
 
 	config := xmlProtocolsBgpGroupTraceoptionsFileFilename{}
-	config.V_group.V_name = V_name
-	config.V_group.V_file.V_filename = V_filename
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_group.V_name = V_name
+	config.Groups.V_group.V_file.V_filename = V_filename
 
     err = client.SendTransaction("", config, commit)
     check(err)
@@ -62,8 +69,8 @@ func junosProtocolsBgpGroupTraceoptionsFileFilenameRead(d *schema.ResourceData, 
 
 	err = client.MarshalGroup(id, config)
 	check(err)
- 	d.Set("name", config.V_group.V_name)
-	d.Set("filename", config.V_group.V_file.V_filename)
+ 	d.Set("name", config.Groups.V_group.V_name)
+	d.Set("filename", config.Groups.V_group.V_file.V_filename)
 
     err = client.Close()
     check(err)
@@ -80,11 +87,13 @@ func junosProtocolsBgpGroupTraceoptionsFileFilenameUpdate(d *schema.ResourceData
     id := d.Get("resource_name").(string)
      	V_name := d.Get("name").(string)
 	V_filename := d.Get("filename").(string)
-	commit := true
+	commit := false
 
 	config := xmlProtocolsBgpGroupTraceoptionsFileFilename{}
-	config.V_group.V_name = V_name
-	config.V_group.V_file.V_filename = V_filename
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_group.V_name = V_name
+	config.Groups.V_group.V_file.V_filename = V_filename
 
     err = client.SendTransaction(id, config, commit)
     check(err)
@@ -129,12 +138,12 @@ func junosProtocolsBgpGroupTraceoptionsFileFilename() *schema.Resource {
 			"name": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_group",
+				Description:    "xpath is: config.Groups.V_group",
 			},
 			"filename": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_group.V_file. Name of file in which to write trace information",
+				Description:    "xpath is: config.Groups.V_group.V_file. Name of file in which to write trace information",
 			},
 		},
 	}

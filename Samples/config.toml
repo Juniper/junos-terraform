@@ -1,4 +1,0 @@
-yangDir = "/var/tmp/yang_files"
-providerDir = "/var/tmp/terraform_providers"
-xpathPath = "/var/tmp/xpath_test.xml"
-fileType = "both"

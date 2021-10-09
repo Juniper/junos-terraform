@@ -12,20 +12,25 @@ import (
 // with any keyword in golang. ex - interface is keyword in golang
 type xmlPolicy__OptionsPolicy__StatementTermFromRoute__FilterAddress struct {
 	XMLName xml.Name `xml:"configuration"`
-	V_policy__statement  struct {
-		XMLName xml.Name `xml:"policy-statement"`
-		V_name  string  `xml:"name"`
-		V_term  struct {
-			XMLName xml.Name `xml:"term"`
-			V_name__1  string  `xml:"name"`
-			V_route__filter  struct {
-				XMLName xml.Name `xml:"route-filter"`
-				V_choice__ident  string  `xml:"choice-ident"`
-				V_choice__value  string  `xml:"choice-value"`
-				V_address  string  `xml:"address"`
-			} `xml:"from>route-filter"`
-		} `xml:"term"`
-	} `xml:"policy-options>policy-statement"`
+	Groups  struct {
+		XMLName	xml.Name	`xml:"groups"`
+		Name	string	`xml:"name"`
+		V_policy__statement  struct {
+			XMLName xml.Name `xml:"policy-statement"`
+			V_name  string  `xml:"name"`
+			V_term  struct {
+				XMLName xml.Name `xml:"term"`
+				V_name__1  string  `xml:"name"`
+				V_route__filter  struct {
+					XMLName xml.Name `xml:"route-filter"`
+					V_choice__ident  string  `xml:"choice-ident"`
+					V_choice__value  string  `xml:"choice-value"`
+					V_address  string  `xml:"address"`
+				} `xml:"from>route-filter"`
+			} `xml:"term"`
+		} `xml:"policy-options>policy-statement"`
+	} `xml:"groups"`
+	ApplyGroup string `xml:"apply-groups"`
 }
 
 // v_ is appended before every variable so it doesn't give any conflict
@@ -42,14 +47,16 @@ func junosPolicy__OptionsPolicy__StatementTermFromRoute__FilterAddressCreate(d *
 	V_choice__ident := d.Get("choice__ident").(string)
 	V_choice__value := d.Get("choice__value").(string)
 	V_address := d.Get("address").(string)
-	commit := true
+	commit := false
 
 	config := xmlPolicy__OptionsPolicy__StatementTermFromRoute__FilterAddress{}
-	config.V_policy__statement.V_name = V_name
-	config.V_policy__statement.V_term.V_name__1 = V_name__1
-	config.V_policy__statement.V_term.V_route__filter.V_choice__ident = V_choice__ident
-	config.V_policy__statement.V_term.V_route__filter.V_choice__value = V_choice__value
-	config.V_policy__statement.V_term.V_route__filter.V_address = V_address
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_policy__statement.V_name = V_name
+	config.Groups.V_policy__statement.V_term.V_name__1 = V_name__1
+	config.Groups.V_policy__statement.V_term.V_route__filter.V_choice__ident = V_choice__ident
+	config.Groups.V_policy__statement.V_term.V_route__filter.V_choice__value = V_choice__value
+	config.Groups.V_policy__statement.V_term.V_route__filter.V_address = V_address
 
     err = client.SendTransaction("", config, commit)
     check(err)
@@ -74,11 +81,11 @@ func junosPolicy__OptionsPolicy__StatementTermFromRoute__FilterAddressRead(d *sc
 
 	err = client.MarshalGroup(id, config)
 	check(err)
- 	d.Set("name", config.V_policy__statement.V_name)
-	d.Set("name__1", config.V_policy__statement.V_term.V_name__1)
-	d.Set("choice__ident", config.V_policy__statement.V_term.V_route__filter.V_choice__ident)
-	d.Set("choice__value", config.V_policy__statement.V_term.V_route__filter.V_choice__value)
-	d.Set("address", config.V_policy__statement.V_term.V_route__filter.V_address)
+ 	d.Set("name", config.Groups.V_policy__statement.V_name)
+	d.Set("name__1", config.Groups.V_policy__statement.V_term.V_name__1)
+	d.Set("choice__ident", config.Groups.V_policy__statement.V_term.V_route__filter.V_choice__ident)
+	d.Set("choice__value", config.Groups.V_policy__statement.V_term.V_route__filter.V_choice__value)
+	d.Set("address", config.Groups.V_policy__statement.V_term.V_route__filter.V_address)
 
     err = client.Close()
     check(err)
@@ -98,14 +105,16 @@ func junosPolicy__OptionsPolicy__StatementTermFromRoute__FilterAddressUpdate(d *
 	V_choice__ident := d.Get("choice__ident").(string)
 	V_choice__value := d.Get("choice__value").(string)
 	V_address := d.Get("address").(string)
-	commit := true
+	commit := false
 
 	config := xmlPolicy__OptionsPolicy__StatementTermFromRoute__FilterAddress{}
-	config.V_policy__statement.V_name = V_name
-	config.V_policy__statement.V_term.V_name__1 = V_name__1
-	config.V_policy__statement.V_term.V_route__filter.V_choice__ident = V_choice__ident
-	config.V_policy__statement.V_term.V_route__filter.V_choice__value = V_choice__value
-	config.V_policy__statement.V_term.V_route__filter.V_address = V_address
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_policy__statement.V_name = V_name
+	config.Groups.V_policy__statement.V_term.V_name__1 = V_name__1
+	config.Groups.V_policy__statement.V_term.V_route__filter.V_choice__ident = V_choice__ident
+	config.Groups.V_policy__statement.V_term.V_route__filter.V_choice__value = V_choice__value
+	config.Groups.V_policy__statement.V_term.V_route__filter.V_address = V_address
 
     err = client.SendTransaction(id, config, commit)
     check(err)
@@ -150,27 +159,27 @@ func junosPolicy__OptionsPolicy__StatementTermFromRoute__FilterAddress() *schema
 			"name": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_policy__statement",
+				Description:    "xpath is: config.Groups.V_policy__statement",
 			},
 			"name__1": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_policy__statement.V_term",
+				Description:    "xpath is: config.Groups.V_policy__statement.V_term",
 			},
 			"choice__ident": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_policy__statement.V_term.V_route__filter",
+				Description:    "xpath is: config.Groups.V_policy__statement.V_term.V_route__filter",
 			},
 			"choice__value": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_policy__statement.V_term.V_route__filter",
+				Description:    "xpath is: config.Groups.V_policy__statement.V_term.V_route__filter",
 			},
 			"address": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_policy__statement.V_term.V_route__filter. IP address or hostname",
+				Description:    "xpath is: config.Groups.V_policy__statement.V_term.V_route__filter. IP address or hostname",
 			},
 		},
 	}

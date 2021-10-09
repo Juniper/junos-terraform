@@ -12,18 +12,23 @@ import (
 // with any keyword in golang. ex - interface is keyword in golang
 type xmlSecurityNatSourcePoolAddressToIpaddr struct {
 	XMLName xml.Name `xml:"configuration"`
-	V_pool  struct {
-		XMLName xml.Name `xml:"pool"`
-		V_name  string  `xml:"name"`
-		V_address  struct {
-			XMLName xml.Name `xml:"address"`
-			V_name__1  string  `xml:"name"`
-			V_to  struct {
-				XMLName xml.Name `xml:"to"`
-				V_ipaddr  string  `xml:"ipaddr"`
-			} `xml:"to"`
-		} `xml:"address"`
-	} `xml:"security>nat>source>pool"`
+	Groups  struct {
+		XMLName	xml.Name	`xml:"groups"`
+		Name	string	`xml:"name"`
+		V_pool  struct {
+			XMLName xml.Name `xml:"pool"`
+			V_name  string  `xml:"name"`
+			V_address  struct {
+				XMLName xml.Name `xml:"address"`
+				V_name__1  string  `xml:"name"`
+				V_to  struct {
+					XMLName xml.Name `xml:"to"`
+					V_ipaddr  string  `xml:"ipaddr"`
+				} `xml:"to"`
+			} `xml:"address"`
+		} `xml:"security>nat>source>pool"`
+	} `xml:"groups"`
+	ApplyGroup string `xml:"apply-groups"`
 }
 
 // v_ is appended before every variable so it doesn't give any conflict
@@ -38,12 +43,14 @@ func junosSecurityNatSourcePoolAddressToIpaddrCreate(d *schema.ResourceData, m i
      	V_name := d.Get("name").(string)
 	V_name__1 := d.Get("name__1").(string)
 	V_ipaddr := d.Get("ipaddr").(string)
-	commit := true
+	commit := false
 
 	config := xmlSecurityNatSourcePoolAddressToIpaddr{}
-	config.V_pool.V_name = V_name
-	config.V_pool.V_address.V_name__1 = V_name__1
-	config.V_pool.V_address.V_to.V_ipaddr = V_ipaddr
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_pool.V_name = V_name
+	config.Groups.V_pool.V_address.V_name__1 = V_name__1
+	config.Groups.V_pool.V_address.V_to.V_ipaddr = V_ipaddr
 
     err = client.SendTransaction("", config, commit)
     check(err)
@@ -68,9 +75,9 @@ func junosSecurityNatSourcePoolAddressToIpaddrRead(d *schema.ResourceData, m int
 
 	err = client.MarshalGroup(id, config)
 	check(err)
- 	d.Set("name", config.V_pool.V_name)
-	d.Set("name__1", config.V_pool.V_address.V_name__1)
-	d.Set("ipaddr", config.V_pool.V_address.V_to.V_ipaddr)
+ 	d.Set("name", config.Groups.V_pool.V_name)
+	d.Set("name__1", config.Groups.V_pool.V_address.V_name__1)
+	d.Set("ipaddr", config.Groups.V_pool.V_address.V_to.V_ipaddr)
 
     err = client.Close()
     check(err)
@@ -88,12 +95,14 @@ func junosSecurityNatSourcePoolAddressToIpaddrUpdate(d *schema.ResourceData, m i
      	V_name := d.Get("name").(string)
 	V_name__1 := d.Get("name__1").(string)
 	V_ipaddr := d.Get("ipaddr").(string)
-	commit := true
+	commit := false
 
 	config := xmlSecurityNatSourcePoolAddressToIpaddr{}
-	config.V_pool.V_name = V_name
-	config.V_pool.V_address.V_name__1 = V_name__1
-	config.V_pool.V_address.V_to.V_ipaddr = V_ipaddr
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_pool.V_name = V_name
+	config.Groups.V_pool.V_address.V_name__1 = V_name__1
+	config.Groups.V_pool.V_address.V_to.V_ipaddr = V_ipaddr
 
     err = client.SendTransaction(id, config, commit)
     check(err)
@@ -138,17 +147,17 @@ func junosSecurityNatSourcePoolAddressToIpaddr() *schema.Resource {
 			"name": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_pool",
+				Description:    "xpath is: config.Groups.V_pool",
 			},
 			"name__1": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_pool.V_address",
+				Description:    "xpath is: config.Groups.V_pool.V_address",
 			},
 			"ipaddr": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_pool.V_address.V_to. IPv4 or IPv6 upper limit of address range",
+				Description:    "xpath is: config.Groups.V_pool.V_address.V_to. IPv4 or IPv6 upper limit of address range",
 			},
 		},
 	}

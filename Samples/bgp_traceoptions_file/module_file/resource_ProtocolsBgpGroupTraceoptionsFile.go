@@ -12,18 +12,23 @@ import (
 // with any keyword in golang. ex - interface is keyword in golang
 type xmlProtocolsBgpGroupTraceoptionsFile struct {
 	XMLName xml.Name `xml:"configuration"`
-	V_group  struct {
-		XMLName xml.Name `xml:"group"`
-		V_name  string  `xml:"name"`
-		V_file  struct {
-			XMLName xml.Name `xml:"file"`
-			V_filename  string  `xml:"filename"`
-			V_replace  string  `xml:"replace"`
-			V_size  string  `xml:"size"`
-			V_files  string  `xml:"files"`
-			V_no__stamp  string  `xml:"no-stamp"`
-		} `xml:"traceoptions>file"`
-	} `xml:"protocols>bgp>group"`
+	Groups  struct {
+		XMLName	xml.Name	`xml:"groups"`
+		Name	string	`xml:"name"`
+		V_group  struct {
+			XMLName xml.Name `xml:"group"`
+			V_name  string  `xml:"name"`
+			V_file  struct {
+				XMLName xml.Name `xml:"file"`
+				V_filename  string  `xml:"filename"`
+				V_replace  string  `xml:"replace"`
+				V_size  string  `xml:"size"`
+				V_files  string  `xml:"files"`
+				V_no__stamp  string  `xml:"no-stamp"`
+			} `xml:"traceoptions>file"`
+		} `xml:"protocols>bgp>group"`
+	} `xml:"groups"`
+	ApplyGroup string `xml:"apply-groups"`
 }
 
 // v_ is appended before every variable so it doesn't give any conflict
@@ -41,15 +46,17 @@ func junosProtocolsBgpGroupTraceoptionsFileCreate(d *schema.ResourceData, m inte
 	V_size := d.Get("size").(string)
 	V_files := d.Get("files").(string)
 	V_no__stamp := d.Get("no__stamp").(string)
-	commit := true
+	commit := false
 
 	config := xmlProtocolsBgpGroupTraceoptionsFile{}
-	config.V_group.V_name = V_name
-	config.V_group.V_file.V_filename = V_filename
-	config.V_group.V_file.V_replace = V_replace
-	config.V_group.V_file.V_size = V_size
-	config.V_group.V_file.V_files = V_files
-	config.V_group.V_file.V_no__stamp = V_no__stamp
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_group.V_name = V_name
+	config.Groups.V_group.V_file.V_filename = V_filename
+	config.Groups.V_group.V_file.V_replace = V_replace
+	config.Groups.V_group.V_file.V_size = V_size
+	config.Groups.V_group.V_file.V_files = V_files
+	config.Groups.V_group.V_file.V_no__stamp = V_no__stamp
 
     err = client.SendTransaction("", config, commit)
     check(err)
@@ -74,12 +81,12 @@ func junosProtocolsBgpGroupTraceoptionsFileRead(d *schema.ResourceData, m interf
 
 	err = client.MarshalGroup(id, config)
 	check(err)
- 	d.Set("name", config.V_group.V_name)
-	d.Set("filename", config.V_group.V_file.V_filename)
-	d.Set("replace", config.V_group.V_file.V_replace)
-	d.Set("size", config.V_group.V_file.V_size)
-	d.Set("files", config.V_group.V_file.V_files)
-	d.Set("no__stamp", config.V_group.V_file.V_no__stamp)
+ 	d.Set("name", config.Groups.V_group.V_name)
+	d.Set("filename", config.Groups.V_group.V_file.V_filename)
+	d.Set("replace", config.Groups.V_group.V_file.V_replace)
+	d.Set("size", config.Groups.V_group.V_file.V_size)
+	d.Set("files", config.Groups.V_group.V_file.V_files)
+	d.Set("no__stamp", config.Groups.V_group.V_file.V_no__stamp)
 
     err = client.Close()
     check(err)
@@ -100,15 +107,17 @@ func junosProtocolsBgpGroupTraceoptionsFileUpdate(d *schema.ResourceData, m inte
 	V_size := d.Get("size").(string)
 	V_files := d.Get("files").(string)
 	V_no__stamp := d.Get("no__stamp").(string)
-	commit := true
+	commit := false
 
 	config := xmlProtocolsBgpGroupTraceoptionsFile{}
-	config.V_group.V_name = V_name
-	config.V_group.V_file.V_filename = V_filename
-	config.V_group.V_file.V_replace = V_replace
-	config.V_group.V_file.V_size = V_size
-	config.V_group.V_file.V_files = V_files
-	config.V_group.V_file.V_no__stamp = V_no__stamp
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_group.V_name = V_name
+	config.Groups.V_group.V_file.V_filename = V_filename
+	config.Groups.V_group.V_file.V_replace = V_replace
+	config.Groups.V_group.V_file.V_size = V_size
+	config.Groups.V_group.V_file.V_files = V_files
+	config.Groups.V_group.V_file.V_no__stamp = V_no__stamp
 
     err = client.SendTransaction(id, config, commit)
     check(err)
@@ -153,32 +162,32 @@ func junosProtocolsBgpGroupTraceoptionsFile() *schema.Resource {
 			"name": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_group",
+				Description:    "xpath is: config.Groups.V_group",
 			},
 			"filename": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_group.V_file. Name of file in which to write trace information",
+				Description:    "xpath is: config.Groups.V_group.V_file. Name of file in which to write trace information",
 			},
 			"replace": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_group.V_file. Replace trace file rather than appending to it",
+				Description:    "xpath is: config.Groups.V_group.V_file. Replace trace file rather than appending to it",
 			},
 			"size": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_group.V_file. Maximum trace file size",
+				Description:    "xpath is: config.Groups.V_group.V_file. Maximum trace file size",
 			},
 			"files": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_group.V_file. Maximum number of trace files",
+				Description:    "xpath is: config.Groups.V_group.V_file. Maximum number of trace files",
 			},
 			"no__stamp": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_group.V_file. Do not timestamp trace file",
+				Description:    "xpath is: config.Groups.V_group.V_file. Do not timestamp trace file",
 			},
 		},
 	}

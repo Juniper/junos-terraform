@@ -35,5 +35,4 @@ The description of each variable provides their exact hierarchy which helps user
 In this example we have a list ``group`` in the hierarchy ``/protocols/bgp/group/traceoptions/file/filename``. 
 ``name`` is the variable assigned to its key element and it needs to be mentioned in the test.tf
 * The variable ``filename`` is assigned to leaf-element ``filename`` and needs to be mentioned in the test.tf .
-* The variable resource_name helps to identify if it is a group based configuration and is required. 
-In this example in xpath_sample.xml we have mentioned ``group-flag`` as false so it will not be set in the database.  
+* The variable resource_name helps to identify if it is a group based configuration and is required.   

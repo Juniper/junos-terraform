@@ -12,15 +12,20 @@ import (
 // with any keyword in golang. ex - interface is keyword in golang
 type xmlSecurityAddress__BookAddressIp__Prefix struct {
 	XMLName xml.Name `xml:"configuration"`
-	V_address__book  struct {
-		XMLName xml.Name `xml:"address-book"`
-		V_name  string  `xml:"name"`
-		V_address  struct {
-			XMLName xml.Name `xml:"address"`
-			V_name__1  string  `xml:"name"`
-			V_ip__prefix  string  `xml:"ip-prefix"`
-		} `xml:"address"`
-	} `xml:"security>address-book"`
+	Groups  struct {
+		XMLName	xml.Name	`xml:"groups"`
+		Name	string	`xml:"name"`
+		V_address__book  struct {
+			XMLName xml.Name `xml:"address-book"`
+			V_name  string  `xml:"name"`
+			V_address  struct {
+				XMLName xml.Name `xml:"address"`
+				V_name__1  string  `xml:"name"`
+				V_ip__prefix  string  `xml:"ip-prefix"`
+			} `xml:"address"`
+		} `xml:"security>address-book"`
+	} `xml:"groups"`
+	ApplyGroup string `xml:"apply-groups"`
 }
 
 // v_ is appended before every variable so it doesn't give any conflict
@@ -35,12 +40,14 @@ func junosSecurityAddress__BookAddressIp__PrefixCreate(d *schema.ResourceData, m
      	V_name := d.Get("name").(string)
 	V_name__1 := d.Get("name__1").(string)
 	V_ip__prefix := d.Get("ip__prefix").(string)
-	commit := true
+	commit := false
 
 	config := xmlSecurityAddress__BookAddressIp__Prefix{}
-	config.V_address__book.V_name = V_name
-	config.V_address__book.V_address.V_name__1 = V_name__1
-	config.V_address__book.V_address.V_ip__prefix = V_ip__prefix
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_address__book.V_name = V_name
+	config.Groups.V_address__book.V_address.V_name__1 = V_name__1
+	config.Groups.V_address__book.V_address.V_ip__prefix = V_ip__prefix
 
     err = client.SendTransaction("", config, commit)
     check(err)
@@ -65,9 +72,9 @@ func junosSecurityAddress__BookAddressIp__PrefixRead(d *schema.ResourceData, m i
 
 	err = client.MarshalGroup(id, config)
 	check(err)
- 	d.Set("name", config.V_address__book.V_name)
-	d.Set("name__1", config.V_address__book.V_address.V_name__1)
-	d.Set("ip__prefix", config.V_address__book.V_address.V_ip__prefix)
+ 	d.Set("name", config.Groups.V_address__book.V_name)
+	d.Set("name__1", config.Groups.V_address__book.V_address.V_name__1)
+	d.Set("ip__prefix", config.Groups.V_address__book.V_address.V_ip__prefix)
 
     err = client.Close()
     check(err)
@@ -85,12 +92,14 @@ func junosSecurityAddress__BookAddressIp__PrefixUpdate(d *schema.ResourceData, m
      	V_name := d.Get("name").(string)
 	V_name__1 := d.Get("name__1").(string)
 	V_ip__prefix := d.Get("ip__prefix").(string)
-	commit := true
+	commit := false
 
 	config := xmlSecurityAddress__BookAddressIp__Prefix{}
-	config.V_address__book.V_name = V_name
-	config.V_address__book.V_address.V_name__1 = V_name__1
-	config.V_address__book.V_address.V_ip__prefix = V_ip__prefix
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_address__book.V_name = V_name
+	config.Groups.V_address__book.V_address.V_name__1 = V_name__1
+	config.Groups.V_address__book.V_address.V_ip__prefix = V_ip__prefix
 
     err = client.SendTransaction(id, config, commit)
     check(err)
@@ -135,17 +144,17 @@ func junosSecurityAddress__BookAddressIp__Prefix() *schema.Resource {
 			"name": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_address__book",
+				Description:    "xpath is: config.Groups.V_address__book",
 			},
 			"name__1": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_address__book.V_address",
+				Description:    "xpath is: config.Groups.V_address__book.V_address",
 			},
 			"ip__prefix": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_address__book.V_address. Numeric IPv4 or IPv6 address with prefix",
+				Description:    "xpath is: config.Groups.V_address__book.V_address. Numeric IPv4 or IPv6 address with prefix",
 			},
 		},
 	}

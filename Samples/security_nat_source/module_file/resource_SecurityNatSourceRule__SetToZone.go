@@ -12,14 +12,19 @@ import (
 // with any keyword in golang. ex - interface is keyword in golang
 type xmlSecurityNatSourceRule__SetToZone struct {
 	XMLName xml.Name `xml:"configuration"`
-	V_rule__set  struct {
-		XMLName xml.Name `xml:"rule-set"`
-		V_name  string  `xml:"name"`
-		V_to  struct {
-			XMLName xml.Name `xml:"to"`
-			V_zone  string  `xml:"zone"`
-		} `xml:"to"`
-	} `xml:"security>nat>source>rule-set"`
+	Groups  struct {
+		XMLName	xml.Name	`xml:"groups"`
+		Name	string	`xml:"name"`
+		V_rule__set  struct {
+			XMLName xml.Name `xml:"rule-set"`
+			V_name  string  `xml:"name"`
+			V_to  struct {
+				XMLName xml.Name `xml:"to"`
+				V_zone  string  `xml:"zone"`
+			} `xml:"to"`
+		} `xml:"security>nat>source>rule-set"`
+	} `xml:"groups"`
+	ApplyGroup string `xml:"apply-groups"`
 }
 
 // v_ is appended before every variable so it doesn't give any conflict
@@ -33,11 +38,13 @@ func junosSecurityNatSourceRule__SetToZoneCreate(d *schema.ResourceData, m inter
     id := d.Get("resource_name").(string)
      	V_name := d.Get("name").(string)
 	V_zone := d.Get("zone").(string)
-	commit := true
+	commit := false
 
 	config := xmlSecurityNatSourceRule__SetToZone{}
-	config.V_rule__set.V_name = V_name
-	config.V_rule__set.V_to.V_zone = V_zone
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_rule__set.V_name = V_name
+	config.Groups.V_rule__set.V_to.V_zone = V_zone
 
     err = client.SendTransaction("", config, commit)
     check(err)
@@ -62,8 +69,8 @@ func junosSecurityNatSourceRule__SetToZoneRead(d *schema.ResourceData, m interfa
 
 	err = client.MarshalGroup(id, config)
 	check(err)
- 	d.Set("name", config.V_rule__set.V_name)
-	d.Set("zone", config.V_rule__set.V_to.V_zone)
+ 	d.Set("name", config.Groups.V_rule__set.V_name)
+	d.Set("zone", config.Groups.V_rule__set.V_to.V_zone)
 
     err = client.Close()
     check(err)
@@ -80,11 +87,13 @@ func junosSecurityNatSourceRule__SetToZoneUpdate(d *schema.ResourceData, m inter
     id := d.Get("resource_name").(string)
      	V_name := d.Get("name").(string)
 	V_zone := d.Get("zone").(string)
-	commit := true
+	commit := false
 
 	config := xmlSecurityNatSourceRule__SetToZone{}
-	config.V_rule__set.V_name = V_name
-	config.V_rule__set.V_to.V_zone = V_zone
+	config.ApplyGroup = id
+	config.Groups.Name = id
+	config.Groups.V_rule__set.V_name = V_name
+	config.Groups.V_rule__set.V_to.V_zone = V_zone
 
     err = client.SendTransaction(id, config, commit)
     check(err)
@@ -129,12 +138,12 @@ func junosSecurityNatSourceRule__SetToZone() *schema.Resource {
 			"name": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_rule__set",
+				Description:    "xpath is: config.Groups.V_rule__set",
 			},
 			"zone": &schema.Schema{
 				Type:    schema.TypeString,
 				Optional: true,
-				Description:    "xpath is: config.V_rule__set.V_to. Destination zone list",
+				Description:    "xpath is: config.Groups.V_rule__set.V_to. Destination zone list",
 			},
 		},
 	}
