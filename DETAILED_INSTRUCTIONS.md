@@ -26,6 +26,8 @@ Other versions beyond these will work, but this is what was tested for the writi
 
 A virtual environment does nothing more than provide a separate Python environment, that's safe to install whatever you need, without affecting the global Python install on a given system. 
 
+*For this step, ensure that you're in the `processYang` directory of JTAF.*
+
 ```bash
 python -m venv ./venv
 source venv/bin/activate
@@ -52,7 +54,7 @@ git clone https://github.com/Juniper/yang.git
 
 *Note - this may take some time*
 
-Next, to match one of Rahul's examples, let's copy a YANG models into working directory from the Juniper hoard of models.
+Next, to match one of Rahul's examples, let's copy a YANG model into working directory from the Juniper hoard of models.
 
 *I've repeated the directory change in the bash steps below (just in case!)*
 
@@ -61,7 +63,7 @@ cd /var/tmp
 mkdir jtafwd && cd jtafwd
 mkdir terraform_providers
 cd ../
-mv yang/20.3/20.3R1/junos-qfx/conf/junos-qfx-conf-protocols@2019-01-01.yang ./jtafwd
+mv yang/19.4/19.4R1/junos-qfx/conf/junos-qfx-conf-protocols@2019-01-01.yang ./jtafwd
 ```
 
 If you wanted to remove the YANG directory, you can do it like this:
@@ -77,7 +79,7 @@ rm -rf yang
 
 Create a config file somewhere memorable. I'll use `/var/tmp/jtafwd/config.toml` because why not.
 
-Using your favourite text editor, create a file here: `/var/tmp/jtafwd/config.toml` and put the content below into the file:
+Using your favourite text editor, create a file here: `/var/tmp/jtafwd/config.toml` and put the content below into the file. Don't worry about the xPath or fileType keys. They'll be explained shortly.
 
 ```bash
 yangDir = "/var/tmp/jtafwd"
@@ -96,16 +98,16 @@ The next step, depending on the size of YANG model/s, may take some time. Prepar
 cd cmd/processYang
 go build
 ./processYang -config /var/tmp/jtafwd/config.toml
-# OUTPUT
+# OUTPUT - WARNING >> This can take some time. Lack of activity does not mean broken!
 Yin file for junos-qfx-conf-protocols@2019-01-01 is generated
 Creating Xpath file: junos-qfx-conf-protocols@2019-01-01_xpath.txt
 Creating Xpath file: junos-qfx-conf-protocols@2019-01-01_xpath.xml
 ```
 
 ### 7.	Create an XML XPath File
-This file acts as an input to JTAF. This input identifies the content of the provider that JTAF will create. Some `xpath_sample.xml` files are scattered are in the `Samples` directory. 
+This file acts as an input to JTAF. This input identifies the content of the provider that JTAF will create. Some `xpath_test.xml` files are scattered are in the `Samples` directory. 
 
-Create a file `/var/tmp/jtafwd/xpath_sample.xml` and populate it with the content below.
+Create a file `/var/tmp/jtafwd/xpath_test.xml` and populate it with the content below.
 
 ```bash
 <!-- This is a sample example. Modify it to your requirements -->
@@ -142,6 +144,8 @@ cp /var/tmp/jtafwd/terraform_providers/*.go ./
 The last step is to actually build the provider!
 
 ```bash
+go mod init terraform-provider-junos-device
+go mod tidy
 go build -o terraform-provider-junos-device
 ```
 
