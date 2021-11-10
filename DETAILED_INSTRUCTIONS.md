@@ -45,7 +45,7 @@ pyang -v
 On the system under test, the version installed by `pip` in to the `venv` was: `2.5.0`.
 
 ### 4.	Copy the YANG Files 
-Let's put the YANG files in to a memorable location. Let's use `/var/tmp/yang`.
+Let's put the YANG files from [Juniper's YANG GitHub repository](https://github.com/Juniper/yang.git) in to a memorable location. Let's use `/var/tmp/yang`.
 
 ```bash
 cd /var/tmp/
@@ -54,7 +54,7 @@ git clone https://github.com/Juniper/yang.git
 
 *Note - this may take some time*
 
-Next, to match one of Rahul's examples, let's copy a YANG model into working directory from the Juniper hoard of models.
+Next, to match one of the existing examples, let's copy a YANG model into working directory..
 
 *I've repeated the directory change in the bash steps below (just in case!)*
 
