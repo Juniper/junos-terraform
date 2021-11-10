@@ -2,9 +2,9 @@
 
 JTAF is a framework, meaning, it's an opinionated set of tools and steps that allow you to go from YANG models to a Junos Terraform provider. With all frameworks, there are some dependencies.
 
-The tool you'll need to use JTAF is a bash shell and all of this example how-to below is using a shell. If you're on OSX or a Linux user, you're set for success out of the box. On Windows you can use WSL to install a Linux flavour like Ubuntu.
+The tool you'll need to use JTAF is a bash shell. If you're on OSX or a Linux user, you're set for success out of the box. On Windows you can use WSL to install a Linux flavour like Ubuntu and use its bash shell.
 
-In this document, if you see `$JTAF_PROJECT` you can replace it with the path of the JTAF project on your system or create an environment variable. An example of this on my test system is:
+In this document, if you see `$JTAF_PROJECT` you can replace it with the path of the JTAF project on your system or create an environment variable. On the author's sytem, this happens to be below:
 
 ```bash
 export JTAF_PROJECT=/Users/dgee/Documents/GoDev/src/github.com/Juniper/junos-terraform
@@ -54,7 +54,7 @@ git clone https://github.com/Juniper/yang.git
 
 *Note - this may take some time*
 
-Next, to match one of the existing examples, let's copy a YANG model into working directory..
+Next, to match one of the existing samples, let's copy a specific YANG model into working directory.
 
 *I've repeated the directory change in the bash steps below (just in case!)*
 
@@ -110,7 +110,6 @@ This file acts as an input to JTAF. This input identifies the content of the pro
 Create a file `/var/tmp/jtafwd/xpath_test.xml` and populate it with the content below.
 
 ```bash
-<!-- This is a sample example. Modify it to your requirements -->
 <file-list>
     <xpath name="/protocols/bgp/group/traceoptions/file/filename">
     </xpath>
@@ -149,7 +148,7 @@ go mod tidy
 go build -o terraform-provider-junos-device
 ```
 
-This provider without any Go cross-compilation directives, will work on the system it's been generated with. In this example, I'm on an x64 OSX machine. In simple terms, this provider for Junos, will work on my Mac book pro just fine, but don't expect that you can copy it to a Linux machine. 
+This provider without any Go cross-compilation directives, will work on the system it's been generated with. If you happen to be on an OSX machine, then the provider will work for Terraform on OSX and the same is true for Linux, if you use JTAF on Linux, then natively the generated provider will operate on Linux. However, you can cross-compile the provider so that it will operate on another operating system and even CPU architecture.
 
 ```bash
 $ file terraform-provider-junos-device
