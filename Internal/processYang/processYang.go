@@ -169,6 +169,7 @@ func generateYinFile(filePath string) {
 		// pyang doesn't provide any output for creating Yin files
 		_, err := exec.Command("pyang", "-f", "yin", file+".yang", "-o", file+".yin", "-p", filePath).Output()
 		if err != nil {
+			fmt.Println("error processing file: ", file)
 			panic("pyang error: " + err.Error())
 		}
 
