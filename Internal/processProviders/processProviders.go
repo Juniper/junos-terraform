@@ -26,10 +26,19 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 	s "strings"
+	"unicode/utf8"
 
 	"github.com/Juniper/junos-terraform/Internal/cfg"
 )
+
+// PrintHeader accepts a message of any length (ideally no more than 80 chars) and pretty prints it in a box
+func PrintHeader(message string) {
+	header := strings.Repeat("-", utf8.RuneCountInString(message)) + "----" + "\n"
+	footer := strings.Repeat("-", utf8.RuneCountInString(message)) + "----" + "\n"
+	fmt.Print(header, "- "+message+" -\n", footer)
+}
 
 // Node is a helper type for traversing the data tree.
 type Node struct {
@@ -109,6 +118,12 @@ var providerFileData string
 // String variable for tabs in schema.
 var strSchemaTab string
 
+// Issue Counter
+var issueCounter int
+
+// XPath Counter
+var xpathCounter int
+
 // Syntactic helper to reduce repetition.
 func check(e error) {
 	if e != nil {
@@ -118,6 +133,8 @@ func check(e error) {
 
 // CreateProviders consumes a YANG file, Xpath file and module name to create a provider
 func CreateProviders(jcfg cfg.Config) error {
+
+	PrintHeader("Autogenerating Terraform Provider code from _xpath files")
 
 	yangFilePath := jcfg.YangDir
 	xpathFilePath := jcfg.XpathPath
@@ -212,10 +229,16 @@ func CreateProviders(jcfg cfg.Config) error {
 	var fileName string = "provider.go"
 	fileName = moduleFilePath + "/" + fileName
 	fPtr, err := os.Create(fileName)
+	defer fPtr.Close()
 	check(err)
 
 	// Write to the file
 	_, err = fPtr.WriteString(providerFileData)
+
+	// List summary data
+	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Println("Number of Xpaths processed: ", xpathCounter)
+	fmt.Println("Number of potential issues: ", issueCounter)
 
 	// No errors, so return nil.
 	return nil
@@ -451,8 +474,9 @@ func matchXpath(nodes Node) {
 				// End of looping of nodes.
 			}
 			if matchFound == false {
+				issueCounter += 1
 				fmt.Printf("Xpath not found in file, check it. : %s \n", strXpath)
-				// os.Exit(0)
+
 				return
 			}
 
@@ -844,6 +868,7 @@ func createFile(moduleFilePath string) {
 	fileName = s.Join([]string{fileName, "go"}, ".")
 	fileName = moduleFilePath + "/" + fileName
 	fPtr, err := os.Create(fileName)
+	defer fPtr.Close()
 	check(err)
 
 	// Append at the end of the schema which is at bottom of created file.
@@ -871,6 +896,7 @@ func createFile(moduleFilePath string) {
 	_, err = fPtr.WriteString(strDelete)
 	_, err = fPtr.WriteString(strSchema)
 	fmt.Printf("Terraform API resource_%s created \n", strModuleName)
+	xpathCounter += 1
 }
 
 // copy file from source location to destination
