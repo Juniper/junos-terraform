@@ -25,7 +25,6 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
-	s "strings"
 	"unicode/utf8"
 
 	"github.com/Juniper/junos-terraform/Internal/cfg"
@@ -139,12 +138,12 @@ func listFiles(filePath string) error {
 	// fmt.Println(string(out))
 
 	output := string(out[:])
-	lines := s.Split(output, "\n")
+	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		// TODO: Consider using regexp.Compile() for this.
 		matched, _ := regexp.Match(`.yang`, []byte(line))
 		if matched {
-			temp := s.Split(line, ".yang")
+			temp := strings.Split(line, ".yang")
 			yangFileList = append(yangFileList, temp[0])
 		}
 	}
@@ -336,7 +335,7 @@ func handleChoices(nodeChoice Node, strXpath string, strTab string) {
 func createFile(file string, fileType string) error {
 
 	if fileType == "text" || fileType == "both" {
-		var fileName string = s.Join([]string{file, "txt"}, ".")
+		var fileName string = strings.Join([]string{file, "txt"}, ".")
 		fPtr, err := os.Create(fileName)
 		if err != nil {
 			return err
@@ -351,7 +350,7 @@ func createFile(file string, fileType string) error {
 		fmt.Printf("Creating Xpath file: %s\n", fileName)
 	}
 	if fileType == "xml" || fileType == "both" {
-		var fileNameXML string = s.Join([]string{file, "xml"}, ".")
+		var fileNameXML string = strings.Join([]string{file, "xml"}, ".")
 		fPtr, err := os.Create(fileNameXML)
 		if err != nil {
 			return err
