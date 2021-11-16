@@ -24,10 +24,18 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-	s "strings"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/Juniper/junos-terraform/Internal/cfg"
 )
+
+// PrintHeader accepts a message of any length (ideally no more than 80 chars) and pretty prints it in a box
+func PrintHeader(message string) {
+	header := strings.Repeat("-", utf8.RuneCountInString(message)) + "----" + "\n"
+	footer := strings.Repeat("-", utf8.RuneCountInString(message)) + "----" + "\n"
+	fmt.Print(header, "- "+message+" -\n", footer)
+}
 
 // Node is a helper type for traversing the data tree.
 type Node struct {
@@ -72,7 +80,9 @@ func CreateYinFileAndXpath(jcfg cfg.Config) error {
 	}
 
 	// Generate yin file for all yang files.
-	generateYinFile()
+	generateYinFile(filePath)
+
+	PrintHeader("Creating _xpath files from the Yin files")
 
 	for _, inputYinFile := range yangFileList {
 
@@ -83,6 +93,7 @@ func CreateYinFileAndXpath(jcfg cfg.Config) error {
 		// Read data from file.
 		dat, err := ioutil.ReadFile(inputYinFile + ".yin")
 		if err != nil {
+			fmt.Println("DEBUG: Error reading .yin file")
 			return err
 		}
 
@@ -94,6 +105,7 @@ func CreateYinFileAndXpath(jcfg cfg.Config) error {
 		var n Node
 		err = dec.Decode(&n)
 		if err != nil {
+			fmt.Println("DEBUG: Error decododing XML")
 			return err
 		}
 
@@ -126,12 +138,12 @@ func listFiles(filePath string) error {
 	// fmt.Println(string(out))
 
 	output := string(out[:])
-	lines := s.Split(output, "\n")
+	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		// TODO: Consider using regexp.Compile() for this.
 		matched, _ := regexp.Match(`.yang`, []byte(line))
 		if matched {
-			temp := s.Split(line, ".yang")
+			temp := strings.Split(line, ".yang")
 			yangFileList = append(yangFileList, temp[0])
 		}
 	}
@@ -140,7 +152,7 @@ func listFiles(filePath string) error {
 }
 
 // Generate yin file for all yang files.
-func generateYinFile() {
+func generateYinFile(filePath string) {
 
 	if !isCommandAvailable("pyang") {
 		panic("pyang is not installed")
@@ -149,10 +161,18 @@ func generateYinFile() {
 	// Retained for debugging purposes.
 	// fmt.Println(yangFileList)
 
+	PrintHeader("Creating Yin files from Yang file directory: " + filePath)
+
 	for _, file := range yangFileList {
-		out, _ := exec.Command("pyang", "-f", "yin", file+".yang", "-o", file+".yin").Output()
-		output := string(out[:])
-		fmt.Printf("Yin file for %s is generated %s\n", file, output)
+		// The search path is required for included models
+		// pyang doesn't provide any output for creating Yin files
+		_, err := exec.Command("pyang", "-f", "yin", file+".yang", "-o", file+".yin", "-p", filePath).Output()
+		if err != nil {
+			fmt.Println("error processing file: ", file)
+			panic("pyang error: " + err.Error())
+		}
+
+		fmt.Printf("Yin file for %s is generated\n", file)
 	}
 }
 
@@ -282,40 +302,40 @@ func handleGrouping(nodes Node, strXpath string, strTab string) {
 // For choice defined in yang file, it needs to be resolved to corresponding elements
 func handleChoices(nodeChoice Node, strXpath string, strTab string) {
 
-    for _, nodeCase := range nodeChoice.Nodes {
-	    if nodeCase.XMLName.Local == "case" {
-            for _, n2 := range nodeCase.Nodes {
-                if n2.XMLName.Local == "uses" {
-                    handleGrouping(n2, strXpath, strTab)
-                }
-                if n2.XMLName.Local == "container" {
-                    handleContainer(n2, strXpath, strTab)
-                }
-                if n2.XMLName.Local == "leaf" {
-                    handleContainer(n2, strXpath, strTab)
-                }
-                // if leaf-list append it in the path.
-                if n2.XMLName.Local == "leaf-list" {
-                    handleContainer(n2, strXpath, strTab)
-                }
-                // if list append it in the path.
-                if n2.XMLName.Local == "list" {
-                    handleContainer(n2, strXpath, strTab)
-                }
-                //if choice handle cases
-                if n2.XMLName.Local == "choice" {
-                    handleChoices(n2, strXpath, strTab)
-                }
-            }
-        }
-    }
+	for _, nodeCase := range nodeChoice.Nodes {
+		if nodeCase.XMLName.Local == "case" {
+			for _, n2 := range nodeCase.Nodes {
+				if n2.XMLName.Local == "uses" {
+					handleGrouping(n2, strXpath, strTab)
+				}
+				if n2.XMLName.Local == "container" {
+					handleContainer(n2, strXpath, strTab)
+				}
+				if n2.XMLName.Local == "leaf" {
+					handleContainer(n2, strXpath, strTab)
+				}
+				// if leaf-list append it in the path.
+				if n2.XMLName.Local == "leaf-list" {
+					handleContainer(n2, strXpath, strTab)
+				}
+				// if list append it in the path.
+				if n2.XMLName.Local == "list" {
+					handleContainer(n2, strXpath, strTab)
+				}
+				//if choice handle cases
+				if n2.XMLName.Local == "choice" {
+					handleChoices(n2, strXpath, strTab)
+				}
+			}
+		}
+	}
 }
 
 // Create file with the top container / module name.
 func createFile(file string, fileType string) error {
 
 	if fileType == "text" || fileType == "both" {
-		var fileName string = s.Join([]string{file, "txt"}, ".")
+		var fileName string = strings.Join([]string{file, "txt"}, ".")
 		fPtr, err := os.Create(fileName)
 		if err != nil {
 			return err
@@ -330,7 +350,7 @@ func createFile(file string, fileType string) error {
 		fmt.Printf("Creating Xpath file: %s\n", fileName)
 	}
 	if fileType == "xml" || fileType == "both" {
-		var fileNameXML string = s.Join([]string{file, "xml"}, ".")
+		var fileNameXML string = strings.Join([]string{file, "xml"}, ".")
 		fPtr, err := os.Create(fileNameXML)
 		if err != nil {
 			return err
