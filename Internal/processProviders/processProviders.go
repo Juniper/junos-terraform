@@ -43,10 +43,11 @@ func PrintHeader(message string) {
 // Node is a helper type for traversing the data tree.
 type Node struct {
 	XMLName xml.Name
-	Key     string `xml:"name,attr"`
-	Val     string `xml:"value,attr"`
-	Content []byte `xml:",innerxml"`
-	Nodes   []Node `xml:",any"`
+	Key     string            `xml:"name,attr"`
+	Val     string            `xml:"value,attr"`
+	Enums   map[string]string `xml:"-"`
+	Content []byte            `xml:",innerxml"`
+	Nodes   []Node            `xml:",any"`
 }
 
 // ElementName is a helper type for traversing the data tree.
@@ -63,6 +64,11 @@ var isXpathFound bool = false
 
 // Create variable to store groups in the yin file.
 var grpNode []Node
+
+// Enums contains the enumerated choices from the YANG files under a given 'uses' grouping
+// The first map key is the group name and the second map key is the enum name
+// It's possible to store data under the enum according to the YANG spec, so a string var is required
+var enums map[string]map[string]string
 
 var elementNameList []ElementName
 
@@ -206,6 +212,37 @@ func CreateProviders(jcfg cfg.Config) error {
 			// Process all the groups in yin file and store them
 			create_group_nodes([]Node{n})
 
+			// Process all of the 'uses enums' as choice-ident and choice-value
+			for _, v := range grpNode {
+
+				// fmt.Println("In file: ", inputYinFile)
+				if v.Key == "control_route_filter_type" {
+					// fmt.Println("looking for choice-ident")
+					for _, v2 := range v.Nodes {
+						if v2.Key == "choice-ident" {
+							// fmt.Println("Found choice-ident...")
+							for _, v3 := range v2.Nodes {
+								// fmt.Println("looking for enumeration...")
+								if v3.Key == "enumeration" {
+									// fmt.Println("Found enumeration for choice-ident...")
+									// fmt.Println("Length of enums: ", len(v3.Nodes))
+									for _, v4 := range v3.Nodes {
+										// fmt.Println(v4.Key)
+
+										if enums[v.Key] == nil {
+											enums[v.Key] = make(map[string]string)
+										}
+										enums[v.Key][v4.Key] = v4.Key
+
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			// End of 'uses' enum processing for lists.
+
 			isXpathFound = false
 
 			// Start processing of the file data
@@ -249,6 +286,8 @@ func initialize_global_variables() {
 
 	grpNode = []Node{}
 
+	enums = make(map[string]map[string]string)
+
 	elementNameList = []ElementName{}
 
 	strModuleName = ""
@@ -290,12 +329,12 @@ import (
     `
 
 	strSendTrans = `
-    err = client.SendTransaction("", config, commit)
+    err = client.SendTransaction("", config, false)
     check(err)
     `
 
 	strSendTransId = `
-    err = client.SendTransaction(id, config, commit)
+    err = client.SendTransaction(id, config, false)
     check(err)
     `
 
@@ -458,7 +497,19 @@ func matchXpath(nodes Node) {
 								// this is done to avoid duplication of key element when passed in xpath as end-element
 								structXpath_last_elem = strParts[itr+1]
 							}
-							strStructHierarchy, structXpath, schemaTab = setListXpathMatch(nodeCheck, schemaTab, structXpath, strStructHierarchy, structXpath_last_elem)
+
+							uses := ""
+
+							for _, tmp := range nodeCheck.Nodes {
+								if tmp.XMLName.Local == "uses" {
+									if tmp.Key != "apply-advanced" {
+										// fmt.Println("DEBUG: Found: uses-> ", tmp.Key)
+										uses = tmp.Key
+									}
+								}
+							}
+
+							strStructHierarchy, structXpath, schemaTab = setListXpathMatch(uses, nodeCheck, schemaTab, structXpath, strStructHierarchy, structXpath_last_elem)
 						}
 
 						// For 2nd last element store the node.
@@ -607,13 +658,16 @@ func matchChoiceXpath(nodeChoice Node, xpathElem string) (Node, bool) {
 }
 
 // Handle xpath matching for list. Need to add key also in case of list during xpath matching
-func setListXpathMatch(nodeCheck Node, schemaTab string, structXpath string, strStructHierarchy string, structXpath_last_elem string) (string, string, string) {
+func setListXpathMatch(uses string, nodeCheck Node, schemaTab string, structXpath string, strStructHierarchy string, structXpath_last_elem string) (string, string, string) {
 	var keyValue string
+
 	for _, n1 := range nodeCheck.Nodes {
+
 		if n1.XMLName.Local == "key" {
 			keyValue = n1.Val
 			break
 		}
+
 	}
 
 	// Assign values for list and its key values.
@@ -630,9 +684,35 @@ func setListXpathMatch(nodeCheck Node, schemaTab string, structXpath string, str
 	schemaTab += "\t"
 
 	elements := s.Split(keyValue, " ")
+
 	for _, keyVar := range elements {
 
-		// this is done to avoid duplication of key element when passed in xpath as end-element
+		// required to remove choice-ident and choice-value from 'uses' within a YANG list construct
+		if keyVar != "choice-ident" && keyVar != "choice-value" {
+			// this is done to avoid duplication of key element when passed in xpath as end-element
+			if structXpath_last_elem != keyVar {
+				val_ = s.ReplaceAll(keyVar, "-", "__")
+				val_ = s.ReplaceAll(val_, ".", "__")
+				// Duplicate name check for key.
+				id = check_element_name(keyVar)
+				if id != 0 {
+					val_ += "__" + strconv.Itoa(int(id)) //string(id)
+				}
+
+				strSchema += "\n\t\t\t\"" + val_ + "\": &schema.Schema{\n\t\t\t\tType:    schema.TypeString,"
+				strSchema += "\n\t\t\t\tOptional: true,"
+				strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + "\",\n\t\t\t},"
+
+				strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + keyVar + "\"`"
+				strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
+				strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
+				strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
+			}
+		}
+	}
+
+	// TODO: Add the enums for the 'uses' to the element slice
+	for keyVar, _ := range enums[uses] {
 		if structXpath_last_elem != keyVar {
 			val_ = s.ReplaceAll(keyVar, "-", "__")
 			val_ = s.ReplaceAll(val_, ".", "__")
@@ -645,11 +725,20 @@ func setListXpathMatch(nodeCheck Node, schemaTab string, structXpath string, str
 			strSchema += "\n\t\t\t\"" + val_ + "\": &schema.Schema{\n\t\t\t\tType:    schema.TypeString,"
 			strSchema += "\n\t\t\t\tOptional: true,"
 			strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + "\",\n\t\t\t},"
-			strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + keyVar + "\"`"
-			strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
-			strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
-			strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
 
+			strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + keyVar + ",omitempty\"`"
+			strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
+
+			// TODO: strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
+			strSetFunc += "\tif " + strStructHierarchy + ".V_" + val_ + " == \"\" { \n\t\ttmpGet := d.Get(\"" + val_ + "\").(string)\n\t\tif tmpGet == \" \" { d.Set(\"" + val_ + "\", \" \") } else { d.Set(\"" + val_ + "\"," + strStructHierarchy + ".V_" + val_ + ")}}\n"
+			/*
+				if config.Groups.V_policy__statement.V_term.V_route__filter.V_longer == "" {
+					tmpGet = d.Get("longer").(string)
+					if tmpGet == " " { d.Set("longer", " ")}
+				} else { d.Set("longer",config.Groups.V_policy__statement.V_term.V_route__filter.V_longer) }
+			*/
+
+			strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
 		}
 	}
 
@@ -753,6 +842,7 @@ func handleContainer(nodes Node, strStructHierarchy string, schemaTab string) {
 
 // handle the structure creation for the 'leaf'/'leaf-list' defined in yang files
 func handleLeaf(nodes Node, strStructHierarchy string, schemaTab string) {
+
 	var desc string
 	// Extract description for the node.
 	for _, n := range nodes.Nodes {
@@ -877,10 +967,10 @@ func createFile(moduleFilePath string) {
 	// Append at end of structure which is near the top of the created file.
 	strStruct += "\n}"
 	// Append for the create function.
-	strCreate += strGetFunc + "\tcommit := false\n" + strVarAssign + strSendTrans + strSetIdValue +
+	strCreate += strGetFunc + "\n" + strVarAssign + strSendTrans + strSetIdValue +
 		"\n\treturn junos" + strModuleName + "Read(d,m)" + "\n}"
 	// Append for the update function.
-	strUpdate += strGetFunc + "\tcommit := false\n" + strVarAssign + strSendTransId +
+	strUpdate += strGetFunc + "\n" + strVarAssign + strSendTransId +
 		"\n\treturn junos" + strModuleName + "Read(d,m)" + "\n}"
 	// Append for the read function.
 	strRead += strSetFunc + "\n\treturn nil\n}"
@@ -949,6 +1039,7 @@ import (
 
 	gonetconf "github.com/davedotdev/go-netconf/helpers/junos_helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"os"
 )
 
 // ProviderConfig is to hold client information
@@ -957,10 +1048,14 @@ type ProviderConfig struct {
 	Host string
 }
 
-func check(e error) {
-    if e != nil {
-        panic(e)
-    }
+func check(err error) {
+	if err != nil {
+		// Some of these errors will be "normal".
+		f, _ := os.OpenFile("jtaf_logging.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f.WriteString(err.Error() + "\n")
+		f.Close()
+		return
+	}
 }
 
 

@@ -25,7 +25,7 @@ import (
 	"github.com/Juniper/junos-terraform/Internal/processProviders"
 )
 
-const _ver = "0.1.0"
+const _ver = "0.1.1"
 
 // Syntactic helper to reduce repetition.
 func check(e error) {

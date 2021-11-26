@@ -166,9 +166,10 @@ func generateYinFile(filePath string) {
 	for _, file := range yangFileList {
 		// The search path is required for included models
 		// pyang doesn't provide any output for creating Yin files
-		_, err := exec.Command("pyang", "-f", "yin", file+".yang", "-o", file+".yin", "-p", filePath).Output()
+		output, err := exec.Command("pyang", "-f", "yin", file+".yang", "-o", file+".yin", "-p", filePath).Output()
 		if err != nil {
 			fmt.Println("error processing file: ", file)
+			fmt.Println("output from pyang: ", string(output))
 			panic("pyang error: " + err.Error())
 		}
 
