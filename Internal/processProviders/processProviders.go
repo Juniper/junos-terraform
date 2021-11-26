@@ -251,16 +251,17 @@ func CreateProviders(jcfg cfg.Config) error {
 
 			if isXpathFound == true {
 				// After all the data processing is done, create the file.
-				createFile(moduleFilePath)
+				createFile(moduleFilePath, jcfg.ProviderName)
 			}
 		}
 	}
 
-	providerFileData += `			"junos-device_commit": junosCommit(),
-		},
-		ConfigureFunc: providerConfigure,
-	}
-}
+	providerFileData += `			"junos-` + jcfg.ProviderName + `_commit": junosCommit(),
+	        	"junos-` + jcfg.ProviderName + `_destroycommit": junosDestroyCommit(),
+			},
+		    ConfigureFunc: providerConfigure,
+	    } 
+    }
 `
 	// Create provider.go file
 	var fileName string = "provider.go"
@@ -276,6 +277,53 @@ func CreateProviders(jcfg cfg.Config) error {
 	fmt.Println("--------------------------------------------------------------------------------")
 	fmt.Println("Number of Xpaths processed: ", xpathCounter)
 	fmt.Println("Number of potential issues: ", issueCounter)
+
+	// Change path to the terraform_provider dir in this project
+	// we don't know the exact location, so find it through some path building
+	path, _ := os.Executable()
+	pathBits := strings.Split(path, "/")
+	pathBitsLen := len(pathBits)
+	pathBits = pathBits[:pathBitsLen-3]
+	pathBits = append(pathBits, "terraform_providers")
+
+	tpPath := ""
+	pathBitsLen = len(pathBits)
+	for k, v := range pathBits {
+		tpPath += v
+		if k != pathBitsLen-1 {
+			tpPath += "/"
+		}
+	}
+
+	// Copy the files from ../terraform_providers to the `providerDir` from the config file
+	files, err := ioutil.ReadDir(tpPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println()
+	PrintHeader("Copying the rest of the required Go files")
+	for _, f := range files {
+		if strings.Contains(f.Name(), ".go") {
+			input, err := ioutil.ReadFile(tpPath + "/" + f.Name())
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			err = ioutil.WriteFile(jcfg.ProviderDir+"/"+f.Name(), input, 0644)
+			if err != nil {
+				fmt.Println("Error creating", jcfg.ProviderDir+"/"+f.Name())
+			}
+
+			fmt.Printf("Copied file: %+v to %+v\n", f.Name(), jcfg.ProviderDir)
+		}
+	}
+
+	PrintHeader("Creating Go Mod")
+	err = ioutil.WriteFile(jcfg.ProviderDir+"/go.mod", []byte(fmt.Sprintf(gomodcontent, jcfg.ProviderName)), 0644)
+	if err != nil {
+		fmt.Println("Error creating", jcfg.ProviderDir+"/go.mod")
+	}
 
 	// No errors, so return nil.
 	return nil
@@ -357,7 +405,7 @@ import (
 	strUpdate = ""
 
 	strDelete = `
-    _, err = client.DeleteConfig(id)
+    _, err = client.DeleteConfigNoCommit(id)
     check(err)
 
     d.SetId("")
@@ -949,9 +997,9 @@ func check_element_name(text string) int {
 }
 
 // Generate terraform Modules
-func createFile(moduleFilePath string) {
+func createFile(moduleFilePath, providerName string) {
 
-	providerFileData += "\t\t\t\"junos-device_" + strModuleName + "\": junos" + strModuleName + "(),\n"
+	providerFileData += "\t\t\t\"junos-" + providerName + "_" + strModuleName + "\": junos" + strModuleName + "(),\n"
 
 	// Create go file with top container/module name.
 	var fileName string = s.Join([]string{"resource", strModuleName}, "_")
