@@ -7,13 +7,14 @@ terraform {
   }
 }
 
-/*
+// To test Terraform's ability to remove a single resource,
+// comment out one resource below and use `terraform taint` on the commit
+// resource so that an apply also applies the commit.
 resource "junos-vsrx_InterfacesInterfaceDescription" "vsrx_1" {
     resource_name = "vsrx_1"
     name = "ge-0/0/0"
     description = "LEFT-UNTRUST"
 }
-*/
 
 resource "junos-vsrx_InterfacesInterfaceUnitFamilyInetAddressName" "vsrx_2" {
     resource_name = "vsrx_2"

@@ -15,8 +15,8 @@ provider "junos-vsrx" {
     sshkey = ""
 }
 
-module "qfx_1" {
-  source = "./qfx_1"
+module "vsrx_1" {
+  source = "./vsrx_1"
 
   providers = {junos-vsrx = junos-vsrx}
 
@@ -26,7 +26,7 @@ module "qfx_1" {
 
 resource "junos-vsrx_commit" "commit-main" {
   resource_name = "commit"
-  depends_on = [module.qfx_1]
+  depends_on = [module.vsrx_1]
 }
 
 resource "junos-vsrx_destroycommit" "commit-main" {
