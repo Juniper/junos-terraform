@@ -25,12 +25,13 @@ import (
 	"github.com/Juniper/junos-terraform/Internal/processProviders"
 )
 
-const _ver = "0.1.2"
+const _ver = "0.1.3"
 
 // Syntactic helper to reduce repetition.
 func check(e error) {
 	if e != nil {
-		panic(e)
+		fmt.Println(e)
+		os.Exit(0)
 	}
 }
 
@@ -76,6 +77,7 @@ func main() {
 		jcfg, err := cfg.GetConfig(*flagConfig)
 		if err != nil {
 			fmt.Println("Error retrieving configuration: ", err)
+			os.Exit(0)
 		}
 
 		PrintLogo()

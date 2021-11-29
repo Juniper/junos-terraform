@@ -43,11 +43,10 @@ func PrintHeader(message string) {
 // Node is a helper type for traversing the data tree.
 type Node struct {
 	XMLName xml.Name
-	Key     string            `xml:"name,attr"`
-	Val     string            `xml:"value,attr"`
-	Enums   map[string]string `xml:"-"`
-	Content []byte            `xml:",innerxml"`
-	Nodes   []Node            `xml:",any"`
+	Key     string `xml:"name,attr"`
+	Val     string `xml:"value,attr"`
+	Content []byte `xml:",innerxml"`
+	Nodes   []Node `xml:",any"`
 }
 
 // ElementName is a helper type for traversing the data tree.
@@ -149,7 +148,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	// Create list of yang files present
 	listFiles(yangFilePath)
 
-	// Read data from file
+	// Read data from xpath file
 	datIn, err := ioutil.ReadFile(xpathFilePath)
 	if err != nil {
 		return err
@@ -216,30 +215,30 @@ func CreateProviders(jcfg cfg.Config) error {
 			for _, v := range grpNode {
 
 				// fmt.Println("In file: ", inputYinFile)
-				if v.Key == "control_route_filter_type" {
-					// fmt.Println("looking for choice-ident")
-					for _, v2 := range v.Nodes {
-						if v2.Key == "choice-ident" {
-							// fmt.Println("Found choice-ident...")
-							for _, v3 := range v2.Nodes {
-								// fmt.Println("looking for enumeration...")
-								if v3.Key == "enumeration" {
-									// fmt.Println("Found enumeration for choice-ident...")
-									// fmt.Println("Length of enums: ", len(v3.Nodes))
-									for _, v4 := range v3.Nodes {
-										// fmt.Println(v4.Key)
+				// if v.Key == "control_route_filter_type" {
+				// fmt.Println("looking for choice-ident")
+				for _, v2 := range v.Nodes {
+					if v2.Key == "choice-ident" {
+						// fmt.Println("Found choice-ident...")
+						for _, v3 := range v2.Nodes {
+							// fmt.Println("looking for enumeration...")
+							if v3.Key == "enumeration" {
+								// fmt.Println("Found enumeration for choice-ident...")
+								// fmt.Println("Length of enums: ", len(v3.Nodes))
+								for _, v4 := range v3.Nodes {
+									// fmt.Println(v4.Key)
 
-										if enums[v.Key] == nil {
-											enums[v.Key] = make(map[string]string)
-										}
-										enums[v.Key][v4.Key] = v4.Key
-
+									if enums[v.Key] == nil {
+										enums[v.Key] = make(map[string]string)
 									}
+									enums[v.Key][v4.Key] = v4.Key
+
 								}
 							}
 						}
 					}
 				}
+				// }
 			}
 			// End of 'uses' enum processing for lists.
 
