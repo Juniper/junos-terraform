@@ -25,7 +25,7 @@ import (
 	"github.com/Juniper/junos-terraform/Internal/processYang"
 )
 
-const _ver = "0.1.1"
+const _ver = "0.1.2"
 
 // Syntactic helper to reduce repetition.
 func check(e error) {

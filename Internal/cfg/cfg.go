@@ -26,10 +26,11 @@ import (
 
 // Config used to decode configuration file.
 type Config struct {
-	YangDir     string `toml:"yangDir"`
-	ProviderDir string `toml:"providerDir"`
-	XpathPath   string `toml:"xpathPath"`
-	FileType    string `toml:"fileType"`
+	YangDir      string `toml:"yangDir"`
+	ProviderDir  string `toml:"providerDir"`
+	XpathPath    string `toml:"xpathPath"`
+	FileType     string `toml:"fileType"`
+	ProviderName string `toml:"providerName"`
 }
 
 // GetConfig loads the config from a .TOML file and removes the problem of repetition.
