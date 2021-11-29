@@ -20,7 +20,7 @@ resource "junos-vsrx_InterfacesInterfaceUnitFamilyInetAddressName" "vsrx_2" {
     resource_name = "vsrx_2"
     name = "ge-0/0/0"
     name__1 = "0"
-    name__2 = "10.0.0.0/24"
+    name__2 = "10.0.0.1/24"
 }
 
 
