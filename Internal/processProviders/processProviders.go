@@ -773,19 +773,17 @@ func setListXpathMatch(uses string, nodeCheck Node, schemaTab string, structXpat
 			strSchema += "\n\t\t\t\tOptional: true,"
 			strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + "\",\n\t\t\t},"
 
-			strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + keyVar + ",omitempty\"`"
+			// This can be tricky to understand. Look at the generated code for more insight.
+			// We use pointers for choice-ident enums, because Junos presents us empty elements.
+			// Therefore, if the element isn't presented, the choice isn't configured.
+			// So, we use pointers, if the element is presented, then the pointer is no longer nil
+			// on unmarshal.
+			strStruct += "\n" + schemaTab + "V_" + val_ + "  *string  `xml:\"" + keyVar + ",omitempty\"`"
 			strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
 
-			// TODO: strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
-			strSetFunc += "\tif " + strStructHierarchy + ".V_" + val_ + " == \"\" { \n\t\ttmpGet := d.Get(\"" + val_ + "\").(string)\n\t\tif tmpGet == \" \" { d.Set(\"" + val_ + "\", \" \") } else { d.Set(\"" + val_ + "\"," + strStructHierarchy + ".V_" + val_ + ")}}\n"
-			/*
-				if config.Groups.V_policy__statement.V_term.V_route__filter.V_longer == "" {
-					tmpGet = d.Get("longer").(string)
-					if tmpGet == " " { d.Set("longer", " ")}
-				} else { d.Set("longer",config.Groups.V_policy__statement.V_term.V_route__filter.V_longer) }
-			*/
+			strSetFunc += "\tif " + strStructHierarchy + ".V_" + val_ + " != nil { \n\t\td.Set(\"" + val_ + "\", \" \") } else { d.Set(\"" + val_ + "\", \"\")}\n\n"
 
-			strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
+			strVarAssign += "\tif V_" + val_ + " != \"\" { " + strStructHierarchy + ".V_" + val_ + " = &V_" + val_ + " }\n"
 		}
 	}
 
