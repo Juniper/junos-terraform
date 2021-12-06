@@ -80,19 +80,21 @@ rm -rf yang
 Create a config file somewhere memorable. I'll use `/var/tmp/jtafwd/config.toml` because why not.
 
 Using your favourite text editor, create a file here: `/var/tmp/jtafwd/config.toml` and put the content below into the file. Don't worry about the xPath or fileType keys. They'll be explained shortly.
+The providerName in the toml file will be used to represent the name of the provider in the automagically generated provider files within the "providerDir"
 
 ```bash
 yangDir = "/var/tmp/jtafwd"
 providerDir = "/var/tmp/jtafwd/terraform_providers"
 xpathPath = "/var/tmp/jtafwd/xpath_test.xml"
 fileType = "both"
+providerName = "vsrx"
 ```
 
 You can also replace the fileType field to "text" or "xml". The text files are for us humans.
 
 ### 6.	Generate the YIN and XPath Files
 
-The next step, depending on the size of YANG model/s, may take some time. Prepare some popcorn!
+The next step, depending on the size of YANG model/s, may take some time. Prepare some popcorn! Ensure you have copied all the dependent yang modules into the specified yangDir, else you may run into errors when you run the processYang program. 
 
 ```bash
 cd cmd/processYang
@@ -102,6 +104,13 @@ go build
 Yin file for junos-qfx-conf-protocols@2019-01-01 is generated
 Creating Xpath file: junos-qfx-conf-protocols@2019-01-01_xpath.txt
 Creating Xpath file: junos-qfx-conf-protocols@2019-01-01_xpath.xml
+```
+
+Note: Copy the below yang files from the common directory as the other junos yang modules such as junos, junos-es, junos-nfx etc are dependent on them
+```
+-rw-r--r-- 1 root root 3398 Dec 4 06:26 junos-common-types@2019-01-01.yang
+-rw-r--r-- 1 root root 2346 Dec 4 06:26 junos-common-odl-extensions@2019-01-01.yang
+-rw-r--r-- 1 root root 1806 Dec 4 06:26 junos-common-ddl-extensions@2019-01-01.yang
 ```
 
 ### 7.	Create an XML XPath File
@@ -132,6 +141,26 @@ go build
 ```
 
 The output of this step is written to the `/var/tmp/jtafwd/terraform_provider` directory. You'll see a `.go` source file.
+notice that the generated `.go` files are shown as "resource_<name>", however the provider name is appended to the resources based on declared name from the config.toml file.
+
+Example of generated providers
+```
+-rw-r--r-- 1 root root  3814 Dec  6 06:22 resource_ApplicationsApplicationDestination__Port.go
+-rw-r--r-- 1 root root  3555 Dec  6 06:22 resource_ApplicationsApplicationProtocol.go
+-rw-r--r-- 1 root root  3669 Dec  6 06:22 resource_ApplicationsApplicationSource__Port.go
+-rw-r--r-- 1 root root  4096 Dec  6 06:22 resource_FirewallFilterTermFromProtocol.go
+```
+
+View the provider.go file and notice the declared provider name is appended to the resources generated. The .tf file must call the resources based on the resource map definition within provider.go file.
+
+```
+"junos-vsrx_ApplicationsApplicationProtocol": junosApplicationsApplicationProtocol(),
+"junos-vsrx_ApplicationsApplicationSource__Port": junosApplicationsApplicationSource__Port(),
+"junos-vsrx_ApplicationsApplicationDestination__Port": junosApplicationsApplicationDestination__Port(),
+"junos-vsrx_InterfacesInterfaceDescription": junosInterfacesInterfaceDescription(),
+...
+```
+
 
 Next, copy this `.go` file to the `terraform_providers` directory within the JTAF project.
 
