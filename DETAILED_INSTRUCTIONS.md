@@ -94,7 +94,7 @@ You can also replace the fileType field to "text" or "xml". The text files are f
 
 ### 6.	Generate the YIN and XPath Files
 
-The next step, depending on the size of YANG model/s, may take some time. Prepare some popcorn! Ensure you have copied all the dependent yang modules into the specified yangDir, else you may run into errors when you run the processYang program. 
+The next step, depending on the size of YANG model/s, may take some time. Prepare some popcorn! Ensure you have copied all the dependent YANG modules into the specified yangDir, else you may run into errors when you run the processYang program. 
 
 ```bash
 cd cmd/processYang
@@ -106,7 +106,7 @@ Creating Xpath file: junos-qfx-conf-protocols@2019-01-01_xpath.txt
 Creating Xpath file: junos-qfx-conf-protocols@2019-01-01_xpath.xml
 ```
 
-Note: Copy the below yang files from the common directory as the other junos yang modules such as junos, junos-es, junos-nfx etc are dependent on them
+Note: Copy the below YANG files from the common directory as the other junos YANG modules such as junos, junos-es, junos-nfx etc are dependent on them. Any dependent YANG files used should be from the same version. Mixing versions may cause issues.
 ```
 -rw-r--r-- 1 root root 3398 Dec 4 06:26 junos-common-types@2019-01-01.yang
 -rw-r--r-- 1 root root 2346 Dec 4 06:26 junos-common-odl-extensions@2019-01-01.yang
