@@ -123,6 +123,9 @@ var providerFileData string
 // String variable for tabs in schema.
 var strSchemaTab string
 
+// Variable to hold current XPath being processed
+var currentXPath string
+
 // Issue Counter
 var issueCounter int
 
@@ -167,6 +170,10 @@ func CreateProviders(jcfg cfg.Config) error {
 
 	// parse the xpaths provided to generate terraform based modules
 	for _, n5 := range inNode.Nodes {
+
+		// fmt.Println("DEBUG: Working with XPath Expression(n5.Key): -> ", n5.Key)
+		currentXPath = n5.Key
+
 		if n5.XMLName.Local == "xpath" {
 			inputXpath = n5.Key
 			strParts := s.Split(inputXpath, "/")
@@ -214,10 +221,13 @@ func CreateProviders(jcfg cfg.Config) error {
 			// Process all of the 'uses enums' as choice-ident and choice-value
 			for _, v := range grpNode {
 
+				// fmt.Println("DEBUG: Looking at nodes in V1: ", v.Key)
+
 				// fmt.Println("In file: ", inputYinFile)
 				// if v.Key == "control_route_filter_type" {
 				// fmt.Println("looking for choice-ident")
 				for _, v2 := range v.Nodes {
+					// fmt.Println("DEBUG: Looking at nodes in v2: ", v2.Key)
 					if v2.Key == "choice-ident" {
 						// fmt.Println("Found choice-ident...")
 						for _, v3 := range v2.Nodes {
@@ -248,9 +258,13 @@ func CreateProviders(jcfg cfg.Config) error {
 			// Notes : "-" and "." is not allowed in go as variable name. need to replace it with "_"
 			start([]Node{n})
 
-			if isXpathFound == true {
+			if isXpathFound {
 				// After all the data processing is done, create the file.
-				createFile(moduleFilePath, jcfg.ProviderName)
+				err = createFile(moduleFilePath, jcfg.ProviderName)
+				if err != nil {
+					fmt.Println("Issue creating file. Check presence of directory and permissions")
+					os.Exit(0)
+				}
 			}
 		}
 	}
@@ -478,7 +492,7 @@ func matchXpath(nodes Node) {
 	schemaTab := "\t"
 	var strStructHierarchy string = "config"
 
-	if isGrpFlag == true {
+	if isGrpFlag {
 		schemaTab += "\t"
 		strStructHierarchy += ".Groups"
 	}
@@ -571,7 +585,7 @@ func matchXpath(nodes Node) {
 
 				// End of looping of nodes.
 			}
-			if matchFound == false {
+			if !matchFound {
 				issueCounter += 1
 				fmt.Printf("Xpath not found in file, check it. : %s \n", strXpath)
 
@@ -583,6 +597,7 @@ func matchXpath(nodes Node) {
 
 		// If last element is leaf, further processing will be handled here and return from here.
 		if nodeCheck.XMLName.Local == "leaf" || nodeCheck.XMLName.Local == "leaf-list" {
+
 			if node_last_elemt_2.XMLName.Local == "list" {
 				handleLeaf(nodeCheck, strStructHierarchy, schemaTab)
 			} else {
@@ -593,6 +608,7 @@ func matchXpath(nodes Node) {
 				if id != 0 {
 					val_ += "__" + strconv.Itoa(int(id)) //string(id)
 				}
+				// fmt.Println("DEBUG: Check val_name 0: ", val_)
 				strStruct += "\n" + schemaTab + "V_" + val_ + "  struct {\n" + schemaTab + "\tXMLName xml.Name `xml:\"" + node_last_elemt_2.Key + "\"`"
 				strStructHierarchy += ".V_" + val_
 
@@ -697,7 +713,7 @@ func matchChoiceXpath(nodeChoice Node, xpathElem string) (Node, bool) {
 				}
 			}
 		}
-		if flag == true {
+		if flag {
 			break
 		}
 	}
@@ -725,6 +741,7 @@ func setListXpathMatch(uses string, nodeCheck Node, schemaTab string, structXpat
 	if id != 0 {
 		val_ += "__" + strconv.Itoa(int(id)) //string(id)
 	}
+	// fmt.Println("DEBUG: Check val_name 1: ", val_)
 	strStruct += "\n" + schemaTab + "V_" + val_ + "  struct {\n" + schemaTab + "\tXMLName xml.Name `xml:\"" + nodeCheck.Key + "\"`"
 	strStructEnd = "\n" + schemaTab + "} `xml:\"" + structXpath + "\"`" + strStructEnd
 	strStructHierarchy += ".V_" + val_
@@ -750,16 +767,17 @@ func setListXpathMatch(uses string, nodeCheck Node, schemaTab string, structXpat
 				strSchema += "\n\t\t\t\tOptional: true,"
 				strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + "\",\n\t\t\t},"
 
-				strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + keyVar + "\"`"
+				strStruct += "\n" + schemaTab + "V_" + val_ + "  *string  `xml:\"" + keyVar + ",omitempty\"`"
 				strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
 				strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
-				strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
+				strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = &V_" + val_ + "\n"
 			}
 		}
 	}
 
 	// TODO: Add the enums for the 'uses' to the element slice
 	for keyVar, _ := range enums[uses] {
+
 		if structXpath_last_elem != keyVar {
 			val_ = s.ReplaceAll(keyVar, "-", "__")
 			val_ = s.ReplaceAll(val_, ".", "__")
@@ -785,6 +803,7 @@ func setListXpathMatch(uses string, nodeCheck Node, schemaTab string, structXpat
 
 			strVarAssign += "\tif V_" + val_ + " != \"\" { " + strStructHierarchy + ".V_" + val_ + " = &V_" + val_ + " }\n"
 		}
+
 	}
 
 	structXpath = ""
@@ -800,9 +819,11 @@ func initializeFunctionString(name string) {
 
 	strVarAssign = "\n\tconfig := xml" + name + "{}\n"
 
+	// fmt.Println("DEBUG: Check name 3: ", name)
+
 	strStruct += "type xml" + name + " struct {\n\tXMLName xml.Name `xml:\"configuration\"`"
 
-	if isGrpFlag == true {
+	if isGrpFlag {
 		strVarAssign += "\tconfig.ApplyGroup = id\n\tconfig.Groups.Name = id\n"
 		strStruct += "\n\tGroups  struct {\n\t\tXMLName\txml.Name\t`xml:\"groups\"`\n\t\tName\tstring\t`xml:\"name\"`"
 		strStructEnd = "\n\t} `xml:\"groups\"`\n\tApplyGroup string `xml:\"apply-groups\"`"
@@ -838,20 +859,39 @@ func handleParentNodeXpath(nodes Node, strStructHierarchy string, schemaTab stri
 	if id != 0 {
 		val_ += "__" + strconv.Itoa(int(id)) //string(id)
 	}
+
 	// Initialization for the structure present at top of file.
+	// fmt.Println("DEBUG: Check val_name 2: ", val_)
+	// fmt.Println("DEBUG: Check nodes.Key: ", nodes.Key)
 	strStruct += "\n" + schemaTab + "V_" + val_ + "  struct {\n" + schemaTab + "\tXMLName xml.Name `xml:\"" + nodes.Key + "\"`"
 	tab := schemaTab + "\t"
 	strStructHierarchy += ".V_" + val_
 	for _, n := range nodes.Nodes {
-		// If there is list or container, hierarchy needs to be added.
-		// If leaf or leaf-list then hierarchy doesn't need to ne there.
-		// If uses, then grouping needs to be resolved.
-		if n.XMLName.Local == "container" || n.XMLName.Local == "list" {
-			handleContainer(n, strStructHierarchy, tab)
-		} else if n.XMLName.Local == "leaf" || n.XMLName.Local == "leaf-list" {
-			handleLeaf(n, strStructHierarchy, tab)
-		} else if n.XMLName.Local == "uses" {
-			handleGrouping(n, strStructHierarchy, tab)
+		// Simple gate whether to include children
+		processInner := false
+		// Here we need to see if the inner data is part of our explicit XPath expression.
+		// Remember, these XPaths are the longest match and should not include siblings, if they're not included in the full path
+		// fmt.Println("DEBUG is: ", n.Key)
+		xPathParts := s.Split(currentXPath, "/")
+		for _, v := range xPathParts {
+			// fmt.Println("DEBUG: searching children...")
+			if n.Key == v {
+				processInner = true
+				// fmt.Println("DEBUG: found inner child: ", n.Key, n.XMLName.Local, n.XMLName, n.XMLName.Space)
+			}
+		}
+
+		if processInner {
+			// If there is list or container, hierarchy needs to be added.
+			// If leaf or leaf-list then hierarchy doesn't need to ne there.
+			// If uses, then grouping needs to be resolved.
+			if n.XMLName.Local == "container" || n.XMLName.Local == "list" {
+				handleContainer(n, strStructHierarchy, tab)
+			} else if n.XMLName.Local == "leaf" || n.XMLName.Local == "leaf-list" {
+				handleLeaf(n, strStructHierarchy, tab)
+			} else if n.XMLName.Local == "uses" {
+				handleGrouping(n, strStructHierarchy, tab)
+			}
 		}
 	}
 	// Close the structure.
@@ -866,54 +906,61 @@ func handleContainer(nodes Node, strStructHierarchy string, schemaTab string) {
 	if id != 0 {
 		val_ += "__" + strconv.Itoa(int(id)) //string(id)
 	}
-	strStruct += "\n" + schemaTab + "V_" + val_ + "\tstruct {\n" + schemaTab + "\tXMLName xml.Name `xml:\"" + nodes.Key + "\"`"
-	tab := schemaTab + "\t"
-	strStructHierarchy += ".V_" + val_
-	for _, n := range nodes.Nodes {
-		// If there is list or container, hierarchy needs to be added.
-		// If leaf or leaf-list then hierarchy doesn't need to ne there.
-		// If uses, then grouping needs to be resolved.
-		if n.XMLName.Local == "container" || n.XMLName.Local == "list" {
-			handleContainer(n, strStructHierarchy, tab)
+
+	// WORKING ON ARAVIND ISSUE
+	if nodes.Key != "apply-macro" && nodes.Key != "apply-groups" {
+		strStruct += "\n" + schemaTab + "V_" + val_ + "\tstruct {\n" + schemaTab + "\tXMLName xml.Name `xml:\"" + nodes.Key + "\"`"
+		tab := schemaTab + "\t"
+		strStructHierarchy += ".V_" + val_
+		for _, n := range nodes.Nodes {
+			// If there is list or container, hierarchy needs to be added.
+			// If leaf or leaf-list then hierarchy doesn't need to ne there.
+			// If uses, then grouping needs to be resolved.
+			if n.XMLName.Local == "container" || n.XMLName.Local == "list" {
+				handleContainer(n, strStructHierarchy, tab)
+			}
+			if n.XMLName.Local == "leaf" || n.XMLName.Local == "leaf-list" {
+				handleLeaf(n, strStructHierarchy, tab)
+			} else if n.XMLName.Local == "uses" {
+				handleGrouping(n, strStructHierarchy, tab)
+			}
 		}
-		if n.XMLName.Local == "leaf" || n.XMLName.Local == "leaf-list" {
-			handleLeaf(n, strStructHierarchy, tab)
-		} else if n.XMLName.Local == "uses" {
-			handleGrouping(n, strStructHierarchy, tab)
-		}
+		strStruct += "\n" + schemaTab + "} `xml:\"" + nodes.Key + "\"`"
 	}
-	strStruct += "\n" + schemaTab + "} `xml:\"" + nodes.Key + "\"`"
 }
 
 // handle the structure creation for the 'leaf'/'leaf-list' defined in yang files
 func handleLeaf(nodes Node, strStructHierarchy string, schemaTab string) {
 
-	var desc string
-	// Extract description for the node.
-	for _, n := range nodes.Nodes {
-		if n.XMLName.Local == "description" {
-			for _, n1 := range n.Nodes {
-				if n1.XMLName.Local == "text" {
-					desc = string([]byte(n1.Content))
+	// This fixes the apply-groups and apply-groups-except nodes appearing in the providers.
+	if nodes.Key != "apply-groups" && nodes.Key != "apply-groups-except" {
+		var desc string
+		// Extract description for the node.
+		for _, n := range nodes.Nodes {
+			if n.XMLName.Local == "description" {
+				for _, n1 := range n.Nodes {
+					if n1.XMLName.Local == "text" {
+						desc = string([]byte(n1.Content))
+					}
 				}
 			}
 		}
-	}
 
-	val_ := s.ReplaceAll(nodes.Key, "-", "__")
-	val_ = s.ReplaceAll(val_, ".", "__")
-	id := check_element_name(nodes.Key)
-	if id != 0 {
-		val_ += "__" + strconv.Itoa(int(id)) //string(id)
-	}
+		val_ := s.ReplaceAll(nodes.Key, "-", "__")
+		val_ = s.ReplaceAll(val_, ".", "__")
+		id := check_element_name(nodes.Key)
+		if id != 0 {
+			val_ += "__" + strconv.Itoa(int(id)) //string(id)
+		}
 
-	strStruct += "\n" + schemaTab + "V_" + val_ + "  string  `xml:\"" + nodes.Key + "\"`"
-	strSchema += "\n\t\t\t\"" + val_ + "\": &schema.Schema{\n\t\t\t\tType:    schema.TypeString,"
-	strSchema += "\n\t\t\t\tOptional: true,"
-	strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + ". " + desc + "\",\n\t\t\t},"
-	strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
-	strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
-	strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = V_" + val_ + "\n"
+		strStruct += "\n" + schemaTab + "V_" + val_ + "  *string  `xml:\"" + nodes.Key + ",omitempty\"`"
+		strSchema += "\n\t\t\t\"" + val_ + "\": &schema.Schema{\n\t\t\t\tType:    schema.TypeString,"
+		strSchema += "\n\t\t\t\tOptional: true,"
+		strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + ". " + desc + "\",\n\t\t\t},"
+		strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
+		strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
+		strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = &V_" + val_ + "\n"
+	}
 }
 
 // For groups defined in yang file, it needs to be resolved to corresponding container/list
@@ -994,7 +1041,7 @@ func check_element_name(text string) int {
 }
 
 // Generate terraform Modules
-func createFile(moduleFilePath, providerName string) {
+func createFile(moduleFilePath, providerName string) error {
 
 	providerFileData += "\t\t\t\"junos-" + providerName + "_" + strModuleName + "\": junos" + strModuleName + "(),\n"
 
@@ -1003,8 +1050,10 @@ func createFile(moduleFilePath, providerName string) {
 	fileName = s.Join([]string{fileName, "go"}, ".")
 	fileName = moduleFilePath + "/" + fileName
 	fPtr, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
 	defer fPtr.Close()
-	check(err)
 
 	// Append at the end of the schema which is at bottom of created file.
 	strSchema += "\n\t\t},\n\t}\n}"
@@ -1032,6 +1081,7 @@ func createFile(moduleFilePath, providerName string) {
 	_, err = fPtr.WriteString(strSchema)
 	fmt.Printf("Terraform API resource_%s created \n", strModuleName)
 	xpathCounter += 1
+	return nil
 }
 
 // copy file from source location to destination
