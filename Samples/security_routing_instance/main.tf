@@ -17,7 +17,7 @@ terraform {
 	required_providers {
 		junos-vsrx = {
 			source = "juniper/providers/junos-vsrx"
-			version = "1.1"
+			version = "1.2"
 		}
 	}
 }
@@ -32,8 +32,8 @@ provider "junos-vsrx" {
 
 
 # --------- configure IPSEC tunnel -------------- #
-module "ipsec" {
-    source = "./ipsec"
+module "vpn" {
+    source = "./vpn"
     providers = { junos-vsrx = junos-vsrx }
     depends_on = [ junos-vsrx_destroycommit.commit-main ]
 }
@@ -41,7 +41,7 @@ module "ipsec" {
 # -------- commit ---------- #
 resource "junos-vsrx_commit" "commit-main" {
 	resource_name = "commit"
-	depends_on = [module.interfaces, module.ipsec]
+	depends_on = [module.vpn]
 }
 
 resource "junos-vsrx_destroycommit" "commit-main" {
