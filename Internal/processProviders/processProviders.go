@@ -907,14 +907,14 @@ func handleContainer(nodes Node, strStructHierarchy string, schemaTab string) {
 		val_ += "__" + strconv.Itoa(int(id)) //string(id)
 	}
 
-	// WORKING ON ARAVIND ISSUE
+	// this logic removes embedded apply-macro and apply-groups that are superfluious and potentially breaking
 	if nodes.Key != "apply-macro" && nodes.Key != "apply-groups" {
 		strStruct += "\n" + schemaTab + "V_" + val_ + "\tstruct {\n" + schemaTab + "\tXMLName xml.Name `xml:\"" + nodes.Key + "\"`"
 		tab := schemaTab + "\t"
 		strStructHierarchy += ".V_" + val_
 		for _, n := range nodes.Nodes {
 			// If there is list or container, hierarchy needs to be added.
-			// If leaf or leaf-list then hierarchy doesn't need to ne there.
+			// If leaf or leaf-list then hierarchy doesn't need to be there.
 			// If uses, then grouping needs to be resolved.
 			if n.XMLName.Local == "container" || n.XMLName.Local == "list" {
 				handleContainer(n, strStructHierarchy, tab)

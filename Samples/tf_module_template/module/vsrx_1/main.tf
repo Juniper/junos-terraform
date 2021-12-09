@@ -29,6 +29,9 @@ resource "junos-vsrx_Policy__OptionsPolicy__StatementTermFromRoute__FilterAddres
     name = "DEF-IMPORT-FWTRUST-TABLE"
     name__1 = "t1"
     address = "10.0.0.0/17"
+    // orlonger below, is an enumerated type. The single whitespace turns it on.
+    // XPath for this type is: <xpath name="/policy-options/policy-statement/term/from/route-filter/address"/>
+    // Some enums require input, in which case use the key like any other and insert the data.
     orlonger = " "
 }
 
