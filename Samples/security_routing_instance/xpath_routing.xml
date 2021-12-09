@@ -1,0 +1,38 @@
+<!-- Std L3VPN config generation for vSRX -->
+<file-list>
+        <xpath name="/routing-instances/instance/instance-type"/>
+        <xpath name="/routing-instances/instance/vrf-table-label"/>
+        <xpath name="/routing-instances/instance/route-distinguisher/rd-type"/>
+        <xpath name="/routing-instances/instance/vrf-target/community"/>
+        <xpath name="/routing-instances/instance/vrf-target/import"/>
+        <xpath name="/routing-instances/instance/vrf-target/export"/>
+        <xpath name="/routing-instances/instance/vrf-target/auto"/>
+        <xpath name="/routing-instances/instance/interface/name"/>
+        <xpath name="/routing-instances/instance/description"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/family/inet/labeled-unicast"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/family/inet/unicast"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/group/type"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/group/description"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/group/multihop"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/group/local-address"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/group/local-preference"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/group/as-override"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/group/allow"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/group/neighbor/multihop"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/group/neighbor/local-address"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/group/neighbor/family/inet/unicast"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/group/neighbor/family/inet6/unicast"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/export"/>
+        <xpath name="/routing-instances/instance/protocols/bgp/import"/>
+        <xpath name="/policy-options/community/members"/>
+        <xpath name="/policy-options/policy-statement/term/from/protocol"/>
+        <xpath name="/policy-options/policy-statement/from/community"/>
+        <xpath name="/policy-options/policy-statement/from/router-filter"/>
+        <xpath name="/policy-options/policy-statement/then/accept"/>
+        <xpath name="/policy-options/policy-statement/then/reject"/>
+        <xpath name="/policy-options/policy-statement/then/next"/>
+        <xpath name="/policy-options/policy-statement/term/from/community"/>
+        <xpath name="/policy-options/policy-statement/term/then/community"/>
+        <xpath name="/policy-options/policy-statement/then/as-path-prepend"/>
+        <xpath name="/policy-options/policy-statement/then/as-path-expand"/>
+</file-list>

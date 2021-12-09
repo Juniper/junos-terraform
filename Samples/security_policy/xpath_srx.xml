@@ -1,0 +1,29 @@
+<!-- Std IPSEC config generation for vSRX -->
+<file-list>
+        <xpath name="/applications/application/protocol"/>
+        <xpath name="/applications/application/source-port"/>
+        <xpath name="/applications/application/destination-port"/>
+        <xpath name="/security/address-book/address/ip-prefix"/>
+        <xpath name="/security/address-book/address/range-address/to/range-high"/>
+        <xpath name="/security/address-book/address-set/address/name"/>
+        <xpath name="/security/nat/source/pool/address/to/ipaddr"/>
+        <xpath name="/security/nat/source/rule-set/from/zone"/>         <!--this is a choice, it needs full path to be generated-->
+        <xpath name="/security/nat/source/rule-set/to/zone"/>
+        <xpath name="/security/nat/source/rule-set/rule/src-nat-rule-match/source-address"/>
+        <xpath name="/security/nat/source/rule-set/rule/then/source-nat/pool/pool-name"/>
+        <xpath name="/security/nat/destination/pool/routing-instance/ri-name"/>
+        <xpath name="/security/nat/destination/pool/address/ipaddr"/>
+        <xpath name="/security/nat/destination/pool/address/port"/>             <!--this is a choice, it needs full path to be generated-->
+        <xpath name="/security/nat/destination/rule-set/from/interface"/>
+        <xpath name="/security/nat/destination/rule-set/rule/dest-nat-rule-match/destination-address/dst-addr"/>
+        <xpath name="/security/nat/destination/rule-set/rule/dest-nat-rule-match/destination-port/name"/>
+        <xpath name="/security/nat/destination/rule-set/rule/then/destination-nat/pool/pool-name"/>
+        <xpath name="/security/nat/proxy-arp/interface/address/to/ipaddr"/>
+        <xpath name="/security/policies/policy/policy/match/source-address"/>
+        <xpath name="/security/policies/policy/policy/match/destination-address"/>
+        <xpath name="/security/policies/policy/policy/match/application"/>
+        <xpath name="/security/policies/policy/policy/then/permit/tunnel/pair-policy"/>
+        <xpath name="/security/policies/policy/policy/then/log/session-init"/>
+        <xpath name="/security/policies/policy/policy/then/count/apply-groups"/>
+        <xpath name="/security/policies/policy/policy/then/deny"/>
+</file-list>
