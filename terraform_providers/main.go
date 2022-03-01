@@ -17,14 +17,23 @@
 package main
 
 import (
-	"github.com/hashicorp/terraform-plugin-sdk/plugin"
-	"github.com/hashicorp/terraform-plugin-sdk/terraform"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
 )
 
 func main() {
-	plugin.Serve(&plugin.ServeOpts{
-		ProviderFunc: func() terraform.ResourceProvider {
-			return Provider()
-		},
-	})
+	var debugMode bool
+	//
+	//flag.BoolVar(&debugMode, "debug", false, "set to true to run the provider with support for debuggers like delve")
+	//flag.Parse()
+
+	opts := &plugin.ServeOpts{ProviderFunc: Provider}
+
+	//if debugMode {
+	//	err := plugin.Debug(context.Background(), "testing", opts)
+	//	if err != nil {
+	//		log.Fatal(err.Error())
+	//	}
+	//}
+	plugin.Serve(opts)
+
 }

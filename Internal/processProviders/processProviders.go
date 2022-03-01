@@ -272,7 +272,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	providerFileData += `			"junos-` + jcfg.ProviderName + `_commit": junosCommit(),
 	        	"junos-` + jcfg.ProviderName + `_destroycommit": junosDestroyCommit(),
 			},
-		    ConfigureFunc: providerConfigure,
+		    ConfigureContextFunc: providerConfigure,
 	    } 
     }
 `
@@ -361,7 +361,9 @@ package main
 import (
     "encoding/xml"
     "fmt"
-    "github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+    "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"context"
 )
 
 `
@@ -381,7 +383,7 @@ import (
                 Required: true,
             },`
 
-	strClientInit = `(d *schema.ResourceData, m interface{}) error {
+	strClientInit = `(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	var err error
 	client := m.(*ProviderConfig)
@@ -769,7 +771,9 @@ func setListXpathMatch(uses string, nodeCheck Node, schemaTab string, structXpat
 
 				strStruct += "\n" + schemaTab + "V_" + val_ + "  *string  `xml:\"" + keyVar + ",omitempty\"`"
 				strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
-				strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
+				strSetFunc += "\tif err :=d.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ");err != nil{\n"
+				strSetFunc += "\t\treturn diag.FromErr(err)\n"
+				strSetFunc += "\t}\n"
 				strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = &V_" + val_ + "\n"
 			}
 		}
@@ -844,10 +848,10 @@ func initializeFunctionString(name string) {
 
 	// Append text with function name to schema string.
 	var schemaTemp string = "\n\nfunc junos" + name + "() *schema.Resource {\n\treturn &schema.Resource{\n"
-	schemaTemp = schemaTemp + "\t\tCreate: junos" + name + "Create,\n"
-	schemaTemp = schemaTemp + "\t\tRead: junos" + name + "Read,\n"
-	schemaTemp = schemaTemp + "\t\tUpdate: junos" + name + "Update,\n"
-	schemaTemp = schemaTemp + "\t\tDelete: junos" + name + "Delete,"
+	schemaTemp = schemaTemp + "\t\tCreateContext: junos" + name + "Create,\n"
+	schemaTemp = schemaTemp + "\t\tReadContext: junos" + name + "Read,\n"
+	schemaTemp = schemaTemp + "\t\tUpdateContext: junos" + name + "Update,\n"
+	schemaTemp = schemaTemp + "\t\tDeleteContext: junos" + name + "Delete,"
 	strSchema = schemaTemp + strSchema
 }
 
@@ -958,7 +962,9 @@ func handleLeaf(nodes Node, strStructHierarchy string, schemaTab string) {
 		strSchema += "\n\t\t\t\tOptional: true,"
 		strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + ". " + desc + "\",\n\t\t\t},"
 		strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
-		strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
+		strSetFunc += "\tif err := d.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ");err != nil{\n"
+		strSetFunc += "\t\treturn diag.FromErr(err)\n"
+		strSetFunc += "\t}\n"
 		strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = &V_" + val_ + "\n"
 	}
 }
@@ -1062,10 +1068,10 @@ func createFile(moduleFilePath, providerName string) error {
 	strStruct += "\n}"
 	// Append for the create function.
 	strCreate += strGetFunc + "\n" + strVarAssign + strSendTrans + strSetIdValue +
-		"\n\treturn junos" + strModuleName + "Read(d,m)" + "\n}"
+		"\n\treturn junos" + strModuleName + "Read(ctx,d,m)" + "\n}"
 	// Append for the update function.
 	strUpdate += strGetFunc + "\n" + strVarAssign + strSendTransId +
-		"\n\treturn junos" + strModuleName + "Read(d,m)" + "\n}"
+		"\n\treturn junos" + strModuleName + "Read(ctx,d,m)" + "\n}"
 	// Append for the read function.
 	strRead += strSetFunc + "\n\treturn nil\n}"
 	// Append for the delete function.
@@ -1131,9 +1137,10 @@ func listFiles(yangFilePath string) {
 package main
 
 import (
-
+	"context"
 	gonetconf "github.com/davedotdev/go-netconf/helpers/junos_helpers"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"os"
 )
 
@@ -1142,7 +1149,9 @@ type ProviderConfig struct {
 	*gonetconf.GoNCClient
 	Host string
 }
-
+func init() {
+	schema.DescriptionKind = schema.StringMarkdown
+}
 func check(err error) {
 	if err != nil {
 		// Some of these errors will be "normal".
@@ -1154,7 +1163,7 @@ func check(err error) {
 }
 
 
-func providerConfigure(d *schema.ResourceData) (interface{}, error) {
+func providerConfigure(ctx context.Context,d *schema.ResourceData) (interface{}, diag.Diagnostics) {
 	config := Config{
 		Host:     d.Get("host").(string),
 		Port:     d.Get("port").(int),
@@ -1165,7 +1174,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 
 	client, err := config.Client()
 	if err != nil {
-		return nil, err
+		return nil, diag.FromErr(err)
 	}
 
 	return &ProviderConfig{client, config.Host}, nil

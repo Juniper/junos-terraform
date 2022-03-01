@@ -17,12 +17,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func junosDestroyCommitCreate(d *schema.ResourceData, m interface{}) error {
+func junosDestroyCommitCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	// var err error
 	id := d.Get("resource_name").(string)
@@ -39,17 +41,17 @@ func junosDestroyCommitCreate(d *schema.ResourceData, m interface{}) error {
 	return nil
 }
 
-func junosDestroyCommitRead(d *schema.ResourceData, m interface{}) error {
+func junosDestroyCommitRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	return nil
 }
 
-func junosDestroyCommitUpdate(d *schema.ResourceData, m interface{}) error {
+func junosDestroyCommitUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	return nil
 }
 
-func junosDestroyCommitDelete(d *schema.ResourceData, m interface{}) error {
+func junosDestroyCommitDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	var err error
 
@@ -58,12 +60,12 @@ func junosDestroyCommitDelete(d *schema.ResourceData, m interface{}) error {
 	err = client.SendCommit()
 
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
 	err = client.Close()
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
 	return nil
@@ -71,10 +73,10 @@ func junosDestroyCommitDelete(d *schema.ResourceData, m interface{}) error {
 
 func junosDestroyCommit() *schema.Resource {
 	return &schema.Resource{
-		Create: junosDestroyCommitCreate,
-		Read:   junosDestroyCommitRead,
-		Update: junosDestroyCommitUpdate,
-		Delete: junosDestroyCommitDelete,
+		CreateContext: junosDestroyCommitCreate,
+		ReadContext:   junosDestroyCommitRead,
+		UpdateContext: junosDestroyCommitUpdate,
+		DeleteContext: junosDestroyCommitDelete,
 
 		Schema: map[string]*schema.Schema{
 			"resource_name": &schema.Schema{
