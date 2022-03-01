@@ -393,12 +393,12 @@ import (
 
 	strSendTrans = `
     err = client.SendTransaction("", config, false)
-    check(err)
+    check(ctx,err)
     `
 
 	strSendTransId = `
     err = client.SendTransaction(id, config, false)
-    check(err)
+    check(ctx,err)
     `
 
 	strSetIdValue = `
@@ -421,7 +421,7 @@ import (
 
 	strDelete = `
     _, err = client.DeleteConfigNoCommit(id)
-    check(err)
+    check(ctx,err)
 
     d.SetId("")
     `
@@ -832,7 +832,7 @@ func initializeFunctionString(name string) {
 		strStruct += "\n\tGroups  struct {\n\t\tXMLName\txml.Name\t`xml:\"groups\"`\n\t\tName\tstring\t`xml:\"name\"`"
 		strStructEnd = "\n\t} `xml:\"groups\"`\n\tApplyGroup string `xml:\"apply-groups\"`"
 	}
-	strRead = "\n\tconfig := &xml" + name + "{}\n\n\terr = client.MarshalGroup(id, config)\n\tcheck(err)\n"
+	strRead = "\n\tconfig := &xml" + name + "{}\n\n\terr = client.MarshalGroup(id, config)\n\tcheck(ctx,err)\n"
 
 	// Append text for Create Function.
 	strCreate += "func junos" + name + "Create" + strClientInit
@@ -1139,6 +1139,7 @@ package main
 import (
 	"context"
 	gonetconf "github.com/davedotdev/go-netconf/helpers/junos_helpers"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"os"
@@ -1152,9 +1153,10 @@ type ProviderConfig struct {
 func init() {
 	schema.DescriptionKind = schema.StringMarkdown
 }
-func check(err error) {
+func check(ctx context.Context,err error) {
 	if err != nil {
 		// Some of these errors will be "normal".
+		tflog.Debug(ctx, "encountered possible error response: %s", err.Error())
 		f, _ := os.OpenFile("jtaf_logging.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		f.WriteString(err.Error() + "\n")
 		f.Close()
