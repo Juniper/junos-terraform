@@ -270,7 +270,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	}
 
 	providerFileData += `			"junos-` + jcfg.ProviderName + `_commit": junosCommit(),
-	        	"junos-` + jcfg.ProviderName + `_destroycommit": junosDestroyCommit(),
+	        "junos-` + jcfg.ProviderName + `_destroycommit": junosDestroyCommit(),
 			},
 		    ConfigureFunc: providerConfigure,
 	    } 
