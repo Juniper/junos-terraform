@@ -257,20 +257,20 @@ tree /Users/dgee/.terraform.d
     └── juniper
         └── providers
             └── junos-vsrx
-                └── 19.41.0101
+                └── 19.41.101
                     ├── darwin_amd64
                     │   └── terraform-provider-junos-vsrx
                     └── linux_amd64
                         └── terraform-provider-junos-vsrx
 ```
 
-Notice that the R is missing in the version `19.41.0101`. This is an official Juniper method of naming providers. It basically says:
+Notice that the R is missing in the version `19.41.101`. This is an official Juniper method of naming providers. It basically says: 19.4R1.01 of Junos, with version 01 of the provider. Due to semantic versioning, you'll notice that the leading zero has been stripped, leaving us with the last two digits for the provider number and any other digits in front being the Junos version patch number.
 
-19.4R1.01 of Junos, with version 01 of the provider. If you're building providers locally, it's worth considering how to version control them. Each provider generated can have a different set of capabilities, even for the same software release, so it's important that you keep a track through a simple version control system. MD5 hashing of the binary is also recommended, so as a worst case, you can identify the binaries by their computed hash.
+If you're building providers locally, it's worth considering how to version control them. Each provider generated can have a different set of capabilities, even for the same software release, so it's important that you keep a track through a simple version control system. MD5 hashing of the binary is also recommended, so as a worst case, you can identify the binaries by their computed hash.
 
 You can use the method above, enabling Terraform to find the provider locally. Here's how:
 
-`mkdir -p ~/.terraform.d/plugins/juniper/junos-vsrx/19.4R1.0101/darwin_amd64`
+`mkdir -p ~/.terraform.d/plugins/juniper/junos-vsrx/19.4R1.101/darwin_amd64`
 
 It's probably a good idea to replace the `juniper` part with your own organisation's name to prevent any confusion.
 
@@ -314,7 +314,7 @@ terraform {
   required_providers {
     junos-vsrx = {
       source = "juniper/providers/junos-vsrx"
-      version = "19.41.0101"
+      version = "19.41.101"
     }
   }
 }
@@ -352,7 +352,7 @@ terraform {
   required_providers {
     junos-vsrx = {
       source = "juniper/providers/junos-vsrx"
-      version = "19.41.0101"
+      version = "19.41.101"
     }
   }
 }
