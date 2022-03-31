@@ -552,9 +552,10 @@ It's by using these concrete dependencies, we are able to trigger the resources 
 
 The dependency order is thus:
 
-1. The `commitdestroy` resource depends on the module
+1. The `commit` resource depends on the module
 2. The module contains the actual desired state (which may have further ordered structure)
-3. The module depends on the `commit` resource
+3. The module depends on the `commitdestroy` resource
+
 
 This ordering means the `commitdestroy` is created first. No action is taken when this resource is created other than local state is stored on the system. The contents of the module are executed next, which consists of NETCONF sessions being made against the target system and stored in configuration groups, which are applied. Lastly, the commit resource is created, which actually runs a commit on Junos via a NETCONF RPC.
 
