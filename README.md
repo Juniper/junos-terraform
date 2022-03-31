@@ -554,10 +554,10 @@ The dependency order is thus:
 
 1. The `commit` resource depends on the module
 2. The module contains the actual desired state (which may have further ordered structure)
-3. The module depends on the `commitdestroy` resource
+3. The module depends on the `destroycommit` resource
 
 
-This ordering means the `commitdestroy` is created first. No action is taken when this resource is created other than local state is stored on the system. The contents of the module are executed next, which consists of NETCONF sessions being made against the target system and stored in configuration groups, which are applied. Lastly, the commit resource is created, which actually runs a commit on Junos via a NETCONF RPC.
+This ordering means the `destroycommit` is created first. No action is taken when this resource is created other than local state is stored on the system. The contents of the module are executed next, which consists of NETCONF sessions being made against the target system and stored in configuration groups, which are applied. Lastly, the commit resource is created, which actually runs a commit on Junos via a NETCONF RPC.
 
 __Making Changes__
 
@@ -726,6 +726,55 @@ show interfaces ge-0/0/0 | display inheritance no-comments
 There is some inverse logic here. The `destroycommit` is 'created' on the delete cycle within the provider, whereas the `commit` is 'created' on the create cycle. Terraform providers do nothing more than CRUD (create/read/update/delete) on data structures, which in turn have methods on them. The Terraform apply cycle runs `create` and `update`. Terraform destroy in turns runs the `delete` method.
 
 You can read more on this commit 'bookend' pattern [here](https://dave.dev/blog/2021/11/).
+
+## Q&A
+
+__1. Where do I find the names of the resources I have created?__
+
+Check in the `provider.go` file that is dynamically generated. You will find a data structure with this signature: `ResourcesMap: map[string]*schema.Resource`. Your resources are named in a map. Here is an example:
+
+```bash
+// Output of a provider.go example
+func Provider() *schema.Provider {
+	return &schema.Provider{
+
+		Schema: map[string]*schema.Schema{
+			"host": &schema.Schema{
+				Type:     schema.TypeString,
+				Required: true,
+			},
+
+			"port": &schema.Schema{
+				Type:     schema.TypeInt,
+				Required: true,
+			},
+
+			"username": &schema.Schema{
+				Type:     schema.TypeString,
+				Required: true,
+			},
+
+			"password": &schema.Schema{
+				Type:     schema.TypeString,
+				Required: true,
+			},
+			"sshkey": &schema.Schema{
+				Type:     schema.TypeString,
+				Required: true,
+			},
+		},
+
+        // These are your resources
+		ResourcesMap: map[string]*schema.Resource{
+			"junos-vsrx_InterfacesInterfaceDescription": junosInterfacesInterfaceDescription(),
+			"junos-vsrx_InterfacesInterfaceUnitFamilyInetAddressName": junosInterfacesInterfaceUnitFamilyInetAddressName(),
+			"junos-vsrx_commit": junosCommit(),
+	        "junos-vsrx_destroycommit": junosDestroyCommit(),
+			},
+		ConfigureFunc: providerConfigure,
+	}
+}
+```
 
 ## Close
 
