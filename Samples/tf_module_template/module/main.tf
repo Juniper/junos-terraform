@@ -2,7 +2,7 @@ terraform {
   required_providers {
     junos-vsrx = {
       source = "juniper/providers/junos-vsrx"
-      version = "20.32.0101"
+      version = "20.32.101"
     }
   }
 }
