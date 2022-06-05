@@ -20,14 +20,18 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"io"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	s "strings"
+	"sync/atomic"
 	"unicode/utf8"
 
 	"github.com/Juniper/junos-terraform/Internal/cfg"
@@ -284,7 +288,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	check(err)
 
 	// Write to the file
-	_, err = fPtr.WriteString(providerFileData)
+	_, err = fPtr.WriteString(fmt.Sprintf(providerFileData, jcfg.ProviderName))
 
 	// List summary data
 	fmt.Println("--------------------------------------------------------------------------------")
@@ -307,30 +311,15 @@ func CreateProviders(jcfg cfg.Config) error {
 			tpPath += "/"
 		}
 	}
-
-	// Copy the files from ../terraform_providers to the `providerDir` from the config file
-	files, err := ioutil.ReadDir(tpPath)
-	if err != nil {
-		fmt.Println(err)
+	// Copy the go files from ../terraform_providers to the `providerDir` from the config file
+	PrintHeader("Copying files")
+	var fileCopyCount uint32
+	if err := copyDir(tpPath, jcfg.ProviderDir, ".go", jcfg.ProviderName, &fileCopyCount); err != nil {
+		panic(err)
 	}
-
-	fmt.Println()
-	PrintHeader("Copying the rest of the required Go files")
-	for _, f := range files {
-		if strings.Contains(f.Name(), ".go") {
-			input, err := ioutil.ReadFile(tpPath + "/" + f.Name())
-			if err != nil {
-				fmt.Println(err)
-			}
-
-			err = ioutil.WriteFile(jcfg.ProviderDir+"/"+f.Name(), input, 0644)
-			if err != nil {
-				fmt.Println("Error creating", jcfg.ProviderDir+"/"+f.Name())
-			}
-
-			fmt.Printf("Copied file: %+v to %+v\n", f.Name(), jcfg.ProviderDir)
-		}
-	}
+	fmt.Println("------------------------------------------------------------")
+	fmt.Println(fmt.Sprintf("- Copied a total of %d .go files from %s to %s -", fileCopyCount, filepath.Base(tpPath), filepath.Base(jcfg.ProviderDir)))
+	fmt.Println("------------------------------------------------------------")
 
 	PrintHeader("Creating Go Mod")
 	err = ioutil.WriteFile(jcfg.ProviderDir+"/go.mod", []byte(fmt.Sprintf(gomodcontent, jcfg.ProviderName)), 0644)
@@ -338,6 +327,11 @@ func CreateProviders(jcfg cfg.Config) error {
 		fmt.Println("Error creating", jcfg.ProviderDir+"/go.mod")
 	}
 
+	PrintHeader("Creating provider config")
+	err = ioutil.WriteFile(jcfg.ProviderDir+"/config.go", []byte(fmt.Sprintf(providerConfigContent, jcfg.ProviderName)), 0644)
+	if err != nil {
+		fmt.Println("Error creating", jcfg.ProviderDir+"/config.go")
+	}
 	// No errors, so return nil.
 	return nil
 }
@@ -1132,14 +1126,14 @@ package main
 
 import (
 
-	gonetconf "github.com/davedotdev/go-netconf/helpers/junos_helpers"
+	"terraform-provider-junos-%+v/netconf"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"os"
 )
 
 // ProviderConfig is to hold client information
 type ProviderConfig struct {
-	*gonetconf.GoNCClient
+	netconf.Client
 	Host string
 }
 
@@ -1203,4 +1197,49 @@ func Provider() *schema.Provider {
 
 		ResourcesMap: map[string]*schema.Resource{
 `
+}
+
+func copyDir(src, dst, extension string, providerName string, fileCopyCount *uint32) error {
+	return filepath.Walk(src, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			if !strings.Contains(info.Name(), extension) {
+				return nil
+			}
+			atomic.AddUint32(fileCopyCount, 1)
+		}
+		fmt.Println(fmt.Sprintf("- Copying %s to %s", info.Name(), filepath.Base(dst)))
+		outpath := filepath.Join(dst, strings.TrimPrefix(path, src))
+		if info.IsDir() {
+			os.MkdirAll(outpath, info.Mode())
+			return nil // means recursive
+		}
+		if !info.Mode().IsRegular() {
+			switch info.Mode().Type() & os.ModeType {
+			case os.ModeSymlink:
+				link, err := os.Readlink(path)
+				if err != nil {
+					return err
+				}
+				return os.Symlink(link, outpath)
+			}
+			return nil
+		}
+		in, _ := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+		fh, err := os.Create(outpath)
+		if err != nil {
+			return err
+		}
+		defer fh.Close()
+
+		fh.Chmod(info.Mode())
+		_, err = io.Copy(fh, in)
+		return err
+	})
 }
