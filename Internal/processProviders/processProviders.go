@@ -311,11 +311,12 @@ func CreateProviders(jcfg cfg.Config) error {
 			tpPath += "/"
 		}
 	}
+	fmt.Println(tpPath)
 	// Copy the go files from ../terraform_providers to the `providerDir` from the config file
 	PrintHeader("Copying files")
 	var fileCopyCount uint32
-	if err := copyDir(tpPath, jcfg.ProviderDir, ".go", jcfg.ProviderName, &fileCopyCount); err != nil {
-		panic(err)
+	if err := copyDir(tpPath, jcfg.ProviderDir, ".go", &fileCopyCount); err != nil {
+		return fmt.Errorf("failed to copy files from the %s direcotry: %w", tpPath, err)
 	}
 	fmt.Println("------------------------------------------------------------")
 	fmt.Println(fmt.Sprintf("- Copied a total of %d .go files from %s to %s -", fileCopyCount, filepath.Base(tpPath), filepath.Base(jcfg.ProviderDir)))
@@ -1199,7 +1200,7 @@ func Provider() *schema.Provider {
 `
 }
 
-func copyDir(src, dst, extension string, providerName string, fileCopyCount *uint32) error {
+func copyDir(src, dst, extension string, fileCopyCount *uint32) error {
 	return filepath.Walk(src, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
