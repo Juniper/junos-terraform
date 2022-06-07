@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2021, Juniper Networks Inc. All rights reserved.
+// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
 //
 // License: Apache 2.0
 //
@@ -17,12 +17,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func junosCommitCreate(d *schema.ResourceData, m interface{}) error {
+func junosCommitCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	var err error
 	id := d.Get("resource_name").(string)
@@ -32,40 +34,40 @@ func junosCommitCreate(d *schema.ResourceData, m interface{}) error {
 	err = client.SendCommit()
 
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
 	d.SetId(fmt.Sprintf("%s_%s", client.Host, id))
 
 	err = client.Close()
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
-	return junosCommitRead(d, m)
+	return junosCommitRead(ctx, d, m)
 }
 
-func junosCommitRead(d *schema.ResourceData, m interface{}) error {
+func junosCommitRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	return nil
 }
 
-func junosCommitUpdate(d *schema.ResourceData, m interface{}) error {
+func junosCommitUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	return nil
 }
 
-func junosCommitDelete(d *schema.ResourceData, m interface{}) error {
+func junosCommitDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	return nil
 }
 
 func junosCommit() *schema.Resource {
 	return &schema.Resource{
-		Create: junosCommitCreate,
-		Read:   junosCommitRead,
-		Update: junosCommitUpdate,
-		Delete: junosCommitDelete,
+		CreateContext: junosCommitCreate,
+		ReadContext:   junosCommitRead,
+		UpdateContext: junosCommitUpdate,
+		DeleteContext: junosCommitDelete,
 
 		Schema: map[string]*schema.Schema{
 			"resource_name": &schema.Schema{
