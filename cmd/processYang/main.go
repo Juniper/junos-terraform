@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/Juniper/junos-terraform/Internal/cfg"
 	"github.com/Juniper/junos-terraform/Internal/processYang"
@@ -31,6 +32,35 @@ const _ver = "0.1.5"
 func check(e error) {
 	if e != nil {
 		panic(e)
+	}
+}
+
+// Check if running from venv
+func check_venv_exists() {
+	app	:= "python3"
+	script	:= "checkVenv.py"
+	cmd := exec.Command(app, script)
+	stdout, err := cmd.Output()
+
+	if err != nil {
+		fmt.Println(err.Error())
+		panic(err)
+	}
+	if string(stdout) == "false\n" {
+		fmt.Println("ERROR: Please run this in a python3 virtual environment.\n")
+		os.Exit(1)
+	}
+}
+
+func check_pyang_installed() {
+	app := "pyang"
+	ver := "-v"
+	cmd := exec.Command(app, ver)
+	_, err := cmd.Output()
+
+	if err != nil {
+		fmt.Println("ERROR: Please install pyang in the virtual environment.\n")
+		os.Exit(1)
 	}
 }
 
@@ -79,6 +109,8 @@ func main() {
 
 		PrintLogo()
 
+		check_venv_exists()
+		check_pyang_installed()
 		check(processYang.CreateYinFileAndXpath(jcfg))
 	} else if *flagYang != "" || *flagFileType != "" {
 		// If config file path is not present then check for individual elements.
@@ -87,6 +119,8 @@ func main() {
 
 		PrintLogo()
 
+		check_venv_exists()
+		check_pyang_installed()
 		check(processYang.CreateYinFileAndXpath(jcfg))
 	} else {
 		fmt.Println("One or more mandatory inputs are missing, exiting...")
