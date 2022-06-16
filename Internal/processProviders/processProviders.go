@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2021, Juniper Networks Inc. All rights reserved.
+// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
 //
 // License: Apache 2.0
 //
@@ -272,7 +272,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	providerFileData += `			"junos-` + jcfg.ProviderName + `_commit": junosCommit(),
 	        "junos-` + jcfg.ProviderName + `_destroycommit": junosDestroyCommit(),
 			},
-		    ConfigureFunc: providerConfigure,
+		    ConfigureContextFunc: providerConfigure,
 	    } 
     }
 `
@@ -359,9 +359,12 @@ func initialize_global_variables() {
 package main
 
 import (
+    "context"
     "encoding/xml"
     "fmt"
-    "github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+    "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+    "github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+
 )
 
 `
@@ -381,7 +384,7 @@ import (
                 Required: true,
             },`
 
-	strClientInit = `(d *schema.ResourceData, m interface{}) error {
+	strClientInit = `(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
 	var err error
 	client := m.(*ProviderConfig)
@@ -391,12 +394,12 @@ import (
 
 	strSendTrans = `
     err = client.SendTransaction("", config, false)
-    check(err)
+    check(ctx, err)
     `
 
 	strSendTransId = `
     err = client.SendTransaction(id, config, false)
-    check(err)
+    check(ctx, err)
     `
 
 	strSetIdValue = `
@@ -419,7 +422,7 @@ import (
 
 	strDelete = `
     _, err = client.DeleteConfigNoCommit(id)
-    check(err)
+    check(ctx, err)
 
     d.SetId("")
     `
@@ -769,7 +772,9 @@ func setListXpathMatch(uses string, nodeCheck Node, schemaTab string, structXpat
 
 				strStruct += "\n" + schemaTab + "V_" + val_ + "  *string  `xml:\"" + keyVar + ",omitempty\"`"
 				strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
-				strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
+				strSetFunc += "\tif err :=d.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ");err != nil{\n"
+				strSetFunc += "\t\treturn diag.FromErr(err)\n"
+				strSetFunc += "\t}\n"
 				strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = &V_" + val_ + "\n"
 			}
 		}
@@ -828,7 +833,7 @@ func initializeFunctionString(name string) {
 		strStruct += "\n\tGroups  struct {\n\t\tXMLName\txml.Name\t`xml:\"groups\"`\n\t\tName\tstring\t`xml:\"name\"`"
 		strStructEnd = "\n\t} `xml:\"groups\"`\n\tApplyGroup string `xml:\"apply-groups\"`"
 	}
-	strRead = "\n\tconfig := &xml" + name + "{}\n\n\terr = client.MarshalGroup(id, config)\n\tcheck(err)\n"
+	strRead = "\n\tconfig := &xml" + name + "{}\n\n\terr = client.MarshalGroup(id, config)\n\tcheck(ctx, err)\n"
 
 	// Append text for Create Function.
 	strCreate += "func junos" + name + "Create" + strClientInit
@@ -844,10 +849,10 @@ func initializeFunctionString(name string) {
 
 	// Append text with function name to schema string.
 	var schemaTemp string = "\n\nfunc junos" + name + "() *schema.Resource {\n\treturn &schema.Resource{\n"
-	schemaTemp = schemaTemp + "\t\tCreate: junos" + name + "Create,\n"
-	schemaTemp = schemaTemp + "\t\tRead: junos" + name + "Read,\n"
-	schemaTemp = schemaTemp + "\t\tUpdate: junos" + name + "Update,\n"
-	schemaTemp = schemaTemp + "\t\tDelete: junos" + name + "Delete,"
+	schemaTemp = schemaTemp + "\t\tCreateContext: junos" + name + "Create,\n"
+	schemaTemp = schemaTemp + "\t\tReadContext: junos" + name + "Read,\n"
+	schemaTemp = schemaTemp + "\t\tUpdateContext: junos" + name + "Update,\n"
+	schemaTemp = schemaTemp + "\t\tDeleteContext: junos" + name + "Delete,"
 	strSchema = schemaTemp + strSchema
 }
 
@@ -958,7 +963,9 @@ func handleLeaf(nodes Node, strStructHierarchy string, schemaTab string) {
 		strSchema += "\n\t\t\t\tOptional: true,"
 		strSchema += "\n\t\t\t\tDescription:    \"xpath is: " + strStructHierarchy + ". " + desc + "\",\n\t\t\t},"
 		strGetFunc += "\tV_" + val_ + " := d.Get(\"" + val_ + "\").(string)\n"
-		strSetFunc += "\td.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ")\n"
+		strSetFunc += "\tif err :=d.Set(\"" + val_ + "\", " + strStructHierarchy + ".V_" + val_ + ");err != nil{\n"
+		strSetFunc += "\t\treturn diag.FromErr(err)\n"
+		strSetFunc += "\t}\n"
 		strVarAssign += "\t" + strStructHierarchy + ".V_" + val_ + " = &V_" + val_ + "\n"
 	}
 }
@@ -1062,10 +1069,10 @@ func createFile(moduleFilePath, providerName string) error {
 	strStruct += "\n}"
 	// Append for the create function.
 	strCreate += strGetFunc + "\n" + strVarAssign + strSendTrans + strSetIdValue +
-		"\n\treturn junos" + strModuleName + "Read(d,m)" + "\n}"
+		"\n\treturn junos" + strModuleName + "Read(ctx,d,m)" + "\n}"
 	// Append for the update function.
 	strUpdate += strGetFunc + "\n" + strVarAssign + strSendTransId +
-		"\n\treturn junos" + strModuleName + "Read(d,m)" + "\n}"
+		"\n\treturn junos" + strModuleName + "Read(ctx,d,m)" + "\n}"
 	// Append for the read function.
 	strRead += strSetFunc + "\n\treturn nil\n}"
 	// Append for the delete function.
@@ -1112,7 +1119,7 @@ func listFiles(yangFilePath string) {
 	}
 
 	providerFileData = `
-// Copyright (c) 2017-2021, Juniper Networks Inc. All rights reserved.
+// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
 //
 // License: Apache 2.0
 //
@@ -1132,8 +1139,11 @@ package main
 
 import (
 
+	"context"
 	gonetconf "github.com/davedotdev/go-netconf/helpers/junos_helpers"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"os"
 )
 
@@ -1143,9 +1153,14 @@ type ProviderConfig struct {
 	Host string
 }
 
-func check(err error) {
+func init() {
+	schema.DescriptionKind = schema.StringMarkdown
+}
+
+func check(ctx context.Context, err error) {
 	if err != nil {
 		// Some of these errors will be "normal".
+		tflog.Debug(ctx, err.Error())
 		f, _ := os.OpenFile("jtaf_logging.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		f.WriteString(err.Error() + "\n")
 		f.Close()
@@ -1154,7 +1169,7 @@ func check(err error) {
 }
 
 
-func providerConfigure(d *schema.ResourceData) (interface{}, error) {
+func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
 	config := Config{
 		Host:     d.Get("host").(string),
 		Port:     d.Get("port").(int),
@@ -1165,13 +1180,13 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 
 	client, err := config.Client()
 	if err != nil {
-		return nil, err
+		return nil, diag.FromErr(err)
 	}
 
 	return &ProviderConfig{client, config.Host}, nil
 }
 
-// Provider returns a Terraform ResourceProvider.
+// Provider returns a Terraform Provider.
 func Provider() *schema.Provider {
 	return &schema.Provider{
 
