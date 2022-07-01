@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2021, Juniper Networks Inc. All rights reserved.
+// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
 //
 // License: Apache 2.0
 //
@@ -17,14 +17,10 @@
 package main
 
 import (
-	"github.com/hashicorp/terraform-plugin-sdk/plugin"
-	"github.com/hashicorp/terraform-plugin-sdk/terraform"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
 )
 
 func main() {
-	plugin.Serve(&plugin.ServeOpts{
-		ProviderFunc: func() terraform.ResourceProvider {
-			return Provider()
-		},
-	})
+	opts := &plugin.ServeOpts{ProviderFunc: Provider}
+	plugin.Serve(opts)
 }

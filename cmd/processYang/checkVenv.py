@@ -1,6 +1,7 @@
-package processProviders
+#!/usr/bin/env python3
 
-const providerConfigContent = `// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
+"""
+// Copyright (c) 2017-2021, Juniper Networks Inc. All rights reserved.
 //
 // License: Apache 2.0
 //
@@ -16,28 +17,14 @@ const providerConfigContent = `// Copyright (c) 2017-2022, Juniper Networks Inc.
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-package main
+"""
+import sys
 
-import(
-	"terraform-provider-junos-%+v/netconf"
-)
-
-// Config is the configuration structure used to instantiate the Netconf provider.
-type Config struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
-	SSHKey   string
-}
-
-// Client returns a new client for the provider to use
-func (c *Config) Client() (netconf.Client, error) {
-	return newClient(c)
-}
-
-func newClient(c *Config) (netconf.Client, error) {
-
-	client, err := netconf.NewClient(c.Username, c.Password, c.SSHKey, c.Host, c.Port)
-	return client, err
-}`
+def getBasePrefix():
+    return getattr(sys, "base_prefix", None) or getattr(sys, "real_prefix", 
+                                                        None) or sys.prefix
+if __name__ == "__main__":
+    if getBasePrefix() != sys.prefix:
+        print('true')
+    else:
+        print('false')
