@@ -311,7 +311,6 @@ func CreateProviders(jcfg cfg.Config) error {
 			tpPath += "/"
 		}
 	}
-	fmt.Println(tpPath)
 	// Copy the go files from ../terraform_providers to the `providerDir` from the config file
 	PrintHeader("Copying files")
 	var fileCopyCount uint32
