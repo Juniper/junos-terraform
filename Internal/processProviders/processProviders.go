@@ -415,7 +415,7 @@ import (
 	strUpdate = ""
 
 	strDelete = `
-    _, err = client.DeleteConfigNoCommit(id)
+    _, err = client.DeleteConfig(id,false)
     check(ctx, err)
 
     d.SetId("")
