@@ -53,21 +53,15 @@ func junosDestroyCommitUpdate(ctx context.Context, d *schema.ResourceData, m int
 
 func junosDestroyCommitDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
-	var err error
-
 	client := m.(*ProviderConfig)
 
-	err = client.SendCommit()
-
-	if err != nil {
+	if err := client.SendCommit(); err != nil {
 		return diag.FromErr(err)
 	}
 
-	err = client.Close()
-	if err != nil {
+	if err := client.Close(); err != nil {
 		return diag.FromErr(err)
 	}
-
 	return nil
 }
 
