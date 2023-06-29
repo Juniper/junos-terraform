@@ -455,7 +455,7 @@ func start(nodes []Node) {
 			// n1 is group, the parent container will be the next element.
 			// the parent container is expected to be a single element.
 			for _, n2 := range n1.Nodes {
-				if n2.XMLName.Local == "container" {
+				if n2.XMLName.Local == "container" || (n2.XMLName.Local == "list" && n2.Key == "logical-systems")  {
 					// Append information at start of the code blocks in the file
 					// It needs the parent container name and xpath so it is being done here than
 					// in the main function itself.
@@ -482,7 +482,7 @@ func start(nodes []Node) {
 // check if the xpath provided is a valid xpath in yang file
 func matchXpath(nodes Node) {
 	// Handle variable for xpath hierarchy for structure
-	// remove the 1st / from the xapth as it is not required
+	// remove the 1st / from the xpath as it is not required
 	// for the rest xpath replace / with > as it will be used in struct.
 	strXpath := inputXpath
 	strXpath = s.Replace(strXpath, "/", "", 1)
@@ -511,7 +511,7 @@ func matchXpath(nodes Node) {
 	// TODO: TIDY THIS UP node_last_elemt Node   // no need to store last element, it will be nodeCheck
 	var node_last_elemt_2 Node
 
-	// If the topmost container is chosen, don't process xpath.
+	// If the topmost container is chosen, don't process xpath. --> IGNORE
 	if len(strParts) > 1 {
 		var matchFound bool
 		for itr := 1; itr < len(strParts); itr++ {
