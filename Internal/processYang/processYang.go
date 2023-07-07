@@ -229,8 +229,8 @@ func start(nodes []Node) {
 				}
 			}
 			// n1 is group, the parent container will be the next element.
-			strModuleName = n1.Nodes[0].Key
 			for _, n2 := range n1.Nodes {
+				strModuleName = n1.Nodes[0].Key
 				if n2.XMLName.Local == "container" || n2.XMLName.Local == "list" {
 					handleContainer(n2, "", "")
 					break
