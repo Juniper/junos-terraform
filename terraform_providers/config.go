@@ -17,7 +17,7 @@
 package main
 
 import (
-	gonetconf "github.com/davedotdev/go-netconf/helpers/junos_helpers"
+	gonetconf "github.com/vinpatel24/go-netconf/helpers/junos_helpers"
 )
 
 // Config is the configuration structure used to instantiate the GoNETCONF provider.
