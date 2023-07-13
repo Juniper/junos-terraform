@@ -20,7 +20,7 @@ package main
 import (
 	"log"
 
-	gonetconf "github.com/davedotdev/go-netconf/helpers/junos_helpers"
+	gonetconf "github.com/vinpatel24/go-netconf/helpers/junos_helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
