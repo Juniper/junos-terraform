@@ -143,7 +143,7 @@ func CreateYinFileAndXpath(jcfg cfg.Config) error {
 		}
 	}
 	if len(foundXPath) == 0 {
-		PrintHeader("Yin files already created from Yang file directory: " + filePath)
+		PrintHeader("_xpath files already created from Yin files in yang_files directory: " + filePath)
 	}
 	// No error, return nil.
 	return nil
@@ -180,9 +180,8 @@ func listFiles(filePath string) error {
 			boolFlagXPath := compareFilesCreationTime(line, temp[0] + ".yang")
 			if boolFlagXPath {
 				foundXPath = remove(foundXPath, temp[0])
-				fmt.Println(foundXPath)
-				fmt.Println()
-
+				// fmt.Println(foundXPath)
+				// fmt.Println()
 			}
         }
         if yinMatched {
