@@ -62,6 +62,9 @@ var yangFileList []string
 // Boolean to tell wether yin exists or not.
 var foundYin []string
 
+// Boolean to tell whether xpath files exists or not.
+var foundXPath []string
+
 // Syntactic helper to reduce repetition.
 func check(e error) {
 	if e != nil {
@@ -88,45 +91,59 @@ func CreateYinFileAndXpath(jcfg cfg.Config) error {
 	if len(foundYin) == 0 {
 		PrintHeader("Yin files already created from Yang file directory: " + filePath)
 	}
+	
+	if len(foundXPath) > 0 {
+		PrintHeader("Creating _xpath files from the Yin files")
+		counter := 0
+		numofJobs := len(yangFileList)
 
-	PrintHeader("Creating _xpath files from the Yin files")
+		for _, inputYinFile := range yangFileList {
+			foundFlag := contains(foundXPath, inputYinFile)
+			if foundFlag == true {
+				strCreate = ""
+				strModuleName = ""
+				grpNode = nil
 
-	for _, inputYinFile := range yangFileList {
+				// Read data from file.
+				dat, err := ioutil.ReadFile(inputYinFile + ".yin")
+				if err != nil {
+					fmt.Println("DEBUG: Error reading .yin file")
+					return err
+				}
 
-		strCreate = ""
-		strModuleName = ""
-		grpNode = nil
+				// XML decoding.
+				buf := bytes.NewBuffer(dat)
+				dec := xml.NewDecoder(buf)
 
-		// Read data from file.
-		dat, err := ioutil.ReadFile(inputYinFile + ".yin")
-		if err != nil {
-			fmt.Println("DEBUG: Error reading .yin file")
-			return err
+				// Create Node based structure, Node is defined above.
+				var n Node
+				err = dec.Decode(&n)
+				if err != nil {
+					fmt.Println("DEBUG: Error decododing XML")
+					return err
+				}
+
+				// Process all the groups in yin file and store them.
+				create_group_nodes([]Node{n})
+
+				// Start processing of the data in the file.
+				start([]Node{n})
+
+				// create the xpath for the yin/yang file.
+				err = createFile(inputYinFile+"_xpath", fileType)
+				if err != nil {
+					return err
+				}
+			}
+			if foundFlag == false {
+				fmt.Printf("Xpath file for %s is already generated\n", inputYinFile) 
+			}
+			printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
+			counter++
 		}
-
-		// XML decoding.
-		buf := bytes.NewBuffer(dat)
-		dec := xml.NewDecoder(buf)
-
-		// Create Node based structure, Node is defined above.
-		var n Node
-		err = dec.Decode(&n)
-		if err != nil {
-			fmt.Println("DEBUG: Error decododing XML")
-			return err
-		}
-
-		// Process all the groups in yin file and store them.
-		create_group_nodes([]Node{n})
-
-		// Start processing of the data in the file.
-		start([]Node{n})
-
-		// create the xpath for the yin/yang file.
-		err = createFile(inputYinFile+"_xpath", fileType)
-		if err != nil {
-			return err
-		}
+	}
+	if len(foundXPath) == 0 {
+		PrintHeader("Yin files already created from Yang file directory: " + filePath)
 	}
 	// No error, return nil.
 	return nil
@@ -143,26 +160,39 @@ func listFiles(filePath string) error {
 
 	// Retained for debugging purposes.
 	// fmt.Println(string(out))
-
 	output := string(out[:])
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
-		// TODO: Consider using regexp.Compile() for this.
-		yangMatched, _ := regexp.Match(`.yang`, []byte(line))
-		yinMatched, _ := regexp.Match(`.yin`, []byte(line))
+        // TODO: Consider using regexp.Compile() for this.
+        yangMatched, _ := regexp.Match(`.yang`, []byte(line))
 		if yangMatched {
 			temp := strings.Split(line, ".yang")
 			yangFileList = append(yangFileList, temp[0])
 			foundYin = append(foundYin, temp[0])
-		}
-		if yinMatched {
+			foundXPath = append(foundXPath, temp[0])
+        }
+    }
+	for _, line := range lines {
+		yinMatched, _ := regexp.Match(`.yin`, []byte(line))
+        txtMatched, _ := regexp.Match(`_xpath.txt`, []byte(line))
+        if txtMatched {
+			temp := strings.Split(line, "_xpath.txt")
+			boolFlagXPath := compareFilesCreationTime(line, temp[0] + ".yang")
+			if boolFlagXPath {
+				foundXPath = remove(foundXPath, temp[0])
+				fmt.Println(foundXPath)
+				fmt.Println()
+
+			}
+        }
+        if yinMatched {
 			temp := strings.Split(line, ".yin")
 			boolFlag := compareFilesCreationTime(line, temp[0] + ".yang")
 			if boolFlag {
 				foundYin = remove(foundYin, temp[0])
 			}
-		}
-	}
+        }
+    }
 	// No error, return nil.
 	return nil
 }
@@ -178,6 +208,9 @@ func generateYinFile(filePath string) {
 	//fmt.Println(yangFileList)
 
 	PrintHeader("Creating Yin files from Yang file directory: " + filePath)
+
+	counter := 0
+	numofJobs := len(yangFileList)
 
 	for _, file := range yangFileList {
 		foundFlag := contains(foundYin, file)
@@ -195,8 +228,12 @@ func generateYinFile(filePath string) {
 		if foundFlag == false {
 			fmt.Printf("Yin file for %s is already generated\n", file) 
 		}
+		printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
+		counter++
 	}
 }
+
+
 
 // Create group nodes from []Node.
 func create_group_nodes(nodes []Node) {
@@ -457,4 +494,25 @@ func contains(s []string, str string) bool {
 	}
 
 	return false
+}
+
+func printProgressBar(iteration, total int, prefix, suffix string, length int, fill string) {
+	percent := float64(iteration) / float64(total)
+	filledLength := int(length * iteration / total)
+	end := ">"
+	
+	if iteration == total {
+	 end = "="
+	}
+
+   	bar := strings.Repeat(fill, filledLength) + end + strings.Repeat("-", (length-filledLength))
+	fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, suffix)
+	fmt.Println()
+	fmt.Println()
+
+	
+	if iteration == total {
+	 fmt.Println()
+	 fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, "COMPLETED")
+	}
 }

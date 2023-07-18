@@ -169,6 +169,10 @@ func CreateProviders(jcfg cfg.Config) error {
 	}
 
 	// parse the xpaths provided to generate terraform based modules
+	counter := 0
+	numofJobs := len(inNode.Nodes)
+	fmt.Printf(numofJobs)
+
 	for _, n5 := range inNode.Nodes {
 
 		// fmt.Println("DEBUG: Working with XPath Expression(n5.Key): -> ", n5.Key)
@@ -267,6 +271,8 @@ func CreateProviders(jcfg cfg.Config) error {
 				}
 			}
 		}
+		printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
+		counter++
 	}
 
 	providerFileData += `			"junos-` + jcfg.ProviderName + `_commit": junosCommit(),
@@ -1218,4 +1224,25 @@ func Provider() *schema.Provider {
 
 		ResourcesMap: map[string]*schema.Resource{
 `
+}
+
+func printProgressBar(iteration, total int, prefix, suffix string, length int, fill string) {
+	percent := float64(iteration) / float64(total)
+	filledLength := int(length * iteration / total)
+	end := ">"
+	
+	if iteration == total {
+	 end = "="
+	}
+
+   	bar := strings.Repeat(fill, filledLength) + end + strings.Repeat("-", (length-filledLength))
+	fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, suffix)
+	fmt.Println()
+	fmt.Println()
+
+	
+	if iteration == total {
+	 fmt.Println()
+	 fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, "COMPLETED")
+	}
 }
