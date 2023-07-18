@@ -171,7 +171,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	// parse the xpaths provided to generate terraform based modules
 	counter := 0
 	numofJobs := len(inNode.Nodes)
-	fmt.Printf(numofJobs)
+	// fmt.Printf(numofJobs)
 
 	for _, n5 := range inNode.Nodes {
 
