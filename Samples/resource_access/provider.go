@@ -1,4 +1,3 @@
-
 // Copyright (c) 2017-2021, Juniper Networks Inc. All rights reserved.
 //
 // License: Apache 2.0
@@ -20,8 +19,8 @@ package main
 import (
 	"log"
 
-	gonetconf "github.com/davedotdev/go-netconf/helpers/junos_helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	gonetconf "github.com/vinpatel24/go-netconf/helpers/junos_helpers"
 )
 
 // ProviderConfig is to hold client information
@@ -30,9 +29,9 @@ type ProviderConfig struct {
 }
 
 func check(e error) {
-    if e != nil {
-        panic(e)
-    }
+	if e != nil {
+		panic(e)
+	}
 }
 
 // Client Refreshes the client
@@ -90,10 +89,10 @@ func Provider() *schema.Provider {
 		},
 
 		ResourcesMap: map[string]*schema.Resource{
-			"junos-device_AccessDomainMapApply__MacroData": junosAccessDomainMapApply__MacroData(),
-			"junos-device_AccessGx__PlusPartition": junosAccessGx__PlusPartition(),
+			"junos-device_AccessDomainMapApply__MacroData":          junosAccessDomainMapApply__MacroData(),
+			"junos-device_AccessGx__PlusPartition":                  junosAccessGx__PlusPartition(),
 			"junos-device_AccessRadsecDestinationDynamic__Requests": junosAccessRadsecDestinationDynamic__Requests(),
-			"junos-device_commit": junosCommit(),
+			"junos-device_commit":                                   junosCommit(),
 		},
 		ConfigureFunc: returnProvider,
 	}
