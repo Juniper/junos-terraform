@@ -94,7 +94,7 @@ var strImport string
 var strStruct string
 var strStructEnd string
 
-//string variable for schema.
+// string variable for schema.
 var strSchema string
 var strClientInit string
 var strSendTrans string
@@ -288,7 +288,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	check(err)
 
 	// Write to the file
-	_, err = fPtr.WriteString(fmt.Sprintf(providerFileData, jcfg.ProviderName))
+	_, err = fPtr.WriteString(providerFileData)
 
 	// List summary data
 	fmt.Println("--------------------------------------------------------------------------------")
@@ -311,15 +311,31 @@ func CreateProviders(jcfg cfg.Config) error {
 			tpPath += "/"
 		}
 	}
-	// Copy the go files from ../terraform_providers to the `providerDir` from the config file
-	PrintHeader("Copying files")
-	var fileCopyCount uint32
-	if err := copyDir(tpPath, jcfg.ProviderDir, ".go", &fileCopyCount); err != nil {
-		return fmt.Errorf("failed to copy files from the %s direcotry: %w", tpPath, err)
+
+	// Copy the files from ../terraform_providers to the `providerDir` from the config file
+	files, err := ioutil.ReadDir(tpPath)
+	if err != nil {
+		fmt.Println(err)
 	}
-	fmt.Println("------------------------------------------------------------")
-	fmt.Println(fmt.Sprintf("- Copied a total of %d .go files from %s to %s -", fileCopyCount, filepath.Base(tpPath), filepath.Base(jcfg.ProviderDir)))
-	fmt.Println("------------------------------------------------------------")
+	fmt.Println()
+	PrintHeader("Copying the rest of the required Go files")
+	for _, f := range files {
+		if strings.Contains(f.Name(), ".go") {
+			input, err := ioutil.ReadFile(tpPath + "/" + f.Name())
+			if err != nil {
+				fmt.Println(err)
+			}
+			err = ioutil.WriteFile(jcfg.ProviderDir+"/"+f.Name(), input, 0644)
+			if err != nil {
+				fmt.Println("Error creating", jcfg.ProviderDir+"/"+f.Name())
+			}
+			fmt.Printf("Copied file: %+v to %+v\n", f.Name(), jcfg.ProviderDir)
+		}
+	}
+
+	// fmt.Println("------------------------------------------------------------")
+	// fmt.Println(fmt.Sprintf("- Copied a total of %d .go files from %s to %s -", fileCopyCount, filepath.Base(tpPath), filepath.Base(jcfg.ProviderDir)))
+	// fmt.Println("------------------------------------------------------------")
 
 	PrintHeader("Creating Go Mod")
 	err = ioutil.WriteFile(jcfg.ProviderDir+"/go.mod", []byte(fmt.Sprintf(gomodcontent, jcfg.ProviderName)), 0644)
@@ -328,6 +344,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	}
 
 	PrintHeader("Creating provider config")
+	// fmt.Println(providerConfigContent)
 	err = ioutil.WriteFile(jcfg.ProviderDir+"/config.go", []byte(fmt.Sprintf(providerConfigContent, jcfg.ProviderName)), 0644)
 	if err != nil {
 		fmt.Println("Error creating", jcfg.ProviderDir+"/config.go")
@@ -449,7 +466,7 @@ func start(nodes []Node) {
 			// n1 is group, the parent container will be the next element.
 			// the parent container is expected to be a single element.
 			for _, n2 := range n1.Nodes {
-				if n2.XMLName.Local == "container" {
+				if n2.XMLName.Local == "container" || (n2.XMLName.Local == "list" && n2.Key == "logical-systems") {
 					// Append information at start of the code blocks in the file
 					// It needs the parent container name and xpath so it is being done here than
 					// in the main function itself.
