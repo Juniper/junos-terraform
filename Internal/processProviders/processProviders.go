@@ -172,105 +172,104 @@ func CreateProviders(jcfg cfg.Config) error {
 		return err
 	}
 
+	counter := 0
+	numofJobs := len(inNode.Nodes)
+
 	// parse the xpaths provided to generate terraform based modules
 	for _, n5 := range inNode.Nodes {
 
 		// fmt.Println("DEBUG: Working with XPath Expression(n5.Key): -> ", n5.Key)
 		currentXPath = n5.Key
-
-		if n5.XMLName.Local == "xpath" {
-			inputXpath = n5.Key
-			strParts := s.Split(inputXpath, "/")
-			yangCheck := "conf-" + strParts[1] + "@"
-
-			for _, file := range yang_file_list {
-				if s.Contains(file, yangCheck) {
-					inputYinFile = file + ".yin"
-					break
-				}
-			}
-
-			isGrpFlag = true
-			for _, n2 := range n5.Nodes {
-				if n2.XMLName.Local == "group-flag" {
-					if n2.Key == "false" {
-						isGrpFlag = false
+		// ADD Check here to see if n5.KEY is not empty
+		// test by adding empty xpath to xpath_example
+		if currentXPath == "" {
+			fmt.Println("EMPTY XPATH found, remove this from the xpath file. Issue Marked")
+			issueCounter += 1
+		}
+		if currentXPath != "" {
+			if n5.XMLName.Local == "xpath" {
+				inputXpath = n5.Key
+				strParts := s.Split(inputXpath, "/")
+				yangCheck := "conf-" + strParts[1] + "@"
+				for _, file := range yang_file_list {
+					if s.Contains(file, yangCheck) {
+						inputYinFile = file + ".yin"
+						break
 					}
 				}
-			}
-
-			// Set global variables to default values
-			initialize_global_variables()
-
-			// Parse data from Yin file
-			dat, err := ioutil.ReadFile(inputYinFile)
-			if err != nil {
-				return err
-			}
-
-			// XML decoding
-			buf := bytes.NewBuffer(dat)
-			dec := xml.NewDecoder(buf)
-
-			// Create Node based structure, Node is defined above
-			var n Node
-			err = dec.Decode(&n)
-			if err != nil {
-				return err
-			}
-
-			// Process all the groups in yin file and store them
-			create_group_nodes([]Node{n})
-
-			// Process all of the 'uses enums' as choice-ident and choice-value
-			for _, v := range grpNode {
-
-				// fmt.Println("DEBUG: Looking at nodes in V1: ", v.Key)
-
-				// fmt.Println("In file: ", inputYinFile)
-				// if v.Key == "control_route_filter_type" {
-				// fmt.Println("looking for choice-ident")
-				for _, v2 := range v.Nodes {
-					// fmt.Println("DEBUG: Looking at nodes in v2: ", v2.Key)
-					if v2.Key == "choice-ident" {
-						// fmt.Println("Found choice-ident...")
-						for _, v3 := range v2.Nodes {
-							// fmt.Println("looking for enumeration...")
-							if v3.Key == "enumeration" {
-								// fmt.Println("Found enumeration for choice-ident...")
-								// fmt.Println("Length of enums: ", len(v3.Nodes))
-								for _, v4 := range v3.Nodes {
-									// fmt.Println(v4.Key)
-
-									if enums[v.Key] == nil {
-										enums[v.Key] = make(map[string]string)
+				isGrpFlag = true
+				for _, n2 := range n5.Nodes {
+					if n2.XMLName.Local == "group-flag" {
+						if n2.Key == "false" {
+							isGrpFlag = false
+						}
+					}
+				}
+				// Set global variables to default values
+				initialize_global_variables()
+				// Parse data from Yin file
+				dat, err := ioutil.ReadFile(inputYinFile)
+				if err != nil {
+					return err
+				}
+				// XML decoding
+				buf := bytes.NewBuffer(dat)
+				dec := xml.NewDecoder(buf)
+				// Create Node based structure, Node is defined above
+				var n Node
+				err = dec.Decode(&n)
+				if err != nil {
+					return err
+				}
+				// Process all the groups in yin file and store them
+				create_group_nodes([]Node{n})
+				// Process all of the 'uses enums' as choice-ident and choice-value
+				for _, v := range grpNode {
+					// fmt.Println("DEBUG: Looking at nodes in V1: ", v.Key)
+					// fmt.Println("In file: ", inputYinFile)
+					// if v.Key == "control_route_filter_type" {
+					// fmt.Println("looking for choice-ident")
+					for _, v2 := range v.Nodes {
+						// fmt.Println("DEBUG: Looking at nodes in v2: ", v2.Key)
+						if v2.Key == "choice-ident" {
+							// fmt.Println("Found choice-ident...")
+							for _, v3 := range v2.Nodes {
+								// fmt.Println("looking for enumeration...")
+								if v3.Key == "enumeration" {
+									// fmt.Println("Found enumeration for choice-ident...")
+									// fmt.Println("Length of enums: ", len(v3.Nodes))
+									for _, v4 := range v3.Nodes {
+										// fmt.Println(v4.Key)
+										if enums[v.Key] == nil {
+											enums[v.Key] = make(map[string]string)
+										}
+										enums[v.Key][v4.Key] = v4.Key
 									}
-									enums[v.Key][v4.Key] = v4.Key
-
 								}
 							}
 						}
 					}
 				}
-				// }
-			}
-			// End of 'uses' enum processing for lists.
+				// End of 'uses' enum processing for lists.
 
-			isXpathFound = false
+				isXpathFound = false
 
-			// Start processing of the file data
-			// Notes : "-" and "." is not allowed in go as variable name. need to replace it with "_"
-			start([]Node{n})
+				// Start processing of the file data
+				// Notes : "-" and "." is not allowed in go as variable name. need to replace it with "_"
+				start([]Node{n})
 
-			if isXpathFound {
-				// After all the data processing is done, create the file.
-				err = createFile(moduleFilePath, jcfg.ProviderName)
-				if err != nil {
-					fmt.Println("Issue creating file. Check presence of directory and permissions")
-					os.Exit(0)
+				if isXpathFound {
+					// After all the data processing is done, create the file.
+					err = createFile(moduleFilePath, jcfg.ProviderName)
+					if err != nil {
+						fmt.Println("Issue creating file. Check presence of directory and permissions")
+						os.Exit(0)
+					}
 				}
 			}
 		}
+		printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
+		counter++
 	}
 
 	providerFileData += `			"junos-` + jcfg.ProviderName + `_commit": junosCommit(),
@@ -278,8 +277,8 @@ func CreateProviders(jcfg cfg.Config) error {
 			},
 		    ConfigureContextFunc: providerConfigure,
 	    } 
-    }
-`
+    }`
+
 	// Create provider.go file
 	var fileName string = "provider.go"
 	fileName = moduleFilePath + "/" + fileName
@@ -317,6 +316,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	if err != nil {
 		fmt.Println(err)
 	}
+
 	fmt.Println()
 	PrintHeader("Copying the rest of the required Go files")
 	for _, f := range files {
@@ -325,10 +325,12 @@ func CreateProviders(jcfg cfg.Config) error {
 			if err != nil {
 				fmt.Println(err)
 			}
+
 			err = ioutil.WriteFile(jcfg.ProviderDir+"/"+f.Name(), input, 0644)
 			if err != nil {
 				fmt.Println("Error creating", jcfg.ProviderDir+"/"+f.Name())
 			}
+
 			fmt.Printf("Copied file: %+v to %+v\n", f.Name(), jcfg.ProviderDir)
 		}
 	}
@@ -432,7 +434,7 @@ import (
 	strUpdate = ""
 
 	strDelete = `
-    _, err = client.DeleteConfig(id,false)
+	_, err = client.DeleteConfig(id,false)
     check(ctx, err)
 
     d.SetId("")
@@ -493,7 +495,7 @@ func start(nodes []Node) {
 // check if the xpath provided is a valid xpath in yang file
 func matchXpath(nodes Node) {
 	// Handle variable for xpath hierarchy for structure
-	// remove the 1st / from the xapth as it is not required
+	// remove the 1st / from the xpath as it is not required
 	// for the rest xpath replace / with > as it will be used in struct.
 	strXpath := inputXpath
 	strXpath = s.Replace(strXpath, "/", "", 1)
@@ -522,7 +524,7 @@ func matchXpath(nodes Node) {
 	// TODO: TIDY THIS UP node_last_elemt Node   // no need to store last element, it will be nodeCheck
 	var node_last_elemt_2 Node
 
-	// If the topmost container is chosen, don't process xpath.
+	// If the topmost container is chosen, don't process xpath. --> IGNORE
 	if len(strParts) > 1 {
 		var matchFound bool
 		for itr := 1; itr < len(strParts); itr++ {
@@ -1274,4 +1276,24 @@ func copyDir(src, dst, extension string, fileCopyCount *uint32) error {
 		_, err = io.Copy(fh, in)
 		return err
 	})
+}
+
+func printProgressBar(iteration, total int, prefix, suffix string, length int, fill string) {
+	percent := float64(iteration) / float64(total)
+	filledLength := int(length * iteration / total)
+	end := ">"
+
+	if iteration == total {
+		end = "="
+	}
+
+	bar := strings.Repeat(fill, filledLength) + end + strings.Repeat("-", (length-filledLength))
+	fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, suffix)
+	fmt.Println()
+	fmt.Println()
+
+	if iteration == total {
+		fmt.Println()
+		fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, "COMPLETED")
+	}
 }
