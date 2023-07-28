@@ -37,8 +37,8 @@ func check(e error) {
 
 // Check if running from venv
 func check_venv_exists() {
-	app	:= "python3"
-	script	:= "checkVenv.py"
+	app := "python3"
+	script := "checkVenv.py"
 	cmd := exec.Command(app, script)
 	stdout, err := cmd.Output()
 

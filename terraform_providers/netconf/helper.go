@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	driver "github.com/davedotdev/go-netconf/drivers/driver"
-	sshdriver "github.com/davedotdev/go-netconf/drivers/ssh"
+	driver "github.com/vinpatel24/go-netconf/drivers/driver"
+	sshdriver "github.com/vinpatel24/go-netconf/drivers/ssh"
 
 	"golang.org/x/crypto/ssh"
 )
