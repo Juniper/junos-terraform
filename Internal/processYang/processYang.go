@@ -2,7 +2,7 @@
 //
 // License: Apache 2.0
 //
-// THIS SOFTWARE IS PROVIDED BY Juniper Networks, Inc. ''AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY Juniper Networks, Inc. ”AS IS” AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 // WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
 // DISCLAIMED. IN NO EVENT SHALL Juniper Networks, Inc. BE LIABLE FOR ANY
@@ -12,8 +12,6 @@
 // ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-
 package processYang
 
 import (
@@ -26,6 +24,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
 	"github.com/Juniper/junos-terraform/Internal/cfg"
 )
 
@@ -51,7 +50,7 @@ var grpNode []Node
 var strModuleName string = ""
 
 // String variable for Create Fn.
-var strCreate string = "" 
+var strCreate string = ""
 
 // String variable for XML representation.
 var startXML string = ""
@@ -71,16 +70,13 @@ func check(e error) {
 
 // Create Yin files from Yang files and also generate the xpath for the elements
 func CreateYinFileAndXpath(jcfg cfg.Config) error {
-
 	filePath := jcfg.YangDir
 	fileType := jcfg.FileType
-
 	// Create list of yang files present.
 	err := listFiles(filePath)
 	if err != nil {
 		return err
 	}
-
 	// Generate yin file for all yang files, if not already created
 	if len(foundYin) > 0 {
 		generateYinFile(filePath)
@@ -88,26 +84,20 @@ func CreateYinFileAndXpath(jcfg cfg.Config) error {
 	if len(foundYin) == 0 {
 		PrintHeader("Yin files already created from Yang file directory: " + filePath)
 	}
-
 	PrintHeader("Creating _xpath files from the Yin files")
-
 	for _, inputYinFile := range yangFileList {
-
 		strCreate = ""
 		strModuleName = ""
 		grpNode = nil
-
 		// Read data from file.
 		dat, err := ioutil.ReadFile(inputYinFile + ".yin")
 		if err != nil {
 			fmt.Println("DEBUG: Error reading .yin file")
 			return err
 		}
-
 		// XML decoding.
 		buf := bytes.NewBuffer(dat)
 		dec := xml.NewDecoder(buf)
-
 		// Create Node based structure, Node is defined above.
 		var n Node
 		err = dec.Decode(&n)
@@ -115,13 +105,10 @@ func CreateYinFileAndXpath(jcfg cfg.Config) error {
 			fmt.Println("DEBUG: Error decododing XML")
 			return err
 		}
-
 		// Process all the groups in yin file and store them.
 		create_group_nodes([]Node{n})
-
 		// Start processing of the data in the file.
 		start([]Node{n})
-
 		// create the xpath for the yin/yang file.
 		err = createFile(inputYinFile+"_xpath", fileType)
 		if err != nil {
@@ -135,15 +122,12 @@ func CreateYinFileAndXpath(jcfg cfg.Config) error {
 // List files and get filenames.
 func listFiles(filePath string) error {
 	os.Chdir(filePath)
-
 	out, err := exec.Command("ls").Output()
 	if err != nil {
 		return err
 	}
-
 	// Retained for debugging purposes.
 	// fmt.Println(string(out))
-
 	output := string(out[:])
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
@@ -157,7 +141,7 @@ func listFiles(filePath string) error {
 		}
 		if yinMatched {
 			temp := strings.Split(line, ".yin")
-			boolFlag := compareFilesCreationTime(line, temp[0] + ".yang")
+			boolFlag := compareFilesCreationTime(line, temp[0]+".yang")
 			if boolFlag {
 				foundYin = remove(foundYin, temp[0])
 			}
@@ -169,16 +153,12 @@ func listFiles(filePath string) error {
 
 // Generate yin file for all yang files.
 func generateYinFile(filePath string) {
-
 	if !isCommandAvailable("pyang") {
 		panic("pyang is not installed")
 	}
-
 	// Retained for debugging purposes.
 	//fmt.Println(yangFileList)
-
 	PrintHeader("Creating Yin files from Yang file directory: " + filePath)
-
 	for _, file := range yangFileList {
 		foundFlag := contains(foundYin, file)
 		if foundFlag == true {
@@ -190,10 +170,10 @@ func generateYinFile(filePath string) {
 				fmt.Println("output from pyang: ", string(output))
 				panic("pyang error: " + err.Error())
 			}
-			fmt.Printf("Yin file for %s is generated\n", file) 
+			fmt.Printf("Yin file for %s is generated\n", file)
 		}
 		if foundFlag == false {
-			fmt.Printf("Yin file for %s is already generated\n", file) 
+			fmt.Printf("Yin file for %s is already generated\n", file)
 		}
 	}
 }
@@ -238,7 +218,11 @@ func start(nodes []Node) {
 			}
 			// Only 1st augment needs to be traversed, so breaking the loop.
 			break
-		} else if n.XMLName.Local == "container" { 
+		} else if n.XMLName.Local == "container" {
+			handleContainer(n, "", "")
+			break
+		}
+		if n.XMLName.Local == "container" {
 			handleContainer(n, "", "")
 			break
 		}
@@ -413,39 +397,34 @@ func isCommandAvailable(name string) bool {
 // skip uneeded compiling of yin files
 func compareFilesCreationTime(filePath1, filePath2 string) bool {
 	file1Info, err := os.Stat(filePath1)
-	
 	if err != nil {
 		fmt.Printf("Error reading file1: %s\n", err.Error())
 		return false
 	}
-
 	file2Info, err := os.Stat(filePath2)
 	if err != nil {
 		fmt.Printf("Error reading file2: %s\n", err.Error())
 		return false
 	}
-
 	file1ModTime := file1Info.ModTime()
 	file2ModTime := file2Info.ModTime()
-
 	switch {
 	case file1ModTime.Before(file2ModTime):
 		return false
-	default: 
+	default:
 		return true
 	}
-
 }
 
 // This function can be used to remove a specific element from an array (slice)
 func remove(slice []string, element string) []string {
-    for i, v := range slice {
-        if v == element {
-            slice = append(slice[:i], slice[i+1:]...)
-            break
-        }
-    }
-    return slice
+	for i, v := range slice {
+		if v == element {
+			slice = append(slice[:i], slice[i+1:]...)
+			break
+		}
+	}
+	return slice
 }
 
 // This is a helper fucntion
@@ -455,6 +434,5 @@ func contains(s []string, str string) bool {
 			return true
 		}
 	}
-
 	return false
 }

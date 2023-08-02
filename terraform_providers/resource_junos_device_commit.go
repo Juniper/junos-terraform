@@ -26,24 +26,18 @@ import (
 
 func junosCommitCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 
-	var err error
 	id := d.Get("resource_name").(string)
 
 	client := m.(*ProviderConfig)
 
-	err = client.SendCommit()
-
-	if err != nil {
+	if err := client.SendCommit(); err != nil {
 		return diag.FromErr(err)
 	}
-
 	d.SetId(fmt.Sprintf("%s_%s", client.Host, id))
 
-	err = client.Close()
-	if err != nil {
+	if err := client.Close(); err != nil {
 		return diag.FromErr(err)
 	}
-
 	return junosCommitRead(ctx, d, m)
 }
 

@@ -20,14 +20,18 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"io"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	s "strings"
+	"sync/atomic"
 	"unicode/utf8"
 
 	"github.com/Juniper/junos-terraform/Internal/cfg"
@@ -90,7 +94,7 @@ var strImport string
 var strStruct string
 var strStructEnd string
 
-//string variable for schema.
+// string variable for schema.
 var strSchema string
 var strClientInit string
 var strSendTrans string
@@ -149,7 +153,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	moduleFilePath := jcfg.ProviderDir
 
 	// Create list of yang files present
-	listFiles(yangFilePath)
+	listFiles(yangFilePath, jcfg)
 
 	// Read data from xpath file
 	datIn, err := ioutil.ReadFile(xpathFilePath)
@@ -173,97 +177,91 @@ func CreateProviders(jcfg cfg.Config) error {
 
 		// fmt.Println("DEBUG: Working with XPath Expression(n5.Key): -> ", n5.Key)
 		currentXPath = n5.Key
-
-		if n5.XMLName.Local == "xpath" {
-			inputXpath = n5.Key
-			strParts := s.Split(inputXpath, "/")
-			yangCheck := "conf-" + strParts[1] + "@"
-
-			for _, file := range yang_file_list {
-				if s.Contains(file, yangCheck) {
-					inputYinFile = file + ".yin"
-					break
-				}
-			}
-
-			isGrpFlag = true
-			for _, n2 := range n5.Nodes {
-				if n2.XMLName.Local == "group-flag" {
-					if n2.Key == "false" {
-						isGrpFlag = false
+		// ADD Check here to see if n5.KEY is not empty
+		// test by adding empty xpath to xpath_example
+		if currentXPath == "" {
+			fmt.Println("EMPTY XPATH found, remove this from the xpath file. Issue Marked")
+			issueCounter += 1
+		}
+		if currentXPath != "" {
+			if n5.XMLName.Local == "xpath" {
+				inputXpath = n5.Key
+				strParts := s.Split(inputXpath, "/")
+				yangCheck := "conf-" + strParts[1] + "@"
+				for _, file := range yang_file_list {
+					if s.Contains(file, yangCheck) {
+						inputYinFile = file + ".yin"
+						break
 					}
 				}
-			}
-
-			// Set global variables to default values
-			initialize_global_variables()
-
-			// Parse data from Yin file
-			dat, err := ioutil.ReadFile(inputYinFile)
-			if err != nil {
-				return err
-			}
-
-			// XML decoding
-			buf := bytes.NewBuffer(dat)
-			dec := xml.NewDecoder(buf)
-
-			// Create Node based structure, Node is defined above
-			var n Node
-			err = dec.Decode(&n)
-			if err != nil {
-				return err
-			}
-
-			// Process all the groups in yin file and store them
-			create_group_nodes([]Node{n})
-
-			// Process all of the 'uses enums' as choice-ident and choice-value
-			for _, v := range grpNode {
-
-				// fmt.Println("DEBUG: Looking at nodes in V1: ", v.Key)
-
-				// fmt.Println("In file: ", inputYinFile)
-				// if v.Key == "control_route_filter_type" {
-				// fmt.Println("looking for choice-ident")
-				for _, v2 := range v.Nodes {
-					// fmt.Println("DEBUG: Looking at nodes in v2: ", v2.Key)
-					if v2.Key == "choice-ident" {
-						// fmt.Println("Found choice-ident...")
-						for _, v3 := range v2.Nodes {
-							// fmt.Println("looking for enumeration...")
-							if v3.Key == "enumeration" {
-								// fmt.Println("Found enumeration for choice-ident...")
-								// fmt.Println("Length of enums: ", len(v3.Nodes))
-								for _, v4 := range v3.Nodes {
-									// fmt.Println(v4.Key)
-
-									if enums[v.Key] == nil {
-										enums[v.Key] = make(map[string]string)
+				isGrpFlag = true
+				for _, n2 := range n5.Nodes {
+					if n2.XMLName.Local == "group-flag" {
+						if n2.Key == "false" {
+							isGrpFlag = false
+						}
+					}
+				}
+				// Set global variables to default values
+				initialize_global_variables()
+				// Parse data from Yin file
+				dat, err := ioutil.ReadFile(inputYinFile)
+				if err != nil {
+					return err
+				}
+				// XML decoding
+				buf := bytes.NewBuffer(dat)
+				dec := xml.NewDecoder(buf)
+				// Create Node based structure, Node is defined above
+				var n Node
+				err = dec.Decode(&n)
+				if err != nil {
+					return err
+				}
+				// Process all the groups in yin file and store them
+				create_group_nodes([]Node{n})
+				// Process all of the 'uses enums' as choice-ident and choice-value
+				for _, v := range grpNode {
+					// fmt.Println("DEBUG: Looking at nodes in V1: ", v.Key)
+					// fmt.Println("In file: ", inputYinFile)
+					// if v.Key == "control_route_filter_type" {
+					// fmt.Println("looking for choice-ident")
+					for _, v2 := range v.Nodes {
+						// fmt.Println("DEBUG: Looking at nodes in v2: ", v2.Key)
+						if v2.Key == "choice-ident" {
+							// fmt.Println("Found choice-ident...")
+							for _, v3 := range v2.Nodes {
+								// fmt.Println("looking for enumeration...")
+								if v3.Key == "enumeration" {
+									// fmt.Println("Found enumeration for choice-ident...")
+									// fmt.Println("Length of enums: ", len(v3.Nodes))
+									for _, v4 := range v3.Nodes {
+										// fmt.Println(v4.Key)
+										if enums[v.Key] == nil {
+											enums[v.Key] = make(map[string]string)
+										}
+										enums[v.Key][v4.Key] = v4.Key
 									}
-									enums[v.Key][v4.Key] = v4.Key
-
 								}
 							}
 						}
 					}
 				}
-				// }
-			}
-			// End of 'uses' enum processing for lists.
+				// End of 'uses' enum processing for lists.
 
-			isXpathFound = false
+				isXpathFound = false
 
-			// Start processing of the file data
-			// Notes : "-" and "." is not allowed in go as variable name. need to replace it with "_"
-			start([]Node{n})
+				// Start processing of the file data
+				// Notes : "-" and "." is not allowed in go as variable name. need to replace it with "_"
+				start([]Node{n})
 
-			if isXpathFound {
-				// After all the data processing is done, create the file.
-				err = createFile(moduleFilePath, jcfg.ProviderName)
-				if err != nil {
-					fmt.Println("Issue creating file. Check presence of directory and permissions")
-					os.Exit(0)
+				if isXpathFound {
+					// After all the data processing is done, create the file.
+					err = createFile(moduleFilePath, jcfg.ProviderName)
+					if err != nil {
+						fmt.Println("Issue creating file. Check presence of directory and permissions")
+						os.Exit(0)
+					}
 				}
 			}
 		}
@@ -274,8 +272,8 @@ func CreateProviders(jcfg cfg.Config) error {
 			},
 		    ConfigureContextFunc: providerConfigure,
 	    } 
-    }
-`
+    }`
+
 	// Create provider.go file
 	var fileName string = "provider.go"
 	fileName = moduleFilePath + "/" + fileName
@@ -332,12 +330,22 @@ func CreateProviders(jcfg cfg.Config) error {
 		}
 	}
 
+	// fmt.Println("------------------------------------------------------------")
+	// fmt.Println(fmt.Sprintf("- Copied a total of %d .go files from %s to %s -", fileCopyCount, filepath.Base(tpPath), filepath.Base(jcfg.ProviderDir)))
+	// fmt.Println("------------------------------------------------------------")
+
 	PrintHeader("Creating Go Mod")
 	err = ioutil.WriteFile(jcfg.ProviderDir+"/go.mod", []byte(fmt.Sprintf(gomodcontent, jcfg.ProviderName)), 0644)
 	if err != nil {
 		fmt.Println("Error creating", jcfg.ProviderDir+"/go.mod")
 	}
 
+	PrintHeader("Creating provider config")
+	// fmt.Println(providerConfigContent)
+	err = ioutil.WriteFile(jcfg.ProviderDir+"/config.go", []byte(fmt.Sprintf(providerConfigContent, jcfg.ProviderName)), 0644)
+	if err != nil {
+		fmt.Println("Error creating", jcfg.ProviderDir+"/config.go")
+	}
 	// No errors, so return nil.
 	return nil
 }
@@ -421,7 +429,7 @@ import (
 	strUpdate = ""
 
 	strDelete = `
-    _, err = client.DeleteConfigNoCommit(id)
+	_, err = client.DeleteConfig(id,false)
     check(ctx, err)
 
     d.SetId("")
@@ -455,7 +463,7 @@ func start(nodes []Node) {
 			// n1 is group, the parent container will be the next element.
 			// the parent container is expected to be a single element.
 			for _, n2 := range n1.Nodes {
-				if n2.XMLName.Local == "container" || (n2.XMLName.Local == "list" && n2.Key == "logical-systems")  {
+				if n2.XMLName.Local == "container" || (n2.XMLName.Local == "list" && n2.Key == "logical-systems") {
 					// Append information at start of the code blocks in the file
 					// It needs the parent container name and xpath so it is being done here than
 					// in the main function itself.
@@ -1099,7 +1107,7 @@ func CopyFile(source string, dest string) {
 }
 
 // List files and get filenames.
-func listFiles(yangFilePath string) {
+func listFiles(yangFilePath string, jcfg cfg.Config) {
 
 	os.Chdir(yangFilePath)
 
@@ -1119,103 +1127,152 @@ func listFiles(yangFilePath string) {
 	}
 
 	providerFileData = `
-// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
-//
-// License: Apache 2.0
-//
-// THIS SOFTWARE IS PROVIDED BY Juniper Networks, Inc. ''AS IS'' AND ANY
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL Juniper Networks, Inc. BE LIABLE FOR ANY
-// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
+	// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
+	//
+	// License: Apache 2.0
+	//
+	// THIS SOFTWARE IS PROVIDED BY Juniper Networks, Inc. ''AS IS'' AND ANY
+	// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+	// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+	// DISCLAIMED. IN NO EVENT SHALL Juniper Networks, Inc. BE LIABLE FOR ANY
+	// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+	// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+	// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+	// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+	// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+	// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+	//
 
-package main
+	package main
 
-import (
+	import (
 
-	"context"
-	gonetconf "github.com/vinpatel24/go-netconf/helpers/junos_helpers"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"os"
-)
+		"context"
+		"github.com/hashicorp/terraform-plugin-log/tflog"
+		"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+		"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+		"terraform-provider-junos-[providerName]/netconf"
+		"os"
+	)
 
-// ProviderConfig is to hold client information
-type ProviderConfig struct {
-	*gonetconf.GoNCClient
-	Host string
-}
-
-func init() {
-	schema.DescriptionKind = schema.StringMarkdown
-}
-
-func check(ctx context.Context, err error) {
-	if err != nil {
-		// Some of these errors will be "normal".
-		tflog.Debug(ctx, err.Error())
-		f, _ := os.OpenFile("jtaf_logging.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		f.WriteString(err.Error() + "\n")
-		f.Close()
-		return
-	}
-}
-
-
-func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
-	config := Config{
-		Host:     d.Get("host").(string),
-		Port:     d.Get("port").(int),
-		Username: d.Get("username").(string),
-		Password: d.Get("password").(string),
-		SSHKey:   d.Get("sshkey").(string),
+	// ProviderConfig is to hold client information
+	type ProviderConfig struct {
+		netconf.Client
+		Host string
 	}
 
-	client, err := config.Client()
-	if err != nil {
-		return nil, diag.FromErr(err)
+	func init() {
+		schema.DescriptionKind = schema.StringMarkdown
 	}
 
-	return &ProviderConfig{client, config.Host}, nil
+	func check(ctx context.Context, err error) {
+		if err != nil {
+			// Some of these errors will be "normal".
+			tflog.Debug(ctx, err.Error())
+			f, _ := os.OpenFile("jtaf_logging.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			f.WriteString(err.Error() + "\n")
+			f.Close()
+			return
+		}
+	}
+
+
+	func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+		config := Config{
+			Host:     d.Get("host").(string),
+			Port:     d.Get("port").(int),
+			Username: d.Get("username").(string),
+			Password: d.Get("password").(string),
+			SSHKey:   d.Get("sshkey").(string),
+		}
+
+		client, err := config.Client()
+		if err != nil {
+			return nil, diag.FromErr(err)
+		}
+
+		return &ProviderConfig{client, config.Host}, nil
+	}
+
+	// Provider returns a Terraform Provider.
+	func Provider() *schema.Provider {
+		return &schema.Provider{
+
+			Schema: map[string]*schema.Schema{
+				"host": &schema.Schema{
+					Type:     schema.TypeString,
+					Required: true,
+				},
+
+				"port": &schema.Schema{
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+
+				"username": &schema.Schema{
+					Type:     schema.TypeString,
+					Required: true,
+				},
+
+				"password": &schema.Schema{
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"sshkey": &schema.Schema{
+					Type:     schema.TypeString,
+					Required: true,
+				},
+			},
+
+			ResourcesMap: map[string]*schema.Resource{
+	`
+
+	// Reaplace placeholder with providerName from config
+	providerFileData = strings.Replace(providerFileData, "[providerName]", jcfg.ProviderName, -1)
+
 }
 
-// Provider returns a Terraform Provider.
-func Provider() *schema.Provider {
-	return &schema.Provider{
+func copyDir(src, dst, extension string, fileCopyCount *uint32) error {
+	return filepath.Walk(src, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			if !strings.Contains(info.Name(), extension) {
+				return nil
+			}
+			atomic.AddUint32(fileCopyCount, 1)
+		}
+		fmt.Println(fmt.Sprintf("- Copying %s to %s", info.Name(), filepath.Base(dst)))
+		outpath := filepath.Join(dst, strings.TrimPrefix(path, src))
+		if info.IsDir() {
+			os.MkdirAll(outpath, info.Mode())
+			return nil // means recursive
+		}
+		if !info.Mode().IsRegular() {
+			switch info.Mode().Type() & os.ModeType {
+			case os.ModeSymlink:
+				link, err := os.Readlink(path)
+				if err != nil {
+					return err
+				}
+				return os.Symlink(link, outpath)
+			}
+			return nil
+		}
+		in, _ := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+		fh, err := os.Create(outpath)
+		if err != nil {
+			return err
+		}
+		defer fh.Close()
 
-		Schema: map[string]*schema.Schema{
-			"host": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
-			},
-
-			"port": &schema.Schema{
-				Type:     schema.TypeInt,
-				Required: true,
-			},
-
-			"username": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
-			},
-
-			"password": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
-			},
-			"sshkey": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
-			},
-		},
-
-		ResourcesMap: map[string]*schema.Resource{
-`
+		fh.Chmod(info.Mode())
+		_, err = io.Copy(fh, in)
+		return err
+	})
 }
