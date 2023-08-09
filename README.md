@@ -20,7 +20,7 @@ Interface Configuration: https://youtu.be/iCnnkDodUgQ
 
 BGP Configuration: https://youtu.be/nQVNCNCJZRc
 
-## Begin
+# Begin
 
 We will create a simple provider for a vSRX of version 19.4R1 that has the capability to do two things:
 * Add a description to an interface
@@ -50,30 +50,6 @@ Terraform version: `v0.12.26`
 
 Other versions beyond these will work, but this is what was tested for the writing of this document.
 
-## Create and Activate a Python `venv`
-
-A virtual environment does nothing more than provide a separate Python environment, that's safe to install whatever you need, without affecting the global Python installation on a given system. We need to install `pyang`, which is a dependency of JTAF.
-
-*For this step, ensure that you're in the `processYang` directory of JTAF.*
-
-```bash
-cd $JTAF_PROJECT/cmd/processYang
-python -m venv venv
-source venv/bin/activate
-```
-
-The prompt will change at this point indicating you are running with a Python virtual environment.
-
-## Install Pyang and Check the Version
-
-```bash
-pip install pyang
-pyang -v
-# pyang 2.5.2
-```
-
-On the system under test, the version installed by `pip` in to the `venv` was: `2.5.2`.
-
 ## Copy the YANG Files 
 For our example, our provider will only be able to create an interface description and place an inet address on a sub-interface. We only need a handful of YANG models for this.
 
@@ -101,27 +77,61 @@ cd /var/tmp
 rm -rf yang
 ```
 
-## Create a `config.toml` File
+## Create an XML XPath File
+Great, now we have text file and YIN versions of the YANG files. We need those for the next step.
+
+Let's create a file, which provides a list of inputs to the part of JTAF which writes the `.go` code automagically.
+This input identifies the content of the provider that JTAF will create. **Some `xpath_test.xml` files are scattered are in the `Samples` directory.**
+
+Create a file `/var/tmp/jtaf/xpath_example.xml` and populate it with the content below.
+
+```bash
+<file-list>
+        <xpath name="/interfaces/interface/description"/>
+        <xpath name="/interfaces/interface/unit/family/inet/address/name"/>
+</file-list>
+```
+
+A simple explanation of the above XPaths:
+
+* The first xpath entry is for the interface description and references a YANG leaf.
+* The second xpath entry identifies the inet YANG leaf in the YANG model.
+
+You can view these expressions as a simple way to identify the fields inside the YANG model we're interested in.
+JTAF generated providers has a requirement of the smallest data set possible for each resources. That means, in a single resource you would place a description, and in another, you will place the inet address. Terraform is essentially a dependency aware declarative resource manager and so, we have to model resources in a way that's compatible with Terraform and Junos.
+
+# Run Shell Script:  `jtaf_automation.sh`
+
+Prior to this step, ensure python, go, and pyang is installed.
+
+
+This file can be compiled by running `chmod +x jtaf_automation.sh` from the home directory followed by 
+`./jtaf_automation.sh` to run the script. 
+
+Below describes what the script does:
+
+
+### 1. Creates a `config.toml` File
 
 *If you've never seen a TOML file before, don't worry! It's just a structured file containing configuration that can be parsed by a program, in this case the two main compiled programs that form JTAF. TOML stands for Tom's Obvious Minimal Langage.*
 
-Create a config file somewhere memorable. I'll use `/var/tmp/jtaf/config.toml` because why not.
-
-Using your favourite text editor, create a file here: `/var/tmp/jtaf/config.toml` and put the content below into the file. Don't worry about the xPath or fileType keys. They'll be explained shortly.
+Creates a config file in the home directory. Don't worry about the xPath or fileType keys. They'll be explained shortly.
 
 ```bash
-yangDir = "/var/tmp/jtaf/yang_files"
-providerDir = "/var/tmp/jtaf/terraform_providers"
-xpathPath = "/var/tmp/jtaf/xpath_example.xml"
+yangDir = "$(pwd)/yang_files"
+providerDir = "$(pwd)/terraform_providers"
+xpathPath = "$(pwd)/xpath_example.xml"
 providerName = "vsrx"
 fileType = "both"
 ```
 
 You can also replace the fileType field to `text` or `xml`. The text files are for us humans.
 
-## Generate the YIN and XPath Files
+### 2. Generates the YIN and XPath Files
 
 The next step, depending on the size of YANG model/s, may take some time. Prepare some popcorn!
+This step will activate a python vitual enviornment (make sure python is downloaded) and install `pyang` so it can be used
+to generate the `yin` files.
 
 ```bash
 cd $JTAF_PROJECT/cmd/processYang
@@ -150,32 +160,9 @@ Creating Xpath file: junos-es-conf-interfaces@2019-01-01_xpath.txt
 Creating Xpath file: junos-es-conf-root@2019-01-01_xpath.txt
 ```
 
-At this point, you can also deactivate the `venv` with `deactivate`.
+At this point, `venv` is `deactivated`.
 
-## Create an XML XPath File
-Great, now we have text file and YIN versions of the YANG files. We need those for the next step.
-
-Let's create a file, which provides a list of inputs to the part of JTAF which writes the `.go` code automagically.
-This input identifies the content of the provider that JTAF will create. Some `xpath_test.xml` files are scattered are in the `Samples` directory. 
-
-Create a file `/var/tmp/jtaf/xpath_example.xml` and populate it with the content below.
-
-```bash
-<file-list>
-        <xpath name="/interfaces/interface/description"/>
-        <xpath name="/interfaces/interface/unit/family/inet/address/name"/>
-</file-list>
-```
-
-A simple explanation of the above XPaths:
-
-* The first xpath entry is for the interface description and references a YANG leaf.
-* The second xpath entry identifies the inet YANG leaf in the YANG model.
-
-You can view these expressions as a simple way to identify the fields inside the YANG model we're interested in.
-JTAF generated providers has a requirement of the smallest data set possible for each resources. That means, in a single resource you would place a description, and in another, you will place the inet address. Terraform is essentially a dependency aware declarative resource manager and so, we have to model resources in a way that's compatible with Terraform and Junos.
-
-## Build the Provider
+### 3. Builds the Provider Resources
 
 First, we need JTAF to create some `.go` code from the YANG models and XML data we provided.
 
@@ -215,6 +202,8 @@ Copied file: resource_junos_device_commit.go to /var/tmp/jtaf/terraform_provider
 
 The output of this step is written to the `/var/tmp/jtaf/terraform_provider` directory. Let's build the provider!
 
+## 4. Builds the Provider
+
 ```bash
 cd /var/tmp/jtaf/terraform_providers
 go build
@@ -239,7 +228,7 @@ file terraform-provider-junos-device
 
 The binary file `terraform-provider-junos-vsrx` is actually our fresh new and shiny Terraform Provider. If you got this far, congratulations. You just created a Terraform provider for Junos.
 
-## Using the new Provider
+# Using the new Provider
 
 To test the provider we need to do two more things, one, put the provider where Terraform can find it and two, create a simple set of `.tf` files as inputs to Terraform!
 
@@ -785,6 +774,5 @@ This covers the use of JTAF with a full example. Please post any issues or bug r
 Juniper Networks is actively contributing to and maintaining this repo.
  
 *Contributors:*
-
 * [Rahul Kumar](https://github.com/rahkumar651991)
 * [David Gee](https://github.com/davedotdev)
