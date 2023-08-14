@@ -76,18 +76,18 @@ cd /var/tmp
 rm -rf yang
 ```
 
-# Run First Shell Script:  `jtaf_automation.sh`
+# Run First Shell Script:  `generateFiles.sh`
 
 **Prior to this step, ensure python and go is installed.**
 
 
-This file can be compiled by running `chmod +x jtaf_automation.sh` from the home directory followed by 
-`./jtaf_automation.sh` to run the script. 
+This file can be compiled by running `chmod +x generateFiles.sh` from the home directory followed by 
+`./generateFiles.sh` to run the script. 
 
 Below describes what the script does:
 
 
-### 1. Creates a `config.toml` File
+### 1. Generates a `config.toml` File
 
 *If you've never seen a TOML file before, don't worry! It's just a structured file containing configuration that can be parsed by a program, in this case the two main compiled programs that form JTAF. TOML stands for Tom's Obvious Minimal Langage.*
 
@@ -104,7 +104,7 @@ fileType = "both"
 
 You can also replace the fileType field to `text` or `xml`. The text files are for us humans.
 
-### 2. Generates the YIN and XPath Files
+### 2. Generates the YIN and XPath Files based on YANG files
 
 The next step, depending on the size of YANG model/s, **may take some time**. Prepare some popcorn!
 This step will activate a python vitual enviornment (make sure python is downloaded) and install `pyang` so it can be used
@@ -164,12 +164,12 @@ You can view these expressions as a simple way to identify the fields inside the
 JTAF generated providers has a requirement of the smallest data set possible for each resources. That means, in a single resource you would place a description, and in another, you will place the inet address. Terraform is essentially a dependency aware declarative resource manager and so, we have to model resources in a way that's compatible with Terraform and Junos.
 
 
-# Run Second Shell Script:  `jtaf_automation2.sh`
+# Run Second Shell Script:  `buildProvider.sh`
 
 Prior to this step, ensure an xml, xpath file is created in the `/junos-terraform` home directory with `xpath` in the name of the file
 
-This file can be compiled by running `chmod +x jtaf_automation2.sh` from the home directory followed by 
-`./jtaf_automation2.sh` to run the script. 
+This file can be compiled by running `chmod +x buildProvider.sh` from the home directory followed by 
+`./buildProvider.sh` to run the script. 
 
 Below describes what the script does:
 

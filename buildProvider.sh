@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# caputres the user's home directory
+# captures the user's home directory
 home_dir="$PWD"
 
 # Search for XML files containing "xpath" in their filenames in the home directory
