@@ -52,13 +52,6 @@ if [ -d "yang_files" ]; then
     go build
     ./processYang -config $home_dir/config.toml
     deactivate
-    # Now Build the provider
-    cd $home_dir/cmd/processProviders
-    go build
-    ./processProviders -config $home_dir/config.toml
-    cd $home_dir/terraform_providers
-    go mod tidy -go=1.16 && go mod tidy -go=1.17
-    go build
   else
     echo "No .yang files found in yang_files folder. Add files and re-run script"
   fi
