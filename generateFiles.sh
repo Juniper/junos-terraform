@@ -18,6 +18,18 @@ if ! command_exists go; then
   echo "Go is not installed. Please Install 'Go' before running the script."
 fi
 
+# Ask user what device they are working on
+valid_options=("vsrx" "vmx" "vqfx" "vptx")
+user_input=""
+
+while [[ ! " ${valid_options[*]} " =~ " $user_input " ]]; do
+    read -p "Enter a valid option (vsrx, vmx, vqfx, vptx): " user_input
+    
+    if [[ ! " ${valid_options[*]} " =~ " $user_input " ]]; then
+        echo "Invalid input. Please enter one of the following options: vsrx, vmx, vqfx, vptx."
+    fi
+done
+
 # Create config.toml file
 if [ ! -f "config.toml" ]; then
   echo "Creating config.toml file..."
@@ -25,7 +37,7 @@ if [ ! -f "config.toml" ]; then
 yangDir = "$(pwd)/yang_files"
 providerDir = "$(pwd)/terraform_providers"
 xpathPath = "$(pwd)/xpath_example.xml"
-providerName = "vsrx"
+providerName = "$device_name"
 fileType = "both"
 EOF
 fi

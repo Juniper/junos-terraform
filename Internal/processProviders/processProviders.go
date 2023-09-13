@@ -261,7 +261,7 @@ func CreateProviders(jcfg cfg.Config) error {
 
 				if isXpathFound {
 					// After all the data processing is done, create the file.
-					err = createFile(moduleFilePath, jcfg.ProviderName)
+					err = createFile(moduleFilePath, jcfg)
 					if err != nil {
 						fmt.Println("Issue creating file. Check presence of directory and permissions")
 						os.Exit(0)
@@ -1062,9 +1062,9 @@ func check_element_name(text string) int {
 }
 
 // Generate terraform Modules
-func createFile(moduleFilePath, providerName string) error {
+func createFile(moduleFilePath string, jcfg cfg.Config) error {
 
-	providerFileData += "\t\t\t\"junos-" + providerName + "_" + strModuleName + "\": junos" + strModuleName + "(),\n"
+	providerFileData += "\t\t\t\"junos-" + jcfg.ProviderName + "_" + strModuleName + "\": junos" + strModuleName + "(),\n"
 
 	// Create go file with top container/module name.
 	var fileName string = s.Join([]string{"resource", strModuleName}, "_")
@@ -1100,6 +1100,10 @@ func createFile(moduleFilePath, providerName string) error {
 	_, err = fPtr.WriteString(strUpdate)
 	_, err = fPtr.WriteString(strDelete)
 	_, err = fPtr.WriteString(strSchema)
+
+	// Create terraform file
+	createTerraform(strSchema, jcfg)
+
 	fmt.Printf("Terraform API resource_%s created \n", strModuleName)
 	xpathCounter += 1
 	return nil
@@ -1300,5 +1304,83 @@ func printProgressBar(iteration, total int, prefix, suffix string, length int, f
 	if iteration == total {
 		fmt.Println()
 		fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, "COMPLETED")
+	}
+}
+
+func createTerraform(strSchema string, jcfg cfg.Config) {
+
+	// SETTING UP FILE PATH DIRECTORY AND NAMING
+	// Get the absolute path of the executable binary
+	executablePath, err := os.Executable()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	// Navigate up three directories
+	targetDir := filepath.Join(executablePath, "..", "..", "..", "/TFtemplates")
+
+	// Split the first line by spaces
+	elements := strings.Fields(strSchema)
+	resource := ""
+
+	// Find the name of the resource from the PROVIDER RESOURCE
+	if len(elements) >= 2 {
+		secondElement := elements[1]
+		// Trim "junos" and parentheses from the string
+		resource = strings.Trim(secondElement, "junos")
+		resource = strings.Trim(resource, "()")
+	} else {
+		fmt.Println("Not enough elements on the first line.")
+	}
+
+	// 	FIND THE ARGUMENTS FROM THE SCEHEMA --> PARSE SCHEMA
+	// Define a regular expression pattern to match the keys within double quotes --> This is to find INPUTS
+	pattern := `"\w+":`
+
+	// Compile the regular expression
+	re := regexp.MustCompile(pattern)
+
+	// Find all matches in the input string
+	matches := re.FindAllString(strSchema, -1)
+
+	// Create a slice to store the extracted keys
+	var keys []string
+
+	// Extract and print the keys without the quotes and colon
+	for _, match := range matches {
+		key := match[1 : len(match)-2] // Remove the double quotes and colon
+		keys = append(keys, key)
+	}
+
+	// CREATING THE FILE CONTENTS
+	providerType := "junos-" + jcfg.ProviderName
+	resourceType := providerType + "_" + resource
+	resourceName := "[replace with resource name]"
+	blockHead := "resource" + " \"" + resourceType + "\"" + " \"" + resourceName + "\" {"
+
+	headBlock := "provider " + "\"" + providerType + "\" {\n" + "	host = \"10.x.x.x\"\n	port = 22\n	username = \"\"\n	password = \"\"\n	sshkey = \"\"\n}\n"
+
+	// Initialize an empty result string
+	var argumentBlock string
+
+	// Concatenate the strings with newline characters
+	for _, str := range keys {
+		argumentBlock += "	" + str + " = \"\"" + "\n"
+	}
+	argumentBlock += "}"
+
+	finalTemplate := blockHead + "\n" + argumentBlock
+	finalTemplate = headBlock + "\n" + finalTemplate
+
+	//	DEFINE THE FILE CONTENT AND WRITE TO FILE
+	fileContent := []byte(finalTemplate)
+
+	resultFile := resource + ".tf"
+	// Define the file path where you want to save the .tf file
+	filePath := filepath.Join(targetDir, resultFile)
+
+	// Create and write the Terraform configuration file
+	if err := ioutil.WriteFile(filePath, fileContent, 0644); err != nil {
+		log.Fatalf("Error writing .tf file: %v", err)
 	}
 }
