@@ -90,6 +90,9 @@ var structXpath string
 // String variable for import variables.
 var strImport string
 
+// String variable to hold path to TFtemplate folder
+var targetDir string
+
 // String variable for structure.
 var strStruct string
 var strStructEnd string
@@ -269,8 +272,8 @@ func CreateProviders(jcfg cfg.Config) error {
 				}
 			}
 		}
-		printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
 		counter++
+		printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
 	}
 
 	providerFileData += `			"junos-` + jcfg.ProviderName + `_commit": junosCommit(),
@@ -279,6 +282,9 @@ func CreateProviders(jcfg cfg.Config) error {
 		    ConfigureContextFunc: providerConfigure,
 	    } 
     }`
+
+	// Create terraform main file
+	createTerraformMain(jcfg)
 
 	// Create provider.go file
 	var fileName string = "provider.go"
@@ -1136,7 +1142,134 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 		}
 	}
 
-	providerFileData = `
+	// Step 1: Get the environment variable
+	configFilePath := os.Getenv("MOCK_FILE")
+
+	// Step 2: Check if the environment variable exists
+	if configFilePath == "" {
+		fmt.Println()
+		fmt.Println()
+		fmt.Println("	**Environment variable MY_CONFIG_FILE is not set. Entering DEVICE Config Mode.**")
+		fmt.Println()
+		fmt.Println()
+
+		providerFileData = `
+		// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
+		//
+		// License: Apache 2.0
+		//
+		// THIS SOFTWARE IS PROVIDED BY Juniper Networks, Inc. ''AS IS'' AND ANY
+		// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+		// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+		// DISCLAIMED. IN NO EVENT SHALL Juniper Networks, Inc. BE LIABLE FOR ANY
+		// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+		// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+		// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+		// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+		// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+		// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+		//
+
+		package main
+
+		import (
+
+			"context"
+			"github.com/hashicorp/terraform-plugin-log/tflog"
+			"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+			"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+			"terraform-provider-junos-[providerName]/netconf"
+			"os"
+		)
+
+		// ProviderConfig is to hold client information
+		type ProviderConfig struct {
+			netconf.Client
+			Host string
+		}
+
+		func init() {
+			schema.DescriptionKind = schema.StringMarkdown
+		}
+
+		func check(ctx context.Context, err error) {
+			if err != nil {
+				// Some of these errors will be "normal".
+				tflog.Debug(ctx, err.Error())
+				f, _ := os.OpenFile("jtaf_logging.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				f.WriteString(err.Error() + "\n")
+				f.Close()
+				return
+			}
+		}
+
+
+		func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+			config := Config{
+				Host:     d.Get("host").(string),
+				Port:     d.Get("port").(int),
+				Username: d.Get("username").(string),
+				Password: d.Get("password").(string),
+				SSHKey:   d.Get("sshkey").(string),
+			}
+
+			client, err := config.Client()
+			if err != nil {
+				return nil, diag.FromErr(err)
+			}
+
+			return &ProviderConfig{client, config.Host}, nil
+		}
+
+		// Provider returns a Terraform Provider.
+		func Provider() *schema.Provider {
+			return &schema.Provider{
+
+				Schema: map[string]*schema.Schema{
+					"host": &schema.Schema{
+						Type:     schema.TypeString,
+						Required: true,
+					},
+
+					"port": &schema.Schema{
+						Type:     schema.TypeInt,
+						Required: true,
+					},
+
+					"username": &schema.Schema{
+						Type:     schema.TypeString,
+						Required: true,
+					},
+
+					"password": &schema.Schema{
+						Type:     schema.TypeString,
+						Required: true,
+					},
+					"sshkey": &schema.Schema{
+						Type:     schema.TypeString,
+						Required: true,
+					},
+				},
+
+				ResourcesMap: map[string]*schema.Resource{
+			`
+
+	}
+	if configFilePath != "" {
+		file, err := os.Open(configFilePath)
+		if err != nil {
+			fmt.Println("Error opening file:", err)
+			return
+		}
+		defer file.Close()
+
+		fmt.Println()
+		fmt.Println()
+		fmt.Println("	**Entering MOCK Mode: Test configuration will be displayed to the file defined by ENV variable, MOCK_FILE, during terraform apply.**")
+		fmt.Println()
+		fmt.Println()
+
+		providerFileData = `
 	// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
 	//
 	// License: Apache 2.0
@@ -1152,29 +1285,42 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 	// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 	// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	//
-
+	
 	package main
-
+	
 	import (
-
 		"context"
-		"github.com/hashicorp/terraform-plugin-log/tflog"
-		"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-		"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-		"terraform-provider-junos-[providerName]/netconf"
+		"encoding/xml"
+		"fmt"
 		"os"
+		"sync"
+		"terraform-provider-junos-[providerName]/netconf"
+	
+		"github.com/hashicorp/terraform-plugin-log/tflog"
+		"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+		"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	)
+		`
+		stringToAdd := "\n	// Add global map to merge cfg to map specific to each resource and then finally write to the file at the end \n	type incomingConfig struct {\n		Groups      interface{} `xml:\"groups\"`\n		ApplyGroups string      `xml:\"apply-groups\"`\n	}\n"
 
+		providerFileData += stringToAdd
+
+		providerFileData += `
+	var mockMap map[string]incomingConfig
+	var mockMapMutex sync.Mutex
+	
 	// ProviderConfig is to hold client information
 	type ProviderConfig struct {
 		netconf.Client
 		Host string
 	}
-
+	
 	func init() {
 		schema.DescriptionKind = schema.StringMarkdown
 	}
-
+	
+	var _ netconf.Client = &FileClient{}
+	
 	func check(ctx context.Context, err error) {
 		if err != nil {
 			// Some of these errors will be "normal".
@@ -1185,45 +1331,103 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 			return
 		}
 	}
-
-
+	
 	func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
-		config := Config{
-			Host:     d.Get("host").(string),
-			Port:     d.Get("port").(int),
-			Username: d.Get("username").(string),
-			Password: d.Get("password").(string),
-			SSHKey:   d.Get("sshkey").(string),
+		config := ProviderConfig{
+			Host: d.Get("host").(string),
 		}
-
-		client, err := config.Client()
-		if err != nil {
-			return nil, diag.FromErr(err)
-		}
-
+	
+		var client netconf.Client
+		client = FileClient{filename: "[filename]"}
+	
 		return &ProviderConfig{client, config.Host}, nil
 	}
-
+	
+	// FileClient represents a fake client for testing purposes.
+	type FileClient struct {
+		// You can add fields for testing purposes here.
+		filename string
+	}
+	
+	// Close is a functional thing to close the FileClient (no-op in this case).
+	func (bc FileClient) Close() error {
+		return nil
+	}
+	
+	// updateRawConfig simulates updating the configuration on a network device.
+	func (bc FileClient) updateRawConfig(applyGroup string, netconfCall string, commit bool) (string, error) {
+		// Simulate the update operation (you can customize this part).
+		return fmt.Sprintf("Updated config for group: %s", applyGroup), nil
+	}
+	
+	// DeleteConfig simulates deleting a configuration on a network device.
+	func (bc FileClient) DeleteConfig(applyGroup string, commit bool) (string, error) {
+		// Simulate the delete operation (you can customize this part).
+		return fmt.Sprintf("Deleted config for group: %s", applyGroup), nil
+	}
+	
+	// SendCommit simulates sending a commit to a network device.
+	func (bc FileClient) SendCommit() error {
+		// Simulate the commit operation (you can customize this part).
+		return nil
+	}
+	
+	// MarshalGroup simulates retrieving and marshaling configuration data for a group.
+	func (bc FileClient) MarshalGroup(id string, obj interface{}) error {
+		// Simulate the retrieval and marshaling of configuration data (you can customize this part).
+		// For testing purposes, let's just marshal an example object and save it to a file.
+		return nil
+	}
+	
+	// SendTransaction simulates sending a transaction to a network device.
+	func (bc FileClient) SendTransaction(id string, obj interface{}, commit bool) error {
+		// Simulate sending a transaction (you can customize this part).
+		// For testing purposes, let's just write the transaction data to a file.
+		cfg, err := xml.MarshalIndent(obj, "", "    ") // Indent with four spaces
+		if err != nil {
+			return err
+		}
+	
+		mockMapMutex.Lock()
+		defer mockMapMutex.Unlock()
+		iC := obj.(incomingConfig)
+	
+		if mockMap == nil {
+			mockMap = make(map[string]incomingConfig)
+		}
+		mockMap[iC.ApplyGroups] = iC
+	
+		// open file and print to file
+		// Write the updated XML to a file
+		err = os.WriteFile(bc.filename, cfg, 0644)
+		if err != nil {
+			fmt.Printf("Error writing to XML file: %v\n", err)
+			return err
+		}
+	
+		return nil
+	}
+	
 	// Provider returns a Terraform Provider.
 	func Provider() *schema.Provider {
 		return &schema.Provider{
-
+	
 			Schema: map[string]*schema.Schema{
 				"host": &schema.Schema{
 					Type:     schema.TypeString,
 					Required: true,
 				},
-
+	
 				"port": &schema.Schema{
 					Type:     schema.TypeInt,
 					Required: true,
 				},
-
+	
 				"username": &schema.Schema{
 					Type:     schema.TypeString,
 					Required: true,
 				},
-
+	
 				"password": &schema.Schema{
 					Type:     schema.TypeString,
 					Required: true,
@@ -1233,10 +1437,11 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 					Required: true,
 				},
 			},
-
+	
 			ResourcesMap: map[string]*schema.Resource{
-	`
-
+		`
+		providerFileData = strings.Replace(providerFileData, "[filename]", file.Name(), -1)
+	}
 	// Reaplace placeholder with providerName from config
 	providerFileData = strings.Replace(providerFileData, "[providerName]", jcfg.ProviderName, -1)
 
@@ -1297,13 +1502,12 @@ func printProgressBar(iteration, total int, prefix, suffix string, length int, f
 	}
 
 	bar := strings.Repeat(fill, filledLength) + end + strings.Repeat("-", (length-filledLength))
-	fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, suffix)
+	fmt.Printf("\r     %s [%s] %.2f%% %s", prefix, bar, percent*100, suffix)
 	fmt.Println()
 	fmt.Println()
 
 	if iteration == total {
 		fmt.Println()
-		fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, "COMPLETED")
 	}
 }
 
@@ -1317,7 +1521,7 @@ func createTerraform(strSchema string, jcfg cfg.Config) {
 		return
 	}
 	// Navigate up three directories
-	targetDir := filepath.Join(executablePath, "..", "..", "..", "/TFtemplates")
+	targetDir = filepath.Join(executablePath, "..", "..", "..", "/TFtemplates")
 
 	// Split the first line by spaces
 	elements := strings.Fields(strSchema)
@@ -1355,7 +1559,7 @@ func createTerraform(strSchema string, jcfg cfg.Config) {
 	// CREATING THE FILE CONTENTS
 	providerType := "junos-" + jcfg.ProviderName
 	resourceType := providerType + "_" + resource
-	resourceName := "[replace with resource name]"
+	resourceName := "*replace with name for resource*"
 	blockHead := "resource" + " \"" + resourceType + "\"" + " \"" + resourceName + "\" {"
 
 	headBlock := "provider " + "\"" + providerType + "\" {\n" + "	host = \"10.x.x.x\"\n	port = 22\n	username = \"\"\n	password = \"\"\n	sshkey = \"\"\n}\n"
@@ -1383,4 +1587,63 @@ func createTerraform(strSchema string, jcfg cfg.Config) {
 	if err := ioutil.WriteFile(filePath, fileContent, 0644); err != nil {
 		log.Fatalf("Error writing .tf file: %v", err)
 	}
+}
+
+func createTerraformMain(jcfg cfg.Config) {
+
+	mainFileData :=
+		`
+# replace {text} with your own test setup
+
+terraform {
+	required_providers {
+		junos-{device-type} = {
+			source = "{input source path}"
+			version = "{input version here}"
+		}
+	}
+}
+
+provider "junos-{device-type}" {
+	host = "localhost"
+	port = 8300
+	username = "root"
+	password = "juniper123"
+	sshkey = ""
+}
+
+module "{test-folder-name}" {
+	source = "./{test folder name}"
+
+	providers = {junos-{device-type} = junos-{device-type}}
+
+	depends_on = [junos-{device-type}_destroycommit.commit-main]
+}
+
+
+resource "junos-{device-type}_commit" "commit-main" {
+	resource_name = "commit"
+	depends_on = [module.{test-folder-name}]
+}
+
+resource "junos-{device-type}_destroycommit" "commit-main" {
+	resource_name = "destroycommit"
+}
+	`
+
+	mainFileData = strings.Replace(mainFileData, "{device-type}", jcfg.ProviderName, -1)
+
+	//	DEFINE THE FILE CONTENT AND WRITE TO FILE
+	fileContent := []byte(mainFileData)
+
+	resultFile := "main.tf"
+
+	// Define the file path where you want to save the .tf file
+	filePath := filepath.Join(targetDir, resultFile)
+
+	// Create and write the Terraform configuration file
+	if err := ioutil.WriteFile(filePath, fileContent, 0644); err != nil {
+		log.Fatalf("Error writing .tf file: %v", err)
+	}
+
 }

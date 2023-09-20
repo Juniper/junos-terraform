@@ -97,7 +97,7 @@ You can find this file `config.toml` in the home directory (/junos-terraform)
 ```bash
 yangDir = "$(pwd)/yang_files"
 providerDir = "$(pwd)/terraform_providers"
-xpathPath = "$(pwd)/xpath_example.xml"
+xpathPath = "$(pwd)/xpath_input.xml"
 providerName = "vsrx"
 fileType = "both"
 ```
@@ -139,14 +139,15 @@ Creating Xpath file: junos-es-conf-root@2019-01-01_xpath.txt
 
 At this point, `venv` is `deactivated` and the first script has terminated.
 
-# Create an XML XPath File
+# Create an XPath Input XML File
 
 Great, at this point now we have text file and YIN versions of the YANG files. We need those for the next step.
 
 Let's create a file, which provides a list of inputs to the part of JTAF which writes the `.go` code automagically.
-This input identifies the content of the provider that JTAF will create. **Some `xpath_test.xml` files are scattered are in the `Samples` directory.**
+This input identifies the content of the provider that JTAF will create. **Some of these files such as `xpath_inputs.xml` are scattered are in the `Samples` directory.**
 
-Create a file `/var/tmp/jtaf/xpath_example.xml` and populate it with the content below.
+Create a file `/var/tmp/jtaf/xpath_input.xml` and populate it with the content below.
+**Make sure that the file is named `xpath_inputs.xml`**
 
 ```bash
 <file-list>
@@ -166,7 +167,10 @@ JTAF generated providers has a requirement of the smallest data set possible for
 
 # Run Second Shell Script:  `buildProvider.sh`
 
-Prior to this step, ensure an xml, xpath file is created in the `/junos-terraform` home directory with `xpath` in the name of the file
+### **Prior to this step**
+1. Ensure an xml, xpath file is created in the `/junos-terraform` home directory with `xpath` in the name of the file (ex: xpath_example.xml)
+2. IF you want to test the output of the configuration from the .tf files that will be created later on to define the configuration for a device, set the ENV variable `MOCK_FILE` to the path of an empty `xml` file where the system can display the expected config defined in the .tf files. 
+**Warning:** `MOCK_FILE` should be set to "" or not exist unless wanting to enter Mock mode, otherwise system will look for path setup
 
 This file can be compiled by running `chmod +x buildProvider.sh` from the home directory followed by 
 `./buildProvider.sh` to run the script. 

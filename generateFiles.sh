@@ -30,17 +30,15 @@ while [[ ! " ${valid_options[*]} " =~ " $user_input " ]]; do
     fi
 done
 
-# Create config.toml file
-if [ ! -f "config.toml" ]; then
-  echo "Creating config.toml file..."
-  cat << EOF > config.toml
+# Create or overwrite config.toml file
+echo "Creating or overwriting config.toml file..."
+cat > config.toml << EOF
 yangDir = "$(pwd)/yang_files"
 providerDir = "$(pwd)/terraform_providers"
-xpathPath = "$(pwd)/xpath_example.xml"
-providerName = "$device_name"
+xpathPath = "$(pwd)/xpath_inputs.xml"
+providerName = "$user_input"
 fileType = "both"
 EOF
-fi
 
 # Check if yang_files folder exists
 if [ -d "yang_files" ]; then
