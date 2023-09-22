@@ -1142,134 +1142,7 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 		}
 	}
 
-	// Step 1: Get the environment variable
-	configFilePath := os.Getenv("MOCK_FILE")
-
-	// Step 2: Check if the environment variable exists
-	if configFilePath == "" {
-		fmt.Println()
-		fmt.Println()
-		fmt.Println("	**Environment variable MY_CONFIG_FILE is not set. Entering DEVICE Config Mode.**")
-		fmt.Println()
-		fmt.Println()
-
-		providerFileData = `
-		// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
-		//
-		// License: Apache 2.0
-		//
-		// THIS SOFTWARE IS PROVIDED BY Juniper Networks, Inc. ''AS IS'' AND ANY
-		// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-		// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-		// DISCLAIMED. IN NO EVENT SHALL Juniper Networks, Inc. BE LIABLE FOR ANY
-		// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-		// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-		// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-		// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-		// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-		// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-		//
-
-		package main
-
-		import (
-
-			"context"
-			"github.com/hashicorp/terraform-plugin-log/tflog"
-			"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-			"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-			"terraform-provider-junos-[providerName]/netconf"
-			"os"
-		)
-
-		// ProviderConfig is to hold client information
-		type ProviderConfig struct {
-			netconf.Client
-			Host string
-		}
-
-		func init() {
-			schema.DescriptionKind = schema.StringMarkdown
-		}
-
-		func check(ctx context.Context, err error) {
-			if err != nil {
-				// Some of these errors will be "normal".
-				tflog.Debug(ctx, err.Error())
-				f, _ := os.OpenFile("jtaf_logging.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-				f.WriteString(err.Error() + "\n")
-				f.Close()
-				return
-			}
-		}
-
-
-		func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
-			config := Config{
-				Host:     d.Get("host").(string),
-				Port:     d.Get("port").(int),
-				Username: d.Get("username").(string),
-				Password: d.Get("password").(string),
-				SSHKey:   d.Get("sshkey").(string),
-			}
-
-			client, err := config.Client()
-			if err != nil {
-				return nil, diag.FromErr(err)
-			}
-
-			return &ProviderConfig{client, config.Host}, nil
-		}
-
-		// Provider returns a Terraform Provider.
-		func Provider() *schema.Provider {
-			return &schema.Provider{
-
-				Schema: map[string]*schema.Schema{
-					"host": &schema.Schema{
-						Type:     schema.TypeString,
-						Required: true,
-					},
-
-					"port": &schema.Schema{
-						Type:     schema.TypeInt,
-						Required: true,
-					},
-
-					"username": &schema.Schema{
-						Type:     schema.TypeString,
-						Required: true,
-					},
-
-					"password": &schema.Schema{
-						Type:     schema.TypeString,
-						Required: true,
-					},
-					"sshkey": &schema.Schema{
-						Type:     schema.TypeString,
-						Required: true,
-					},
-				},
-
-				ResourcesMap: map[string]*schema.Resource{
-			`
-
-	}
-	if configFilePath != "" {
-		file, err := os.Open(configFilePath)
-		if err != nil {
-			fmt.Println("Error opening file:", err)
-			return
-		}
-		defer file.Close()
-
-		fmt.Println()
-		fmt.Println()
-		fmt.Println("	**Entering MOCK Mode: Test configuration will be displayed to the file defined by ENV variable, MOCK_FILE, during terraform apply.**")
-		fmt.Println()
-		fmt.Println()
-
-		providerFileData = `
+	providerFileData = `
 	// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
 	//
 	// License: Apache 2.0
@@ -1301,26 +1174,25 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 		"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	)
 		`
-		stringToAdd := "\n	// Add global map to merge cfg to map specific to each resource and then finally write to the file at the end \n	type incomingConfig struct {\n		Groups      interface{} `xml:\"groups\"`\n		ApplyGroups string      `xml:\"apply-groups\"`\n	}\n"
+	// stringToAdd := "\n	// Add global map to merge cfg to map specific to each resource and then finally write to the file at the end \n	type incomingConfig struct {\n		Groups      interface{} `xml:\"groups\"`\n		ApplyGroups string      `xml:\"apply-groups\"`\n	}\n"
 
-		providerFileData += stringToAdd
+	// providerFileData += stringToAdd
 
-		providerFileData += `
-	var mockMap map[string]incomingConfig
-	var mockMapMutex sync.Mutex
+	providerFileData += `
 	
+	// var mockMap map[string]incomingConfig
+	var mockMapMutex sync.Mutex
+
 	// ProviderConfig is to hold client information
 	type ProviderConfig struct {
 		netconf.Client
 		Host string
 	}
-	
+
 	func init() {
 		schema.DescriptionKind = schema.StringMarkdown
 	}
-	
-	var _ netconf.Client = &FileClient{}
-	
+
 	func check(ctx context.Context, err error) {
 		if err != nil {
 			// Some of these errors will be "normal".
@@ -1331,54 +1203,81 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 			return
 		}
 	}
-	
+
 	func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
-		config := ProviderConfig{
-			Host: d.Get("host").(string),
+		config := Config{
+			Host:     d.Get("host").(string),
+			Port:     d.Get("port").(int),
+			Username: d.Get("username").(string),
+			Password: d.Get("password").(string),
+			SSHKey:   d.Get("sshkey").(string),
 		}
-	
+
+		var err error
+
+		path, err := os.Getwd() //get the current directory using the built-in function
+		if err != nil {
+			fmt.Println(err) //print the error if obtained
+		}
+		configFilePath, ok := os.LookupEnv("MOCK_FILE")
+		path += configFilePath
 		var client netconf.Client
-		client = FileClient{filename: "[filename]"}
-	
+
+		if ok {
+			filePtr, err := os.OpenFile(path, os.O_APPEND, 0644)
+			if err != nil {
+				return nil, diag.FromErr(err)
+			}
+			client = FileClient{filePtr: filePtr}
+
+		} else {
+			client, err = config.Client()
+			if err != nil {
+				return nil, diag.FromErr(err)
+			}
+		}
+
 		return &ProviderConfig{client, config.Host}, nil
 	}
-	
+
+	var _ netconf.Client = &FileClient{}
+
 	// FileClient represents a fake client for testing purposes.
 	type FileClient struct {
 		// You can add fields for testing purposes here.
-		filename string
+		filePtr *os.File
 	}
-	
+
 	// Close is a functional thing to close the FileClient (no-op in this case).
 	func (bc FileClient) Close() error {
 		return nil
 	}
-	
+
 	// updateRawConfig simulates updating the configuration on a network device.
 	func (bc FileClient) updateRawConfig(applyGroup string, netconfCall string, commit bool) (string, error) {
 		// Simulate the update operation (you can customize this part).
 		return fmt.Sprintf("Updated config for group: %s", applyGroup), nil
 	}
-	
+
 	// DeleteConfig simulates deleting a configuration on a network device.
 	func (bc FileClient) DeleteConfig(applyGroup string, commit bool) (string, error) {
 		// Simulate the delete operation (you can customize this part).
 		return fmt.Sprintf("Deleted config for group: %s", applyGroup), nil
 	}
-	
+
 	// SendCommit simulates sending a commit to a network device.
 	func (bc FileClient) SendCommit() error {
 		// Simulate the commit operation (you can customize this part).
 		return nil
 	}
-	
+
 	// MarshalGroup simulates retrieving and marshaling configuration data for a group.
 	func (bc FileClient) MarshalGroup(id string, obj interface{}) error {
 		// Simulate the retrieval and marshaling of configuration data (you can customize this part).
 		// For testing purposes, let's just marshal an example object and save it to a file.
 		return nil
 	}
-	
+
 	// SendTransaction simulates sending a transaction to a network device.
 	func (bc FileClient) SendTransaction(id string, obj interface{}, commit bool) error {
 		// Simulate sending a transaction (you can customize this part).
@@ -1387,47 +1286,49 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 		if err != nil {
 			return err
 		}
-	
+
 		mockMapMutex.Lock()
 		defer mockMapMutex.Unlock()
-		iC := obj.(incomingConfig)
-	
-		if mockMap == nil {
-			mockMap = make(map[string]incomingConfig)
-		}
-		mockMap[iC.ApplyGroups] = iC
-	
+		// iC := obj.(incomingConfig)
+
+		// if mockMap == nil {
+		// 	mockMap = make(map[string]incomingConfig)
+		// }
+		// mockMap[iC.ApplyGroups] = iC
+
 		// open file and print to file
 		// Write the updated XML to a file
-		err = os.WriteFile(bc.filename, cfg, 0644)
+		_, err = bc.filePtr.Write(cfg)
+		// fmt.Println("cfg")
+		// fmt.Println(string(cfg))
 		if err != nil {
-			fmt.Printf("Error writing to XML file: %v\n", err)
+			//fmt.Printf("Error writing to XML file: %v\n", err)
 			return err
 		}
-	
+
 		return nil
 	}
-	
+
 	// Provider returns a Terraform Provider.
 	func Provider() *schema.Provider {
 		return &schema.Provider{
-	
+
 			Schema: map[string]*schema.Schema{
 				"host": &schema.Schema{
 					Type:     schema.TypeString,
 					Required: true,
 				},
-	
+
 				"port": &schema.Schema{
 					Type:     schema.TypeInt,
 					Required: true,
 				},
-	
+
 				"username": &schema.Schema{
 					Type:     schema.TypeString,
 					Required: true,
 				},
-	
+
 				"password": &schema.Schema{
 					Type:     schema.TypeString,
 					Required: true,
@@ -1437,14 +1338,10 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 					Required: true,
 				},
 			},
-	
-			ResourcesMap: map[string]*schema.Resource{
-		`
-		providerFileData = strings.Replace(providerFileData, "[filename]", file.Name(), -1)
-	}
-	// Reaplace placeholder with providerName from config
-	providerFileData = strings.Replace(providerFileData, "[providerName]", jcfg.ProviderName, -1)
 
+			ResourcesMap: map[string]*schema.Resource{
+	`
+	providerFileData = strings.Replace(providerFileData, "[providerName]", jcfg.ProviderName, -1)
 }
 
 func copyDir(src, dst, extension string, fileCopyCount *uint32) error {

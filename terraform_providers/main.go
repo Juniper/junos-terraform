@@ -17,14 +17,11 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
 )
 
 func main() {
 	opts := &plugin.ServeOpts{ProviderFunc: Provider}
 	plugin.Serve(opts)
-	os.WriteFile("/tmp/text.txt", []byte(fmt.Sprintf(mockMap)), 0644)
+	//os.WriteFile("/tmp/text.txt", []byte(fmt.Sprintf("%v", mockMap)), 0644)
 }
