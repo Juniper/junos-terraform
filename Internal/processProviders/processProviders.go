@@ -139,6 +139,8 @@ var issueCounter int
 // XPath Counter
 var xpathCounter int
 
+var issue_xpaths []string
+
 // Syntactic helper to reduce repetition.
 func check(e error) {
 	if e != nil {
@@ -180,6 +182,10 @@ func CreateProviders(jcfg cfg.Config) error {
 	numofJobs := len(inNode.Nodes)
 	// fmt.Printf(numofJobs)
 
+	// Create terraform main and test file
+	createTerraformMain(jcfg)
+	createTerraformTest(jcfg)
+
 	for _, n5 := range inNode.Nodes {
 
 		// fmt.Println("DEBUG: Working with XPath Expression(n5.Key): -> ", n5.Key)
@@ -188,6 +194,7 @@ func CreateProviders(jcfg cfg.Config) error {
 		// test by adding empty xpath to xpath_example
 		if currentXPath == "" {
 			fmt.Println("EMPTY XPATH found, remove this from the xpath file. Issue Marked")
+			issue_xpaths = append(issue_xpaths, currentXPath)
 			issueCounter += 1
 		}
 		if currentXPath != "" {
@@ -269,6 +276,10 @@ func CreateProviders(jcfg cfg.Config) error {
 						fmt.Println("Issue creating file. Check presence of directory and permissions")
 						os.Exit(0)
 					}
+				} else {
+					issueCounter += 1
+					fmt.Printf("[ISSUE]: Terraform API resource for %s could NOT be created\nXPATH doesn't have valid match in Yang Files therefore has been removed from xapth_inputs file.\n", currentXPath)
+					issue_xpaths = append(issue_xpaths, currentXPath)
 				}
 			}
 		}
@@ -283,15 +294,14 @@ func CreateProviders(jcfg cfg.Config) error {
 	    } 
     }`
 
-	// Create terraform main file
-	createTerraformMain(jcfg)
-
 	// Create provider.go file
 	var fileName string = "provider.go"
 	fileName = moduleFilePath + "/" + fileName
 	fPtr, err := os.Create(fileName)
 	defer fPtr.Close()
 	check(err)
+
+	fixXPath_Inputs()
 
 	// Write to the file
 	_, err = fPtr.WriteString(providerFileData)
@@ -300,6 +310,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	fmt.Println("--------------------------------------------------------------------------------")
 	fmt.Println("Number of Xpaths processed: ", xpathCounter)
 	fmt.Println("Number of potential issues: ", issueCounter)
+	fmt.Println("	Search for [ISSUE]")
 
 	// Change path to the terraform_provider dir in this project
 	// we don't know the exact location, so find it through some path building
@@ -609,9 +620,8 @@ func matchXpath(nodes Node) {
 				// End of looping of nodes.
 			}
 			if !matchFound {
-				issueCounter += 1
-				fmt.Printf("Xpath not found in file, check it. : %s \n", strXpath)
-
+				// issueCounter += 1
+				// fmt.Printf("[ISSUE]: Xpath not found in file, check it. : %s \n", strXpath)
 				return
 			}
 
@@ -1213,23 +1223,17 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 			SSHKey:   d.Get("sshkey").(string),
 		}
 
+		configFilePath, ok := os.LookupEnv("MOCK_FILE")
+		var client netconf.Client
 		var err error
 
-		path, err := os.Getwd() //get the current directory using the built-in function
-		if err != nil {
-			fmt.Println(err) //print the error if obtained
-		}
-		configFilePath, ok := os.LookupEnv("MOCK_FILE")
-		path += configFilePath
-		var client netconf.Client
-
 		if ok {
-			filePtr, err := os.OpenFile(path, os.O_APPEND, 0644)
+			filePtr, err := os.OpenFile(configFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
 				return nil, diag.FromErr(err)
 			}
 			client = FileClient{filePtr: filePtr}
-
+	
 		} else {
 			client, err = config.Client()
 			if err != nil {
@@ -1298,7 +1302,7 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 
 		// open file and print to file
 		// Write the updated XML to a file
-		_, err = bc.filePtr.Write(cfg)
+		_, err = bc.filePtr.Write(append(cfg, byte('\n')))
 		// fmt.Println("cfg")
 		// fmt.Println(string(cfg))
 		if err != nil {
@@ -1408,7 +1412,7 @@ func printProgressBar(iteration, total int, prefix, suffix string, length int, f
 	}
 }
 
-func createTerraform(strSchema string, jcfg cfg.Config) {
+func createTerraformMain(jcfg cfg.Config) {
 
 	// SETTING UP FILE PATH DIRECTORY AND NAMING
 	// Get the absolute path of the executable binary
@@ -1419,74 +1423,6 @@ func createTerraform(strSchema string, jcfg cfg.Config) {
 	}
 	// Navigate up three directories
 	targetDir = filepath.Join(executablePath, "..", "..", "..", "/TFtemplates")
-
-	// Split the first line by spaces
-	elements := strings.Fields(strSchema)
-	resource := ""
-
-	// Find the name of the resource from the PROVIDER RESOURCE
-	if len(elements) >= 2 {
-		secondElement := elements[1]
-		// Trim "junos" and parentheses from the string
-		resource = strings.Trim(secondElement, "junos")
-		resource = strings.Trim(resource, "()")
-	} else {
-		fmt.Println("Not enough elements on the first line.")
-	}
-
-	// 	FIND THE ARGUMENTS FROM THE SCEHEMA --> PARSE SCHEMA
-	// Define a regular expression pattern to match the keys within double quotes --> This is to find INPUTS
-	pattern := `"\w+":`
-
-	// Compile the regular expression
-	re := regexp.MustCompile(pattern)
-
-	// Find all matches in the input string
-	matches := re.FindAllString(strSchema, -1)
-
-	// Create a slice to store the extracted keys
-	var keys []string
-
-	// Extract and print the keys without the quotes and colon
-	for _, match := range matches {
-		key := match[1 : len(match)-2] // Remove the double quotes and colon
-		keys = append(keys, key)
-	}
-
-	// CREATING THE FILE CONTENTS
-	providerType := "junos-" + jcfg.ProviderName
-	resourceType := providerType + "_" + resource
-	resourceName := "*replace with name for resource*"
-	blockHead := "resource" + " \"" + resourceType + "\"" + " \"" + resourceName + "\" {"
-
-	headBlock := "provider " + "\"" + providerType + "\" {\n" + "	host = \"10.x.x.x\"\n	port = 22\n	username = \"\"\n	password = \"\"\n	sshkey = \"\"\n}\n"
-
-	// Initialize an empty result string
-	var argumentBlock string
-
-	// Concatenate the strings with newline characters
-	for _, str := range keys {
-		argumentBlock += "	" + str + " = \"\"" + "\n"
-	}
-	argumentBlock += "}"
-
-	finalTemplate := blockHead + "\n" + argumentBlock
-	finalTemplate = headBlock + "\n" + finalTemplate
-
-	//	DEFINE THE FILE CONTENT AND WRITE TO FILE
-	fileContent := []byte(finalTemplate)
-
-	resultFile := resource + ".tf"
-	// Define the file path where you want to save the .tf file
-	filePath := filepath.Join(targetDir, resultFile)
-
-	// Create and write the Terraform configuration file
-	if err := ioutil.WriteFile(filePath, fileContent, 0644); err != nil {
-		log.Fatalf("Error writing .tf file: %v", err)
-	}
-}
-
-func createTerraformMain(jcfg cfg.Config) {
 
 	mainFileData :=
 		`
@@ -1542,5 +1478,204 @@ resource "junos-{device-type}_destroycommit" "commit-main" {
 	if err := ioutil.WriteFile(filePath, fileContent, 0644); err != nil {
 		log.Fatalf("Error writing .tf file: %v", err)
 	}
+}
 
+func createTerraformTest(jcfg cfg.Config) {
+
+	testFileData :=
+		`
+terraform {
+	required_providers {
+		junos-{device-type} = {
+			source = "{input source path}"
+			version = "{input version here}"
+		}
+	}
+}
+`
+
+	testFileData = strings.Replace(testFileData, "{device-type}", jcfg.ProviderName, -1)
+
+	testFile := "test.tf"
+
+	// Define the file path where you want to save the .tf file
+	filePath := filepath.Join(targetDir, testFile)
+	// var filePtr *os.File
+
+	// // Open the file for writing (create it if it doesn't exist, truncate it if it does)
+	// filePtr, err := os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC, 0644)
+	// if err != nil {
+	// 	return
+	// }
+
+	// Convert content to a byte slice and append a newline
+	fileContent := []byte(testFileData + "\n")
+
+	// Create and write the Terraform configuration file
+	if err := ioutil.WriteFile(filePath, fileContent, 0644); err != nil {
+		log.Fatalf("Error writing .tf file: %v", err)
+	}
+}
+
+func createTerraform(strSchema string, jcfg cfg.Config) {
+
+	// Split the first line by spaces
+	elements := strings.Fields(strSchema)
+	resource := ""
+
+	// Find the name of the resource from the PROVIDER RESOURCE
+	if len(elements) >= 2 {
+		secondElement := elements[1]
+		// Trim "junos" and parentheses from the string
+		resource = strings.Trim(secondElement, "junos")
+		resource = strings.Trim(resource, "()")
+	} else {
+		fmt.Println("Not enough elements on the first line.")
+	}
+
+	// 	FIND THE ARGUMENTS FROM THE SCEHEMA --> PARSE SCHEMA
+	// Define a regular expression pattern to match the keys within double quotes --> This is to find INPUTS
+	pattern := `"\w+":`
+
+	// Compile the regular expression
+	re := regexp.MustCompile(pattern)
+
+	// Find all matches in the input string
+	matches := re.FindAllString(strSchema, -1)
+
+	// Create a slice to store the extracted keys
+	var keys []string
+
+	// Extract and print the keys without the quotes and colon
+	for _, match := range matches {
+		key := match[1 : len(match)-2] // Remove the double quotes and colon
+		keys = append(keys, key)
+	}
+
+	// CREATING THE FILE CONTENTS
+	providerType := "junos-" + jcfg.ProviderName
+	resourceType := providerType + "_" + resource
+	resourceName := "*replace with name for resource*"
+	blockHead := "resource" + " \"" + resourceType + "\"" + " \"" + resourceName + "\" {"
+
+	// headBlock := "provider " + "\"" + providerType + "\" {\n" + "	host = \"10.x.x.x\"\n	port = 22\n	username = \"\"\n	password = \"\"\n	sshkey = \"\"\n}\n"
+
+	// Initialize an empty result string
+	var argumentBlock string
+
+	// Concatenate the strings with newline characters
+	for _, str := range keys {
+		argumentBlock += "	" + str + " = \"\"" + "\n"
+	}
+	argumentBlock += "}"
+
+	finalTemplate := blockHead + "\n" + argumentBlock
+	addToTF(finalTemplate)
+	// finalTemplate = headBlock + "\n" + finalTemplate
+
+	// //	DEFINE THE FILE CONTENT AND WRITE TO FILE
+	// fileContent := []byte(finalTemplate)
+
+	// resultFile := resource + ".tf"
+	// // Define the file path where you want to save the .tf file
+	// filePath := filepath.Join(targetDir, resultFile)
+
+	// // Create and write the Terraform configuration file
+	// if err := ioutil.WriteFile(filePath, fileContent, 0644); err != nil {
+	// 	log.Fatalf("Error writing .tf file: %v", err)
+	// }
+}
+
+func addToTF(content string) {
+
+	testFile := "test.tf"
+
+	// Define the file path where you want to save the .tf file
+	filePath := filepath.Join(targetDir, testFile)
+
+	//fmt.Println(filePath)
+	fileContent := []byte(content + "\n")
+
+	var filePtr *os.File
+
+	filePtr, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer filePtr.Close()
+
+	if _, err = filePtr.Write(append(fileContent, byte('\n'))); err != nil {
+		log.Fatalf("Error writing .tf file: %v", err)
+	}
+}
+
+// Struct to represent the XML structure
+type FileList struct {
+	XMLName xml.Name `xml:"file-list"`
+	XPaths  []xpath  `xml:"xpath"`
+}
+
+type xpath struct {
+	Name string `xml:"name,attr"`
+}
+
+func fixXPath_Inputs() {
+	// Open and read the XML file
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Println("Error getting the current working directory:", err)
+		return
+	}
+
+	// Navigate back one folder
+	for i := 0; i < 1; i++ {
+		cwd = filepath.Dir(cwd)
+	}
+
+	// Append the file name to the path
+	fileName := "xpath_inputs.xml"
+	filePath := filepath.Join(cwd, fileName)
+
+	xmlFile, err := os.OpenFile(filePath, os.O_RDWR, os.ModeExclusive)
+	if err != nil {
+		fmt.Println("Error opening XML file:", err)
+		return
+	}
+	defer xmlFile.Close()
+
+	// Decode the XML data
+	decoder := xml.NewDecoder(xmlFile)
+	var fileList FileList
+	err = decoder.Decode(&fileList)
+	if err != nil {
+		fmt.Println("Error decoding XML:", err)
+		return
+	}
+
+	// Create a map for fast lookup of issue XPaths
+	issueXPathsMap := make(map[string]bool)
+	for _, xpath := range issue_xpaths {
+		issueXPathsMap[xpath] = true
+	}
+
+	// Truncate the file to remove its content
+	xmlFile.Truncate(0)
+	xmlFile.Seek(0, 0)
+
+	// Write the file-list start tag
+	xmlFile.WriteString("<file-list>\n")
+
+	// Iterate through the XPaths and filter out the unwanted ones
+	for _, xpath := range fileList.XPaths {
+		if !issueXPathsMap[xpath.Name] {
+			// If the XPath is not in the issue_xpaths list, write it to the same file
+			xmlFile.WriteString("    ")
+			xpathString := fmt.Sprintf("<xpath name=\"%s\"/>\n", xpath.Name)
+			fmt.Fprintf(xmlFile, xpathString)
+		}
+	}
+
+	// Write the file-list end tag
+	xmlFile.WriteString("</file-list>")
 }

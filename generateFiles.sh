@@ -18,18 +18,67 @@ if ! command_exists go; then
   echo "Go is not installed. Please Install 'Go' before running the script."
 fi
 
+script_directory="$home_dir/user_config_files"
+
+# Create the directory if it doesn't exist
+mkdir -p "$script_directory"
+
+# Initialize the config_file variable
+config_file=""
+
+echo ""
+echo ""
+
+# Prompt the user for the configuration file name and validate it
+while [ ! -f "$config_file" ]; do
+  read -p "Enter the configuration file name: " config_file
+  full_path="$script_directory/$config_file"
+  
+  if [ -f "$full_path" ]; then
+    config_file="$full_path"
+  else
+    echo "The provided file does not exist in your script's directory."
+    config_file=""
+  fi
+done
+
 # Ask user what device they are working on
 valid_options=("vsrx" "vmx" "vqfx" "vptx")
 user_input=""
 
 while [[ ! " ${valid_options[*]} " =~ " $user_input " ]]; do
-    read -p "Enter a valid option (vsrx, vmx, vqfx, vptx): " user_input
+    read -p "Enter a valid device option (vsrx, vmx, vqfx, vptx): " user_input
     
     if [[ ! " ${valid_options[*]} " =~ " $user_input " ]]; then
         echo "Invalid input. Please enter one of the following options: vsrx, vmx, vqfx, vptx."
     fi
 done
 
+# Prompt the user for the Junos version
+read -p "Enter the Junos version: " junos_version
+
+echo ""
+echo ""
+# Display the user's selections
+echo "Configuration file path: $config_file"
+echo "Device name: $selected_device"
+echo "Junos version: $junos_version"
+
+
+# Ask for confirmation
+while true; do
+  read -p "Are these selections correct? (yes/no): " confirmation
+  case "$confirmation" in
+    [Yy]* ) break;;
+    [Nn]* ) 
+      # If the user says no, allow them to start over
+      exec "$0";;
+    * ) echo "Please answer 'yes' or 'no'.";;
+  esac
+done
+
+echo ""
+echo ""
 # Create or overwrite config.toml file
 echo "Creating or overwriting config.toml file..."
 cat > config.toml << EOF
@@ -39,6 +88,74 @@ xpathPath = "$(pwd)/xpath_inputs.xml"
 providerName = "$user_input"
 fileType = "both"
 EOF
+
+
+echo ""
+echo ""
+target_dir="$home_dir/yang"
+
+# Check if the target directory already exists, and create it if not
+if [ ! -d "$target_dir" ]; then
+  mkdir -p "$target_dir"
+  # Git clone the Juniper YANG repository into the target directory
+  echo "Cloning the Juniper YANG repository for Junos $junos_version into $target_dir..."
+  git clone https://github.com/Juniper/yang.git "$target_dir"
+fi
+
+# Check if the git clone was successful
+if [ $? -eq 0 ]; then
+  echo "Cloning successful. YANG files are in $target_dir."
+else
+  echo "Folder already created or clone failed. If clone failed, please check your internet connection or repository URL."
+fi
+
+junos_version_combined="${junos_version}R1"
+
+# Populate the associative array with mappings
+device_mappings["vmx"]="junos"
+device_mappings["vptx"]="junos"
+device_mappings["vsrx"]="junos-es"
+device_mappings["vqfx"]="junos-qfx"
+
+# Use the user's input to look up the supported devices
+supported_devices="${device_mappings[$selected_device]}"
+
+# Check if the device name exists in the mapping
+if [ -z "$supported_devices" ]; then
+  echo "Device name not recognized."
+  exit 1
+fi
+
+# # Output the supported devices
+# echo "Supported devices for $selected_device: $supported_devices"
+
+common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2023-01-01.yang"
+path_to="yang/$junos_version/$junos_version_combined/$supported_devices/conf/"
+
+
+
+# Define the target directory in the home directory
+target_dir="$home_dir/yang_files"
+
+# Check if the target directory already exists, and create it if not
+if [ ! -d "$target_dir" ]; then
+  mkdir -p "$target_dir"
+  # Copy all files from the source directory to the target directory
+  cp -r "$path_to"* "$target_dir"
+
+  # Copy the common file to the target directory
+  cp "$common_path" "$target_dir"
+
+  # Check if the copy operation was successful
+  if [ $? -eq 0 ]; then
+    echo "Files copied successfully to $target_dir."
+  else
+    echo "Copy operation failed."
+  fi
+
+  rm -rf yang
+fi
+
 
 # Check if yang_files folder exists
 if [ -d "yang_files" ]; then
@@ -67,4 +184,39 @@ if [ -d "yang_files" ]; then
   fi
 else
   echo "yang_files folder does not exist. Create and add necessary files"
+fi
+
+
+cd "$home_dir"
+
+echo ""
+echo ""
+
+# Search for XML files containing "xpath" in their filenames in the home directory
+xml_files=$(find "$PWD" -type f -name '*xpath*.xml')
+
+# Define the folder name
+folderName="TFtemplates"
+
+# Check if the folder already exists
+if [ ! -d "$folderName" ]; then
+    # Create the folder if it doesn't exist
+    mkdir "$folderName"
+    echo "Folder '$folderName' created successfully. Folder stores tf templates for testing"
+else
+    echo "Folder '$folderName' already exists to store .tf templates"
+fi
+
+
+# Check if any matching XML files were found
+if [ -n "$xml_files" ]; then
+    # Now Build the provider
+    cd $home_dir/cmd/processProviders
+    go build
+    ./processProviders -config $home_dir/config.toml
+    cd $home_dir/terraform_providers
+    go mod tidy -go=1.16 && go mod tidy -go=1.17
+    go build
+else
+    echo "No XML xpath file found. Try renaming the xpath file to include 'xpath' in the name."
 fi
