@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
+	"sort"
 	"strings"
 	"sync"
 
@@ -42,6 +43,15 @@ const getGroupXMLStr = `<get-configuration>
 </get-configuration>
 `
 
+const ApplyGroupXML = `<load-configuration action="merge" format="xml">
+	%s
+</load-configuration>
+`
+
+type configuration struct {
+	ApplyGroup []string `xml:"apply-groups"`
+}
+
 // GoNCClient type for storing data and wrapping functions
 type GoNCClient struct {
 	Driver driver.Driver
@@ -71,6 +81,17 @@ func (g *GoNCClient) updateRawConfig(applyGroup string, netconfCall string, comm
 		return "", fmt.Errorf("driver error: %+v, driver close error: %s", err, errInternal)
 	}
 
+	// Extract the string between <name> tags
+	nameStart := strings.Index(netconfCall, "<name>")
+	nameEnd := strings.Index(netconfCall, "</name>")
+	if nameStart == -1 || nameEnd == -1 {
+		return "", fmt.Errorf("failed to extract the group name from the netconfcall")
+	}
+	groupName := netconfCall[nameStart+6 : nameEnd]
+
+	// Add the groupName to the applyGroupsList
+	addToApplyGroupsList(groupName)
+
 	groupString := fmt.Sprintf(groupStrXML, netconfCall)
 
 	reply, err := g.Driver.SendRaw(groupString)
@@ -78,7 +99,6 @@ func (g *GoNCClient) updateRawConfig(applyGroup string, netconfCall string, comm
 		errInternal := g.Driver.Close()
 		return "", fmt.Errorf("driver error: %+v, driver close error: %s", err, errInternal)
 	}
-
 	if commit {
 		if _, err = g.Driver.SendRaw(commitStr); err != nil {
 			errInternal := g.Driver.Close()
@@ -130,10 +150,53 @@ func (g *GoNCClient) SendCommit() error {
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
 
+	// Sort the Apply Groups List
+	sortApplyGroupsList()
+	if err := g.SendApplyGroups(); err != nil {
+		return err
+	}
+
 	if err := g.Driver.Dial(); err != nil {
 		return err
 	}
 	if _, err := g.Driver.SendRaw(commitStr); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (g *GoNCClient) SendApplyGroups() error {
+	g.Lock.Lock()
+	defer g.Lock.Unlock()
+
+	// Concatenate the strings in applyGroupsList.
+	applyGroupsMutex.Lock()
+	defer applyGroupsMutex.Unlock()
+
+	var applyG configuration
+	applyG.ApplyGroup = make([]string, len(applyGroupsList))
+	for i, item := range applyGroupsList {
+		applyG.ApplyGroup[i] = item
+	}
+
+	cfg, err := xml.Marshal(applyG) // Indent with four spaces
+	if err != nil {
+		return err
+	}
+
+	applyGroupString := fmt.Sprintf(ApplyGroupXML, string(cfg))
+
+	if err := g.Driver.Dial(); err != nil {
+		return err
+	}
+
+	_, err = g.Driver.SendRaw(applyGroupString)
+	if err != nil {
+		errInternal := g.Driver.Close()
+		return fmt.Errorf("driver error: %+v, driver close error: %s", err, errInternal)
+	}
+
+	if err = g.Driver.Close(); err != nil {
 		return err
 	}
 	return nil
@@ -152,6 +215,9 @@ func (g *GoNCClient) MarshalGroup(id string, obj interface{}) error {
 	}
 	return nil
 }
+
+var applyGroupsList []string
+var applyGroupsMutex sync.Mutex
 
 // SendTransaction is a method that unmarshal the XML, creates the transaction and passes in a commit
 func (g *GoNCClient) SendTransaction(id string, obj interface{}, commit bool) error {
@@ -173,10 +239,46 @@ func (g *GoNCClient) SendTransaction(id string, obj interface{}, commit bool) er
 	return nil
 }
 
+// Helper function to add an id to the global list.
+func addToApplyGroupsList(id string) {
+	applyGroupsMutex.Lock()
+	defer applyGroupsMutex.Unlock()
+	applyGroupsList = append(applyGroupsList, id)
+}
+
+// Helper function to sort the global list.
+func sortApplyGroupsList() {
+	applyGroupsMutex.Lock()
+	defer applyGroupsMutex.Unlock()
+
+	// Filter out empty strings and sort
+	filteredGroups := make([]string, 0, len(applyGroupsList))
+	for _, group := range applyGroupsList {
+		if group != "" {
+			filteredGroups = append(filteredGroups, group)
+		}
+	}
+	sort.Strings(filteredGroups)
+
+	// Update the global applyGroupsList with the sorted and filtered list
+	applyGroupsList = filteredGroups
+}
+
 // sendRawConfig is a wrapper for driver.SendRaw()
 func (g *GoNCClient) sendRawConfig(netconfCall string, commit bool) (string, error) {
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
+
+	// Extract the string between <name> tags
+	nameStart := strings.Index(netconfCall, "<name>")
+	nameEnd := strings.Index(netconfCall, "</name>")
+	if nameStart == -1 || nameEnd == -1 {
+		return "", fmt.Errorf("Failed to extract the group name from the netconfCall")
+	}
+	groupName := netconfCall[nameStart+6 : nameEnd]
+
+	// Add the groupName to the applyGroupsList
+	addToApplyGroupsList(groupName)
 
 	if err := g.Driver.Dial(); err != nil {
 		return "", err

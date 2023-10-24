@@ -92,22 +92,6 @@ EOF
 
 echo ""
 echo ""
-target_dir="$home_dir/yang"
-
-# Check if the target directory already exists, and create it if not
-if [ ! -d "$target_dir" ]; then
-  mkdir -p "$target_dir"
-  # Git clone the Juniper YANG repository into the target directory
-  echo "Cloning the Juniper YANG repository for Junos $junos_version into $target_dir..."
-  git clone https://github.com/Juniper/yang.git "$target_dir"
-fi
-
-# Check if the git clone was successful
-if [ $? -eq 0 ]; then
-  echo "Cloning successful. YANG files are in $target_dir."
-else
-  echo "Folder already created or clone failed. If clone failed, please check your internet connection or repository URL."
-fi
 
 junos_version_combined="${junos_version}R1"
 
@@ -133,12 +117,27 @@ common_path="yang/$junos_version/$junos_version_combined/common/junos-common-typ
 path_to="yang/$junos_version/$junos_version_combined/$supported_devices/conf/"
 
 
-
 # Define the target directory in the home directory
 target_dir="$home_dir/yang_files"
 
 # Check if the target directory already exists, and create it if not
 if [ ! -d "$target_dir" ]; then
+  target_dir="$home_dir/yang"
+
+  # Check if the target directory already exists, and create it if not
+  if [ ! -d "$target_dir" ]; then
+    mkdir -p "$target_dir"
+    # Git clone the Juniper YANG repository into the target directory
+    echo "Cloning the Juniper YANG repository for Junos $junos_version into $target_dir..."
+    git clone https://github.com/Juniper/yang.git "$target_dir"
+  fi
+
+  # Check if the git clone was successful
+  if [ $? -eq 0 ]; then
+    echo "Cloning successful. YANG files are in $target_dir."
+  else
+    echo "Folder already created or clone failed. If clone failed, please check your internet connection or repository URL."
+  fi
   mkdir -p "$target_dir"
   # Copy all files from the source directory to the target directory
   cp -r "$path_to"* "$target_dir"
@@ -189,6 +188,8 @@ fi
 
 cd "$home_dir"
 
+go run createXpathInputs.go
+
 echo ""
 echo ""
 
@@ -220,3 +221,35 @@ if [ -n "$xml_files" ]; then
 else
     echo "No XML xpath file found. Try renaming the xpath file to include 'xpath' in the name."
 fi
+
+# Change directory to the Terraform plugin location
+cd ~/.terraform.d/plugins/juniper/providers/junos-vqfx/23.11.101/darwin_arm64
+
+# Print a message
+echo "Changing directory to the Terraform plugin location..."
+
+# Remove the existing terraform-provider-junos-vqfx binary
+rm terraform-provider-junos-vqfx
+
+# Print a message
+echo "Removing the existing terraform-provider-junos-vqfx binary..."
+
+# Change directory to the Terraform providers directory
+cd ~/Desktop/junos-terraform/terraform_providers
+
+# Print a message
+echo "Changing directory to the Terraform providers directory..."
+
+# Copy the terraform-provider-junos-vqfx binary to the specified location
+cp terraform-provider-junos-vqfx /Users/patelv/.terraform.d/plugins/juniper/providers/junos-vqfx/23.11.101/darwin_arm64/
+
+# Print a message
+echo "Copying the terraform-provider-junos-vqfx binary..."
+
+cd ../testbed
+
+rm -r .terraform
+
+rm .terraform.lock.hcl 
+
+rm terraform.tfstate 
