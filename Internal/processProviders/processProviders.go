@@ -1200,10 +1200,7 @@ import (
 
 	providerFileData += "\ntype configuration struct {\n\tApplyGroup []string `xml:\"apply-groups\"`\n}\n"
 
-	//providerFileData += "\ntype applyGroupID struct {\n\tApplyGroup string `xml:\"apply-groups\"`\n}"
-
 	providerFileData += `
-// var mockMap map[string]incomingConfig
 var mockMapMutex sync.Mutex
 
 // ProviderConfig is to hold client information
@@ -1286,12 +1283,11 @@ func (bc FileClient) updateRawConfig(applyGroup string, netconfCall string, comm
 
 	var groupString string
 	groupString = fmt.Sprintf(groupStrXML, netconfCall)
-	groupString = fmt.Sprintln("Group String: ", groupString)
 	_, err := bc.filePtr.WriteString(groupString)
 	if err != nil {
 		return "", err
 	}
-
+	bc.filePtr.WriteString("\n\n")
 	if commit {
 		bc.filePtr.WriteString("\nCommiting from Update\n")
 		_, err := bc.filePtr.WriteString(commitStr)
@@ -1338,21 +1334,16 @@ func (bc FileClient) SendTransaction(id string, obj interface{}, commit bool) er
 	mockMapMutex.Lock()
 	defer mockMapMutex.Unlock()
 
-	// _, err = bc.filePtr.Write(append(cfg, byte('\n')))
-	// if err != nil {
-	// 	fmt.Printf("Error writing to XML file: %v\n", err)
-	// 	return err
-	// }
-
 	// updateRawConfig deletes old group by, re-creates it then commits.
 	// As far as Junos cares, it's an edit.
 	if id != "" {
-		// fmt.Println("Updating raw")
+		bc.filePtr.WriteString("Sending groups to device via Update Function:\n")
 		if _, err = bc.updateRawConfig(id, string(cfg), commit); err != nil {
 			return err
 		}
 		return nil
 	}
+	bc.filePtr.WriteString("Sending groups to device via Send Raw Function:\n")
 	if _, err = bc.sendRawConfig(string(cfg), commit); err != nil {
 		return err
 	}
@@ -1388,7 +1379,7 @@ func (bc FileClient) sendRawConfig(netconfCall string, commit bool) (string, err
 		}
 	}
 
-	return "d", nil
+	return "", nil
 }
 
 // Helper function to add an id to the global list.
@@ -1447,7 +1438,7 @@ func (bc FileClient) SendApplyGroups() error {
 		return err
 	}
 
-	_, err = bc.filePtr.WriteString("\n\nApplying Groups\n")
+	_, err = bc.filePtr.WriteString("Sending Apply-Groups to device\n")
 	if err != nil {
 		return err
 	}

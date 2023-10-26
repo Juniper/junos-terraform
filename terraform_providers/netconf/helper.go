@@ -152,6 +152,7 @@ func (g *GoNCClient) SendCommit() error {
 
 	// Sort the Apply Groups List
 	sortApplyGroupsList()
+	// Send the Apply-Groups
 	if err := g.SendApplyGroups(); err != nil {
 		return err
 	}
@@ -165,21 +166,20 @@ func (g *GoNCClient) SendCommit() error {
 	return nil
 }
 
+// This function is a helper used to send apply-groups to the device in chronological order
 func (g *GoNCClient) SendApplyGroups() error {
-	g.Lock.Lock()
-	defer g.Lock.Unlock()
-
 	// Concatenate the strings in applyGroupsList.
 	applyGroupsMutex.Lock()
 	defer applyGroupsMutex.Unlock()
 
+	// Insert group names into correct syntax
 	var applyG configuration
 	applyG.ApplyGroup = make([]string, len(applyGroupsList))
 	for i, item := range applyGroupsList {
 		applyG.ApplyGroup[i] = item
 	}
 
-	cfg, err := xml.Marshal(applyG) // Indent with four spaces
+	cfg, err := xml.Marshal(applyG)
 	if err != nil {
 		return err
 	}
