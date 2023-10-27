@@ -1180,7 +1180,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"terraform-provider-junos-vqfx/netconf"
+	"terraform-provider-junos-[providerName]/netconf"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -1641,13 +1641,6 @@ terraform {
 
 	// Define the file path where you want to save the .tf file
 	filePath := filepath.Join(targetDir, testFile)
-	// var filePtr *os.File
-
-	// // Open the file for writing (create it if it doesn't exist, truncate it if it does)
-	// filePtr, err := os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC, 0644)
-	// if err != nil {
-	// 	return
-	// }
 
 	// Convert content to a byte slice and append a newline
 	fileContent := []byte(testFileData + "\n")
@@ -1712,19 +1705,6 @@ func createTerraform(strSchema string, jcfg cfg.Config) {
 
 	finalTemplate := blockHead + "\n" + argumentBlock
 	addToTF(finalTemplate)
-	// finalTemplate = headBlock + "\n" + finalTemplate
-
-	// //	DEFINE THE FILE CONTENT AND WRITE TO FILE
-	// fileContent := []byte(finalTemplate)
-
-	// resultFile := resource + ".tf"
-	// // Define the file path where you want to save the .tf file
-	// filePath := filepath.Join(targetDir, resultFile)
-
-	// // Create and write the Terraform configuration file
-	// if err := ioutil.WriteFile(filePath, fileContent, 0644); err != nil {
-	// 	log.Fatalf("Error writing .tf file: %v", err)
-	// }
 }
 
 func addToTF(content string) {
