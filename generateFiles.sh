@@ -233,6 +233,7 @@ EOF
         go build
         ./processYang -config $home_dir/config.toml
         deactivate
+        # go run $home_dir/Internal/processYang/createXpathInputs.go
       else
         echo "No .yang files found in yang_files folder. Add files and re-run script"
       fi
@@ -275,20 +276,13 @@ EOF
     fi
 
     # Define the target directory in the home directory
-    target_dir="$HOME/testbed"
+    target_dir="$home_dir/testbed"
 
     # Check if the target directory already exists
     if [ ! -d "$target_dir" ]; then
         # If it doesn't exist, create the directory
         mkdir -p "$target_dir"
         echo "Created target directory: $target_dir"
-    fi
-
-    # Check if jtaf_output.xml does not exist in the testbed directory
-    if [ ! -f "$target_dir/jtaf_output.xml" ]; then
-        # Create jtaf_output.xml
-        touch "$target_dir/jtaf_output.xml"
-        echo "Created jtaf_output.xml in the testbed directory"
     fi
 
     # Check if main.tf does not exist in the testbed directory

@@ -20,13 +20,19 @@ Interface Configuration: https://youtu.be/iCnnkDodUgQ
 
 BGP Configuration: https://youtu.be/nQVNCNCJZRc
 
-# Begin
+# Section Breakdown
+* ## Junos-Terraform Demo (Build from scratch)
+* ##  Junos-Terraform Developer Guide (Build from pre-existing junos config)
+* ## Using the Provider
+* ## Testing with Terraform
+
+# Junos-Terraform Demo (Begin)
 
 We will create a simple provider for a vSRX of version 19.4R1 that has the capability to do two things:
 * Add a description to an interface
 * Add an `inet` address to a sub-interface
   
-Don't worry about commits just yet, we'll discuss that later.
+Don't worry about commits just yet, we'll discuss that later. This demo is for the purpose of creating terrafom providers from scratch with custom device capabilities related to the use of Juniper's yang file resources.
 
 In this document, if you see `$JTAF_PROJECT` you can replace it with the path of the JTAF project on your system or create an environment variable. On the author's system, this happens to be below:
 
@@ -80,11 +86,12 @@ rm -rf yang
 
 **Prior to this step, ensure python and go is installed.**
 
-
 This file can be compiled by running `chmod +x generateFiles.sh` from the home directory followed by 
 `./generateFiles.sh` to run the script. 
 
-Below describes what the script does:
+`Select "Build a provider from scratch" option: [1] out of the options if following along with the demo`
+
+## Below describes what the script does:
 
 
 ### 1. Generates a `config.toml` File
@@ -146,8 +153,10 @@ Great, at this point now we have text file and YIN versions of the YANG files. W
 Let's create a file, which provides a list of inputs to the part of JTAF which writes the `.go` code automagically.
 This input identifies the content of the provider that JTAF will create. **Some of these files such as `xpath_inputs.xml` are scattered are in the `Samples` directory.**
 
-Create a file `/var/tmp/jtaf/xpath_input.xml` and populate it with the content below.
-**Make sure that the file is named `xpath_inputs.xml`**
+Create a file `/junos-terraform/xpath_inputs.xml` and populate it with the content below.
+
+## **Make sure that the file is named `xpath_inputs.xml`** 
+* `The name must match the name defined in config.toml`
 
 ```bash
 <file-list>
@@ -168,10 +177,12 @@ JTAF generated providers has a requirement of the smallest data set possible for
 # Run Second Shell Script:  `buildProvider.sh`
 
 ### **Prior to this step**
-1. Ensure an xml, xpath file is created in the `/junos-terraform` home directory with `xpath` in the name of the file (ex: xpath_example.xml)
-2. IF you want to test the output of the configuration from the .tf files that will be created later on to define the configuration for a device, set the ENV variable `MOCK_FILE` to the path of an empty `xml` file where the system can display the expected config defined in the .tf files. 
-**Warning:** `MOCK_FILE` should be set to "" or not exist unless wanting to enter Mock mode, otherwise system will look for path setup
+* IF you want to test the output of the configuration from the `terraform test` files, set the ENV variable `MOCK_FILE` to the path of an empty `xml` file you create where the system can display the expected config defined in the .tf files. 
+   * example: create a `jtaf_output.xml` file in the `/junos-terraform` directory and run `export MOCK_FILE=/path_to_junos-terraform/jtaf_output.xml`)
 
+* **Warning:** `MOCK_FILE` should be `unset` unless wanting to enter Mock mode, otherwise system will look for path setup. `Mock Mode allows developers to test terraform commands and commits to a local file prior to device communication.` If `MOCK_FILE` is set, terraform commands will output to the file declared by the variable and not the device declared in the `main.tf` file.
+
+### Now let's run the script: 
 This file can be compiled by running `chmod +x buildProvider.sh` from the home directory followed by 
 `./buildProvider.sh` to run the script. 
 
@@ -242,6 +253,64 @@ file terraform-provider-junos-device
 ```
 
 The binary file `terraform-provider-junos-vsrx` is actually our fresh new and shiny Terraform Provider. If you got this far, congratulations. You just created a Terraform provider for Junos.
+
+# Junos-Terraform Developer Guide (Begin)
+
+* ### This section is aimed at users who are a little more comfortable with the way junos-terraform works and want to develop, test, configure Juniper devices with a pre-existing configuration.
+
+**The only requirement for this section is to upload a configuration in `xml` format to the `/junos-terraform/user_config_files` folder.**
+
+* When adding this `xml` file to the folder, remove any starting and ending `<configuration>` and `<cli>` tags.
+
+  * For reference, see `test.xml` in the `/Samples/user_config_files` folder which contains configuration for `vqfx` spine for Junos version `23.1`
+
+* After configuration is uploaded, the rest is taken care of (provider build and test file templates created)
+
+### **Prior to start (for testing)**
+* IF you want to test the output of the configuration from the `terraform test` files, set the ENV variable `MOCK_FILE` to the path of an empty `xml` file you create where the system can display the expected config defined in the .tf files. 
+   * example: create a `jtaf_output.xml` file in the `/junos-terraform` directory and run `export MOCK_FILE=/path_to_junos-terraform/jtaf_output.xml`)
+
+* **Warning:** `MOCK_FILE` should be `unset` unless wanting to enter Mock mode, otherwise system will look for path setup. `Mock Mode allows developers to test terraform commands and commits to a local file prior to device communication.` If `MOCK_FILE` is set, terraform commands will output to the file declared by the variable and not the device declared in the `main.tf` file.
+
+## Run Shell Script: `generateFiles.sh`
+
+**Prior to this step, ensure python and go is installed.**
+
+This file can be compiled by running `chmod +x generateFiles.sh` from the home directory followed by 
+`./generateFiles.sh` to run the script. 
+
+`Select "Provide a configuration" option: [2] out of the options if wanting to create a resource provider based on an existing configuration`
+
+Below describes what the script does:
+
+### 1. Generates a `config.toml` File
+
+* Creates a config file in the home directory. Don't worry about the xPath or fileType keys. They'll be explained shortly.
+* You can find this file `config.toml` in the home directory `/junos-terraform`
+
+### 2. Copies YANG Files 
+
+* This part of the script calls for the cloning of the Juniper `yang` directory in order to copy necessary yang files for the given `device` and `version`. **This will only happen if the folder `yang_files` does not exist already.**
+
+### 3. Generates the YIN and XPath Files based on YANG files
+
+* This part of the script enables the call to create YIN and Xpath files. For more details, look at the demo for this section.
+
+### 4. Creates an XPath Input XML File
+
+* This part of the script uses a go file called `createXpathInputs.go` to parse the configuration loaded by the user and creates an `xpath_inputs.xml` file. This file contains a skeleton of all the configured xpaths contained in the pre-loaded configuration. These xpaths will be used to generate the provider resources.
+
+### 5. Builds the Provider Resources
+
+* We need JTAF to create some `.go` code from the YANG models and XML data we provided which is written to the `/terraform_provider` directory.
+
+### 6. Build the Provider
+
+* Similar to the demo, the script run the creation of the binary file `terraform-provider-junos-[device-name]` which is actually our fresh new and shiny Terraform Provider. If you got this far, congratulations. You just created a Terraform provider for Junos.
+
+### 7. Using the resouce
+
+* For the next section, refer to the `/TFtemaplates` directory created by the script providing a basic `.tf` template for the `main` and `test` files
 
 # Using the new Provider
 
