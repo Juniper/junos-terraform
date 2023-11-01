@@ -301,8 +301,6 @@ func CreateProviders(jcfg cfg.Config) error {
 	defer fPtr.Close()
 	check(err)
 
-	fixXPath_Inputs()
-
 	// Write to the file
 	_, err = fPtr.WriteString(providerFileData)
 
@@ -311,6 +309,9 @@ func CreateProviders(jcfg cfg.Config) error {
 	fmt.Println("Number of Xpaths processed: ", xpathCounter)
 	fmt.Println("Number of potential issues: ", issueCounter)
 	fmt.Println("	Search for [ISSUE]")
+	if issueCounter > 0 {
+		fixXPath_Inputs()
+	}
 
 	// Change path to the terraform_provider dir in this project
 	// we don't know the exact location, so find it through some path building
@@ -1742,14 +1743,13 @@ type xpath struct {
 
 func fixXPath_Inputs() {
 	// Open and read the XML file
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		fmt.Println("Error getting the current working directory:", err)
 		return
 	}
 
-	// Navigate back one folder
+	// Navigate back 1 folder
 	for i := 0; i < 1; i++ {
 		cwd = filepath.Dir(cwd)
 	}
@@ -1758,14 +1758,14 @@ func fixXPath_Inputs() {
 	fileName := "xpath_inputs.xml"
 	filePath := filepath.Join(cwd, fileName)
 
-	xmlFile, err := os.OpenFile(filePath, os.O_RDWR, os.ModeExclusive)
+	xmlFile, err := os.Open(filePath)
 	if err != nil {
 		fmt.Println("Error opening XML file:", err)
 		return
 	}
 	defer xmlFile.Close()
 
-	// Decode the XML data
+	// Decode the original XML data
 	decoder := xml.NewDecoder(xmlFile)
 	var fileList FileList
 	err = decoder.Decode(&fileList)
@@ -1780,23 +1780,28 @@ func fixXPath_Inputs() {
 		issueXPathsMap[xpath] = true
 	}
 
-	// Truncate the file to remove its content
-	xmlFile.Truncate(0)
-	xmlFile.Seek(0, 0)
+	// Create a new XML file to write the filtered XPaths
+	newFilePath := "../updated_xpath_inputs.xml"
+	newFile, err := os.Create(newFilePath)
+	if err != nil {
+		fmt.Println("Error creating new XML file:", err)
+		return
+	}
+	defer newFile.Close()
 
-	// Write the file-list start tag
-	xmlFile.WriteString("<file-list>\n")
+	// Write the file-list start tag to the new file
+	newFile.WriteString("<file-list>\n")
 
 	// Iterate through the XPaths and filter out the unwanted ones
 	for _, xpath := range fileList.XPaths {
 		if !issueXPathsMap[xpath.Name] {
-			// If the XPath is not in the issue_xpaths list, write it to the same file
-			xmlFile.WriteString("    ")
+			// If the XPath is not in the issue_xpaths list, write it to the new file
+			newFile.WriteString("    ")
 			xpathString := fmt.Sprintf("<xpath name=\"%s\"/>\n", xpath.Name)
-			fmt.Fprintf(xmlFile, xpathString)
+			fmt.Fprintf(newFile, xpathString)
 		}
 	}
 
-	// Write the file-list end tag
-	xmlFile.WriteString("</file-list>")
+	// Write the file-list end tag to the new file
+	newFile.WriteString("</file-list>")
 }

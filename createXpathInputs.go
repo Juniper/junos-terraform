@@ -92,8 +92,6 @@ func getXPathsAndDataFromXML(xpathMap map[string]bool, data XMLData, xmlFile *os
 			currentDataKey = currentDataKey[:len(currentDataKey)-1]
 		}
 	}
-
-	// Add logic: if leaf has a type name that is "empty" --> consider it a tag
 }
 
 func createXpathInputsFile(xpathMap map[string]bool) {

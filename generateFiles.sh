@@ -115,7 +115,7 @@ elif [ "$choice" == "2" ]; then
     echo ""
     # Display the user's selections
     echo "Configuration file path: $config_file"
-    echo "Device name: $selected_device"
+    echo "Device name: $user_input"
     echo "Junos version: $junos_version"
 
 
@@ -293,7 +293,7 @@ EOF
     fi
 
     # Create a folder named after device_name appended with "_1"
-    device_folder="$target_dir/${selected_device}_1"
+    device_folder="$target_dir/${user_input}_1"
     if [ ! -d "$device_folder" ]; then
         # If it doesn't exist, create the folder
         mkdir -p "$device_folder"

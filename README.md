@@ -26,7 +26,7 @@ BGP Configuration: https://youtu.be/nQVNCNCJZRc
 * ## Using the Provider
 * ## Testing with Terraform
 
-# Junos-Terraform Demo (Begin)
+# Junos-Terraform Demo
 
 We will create a simple provider for a vSRX of version 19.4R1 that has the capability to do two things:
 * Add a description to an interface
@@ -228,7 +228,13 @@ Copied file: resource_junos_device_commit.go to /var/tmp/jtaf/terraform_provider
 
 The output of this step is written to the `/var/tmp/jtaf/terraform_provider` directory. Let's build the provider!
 
-## 2. Builds the Provider
+
+## 2. Creates updated xpath input file (if needed)
+
+If there are any found issues during the building of the provider resources, a new file called `updated_xpath_inputs.xml` will be created with a trimmed version of the provided xpath inputs file. This file can be used to replace the data in the `xpath_inputs.xml`.
+
+
+## 3. Builds the Provider
 
 ```bash
 cd /var/tmp/jtaf/terraform_providers
@@ -254,9 +260,9 @@ file terraform-provider-junos-device
 
 The binary file `terraform-provider-junos-vsrx` is actually our fresh new and shiny Terraform Provider. If you got this far, congratulations. You just created a Terraform provider for Junos.
 
-# Junos-Terraform Developer Guide (Begin)
+# Junos-Terraform Developer Guide
 
-* ### This section is aimed at users who are a little more comfortable with the way junos-terraform works and want to develop, test, configure Juniper devices with a pre-existing configuration.
+### This section is aimed at users who are a little more comfortable with the way junos-terraform works and want to develop, test, configure Juniper devices with a pre-existing configuration.
 
 **The only requirement for this section is to upload a configuration in `xml` format to the `/junos-terraform/user_config_files` folder.**
 
@@ -302,6 +308,8 @@ Below describes what the script does:
 
 ### 5. Builds the Provider Resources
 
+* Creates updated xpath input file (if needed)
+  * If there are any found issues during the building of the provider resources, a new file called `updated_xpath_inputs.xml` will be created with a trimmed version of the provided xpath inputs file. This file can be used to replace the data in the `xpath_inputs.xml`.
 * We need JTAF to create some `.go` code from the YANG models and XML data we provided which is written to the `/terraform_provider` directory.
 
 ### 6. Build the Provider
