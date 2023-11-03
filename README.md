@@ -6,7 +6,7 @@ Much the same as you can use Terraform to create an AWS EC2 instance, you can ma
 
 So what is JTAF? It's a framework, meaning, it's an opinionated set of tools and steps that allow you to go from YANG models to a custom Junos Terraform provider. With all frameworks, there are some dependencies.
 
-To use JTAF, you'll need machine that can run Go, Python and Terraform. This can be Linux, OSX or Windows. Some easy to consume videos are below.
+To use JTAF, you'll need machine that can run **Go, Python, Git and Terraform.** This can be Linux, OSX or Windows. Some easy to consume videos are below.
 
 Introduction: https://youtu.be/eH24eCZc7pE
 
@@ -21,14 +21,18 @@ Interface Configuration: https://youtu.be/iCnnkDodUgQ
 BGP Configuration: https://youtu.be/nQVNCNCJZRc
 
 # Section Breakdown
-* ## Junos-Terraform Demo (Build from scratch)
-* ##  Junos-Terraform Developer Guide (Build from pre-existing junos config)
-* ## Using the Provider
-* ## Testing with Terraform
+* [Junos-Terraform Demo (Build from scratch)](#demo)
+* [Junos-Terraform Developer Guide (Build from pre-existing junos config)](#guide)
+* [Using the Provider](#provider)
+* [Testing with Terraform](#testing)
+* [Question & Answers/ Common Problems](#questions)
 
+<a id="demo"></a>
 # Junos-Terraform Demo
 
-We will create a simple provider for a vSRX of version 19.4R1 that has the capability to do two things:
+Following this demo, developers will learn to be able to manually create custom junos-terrraform providers with the ability to configure any junos device given explicitly defined xpaths and yang files.
+
+In this demo specifically, we will create a simple provider for a vSRX of version 19.4R1 that has the capability to do two things:
 * Add a description to an interface
 * Add an `inet` address to a sub-interface
   
@@ -59,10 +63,14 @@ Other versions beyond these will work, but this is what was tested for the writi
 ## Copy the YANG Files 
 For our example, our provider will only be able to create an interface description and place an inet address on a sub-interface. We only need a handful of YANG models for this.
 
-Let's put the YANG files from [Juniper's YANG GitHub repository](https://github.com/Juniper/yang.git) in to a memorable location. Let's use `/var/tmp/yang`.
+ > For developers wanting to add more capabilities to the provider, they will need to also add the neccesary `yang_files` required for those capabilites outlined by the `xpath` inputs which are listed in the `xpath_inputs.xml` file created later on 
+ > * say you want to add firewalls or policy-option options in addition to interfaces; you will need to add the yang files along with the xpaths associated with the custom capability (See `/Samples/vsrx_tf_module_template` directory for examples of an xpath file, `xpath_example.xml`, and the corresponding `yang_files` directory)
+
+Let's put the YANG files from [Juniper's YANG GitHub repository](https://github.com/Juniper/yang.git) in to a memorable location. Let's use the home directory `/junos-terraform`. Don't worry, once the necesary files are copied over, the `/yang` folder can be removed.
 
 ```bash
-cd /var/tmp/jtaf
+/junos-terraform $ [from this directory]
+
 git clone https://github.com/Juniper/yang.git
 # this can take some time depending on your internet connection
 
@@ -78,7 +86,7 @@ cp yang/19.4/19.4R1/junos-es/conf/junos-es-conf-interfaces@2019-01-01.yang ./yan
 If you wanted to remove the YANG directory, you can do it like this:
 
 ```bash
-cd /var/tmp
+cd /junos-terraform
 rm -rf yang
 ```
 
@@ -86,7 +94,7 @@ rm -rf yang
 
 **Prior to this step, ensure python and go is installed.**
 
-This file can be compiled by running `chmod +x generateFiles.sh` from the home directory followed by 
+>This file can be compiled by running `chmod +x generateFiles.sh` from the `/junos-terraform` directory followed by 
 `./generateFiles.sh` to run the script. 
 
 `Select "Build a provider from scratch" option: [1] out of the options if following along with the demo`
@@ -104,7 +112,7 @@ You can find this file `config.toml` in the home directory (/junos-terraform)
 ```bash
 yangDir = "$(pwd)/yang_files"
 providerDir = "$(pwd)/terraform_providers"
-xpathPath = "$(pwd)/xpath_input.xml"
+xpathPath = "$(pwd)/xpath_inputs.xml"
 providerName = "vsrx"
 fileType = "both"
 ```
@@ -120,7 +128,7 @@ to generate the `yin` files.
 ```bash
 cd $JTAF_PROJECT/cmd/processYang
 go build
-./processYang -config /var/tmp/jtaf/jtaf_config.toml
+./processYang -config /path_to_junos-terraform/junos-terraform/config.toml
 # OUTPUT - WARNING >> This can take some time. Lack of activity does not mean broken!
 
                     ___ _____ ___  ______
@@ -131,7 +139,7 @@ go build
                  \____/  \_/\_| |_/\_|
                            0.1.5
 -------------------------------------------------------------------------
-- Creating Yin files from Yang file directory: /var/tmp/jtaf/yang_files -
+- Creating Yin files from Yang file directory: /path_to_junos-terraform/junos-terraform/yang_files -
 -------------------------------------------------------------------------
 Yin file for junos-common-types@2019-01-01 is generated
 Yin file for junos-es-conf-interfaces@2019-01-01 is generated
@@ -151,7 +159,10 @@ At this point, `venv` is `deactivated` and the first script has terminated.
 Great, at this point now we have text file and YIN versions of the YANG files. We need those for the next step.
 
 Let's create a file, which provides a list of inputs to the part of JTAF which writes the `.go` code automagically.
-This input identifies the content of the provider that JTAF will create. **Some of these files such as `xpath_inputs.xml` are scattered are in the `Samples` directory.**
+This input identifies the content of the provider that JTAF will create.
+
+> For developers wanting to add more capabilities to the provider, this is where the additional xpath inputs need to be added. Assuming that the neccesary `yang_files` required for those capabilites outlined by the `xpath` inputs are added, the inputs can be incorporated into this file following the format below.
+ > * Again, examples of this implementation cam be found in the `/Samples/vsrx_tf_module_template` directory which include examples of an xpath file, `xpath_example.xml`, and the corresponding `yang_files` directory)
 
 Create a file `/junos-terraform/xpath_inputs.xml` and populate it with the content below.
 
@@ -176,14 +187,13 @@ JTAF generated providers has a requirement of the smallest data set possible for
 
 # Run Second Shell Script:  `buildProvider.sh`
 
-### **Prior to this step**
-* IF you want to test the output of the configuration from the `terraform test` files, set the ENV variable `MOCK_FILE` to the path of an empty `xml` file you create where the system can display the expected config defined in the .tf files. 
-   * example: create a `jtaf_output.xml` file in the `/junos-terraform` directory and run `export MOCK_FILE=/path_to_junos-terraform/jtaf_output.xml`)
-
-* **Warning:** `MOCK_FILE` should be `unset` unless wanting to enter Mock mode, otherwise system will look for path setup. `Mock Mode allows developers to test terraform commands and commits to a local file prior to device communication.` If `MOCK_FILE` is set, terraform commands will output to the file declared by the variable and not the device declared in the `main.tf` file.
+> ### **Prior to this step**
+> * IF you want to test the output of the configuration from the `terraform test` files, set the ENV variable `MOCK_FILE` to the path of an empty `xml` file you create where the system can display the expected config defined in the .tf files. 
+>   * example: create a `jtaf_output.xml` file in the `/junos-terraform` directory and run `export MOCK_FILE=/path_to_junos-terraform/jtaf_output.xml`)
+> * **Warning:** `MOCK_FILE` should be `unset` unless wanting to enter Mock mode, otherwise system will look for path setup in the terraform `.tf` test files created later on. `Mock Mode allows developers to test terraform commands and commits to a local file prior to device communication.` If `MOCK_FILE` is set, terraform commands will output to the file declared by the variable and not the device declared in the `main.tf` file.
 
 ### Now let's run the script: 
-This file can be compiled by running `chmod +x buildProvider.sh` from the home directory followed by 
+>This file can be compiled by running `chmod +x buildProvider.sh` from the home directory followed by 
 `./buildProvider.sh` to run the script. 
 
 Below describes what the script does:
@@ -195,7 +205,7 @@ First, we need JTAF to create some `.go` code from the YANG models and XML data 
 ```bash
 cd $JTAF_PROJECT/cmd/processProviders
 go build
-./processProviders -config /var/tmp/jtaf/config.toml
+./processProviders -config /path_to_config/config.toml
 # This next step is rapid
 
                     ___ _____ ___  ______
@@ -210,23 +220,23 @@ go build
 ------------------------------------------------------------
 Terraform API resource_InterfacesInterfaceDescription created
 Terraform API resource_InterfacesInterfaceUnitFamilyInetAddressName created
---------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
 Number of Xpaths processed:  2
 Number of potential issues:  0
 
 ---------------------------------------------
 - Copying the rest of the required Go files -
 ---------------------------------------------
-Copied file: config.go to /var/tmp/jtaf/terraform_providers
-Copied file: main.go to /var/tmp/jtaf/terraform_providers
-Copied file: resource_junos_destroy_commit.go to /var/tmp/jtaf/terraform_providers
-Copied file: resource_junos_device_commit.go to /var/tmp/jtaf/terraform_providers
+Copied file: config.go to /path_to_junos-terraform/junos-terraform/terraform_providers
+Copied file: main.go to /path_to_junos-terraform/junos-terraform/terraform_providers
+Copied file: resource_junos_destroy_commit.go to /path_to_junos-terraform/junos-terraform/terraform_providers
+Copied file: resource_junos_device_commit.go to /path_to_junos-terraform/junos-terraform/terraform_providers
 -------------------
 - Creating Go Mod -
 -------------------
 ```
 
-The output of this step is written to the `/var/tmp/jtaf/terraform_provider` directory. Let's build the provider!
+The output of this step is written to the `/junos-terraform/terraform_provider` directory. Let's build the provider!
 
 
 ## 2. Creates updated xpath input file (if needed)
@@ -237,7 +247,7 @@ If there are any found issues during the building of the provider resources, a n
 ## 3. Builds the Provider
 
 ```bash
-cd /var/tmp/jtaf/terraform_providers
+cd /terraform_providers
 go build
 ```
 This provider without any Go cross-compilation directives, will work on the system it's been generated with. If you happen to be on an OSX machine, then the provider will work for Terraform on OSX and the same is true for Linux, if you use JTAF on Linux, then natively the generated provider will operate on Linux. However, you can cross-compile the provider so that it will operate on another operating system and even CPU architecture.
@@ -258,19 +268,18 @@ file terraform-provider-junos-device
 # terraform-provider-junos-device: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, Go BuildID=SWvAslM7UiUlMNJJOG8f/MV8jDWinx0vKkuo7Zmec/-2fk9ZDz88J7folCoc0q/ftWLT5N4tiPWQ8DlXY2J, not stripped
 ```
 
-The binary file `terraform-provider-junos-vsrx` is actually our fresh new and shiny Terraform Provider. If you got this far, congratulations. You just created a Terraform provider for Junos.
+The binary file `terraform-provider-junos-vsrx` is actually our fresh new and shiny Terraform Provider. If you got this far, congratulations. You just created a Terraform provider for Junos and you are ready to use it. Jump to [Using the Provider](#provider)
 
+
+<a id="guide"></a>
 # Junos-Terraform Developer Guide
 
-### This section is aimed at users who are a little more comfortable with the way junos-terraform works and want to develop, test, configure Juniper devices with a pre-existing configuration.
+This section is aimed at users who are a little more comfortable with the way junos-terraform works and want to develop, test, configure Juniper devices with a pre-existing configuration.
 
-**The only requirement for this section is to upload a configuration in `xml` format to the `/junos-terraform/user_config_files` folder.**
-
-* When adding this `xml` file to the folder, remove any starting and ending `<configuration>` and `<cli>` tags.
-
-  * For reference, see `test.xml` in the `/Samples/user_config_files` folder which contains configuration for `vqfx` spine for Junos version `23.1`
-
-* After configuration is uploaded, the rest is taken care of (provider build and test file templates created)
+> **The only requirement for this section is to upload a configuration in `xml` format to the `/junos-terraform/user_config_files` folder.**
+> * When adding this `xml` file to the folder, remove any starting and ending `<configuration>` and `<cli>` tags.
+> * For reference, see `test.xml` in the `/Samples/user_config_files` folder which contains configuration for `vqfx` spine for Junos version `23.1`
+> * After configuration is uploaded, the rest is taken care of (provider build and test file templates created)
 
 ### **Prior to start (for testing)**
 * IF you want to test the output of the configuration from the `terraform test` files, set the ENV variable `MOCK_FILE` to the path of an empty `xml` file you create where the system can display the expected config defined in the .tf files. 
@@ -278,12 +287,11 @@ The binary file `terraform-provider-junos-vsrx` is actually our fresh new and sh
 
 * **Warning:** `MOCK_FILE` should be `unset` unless wanting to enter Mock mode, otherwise system will look for path setup. `Mock Mode allows developers to test terraform commands and commits to a local file prior to device communication.` If `MOCK_FILE` is set, terraform commands will output to the file declared by the variable and not the device declared in the `main.tf` file.
 
-## Run Shell Script: `generateFiles.sh`
+# Run Shell Script: `generateFiles.sh`
 
 **Prior to this step, ensure python and go is installed.**
 
-This file can be compiled by running `chmod +x generateFiles.sh` from the home directory followed by 
-`./generateFiles.sh` to run the script. 
+> This file can be compiled by running `chmod +x generateFiles.sh` from the home directory followed by `./generateFiles.sh` to run the script. 
 
 `Select "Provide a configuration" option: [2] out of the options if wanting to create a resource provider based on an existing configuration`
 
@@ -320,6 +328,8 @@ Below describes what the script does:
 
 * For the next section, refer to the `/TFtemaplates` directory created by the script providing a basic `.tf` template for the `main` and `test` files
 
+
+<a id="provider"></a>
 # Using the new Provider
 
 To test the provider we need to do two more things, one, put the provider where Terraform can find it and two, create a simple set of `.tf` files as inputs to Terraform!
@@ -351,16 +361,16 @@ If you're building providers locally, it's worth considering how to version cont
 
 You can use the method above, enabling Terraform to find the provider locally. Here's how:
 
-`mkdir -p ~/.terraform.d/plugins/juniper/junos-vsrx/19.4R1.101/darwin_amd64`
+`mkdir -p ~/.terraform.d/plugins/juniper/providers/junos-vsrx/19.41.101/darwin_amd64`
 
 It's probably a good idea to replace the `juniper` part with your own organisation's name to prevent any confusion.
 
-The second way is to create a `.terraformrc` file in your home directory, where you tell Terraform where to look for the same file structure. That can be in a project directory if you so wish. Here is an example of that file.
+**The second way** is to create a `.terraformrc` file in your home directory, where you tell Terraform where to look for the same file structure. That can be in a project directory if you so wish. Here is an example of that file.
 
 ```bash
 provider_installation {
   filesystem_mirror {
-    path = "/var/tmp/jtaf/plugins"
+    path = "/path_to_junos-terraform/junos-terraform/plugins"
     include = ["*/*/*"]
   }
 }
@@ -370,14 +380,17 @@ Make sure that the same file tree exists from `plugins` as before.
 
 The other option of course, is to publish to your provider/s to the Hashicorp registry and not have them stored locally.
 
+<a id="testing"></a>
 ## __Testing With Terraform__
 
 Ok, now we've got the Terraform provider in place, we can actually test Terraform! For this section, you will replace the `provider` section with the information for the device which is being configured. 
 
-You are free to choose a directory in which to test this. I'm going to stick with the `/var/tmp/jtaf` directory.
+> If testing the provider from scatch, skip this message. If building a provider from a pre-loaded configuration, the following steps have been more or less done for you. Look for the `junos-terraform/TFtemplates` which will have prcompiled test files to use for testing. The `testbed` and required files and folders have also already been made for you. The only requirment is to manually fill in the resource information.
+
+You are free to choose a directory in which to test this. I'm going to stick with the home `/junos-terrafrom` directory.
 
 ```bash
-cd /var/tmp/jtaf
+cd /junos-terraform
 mkdir testbed && cd testbed
 ```
 
@@ -454,9 +467,11 @@ resource "junos-vsrx_InterfacesInterfaceUnitFamilyInetAddressName" "vsrx_2" {
 
 __Let's Initialise Terraform__
 
-We're getting so close! Let's initialise Terraform.
+We're getting so close! Let's initialize Terraform. From the `testbed` folder, run: 
 
 ```bash
+testbed $ terrafrom init
+
 Initializing modules...
 
 Initializing the backend...
@@ -485,7 +500,7 @@ commands will detect it and remind you to do so if necessary.
 The next step is to actually run the plan and apply steps.
 
 ```bash
-terraform plan
+testbed $ terraform plan
 
 Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
   + create
@@ -531,7 +546,7 @@ Note: You didn't use the -out option to save this plan, so Terraform can't guara
 Our plan is simple! Because we do not have any local Terraform state, the plan has been generated quickly and it's straight forward to read. The `commit` and `destroycommit` resources will be covered after this step. We can also tell Terraform to auto-approve the apply without any further manual input.
 
 ```bash
-terraform apply -auto-approve
+testbed $ terraform apply -auto-approve
 
 Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
   + create
@@ -808,9 +823,21 @@ There is some inverse logic here. The `destroycommit` is 'created' on the delete
 
 You can read more on this commit 'bookend' pattern [here](https://dave.dev/blog/2021/11/).
 
-## Q&A
 
-__1. Where do I find the names of the resources I have created?__
+<a id="questions"></a>
+# Q&A
+
+__1. When I downloaded, terraform, the commands are not recognized by my device__
+
+Ensure the that the terraform download is found in the `/usr/local/bin` directory
+
+* Go to where terraform download is located
+ > `cd /Downloads`
+
+* Use the sudo `command` to move it to the correct location.
+> `sudo mv terraform /usr/local/bin/`
+
+__2. Where do I find the names of the resources I have created?__
 
 Check in the `provider.go` file that is dynamically generated. You will find a data structure with this signature: `ResourcesMap: map[string]*schema.Resource`. Your resources are named in a map. Here is an example:
 
@@ -856,6 +883,20 @@ func Provider() *schema.Provider {
 	}
 }
 ```
+
+__3. Running `terraform init` is giving me errors regarding the location of the provider.__
+
+* Some systems have issues recognizing the `.terraformrc` file so if using this method, delete this file and follow below.
+* Ensure that you place the provider in the `~/.terraform.d/plugins/juniper/providers/junos-vsrx/19.41.101/darwin_amd64/` folder. 
+  * If using `darwin_arm64`, make sure to rename the folder to match the device's core. 
+* Once this is double-checked, check the `main.tf` to ensure that the terrafrom `required_providers` matches the naming of the path and try again. 
+
+
+__4. Running `terraform apply` is giving me errors realted to Plugin not Responding. How do I fix this?__
+> This only applies when NOT using the `$MOCK_FILE` testing env variable 
+* If terrafrom cannot connect to a Juniper Device during the `apply` stage, the message `Error: Plugin did not respond` will occur.
+  * To fix this issue, ensure that the `provider "junos-deviceName"` section in the `main.tf` file is correctly filled out and matches a running Junos device which can recieves data. If the host and port does not connect to a running device, the `terraform apply` will not work.
+* If using the `$MOCK_FILE` env variable --> the information in  the `provider "junos-deviceName"` section in the `main.tf` is not relevant to the output in the log file defined by the varible.
 
 ## Close
 
