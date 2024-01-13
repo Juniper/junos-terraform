@@ -32,15 +32,17 @@ import (
 	"strings"
 	s "strings"
 	"sync/atomic"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/Juniper/junos-terraform/Internal/cfg"
+	"github.com/antchfx/xmlquery"
 )
 
 // PrintHeader accepts a message of any length (ideally no more than 80 chars) and pretty prints it in a box
 func PrintHeader(message string) {
-	header := strings.Repeat("-", utf8.RuneCountInString(message)) + "----" + "\n"
-	footer := strings.Repeat("-", utf8.RuneCountInString(message)) + "----" + "\n"
+	header := s.Repeat("-", utf8.RuneCountInString(message)) + "----" + "\n"
+	footer := s.Repeat("-", utf8.RuneCountInString(message)) + "----" + "\n"
 	fmt.Print(header, "- "+message+" -\n", footer)
 }
 
@@ -90,6 +92,9 @@ var structXpath string
 // String variable for import variables.
 var strImport string
 
+// String variable to hold path to TFtemplate folder
+var targetDir string
+
 // String variable for structure.
 var strStruct string
 var strStructEnd string
@@ -136,6 +141,10 @@ var issueCounter int
 // XPath Counter
 var xpathCounter int
 
+var issue_xpaths []string
+
+var terraformResourceCounter int
+
 // Syntactic helper to reduce repetition.
 func check(e error) {
 	if e != nil {
@@ -177,6 +186,10 @@ func CreateProviders(jcfg cfg.Config) error {
 	numofJobs := len(inNode.Nodes)
 	// fmt.Printf(numofJobs)
 
+	// Create terraform main and test file
+	createTerraformMain(jcfg)
+	createTerraformTest(jcfg)
+
 	for _, n5 := range inNode.Nodes {
 
 		// fmt.Println("DEBUG: Working with XPath Expression(n5.Key): -> ", n5.Key)
@@ -185,6 +198,7 @@ func CreateProviders(jcfg cfg.Config) error {
 		// test by adding empty xpath to xpath_example
 		if currentXPath == "" {
 			fmt.Println("EMPTY XPATH found, remove this from the xpath file. Issue Marked")
+			issue_xpaths = append(issue_xpaths, currentXPath)
 			issueCounter += 1
 		}
 		if currentXPath != "" {
@@ -261,16 +275,20 @@ func CreateProviders(jcfg cfg.Config) error {
 
 				if isXpathFound {
 					// After all the data processing is done, create the file.
-					err = createFile(moduleFilePath, jcfg.ProviderName)
+					err = createFile(moduleFilePath, jcfg)
 					if err != nil {
 						fmt.Println("Issue creating file. Check presence of directory and permissions")
 						os.Exit(0)
 					}
+				} else {
+					issueCounter += 1
+					fmt.Printf("[ISSUE]: Terraform API resource for %s could NOT be created\nXPATH doesn't have valid match in Yang Files therefore has been removed from xapth_inputs file.\n", currentXPath)
+					issue_xpaths = append(issue_xpaths, currentXPath)
 				}
 			}
 		}
-		printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
 		counter++
+		printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
 	}
 
 	providerFileData += `			"junos-` + jcfg.ProviderName + `_commit": junosCommit(),
@@ -294,11 +312,15 @@ func CreateProviders(jcfg cfg.Config) error {
 	fmt.Println("--------------------------------------------------------------------------------")
 	fmt.Println("Number of Xpaths processed: ", xpathCounter)
 	fmt.Println("Number of potential issues: ", issueCounter)
+	fmt.Println("	Search for [ISSUE]")
+	if issueCounter > 0 {
+		fixXPath_Inputs()
+	}
 
 	// Change path to the terraform_provider dir in this project
 	// we don't know the exact location, so find it through some path building
 	path, _ := os.Executable()
-	pathBits := strings.Split(path, "/")
+	pathBits := s.Split(path, "/")
 	pathBitsLen := len(pathBits)
 	pathBits = pathBits[:pathBitsLen-3]
 	pathBits = append(pathBits, "terraform_providers")
@@ -321,7 +343,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	fmt.Println()
 	PrintHeader("Copying the rest of the required Go files")
 	for _, f := range files {
-		if strings.Contains(f.Name(), ".go") {
+		if s.Contains(f.Name(), ".go") {
 			input, err := ioutil.ReadFile(tpPath + "/" + f.Name())
 			if err != nil {
 				fmt.Println(err)
@@ -603,9 +625,8 @@ func matchXpath(nodes Node) {
 				// End of looping of nodes.
 			}
 			if !matchFound {
-				issueCounter += 1
-				fmt.Printf("Xpath not found in file, check it. : %s \n", strXpath)
-
+				// issueCounter += 1
+				// fmt.Printf("[ISSUE]: Xpath not found in file, check it. : %s \n", strXpath)
 				return
 			}
 
@@ -707,12 +728,11 @@ func matchChoiceXpath(nodeChoice Node, xpathElem string) (Node, bool) {
 			for _, n := range nodeCase.Nodes {
 				// If the next element is a container , list , leaf-list or leaf
 				// it can be a possible chance for xpath match.
-				if check_node_tag(n.XMLName.Local) {
-					if n.Key == xpathElem {
-						nodeCheck = n
-						flag = true
-						break
-					}
+				// if check_node_tag(n.XMLName.Local) {
+				if n.Key == xpathElem {
+					nodeCheck = n
+					flag = true
+					break
 				} else if n.XMLName.Local == "uses" {
 					nodeGrp, flag := matchGroupingXpath(n.Key, xpathElem)
 					if flag {
@@ -843,9 +863,11 @@ func initializeFunctionString(name string) {
 	strStruct += "type xml" + name + " struct {\n\tXMLName xml.Name `xml:\"configuration\"`"
 
 	if isGrpFlag {
-		strVarAssign += "\tconfig.ApplyGroup = id\n\tconfig.Groups.Name = id\n"
+		// strVarAssign += "\tconfig.ApplyGroup = id\n\tconfig.Groups.Name = id\n"
+		strVarAssign += "\tconfig.Groups.Name = id\n"
 		strStruct += "\n\tGroups  struct {\n\t\tXMLName\txml.Name\t`xml:\"groups\"`\n\t\tName\tstring\t`xml:\"name\"`"
-		strStructEnd = "\n\t} `xml:\"groups\"`\n\tApplyGroup string `xml:\"apply-groups\"`"
+		strStructEnd = "\n\t} `xml:\"groups\"`\n"
+		// strStructEnd = "\n\t} `xml:\"groups\"`\n\tApplyGroup string `xml:\"apply-groups\"`"
 	}
 	strRead = "\n\tconfig := &xml" + name + "{}\n\n\terr = client.MarshalGroup(id, config)\n\tcheck(ctx, err)\n"
 
@@ -1062,9 +1084,9 @@ func check_element_name(text string) int {
 }
 
 // Generate terraform Modules
-func createFile(moduleFilePath, providerName string) error {
+func createFile(moduleFilePath string, jcfg cfg.Config) error {
 
-	providerFileData += "\t\t\t\"junos-" + providerName + "_" + strModuleName + "\": junos" + strModuleName + "(),\n"
+	providerFileData += "\t\t\t\"junos-" + jcfg.ProviderName + "_" + strModuleName + "\": junos" + strModuleName + "(),\n"
 
 	// Create go file with top container/module name.
 	var fileName string = s.Join([]string{"resource", strModuleName}, "_")
@@ -1100,6 +1122,10 @@ func createFile(moduleFilePath, providerName string) error {
 	_, err = fPtr.WriteString(strUpdate)
 	_, err = fPtr.WriteString(strDelete)
 	_, err = fPtr.WriteString(strSchema)
+
+	// Create terraform file
+	createTerraform(strSchema, jcfg)
+
 	fmt.Printf("Terraform API resource_%s created \n", strModuleName)
 	xpathCounter += 1
 	return nil
@@ -1133,109 +1159,339 @@ func listFiles(yangFilePath string, jcfg cfg.Config) {
 	}
 
 	providerFileData = `
-	// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
-	//
-	// License: Apache 2.0
-	//
-	// THIS SOFTWARE IS PROVIDED BY Juniper Networks, Inc. ''AS IS'' AND ANY
-	// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-	// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-	// DISCLAIMED. IN NO EVENT SHALL Juniper Networks, Inc. BE LIABLE FOR ANY
-	// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-	// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-	// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-	// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-	// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-	// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-	//
+// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
+//
+// License: Apache 2.0
+//
+// THIS SOFTWARE IS PROVIDED BY Juniper Networks, Inc. ''AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL Juniper Networks, Inc. BE LIABLE FOR ANY
+// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
 
-	package main
+package main
 
-	import (
+import (
+	"context"
+	"encoding/xml"
+	"fmt"
+	"os"
+	"sort"
+	s "strings"
+	"sync"
+	"terraform-provider-junos-[providerName]/netconf"
 
-		"context"
-		"github.com/hashicorp/terraform-plugin-log/tflog"
-		"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-		"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-		"terraform-provider-junos-[providerName]/netconf"
-		"os"
-	)
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+)
+`
 
-	// ProviderConfig is to hold client information
-	type ProviderConfig struct {
-		netconf.Client
-		Host string
+	providerFileData += "\nconst groupStrXML = `<load-configuration action=\"merge\" format=\"xml\">\n%s\n</load-configuration>`\n"
+
+	providerFileData += "\nconst deleteStr = `<edit-config>\n\t<target>\n\t\t<candidate/>\n\t</target>\n\t<default-operation>none</default-operation>\n\t<config>\n\t\t<configuration>\n\t\t\t<groups operation=\"delete\">\n\t\t\t\t<name>%s</name>\n\t\t\t</groups>\n\t\t\t<apply-groups operation=\"delete\">%s</apply-groups>\n\t\t</configuration>\n\t</config>\n</edit-config>`\n"
+
+	providerFileData += "\nconst commitStr = `<commit/>`\n"
+
+	providerFileData += "\nconst getGroupXMLStr = `<get-configuration>\n\t<configuration>\n\t<groups><name>%s</name></groups>\n\t</configuration>\n</get-configuration>`\n"
+
+	providerFileData += "\nconst ApplyGroupXML = `<load-configuration action=\"merge\" format=\"xml\">\n%s\n</load-configuration>`\n"
+
+	providerFileData += "\ntype configuration struct {\n\tApplyGroup []string `xml:\"apply-groups\"`\n}\n"
+
+	providerFileData += `
+var mockMapMutex sync.Mutex
+
+// ProviderConfig is to hold client information
+type ProviderConfig struct {
+	netconf.Client
+	Host string
+}
+
+func init() {
+	schema.DescriptionKind = schema.StringMarkdown
+}
+
+func check(ctx context.Context, err error) {
+	if err != nil {
+		// Some of these errors will be "normal".
+		tflog.Debug(ctx, err.Error())
+		f, _ := os.OpenFile("jtaf_logging.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f.WriteString(err.Error() + "\n")
+		f.Close()
+		return
+	}
+}
+
+func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+	config := Config{
+		Host:     d.Get("host").(string),
+		Port:     d.Get("port").(int),
+		Username: d.Get("username").(string),
+		Password: d.Get("password").(string),
+		SSHKey:   d.Get("sshkey").(string),
 	}
 
-	func init() {
-		schema.DescriptionKind = schema.StringMarkdown
-	}
+	configFilePath, ok := os.LookupEnv("MOCK_FILE")
+	var client netconf.Client
+	var err error
 
-	func check(ctx context.Context, err error) {
-		if err != nil {
-			// Some of these errors will be "normal".
-			tflog.Debug(ctx, err.Error())
-			f, _ := os.OpenFile("jtaf_logging.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			f.WriteString(err.Error() + "\n")
-			f.Close()
-			return
-		}
-	}
-
-
-	func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
-		config := Config{
-			Host:     d.Get("host").(string),
-			Port:     d.Get("port").(int),
-			Username: d.Get("username").(string),
-			Password: d.Get("password").(string),
-			SSHKey:   d.Get("sshkey").(string),
-		}
-
-		client, err := config.Client()
+	if ok {
+		filePtr, err := os.OpenFile(configFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return nil, diag.FromErr(err)
 		}
+		client = FileClient{filePtr: filePtr}
 
-		return &ProviderConfig{client, config.Host}, nil
+	} else {
+		client, err = config.Client()
+		if err != nil {
+			return nil, diag.FromErr(err)
+		}
 	}
 
-	// Provider returns a Terraform Provider.
-	func Provider() *schema.Provider {
-		return &schema.Provider{
+	return &ProviderConfig{client, config.Host}, nil
+}
 
-			Schema: map[string]*schema.Schema{
-				"host": &schema.Schema{
-					Type:     schema.TypeString,
-					Required: true,
-				},
+var _ netconf.Client = &FileClient{}
 
-				"port": &schema.Schema{
-					Type:     schema.TypeInt,
-					Required: true,
-				},
+// FileClient represents a fake client for testing purposes.
+type FileClient struct {
+	// You can add fields for testing purposes here.
+	filePtr *os.File
+}
 
-				"username": &schema.Schema{
-					Type:     schema.TypeString,
-					Required: true,
-				},
+// Close is a functional thing to close the FileClient (no-op in this case).
+func (bc FileClient) Close() error {
+	return nil
+}
 
-				"password": &schema.Schema{
-					Type:     schema.TypeString,
-					Required: true,
-				},
-				"sshkey": &schema.Schema{
-					Type:     schema.TypeString,
-					Required: true,
-				},
+// updateRawConfig simulates updating the configuration on a network device.
+func (bc FileClient) updateRawConfig(applyGroup string, netconfCall string, commit bool) (string, error) {
+	// Simulate the update operation (you can customize this part).
+	// Extract the string between <name> tags
+	nameStart := s.Index(netconfCall, "<name>")
+	nameEnd := s.Index(netconfCall, "</name>")
+	if nameStart == -1 || nameEnd == -1 {
+		return "", fmt.Errorf("Failed to extract the group name from the netconfCall")
+	}
+	groupName := netconfCall[nameStart+6 : nameEnd]
+
+	// Add the groupName to the applyGroupsList
+	addToApplyGroupsList(groupName)
+
+	var groupString string
+	groupString = fmt.Sprintf(groupStrXML, netconfCall)
+	_, err := bc.filePtr.WriteString(groupString)
+	if err != nil {
+		return "", err
+	}
+	bc.filePtr.WriteString("\n\n")
+	if commit {
+		bc.filePtr.WriteString("\nCommiting from Update\n")
+		_, err := bc.filePtr.WriteString(commitStr)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return fmt.Sprintf("Updated config for group: %s", applyGroup), nil
+}
+
+// DeleteConfig simulates deleting a configuration on a network device.
+func (bc FileClient) DeleteConfig(applyGroup string, commit bool) (string, error) {
+	// Simulate the delete operation (you can customize this part).
+	return fmt.Sprintf("Deleted config for group: %s", applyGroup), nil
+}
+
+// SendCommit simulates sending a commit to a network device.
+func (bc FileClient) SendCommit() error {
+	// Simulate the commit operation (you can customize this part).
+	bc.sortApplyGroupsList()
+	if err := bc.SendApplyGroups(); err != nil {
+		return err
+	}
+	bc.filePtr.WriteString("\nCommiting from the SendCommit function\n")
+	return nil
+}
+
+// MarshalGroup simulates retrieving and marshaling configuration data for a group.
+func (bc FileClient) MarshalGroup(id string, obj interface{}) error {
+	// Simulate the retrieval and marshaling of configuration data (you can customize this part).
+	// For testing purposes, let's just marshal an example object and save it to a file.
+	return nil
+}
+
+// SendTransaction simulates sending a transaction to a network device.
+func (bc FileClient) SendTransaction(id string, obj interface{}, commit bool) error {
+	// Simulate sending a transaction (you can customize this part).
+	// For testing purposes, let's just write the transaction data to a file.
+	cfg, err := xml.Marshal(obj) // Indent with four spaces
+	if err != nil {
+		return err
+	}
+	mockMapMutex.Lock()
+	defer mockMapMutex.Unlock()
+
+	// updateRawConfig deletes old group by, re-creates it then commits.
+	// As far as Junos cares, it's an edit.
+	if id != "" {
+		bc.filePtr.WriteString("Sending groups to device via Update Function:\n")
+		if _, err = bc.updateRawConfig(id, string(cfg), commit); err != nil {
+			return err
+		}
+		return nil
+	}
+	bc.filePtr.WriteString("Sending groups to device via Send Raw Function:\n")
+	if _, err = bc.sendRawConfig(string(cfg), commit); err != nil {
+		return err
+	}
+	return nil
+}
+
+// sendRawConfig is a wrapper for driver.SendRaw()
+func (bc FileClient) sendRawConfig(netconfCall string, commit bool) (string, error) {
+
+	// Extract the string between <name> tags
+	nameStart := s.Index(netconfCall, "<name>")
+	nameEnd := s.Index(netconfCall, "</name>")
+	if nameStart == -1 || nameEnd == -1 {
+		return "", fmt.Errorf("Failed to extract the group name from the netconfCall")
+	}
+	groupName := netconfCall[nameStart+6 : nameEnd]
+
+	// Add the groupName to the applyGroupsList
+	addToApplyGroupsList(groupName)
+
+	groupString := fmt.Sprintf(groupStrXML, netconfCall)
+
+	_, err := bc.filePtr.WriteString(groupString)
+	if err != nil {
+		return "", err
+	}
+	bc.filePtr.WriteString("\n\n")
+	if commit {
+		bc.filePtr.WriteString("\nCommiting from Sending\n")
+		_, err := bc.filePtr.WriteString(commitStr)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return "", nil
+}
+
+// Helper function to add an id to the global list.
+func addToApplyGroupsList(id string) {
+	applyGroupsMutex.Lock()
+	defer applyGroupsMutex.Unlock()
+	applyGroupsList = append(applyGroupsList, id)
+}
+
+// Helper function to sort the global list.
+func (bc FileClient) sortApplyGroupsList() {
+	applyGroupsMutex.Lock()
+	defer applyGroupsMutex.Unlock()
+
+	// Create a map to track unique items
+	uniqueGroups := make(map[string]bool)
+
+	// Filter out empty s and remove duplicates
+	filteredGroups := make([]string, 0)
+	for _, group := range applyGroupsList {
+		if group != "" && !uniqueGroups[group] {
+			uniqueGroups[group] = true
+			filteredGroups = append(filteredGroups, group)
+		}
+	}
+
+	// Sort the filtered list
+	sort.Strings(filteredGroups)
+
+	// Update the global applyGroupsList with the sorted and filtered list
+	applyGroupsList = filteredGroups
+}
+
+var applyGroupsList []string
+var applyGroupsMutex sync.Mutex
+
+func (bc FileClient) SendApplyGroups() error {
+
+	// Concatenate the s in applyGroupsList.
+	applyGroupsMutex.Lock()
+	defer applyGroupsMutex.Unlock()
+
+	var applyG configuration
+	applyG.ApplyGroup = make([]string, len(applyGroupsList))
+	for i, item := range applyGroupsList {
+		applyG.ApplyGroup[i] = item
+	}
+
+	cfg, err := xml.Marshal(applyG)
+	if err != nil {
+		return err
+	}
+
+	_, err = bc.filePtr.WriteString("\n")
+	if err != nil {
+		return err
+	}
+
+	_, err = bc.filePtr.WriteString("Sending Apply-Groups to device\n")
+	if err != nil {
+		return err
+	}
+
+	applyGroupString := fmt.Sprintf(ApplyGroupXML, string(cfg))
+
+	_, err = bc.filePtr.WriteString(applyGroupString)
+	if err != nil {
+		fmt.Printf("Error writing to XML file: %v\n", err)
+		return err
+	}
+
+	return nil
+}
+
+// Provider returns a Terraform Provider.
+func Provider() *schema.Provider {
+	return &schema.Provider{
+
+		Schema: map[string]*schema.Schema{
+			"host": &schema.Schema{
+				Type:     schema.TypeString,
+				Required: true,
 			},
 
-			ResourcesMap: map[string]*schema.Resource{
+			"port": &schema.Schema{
+				Type:     schema.TypeInt,
+				Required: true,
+			},
+
+			"username": &schema.Schema{
+				Type:     schema.TypeString,
+				Required: true,
+			},
+
+			"password": &schema.Schema{
+				Type:     schema.TypeString,
+				Required: true,
+			},
+			"sshkey": &schema.Schema{
+				Type:     schema.TypeString,
+				Required: true,
+			},
+		},
+
+		ResourcesMap: map[string]*schema.Resource{
 	`
-
-	// Reaplace placeholder with providerName from config
-	providerFileData = strings.Replace(providerFileData, "[providerName]", jcfg.ProviderName, -1)
-
+	providerFileData = s.Replace(providerFileData, "[providerName]", jcfg.ProviderName, -1)
 }
 
 func copyDir(src, dst, extension string, fileCopyCount *uint32) error {
@@ -1244,13 +1500,13 @@ func copyDir(src, dst, extension string, fileCopyCount *uint32) error {
 			return err
 		}
 		if !info.IsDir() {
-			if !strings.Contains(info.Name(), extension) {
+			if !s.Contains(info.Name(), extension) {
 				return nil
 			}
 			atomic.AddUint32(fileCopyCount, 1)
 		}
 		fmt.Println(fmt.Sprintf("- Copying %s to %s", info.Name(), filepath.Base(dst)))
-		outpath := filepath.Join(dst, strings.TrimPrefix(path, src))
+		outpath := filepath.Join(dst, s.TrimPrefix(path, src))
 		if info.IsDir() {
 			os.MkdirAll(outpath, info.Mode())
 			return nil // means recursive
@@ -1292,13 +1548,582 @@ func printProgressBar(iteration, total int, prefix, suffix string, length int, f
 		end = "="
 	}
 
-	bar := strings.Repeat(fill, filledLength) + end + strings.Repeat("-", (length-filledLength))
-	fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, suffix)
+	bar := s.Repeat(fill, filledLength) + end + s.Repeat("-", (length-filledLength))
+	fmt.Printf("\r     %s [%s] %.2f%% %s", prefix, bar, percent*100, suffix)
 	fmt.Println()
 	fmt.Println()
 
 	if iteration == total {
 		fmt.Println()
-		fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, "COMPLETED")
 	}
+}
+
+func createTerraformMain(jcfg cfg.Config) {
+
+	// SETTING UP FILE PATH DIRECTORY AND NAMING
+	// Get the absolute path of the executable binary
+	executablePath, err := os.Executable()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	// Navigate up three directories
+	targetDir = filepath.Join(executablePath, "..", "..", "..", "/TFtemplates")
+
+	mainFileData :=
+		`
+# replace {text} with your own test setup
+
+terraform {
+	required_providers {
+		junos-{device-type} = {
+			source = "{input source path}"
+			version = "{input version here}"
+		}
+	}
+}
+
+provider "junos-{device-type}" {
+	host = "localhost"
+	port = 8300
+	username = "root"
+	password = "juniper123"
+	sshkey = ""
+}
+
+module "{test-folder-name}" {
+	source = "./{test-folder-name}"
+
+	providers = {junos-{device-type} = junos-{device-type}}
+
+	depends_on = [junos-{device-type}_destroycommit.commit-main]
+}
+
+
+resource "junos-{device-type}_commit" "commit-main" {
+	resource_name = "commit"
+	depends_on = [module.{test-folder-name}]
+}
+
+resource "junos-{device-type}_destroycommit" "commit-main" {
+	resource_name = "destroycommit"
+}
+	`
+
+	mainFileData = s.Replace(mainFileData, "{device-type}", jcfg.ProviderName, -1)
+
+	// naming folders
+	folder := jcfg.ProviderName + "_1"
+	mainFileData = s.Replace(mainFileData, "{test-folder-name}", folder, -1)
+
+	//	DEFINE THE FILE CONTENT AND WRITE TO FILE
+	fileContent := []byte(mainFileData)
+
+	resultFile := "main.tf"
+
+	// Define the file path where you want to save the .tf file
+	filePath := filepath.Join(targetDir, resultFile)
+
+	// Create and write the Terraform configuration file
+	if err := ioutil.WriteFile(filePath, fileContent, 0644); err != nil {
+		log.Fatalf("Error writing .tf file: %v", err)
+	}
+}
+
+// This function is responsible for the creation of the test.tf file in the /TFtemplates folder
+func createTerraformTest(jcfg cfg.Config) {
+
+	testFileData :=
+		`
+terraform {
+	required_providers {
+		junos-{device-type} = {
+			source = "{input source path}"
+			version = "{input version here}"
+		}
+	}
+}
+`
+
+	testFileData = s.Replace(testFileData, "{device-type}", jcfg.ProviderName, -1)
+
+	testFile := "test.tf"
+
+	// Define the file path where you want to save the .tf file
+	filePath := filepath.Join(targetDir, testFile)
+
+	// Convert content to a byte slice and append a newline
+	fileContent := []byte(testFileData + "\n")
+
+	// Create and write the Terraform configuration file
+	if err := ioutil.WriteFile(filePath, fileContent, 0644); err != nil {
+		log.Fatalf("Error writing .tf file: %v", err)
+	}
+}
+
+// This function is responsible for the content of the test.tf file in the /TFtemplates folder
+// Iterates through provider resources to compile terraform provider resources for xpath lookup
+func createTerraform(strSchema string, jcfg cfg.Config) {
+
+	terraformResourceCounter++
+	// Split the first line by spaces
+	elements := s.Fields(strSchema)
+	resource := ""
+
+	// Find the name of the resource from the PROVIDER RESOURCE
+	if len(elements) >= 2 {
+		secondElement := elements[1]
+		// Trim "junos" and parentheses from the string
+		resource = s.Trim(secondElement, "junos")
+		resource = s.Trim(resource, "()")
+	} else {
+		fmt.Println("Not enough elements on the first line.")
+	}
+
+	// 	FIND THE ARGUMENTS FROM THE SCEHEMA --> PARSE SCHEMA
+	// Define a regular expression pattern to match the keys within double quotes --> This is to find INPUTS
+	pattern := `"\w+":`
+
+	// Compile the regular expression
+	re := regexp.MustCompile(pattern)
+
+	// Find all matches in the input string
+	matches := re.FindAllString(strSchema, -1)
+
+	// Create a slice to store the extracted keys
+	var keys []string
+
+	// Extract and print the keys without the quotes and colon
+	for _, match := range matches {
+		key := match[1 : len(match)-2] // Remove the double quotes and colon
+		keys = append(keys, key)
+	}
+
+	// CREATING THE FILE CONTENTS
+	providerType := "junos-" + jcfg.ProviderName
+	resourceType := providerType + "_" + resource
+	resourceName := jcfg.ProviderName + "_" + strconv.Itoa(terraformResourceCounter)
+	blockHead := "resource" + " \"" + resourceType + "\"" + " \"" + resourceName + "\" {"
+
+	// Initialize an empty result string
+	var argumentBlock string
+	keyValue := make(map[string]string)
+
+	// Parse the Resource Schema to grab the keys and the xpath location for that key
+	for str := range elements {
+		tempString := elements[str]
+		if s.Contains(tempString, "Description") && str > 28 {
+			// Get Key from the schema
+			tempKey := elements[str-6]
+			tempKey = s.ReplaceAll(tempKey, "\"", "")
+			tempKey = s.ReplaceAll(tempKey, ":", "")
+
+			// Get Description from the Schema
+			tempDesc := elements[str+3]
+			// Trim and clean, Remove trailing punctuation (.,;:!? etc.), Replace ".V_" with "/"
+			tempDesc = s.Replace(tempDesc, "config.Groups", "", -1)
+			tempDesc = s.TrimRight(tempDesc, ",;:.\"!?")
+			tempDesc = s.Replace(tempDesc, ".V_", "/", -1)
+
+			// Save the last xpath in the Description, signifying the location of the key
+			tempList := s.Split(tempDesc, "/")
+			xpathLocation := tempList[len(tempList)-1]
+			xpathLocation = s.ReplaceAll(xpathLocation, "__", "-")
+			//fmt.Println(xpathLocation)
+			keyValue[tempKey] = xpathLocation
+		}
+	}
+
+	// keyValue --> stores the key name as well as the last xpath location needed
+
+	// Convert the resource to name to an xpath to create xpath lockup for they keys in the resources
+	result := convertToURLPath(resource)
+	//fmt.Println(result)
+	// Split the result by "/" and join it back with "/"
+	splitResult := s.Split(result, "/")
+	var key string
+	var xpathToQuery []string
+
+	// Concatenate the s with key and corresponding xpaths for easy lookup and query
+	for _, str := range keys {
+		var keyList []string
+		var joinedResult string
+		// Find the values for each key
+		if str == "resource_name" {
+			key = resourceName
+			argumentBlock += "	" + str + " = \"" + key + "\"" + "\n"
+			continue
+		} else {
+			key = str
+		}
+		if keyValue[key] != "" {
+			//fmt.Println(splitResult)
+			for _, value := range splitResult {
+				keyList = append(keyList, value)
+				//fmt.Println(value)
+				if value == keyValue[key] {
+					break
+				}
+			}
+		}
+
+		if s.Contains(key, "name_") {
+			key = "name"
+		}
+		key = s.ReplaceAll(key, "__", "-")
+		keyList = append(keyList, key)
+		joinedResult = s.Join(keyList, "/")
+		// Add all xpath needing to be queried to list
+		xpathToQuery = append(xpathToQuery, joinedResult)
+	}
+
+	// Prints out all of the xapths needed to query for this particular resource
+	fmt.Println("List of all xpaths to query for keys given resource")
+	for _, path := range xpathToQuery {
+		fmt.Println(path)
+	}
+	fmt.Println()
+	fmt.Println()
+	fmt.Println()
+
+	//1.  compile list of all xpath in list of array
+	//2. outside that loop, do the lookup
+
+	// If the list of xpaths is not empty
+	if len(xpathToQuery) > 0 {
+
+		// Get last element in list
+		var lastElement = xpathToQuery[len(xpathToQuery)-1]
+		fmt.Println()
+		splitResult = s.Split(lastElement, "/")
+		lastElementKey := splitResult[len(splitResult)-1]
+
+		fmt.Println("Querying last element: " + lastElement)
+		xmlNode := queryXpath(lastElement, lastElementKey)
+		fmt.Println("Back in createTerraform")
+		for _, val := range xmlNode {
+			fmt.Println()
+			// fmt.Println("Output from queryPath function:")
+			// fmt.Println(val.OutputXML(true))
+			// fmt.Println()
+			// search for reamainging keys using find from THIS object
+			// go though remaining xpaths in list and query
+			fmt.Println("Going through remaining xpaths")
+			for _, path := range xpathToQuery[:len(xpathToQuery)-1] {
+				fmt.Println(path)
+
+				list := xmlquery.Find(val, "/"+path)
+				for _, val := range list {
+					fmt.Println(val.OutputXML(true))
+				}
+			}
+			fmt.Println()
+		}
+		// if xmlNode != nil {
+		// 	fmt.Println("HERE!!!!!")
+		// 	fmt.Println(xmlNode.OutputXML(true))
+		// 	rest := xpathToQuery[:len(xpathToQuery)-1]
+		// 	fmt.Println(rest)
+
+		// 	for _, value := range rest {
+		// 		fmt.Print("Rest of the Values: ")
+		// 		fmt.Println(value)
+		// 		// valueNode := xmlquery.FindOne(xmlNode, value)
+		// 		// if valueNode != nil {
+		// 		// 	fmt.Println(valueNode.OutputXML(true))
+		// 		// }
+		// 	}
+		// }
+	}
+
+	// 		values = queryXpath(joinedResult, key, true)
+
+	//	argumentBlock += "	" + str + " = \"/" + joinedResult + "\"" + "\n"
+
+	argumentBlock += "}"
+
+	finalTemplate := blockHead + "\n" + argumentBlock
+	addToTF(finalTemplate)
+}
+
+func convertToURLPath(input string) string {
+	// Split the input string by capital letters
+	parts := splitByCapitalLetters(input)
+
+	// Replace "__" with "-"
+	for i, part := range parts {
+		parts[i] = s.ReplaceAll(part, "__", "-")
+	}
+
+	// Join the parts with "/"
+	result := s.Join(parts, "/")
+
+	result = s.ToLower(s.ReplaceAll(result, "-/", "-"))
+
+	return result
+}
+
+func splitByCapitalLetters(input string) []string {
+	// Use a custom function to split by capital letters
+	var parts []string
+	runes := []rune(input)
+	start := 0
+	for i, r := range runes {
+		if unicode.IsUpper(r) {
+			if i > start {
+				parts = append(parts, string(runes[start:i]))
+			}
+			start = i
+		}
+	}
+	if start < len(runes) {
+		parts = append(parts, string(runes[start:]))
+	}
+	return parts
+}
+
+func addToTF(content string) {
+
+	testFile := "test.tf"
+
+	// Define the file path where you want to save the .tf file
+	filePath := filepath.Join(targetDir, testFile)
+
+	//fmt.Println(filePath)
+	fileContent := []byte(content + "\n")
+
+	var filePtr *os.File
+
+	filePtr, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer filePtr.Close()
+
+	if _, err = filePtr.Write(append(fileContent, byte('\n'))); err != nil {
+		log.Fatalf("Error writing .tf file: %v", err)
+	}
+}
+
+// Struct to represent the XML structure
+type FileList struct {
+	XMLName xml.Name `xml:"file-list"`
+	XPaths  []path   `xml:"xpath"`
+}
+
+type path struct {
+	Name string `xml:"name,attr"`
+}
+
+func fixXPath_Inputs() {
+	// Open and read the XML file
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Println("Error getting the current working directory:", err)
+		return
+	}
+
+	// Navigate back 1 folder
+	for i := 0; i < 1; i++ {
+		cwd = filepath.Dir(cwd)
+	}
+
+	// Append the file name to the path
+	fileName := "xpath_inputs.xml"
+	filePath := filepath.Join(cwd, fileName)
+
+	xmlFile, err := os.Open(filePath)
+	if err != nil {
+		fmt.Println("Error opening XML file:", err)
+		return
+	}
+	defer xmlFile.Close()
+
+	// Decode the original XML data
+	decoder := xml.NewDecoder(xmlFile)
+	var fileList FileList
+	err = decoder.Decode(&fileList)
+	if err != nil {
+		fmt.Println("Error decoding XML:", err)
+		return
+	}
+
+	// Create a map for fast lookup of issue XPaths
+	issueXPathsMap := make(map[string]bool)
+	for _, xpath := range issue_xpaths {
+		issueXPathsMap[xpath] = true
+	}
+
+	// Create a new XML file to write the filtered XPaths
+	newFilePath := "../updated_xpath_inputs.xml"
+	newFile, err := os.Create(newFilePath)
+	if err != nil {
+		fmt.Println("Error creating new XML file:", err)
+		return
+	}
+	defer newFile.Close()
+
+	// Write the file-list start tag to the new file
+	newFile.WriteString("<file-list>\n")
+
+	// Iterate through the XPaths and filter out the unwanted ones
+	for _, xpath := range fileList.XPaths {
+		if !issueXPathsMap[xpath.Name] {
+			// If the XPath is not in the issue_xpaths list, write it to the new file
+			newFile.WriteString("    ")
+			xpathString := fmt.Sprintf("<xpath name=\"%s\"/>\n", xpath.Name)
+			fmt.Fprintf(newFile, xpathString)
+		}
+	}
+
+	// Write the file-list end tag to the new file
+	newFile.WriteString("</file-list>")
+}
+
+func queryXpath(path string, key string) []*xmlquery.Node {
+	dirPath := "../user_config_files"
+	// For multiple values
+	var validValues []string
+	var returnVal []*xmlquery.Node
+
+	xmlFilePath, err := findXMLFile(dirPath)
+	if err != nil {
+		fmt.Println("Error finding XML file:", err)
+		return returnVal
+	}
+
+	if xmlFilePath == "" {
+		fmt.Println("No XML file found in the specified directory.")
+		return returnVal
+	}
+
+	f, _ := os.Open(xmlFilePath)
+	// doc, err := xmlquery.Parse(f)
+	// if err != nil {
+	// 	fmt.Println("Error parsing XML file:", err)
+	// 	return returnVal
+	// }
+
+	// This is calling the first query on the path which may contains multiple elements for the same xpath
+	fmt.Println("Current search Path: " + path)
+
+	// list := xmlquery.Find(doc, path)
+
+	// fmt.Println("Going through list of keys now")
+	// for _, item := range list {
+	// 	returnVal = append(returnVal, item)
+	// 	// fmt.Println("ITEM")
+	// 	// fmt.Println(item.OutputXML(true))
+	// 	// currentKey := xmlquery.CreateXPathNavigator(item)
+	// 	// isParent := currentKey.MoveToParent()
+	// 	// for isParent {
+	// 	// 	fmt.Println("PARENT")
+	// 	// 	fmt.Println(currentKey.Current().OutputXML(true))
+	// 	// 	isParent = currentKey.MoveToParent()
+	// 	// }
+	// }
+
+	// ----------------------------------------------------------------------------
+	p, err := xmlquery.CreateStreamParser(f, path)
+	if err != nil {
+		fmt.Println("Error")
+	}
+
+	// This for loop is parsing the current search path and collecting all of the different
+	// xpath subsections that have the same xpath query: Valid_Values --> stores different names
+	for {
+		n, err := p.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(err)
+		}
+		// For multiple values
+		// fmt.Println("Output: " + n.OutputXML(true))
+		// fmt.Println("Key: " + key)
+		if strings.Contains(n.OutputXML(true), key) {
+			re := regexp.MustCompile("<.*?>")
+			result := re.ReplaceAllString(n.OutputXML(true), "")
+			validValues = append(validValues, result)
+			// fmt.Print("Valid Values")
+			// fmt.Println(validValues)
+		}
+	}
+
+	fmt.Println("Values found for this search path")
+	fmt.Println(validValues)
+	fmt.Println()
+
+	// validValues --> now contains list of names(s) that now need to be queried
+	// Theses queries will need to traverse up to the parent to gather as much information needed
+
+	f2, _ := os.Open(xmlFilePath)
+	doc, err := xmlquery.Parse(f2)
+	if err != nil {
+		fmt.Println("Error")
+	}
+
+	// Loop that is going through all the potential name(s)
+	for _, value := range validValues {
+		var list []*xmlquery.Node
+		newQuery := strings.Split(path, "/")
+		newString := newQuery[len(newQuery)-2] + "[" + newQuery[len(newQuery)-1] + " = '" + value + "']"
+		newQuery = newQuery[:len(newQuery)-1]
+		newQuery[len(newQuery)-1] = newString
+		newQuery[0] = "/" + newQuery[0]
+
+		toAdd := ""
+		for i := range newQuery[:len(newQuery)-1] {
+			toAdd = toAdd + "/.."
+			fmt.Print(i)
+		}
+
+		newString = strings.Join(newQuery, "/")
+		// newString = newString + "/.."
+		// fmt.Println(newString)
+		newString = newString + toAdd
+		fmt.Println()
+		fmt.Println(newString)
+
+		list = xmlquery.Find(doc, newString)
+		fmt.Println("Printing nodes")
+		for _, node := range list {
+			fmt.Println("New Node")
+			fmt.Println(node.OutputXML(true))
+		}
+		// all the nodes in the list are the same
+
+		return list
+
+		// ----------------------------------------------------------------------------
+	}
+	return returnVal
+}
+
+func findXMLFile(dirPath string) (string, error) {
+	var xmlFilePath string
+
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		if filepath.Ext(info.Name()) == ".xml" {
+			xmlFilePath = path
+			return filepath.SkipDir
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return xmlFilePath, nil
 }

@@ -6,6 +6,19 @@ home_dir="$PWD"
 # Search for XML files containing "xpath" in their filenames in the home directory
 xml_files=$(find "$PWD" -type f -name '*xpath*.xml')
 
+# Define the folder name
+folderName="TFtemplates"
+
+# Check if the folder already exists
+if [ ! -d "$folderName" ]; then
+    # Create the folder if it doesn't exist
+    mkdir "$folderName"
+    echo "Folder '$folderName' created successfully."
+else
+    echo "Folder '$folderName' already exists."
+fi
+
+
 # Check if any matching XML files were found
 if [ -n "$xml_files" ]; then
     # Now Build the provider

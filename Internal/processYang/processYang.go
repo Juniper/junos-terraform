@@ -134,8 +134,8 @@ func CreateYinFileAndXpath(jcfg cfg.Config) error {
 			if foundFlag == false {
 				fmt.Printf("Xpath file for %s is already generated\n", inputYinFile)
 			}
-			printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
 			counter++
+			printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
 		}
 	}
 	if len(foundXPath) == 0 {
@@ -218,8 +218,8 @@ func generateYinFile(filePath string) {
 		if foundFlag == false {
 			fmt.Printf("Yin file for %s is already generated\n", file)
 		}
-		printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
 		counter++
+		printProgressBar(counter, numofJobs, "Progress", "Complete", 25, "=")
 	}
 }
 
@@ -492,12 +492,11 @@ func printProgressBar(iteration, total int, prefix, suffix string, length int, f
 	}
 
 	bar := strings.Repeat(fill, filledLength) + end + strings.Repeat("-", (length-filledLength))
-	fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, suffix)
+	fmt.Printf("\r     %s [%s] %.2f%% %s", prefix, bar, percent*100, suffix)
 	fmt.Println()
 	fmt.Println()
 
 	if iteration == total {
 		fmt.Println()
-		fmt.Printf("\r     %s [%s] %f%% %s", prefix, bar, percent, "COMPLETED")
 	}
 }
