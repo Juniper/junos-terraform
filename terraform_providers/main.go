@@ -23,4 +23,5 @@ import (
 func main() {
 	opts := &plugin.ServeOpts{ProviderFunc: Provider}
 	plugin.Serve(opts)
+	//os.WriteFile("/tmp/text.txt", []byte(fmt.Sprintf("%v", mockMap)), 0644)
 }
