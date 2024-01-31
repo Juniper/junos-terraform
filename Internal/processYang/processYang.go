@@ -23,6 +23,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/Juniper/junos-terraform/Internal/cfg"
@@ -34,6 +35,15 @@ func PrintHeader(message string) {
 	footer := strings.Repeat("-", utf8.RuneCountInString(message)) + "----" + "\n"
 	fmt.Print(header, "- "+message+" -\n", footer)
 }
+
+func runPyangCommand(file, filePath string) ([]byte, error) {
+	return exec.Command("pyang", "-f", "yin", file+".yang", "-o", file+".yin", "-p", filePath).CombinedOutput()
+}
+
+// ... (other parts of your code)
+
+const maxRetries = 3
+const retryDelay = 5 * time.Second
 
 // Node is a helper type for traversing the data tree.
 type Node struct {
@@ -204,18 +214,34 @@ func generateYinFile(filePath string) {
 
 	for _, file := range yangFileList {
 		foundFlag := contains(foundYin, file)
-		if foundFlag == true {
-			// The search path is required for included models
-			// pyang doesn't provide any output for creating Yin files
-			output, err := exec.Command("pyang", "-f", "yin", file+".yang", "-o", file+".yin", "-p", filePath).Output()
+		if foundFlag {
+			var output []byte
+			var err error
+
+			// Retry the command in case of an error
+			for retry := 1; retry <= maxRetries; retry++ {
+				output, err = runPyangCommand(file, filePath)
+				if err == nil {
+					break // Success, exit the retry loop
+				}
+
+				// Print the error and retry message
+				fmt.Printf("Error processing file %s (attempt %d/%d):\n", file, retry, maxRetries)
+				fmt.Printf("Output from pyang:\n%s\n", output)
+				fmt.Printf("pyang command failed: %v\n", err)
+
+				// Wait before retrying
+				time.Sleep(retryDelay)
+			}
+
 			if err != nil {
-				fmt.Println("error processing file: ", file)
-				fmt.Println("output from pyang: ", string(output))
-				panic("pyang error: " + err.Error())
+				fmt.Printf("Max retries reached. Unable to process file %s\n", file)
+				// Handle the error here, e.g., log it or continue to the next iteration
+				continue
 			}
 			fmt.Printf("Yin file for %s is generated\n", file)
 		}
-		if foundFlag == false {
+		if !foundFlag {
 			fmt.Printf("Yin file for %s is already generated\n", file)
 		}
 		counter++

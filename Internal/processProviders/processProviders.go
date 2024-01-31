@@ -1774,6 +1774,7 @@ func createTerraform(strSchema string, jcfg cfg.Config) {
 		keyList = append(keyList, key)
 		joinedResult = s.Join(keyList, "/")
 		// Add all xpath needing to be queried to list
+		argumentBlock += "	" + str + " = \"/" + joinedResult + "\"" + "\n"
 		xpathToQuery = append(xpathToQuery, joinedResult)
 	}
 
@@ -1789,52 +1790,52 @@ func createTerraform(strSchema string, jcfg cfg.Config) {
 	//1.  compile list of all xpath in list of array
 	//2. outside that loop, do the lookup
 
-	// If the list of xpaths is not empty
-	if len(xpathToQuery) > 0 {
+	// // If the list of xpaths is not empty
+	// if len(xpathToQuery) > 0 {
 
-		// Get last element in list
-		var lastElement = xpathToQuery[len(xpathToQuery)-1]
-		fmt.Println()
-		splitResult = s.Split(lastElement, "/")
-		lastElementKey := splitResult[len(splitResult)-1]
+	// 	// Get last element in list
+	// 	var lastElement = xpathToQuery[len(xpathToQuery)-1]
+	// 	fmt.Println()
+	// 	splitResult = s.Split(lastElement, "/")
+	// 	lastElementKey := splitResult[len(splitResult)-1]
 
-		fmt.Println("Querying last element: " + lastElement)
-		xmlNode := queryXpath(lastElement, lastElementKey)
-		fmt.Println("Back in createTerraform")
-		for _, val := range xmlNode {
-			fmt.Println()
-			// fmt.Println("Output from queryPath function:")
-			// fmt.Println(val.OutputXML(true))
-			// fmt.Println()
-			// search for reamainging keys using find from THIS object
-			// go though remaining xpaths in list and query
-			fmt.Println("Going through remaining xpaths")
-			for _, path := range xpathToQuery[:len(xpathToQuery)-1] {
-				fmt.Println(path)
+	// 	fmt.Println("Querying last element: " + lastElement)
+	// 	xmlNode := queryXpath(lastElement, lastElementKey)
+	// 	fmt.Println("Back in createTerraform")
+	// 	for _, val := range xmlNode {
+	// 		fmt.Println()
+	// 		// fmt.Println("Output from queryPath function:")
+	// 		// fmt.Println(val.OutputXML(true))
+	// 		// fmt.Println()
+	// 		// search for reamainging keys using find from THIS object
+	// 		// go though remaining xpaths in list and query
+	// 		fmt.Println("Going through remaining xpaths")
+	// 		for _, path := range xpathToQuery[:len(xpathToQuery)-1] {
+	// 			fmt.Println(path)
 
-				list := xmlquery.Find(val, "/"+path)
-				for _, val := range list {
-					fmt.Println(val.OutputXML(true))
-				}
-			}
-			fmt.Println()
-		}
-		// if xmlNode != nil {
-		// 	fmt.Println("HERE!!!!!")
-		// 	fmt.Println(xmlNode.OutputXML(true))
-		// 	rest := xpathToQuery[:len(xpathToQuery)-1]
-		// 	fmt.Println(rest)
+	// 			list := xmlquery.Find(val, "/"+path)
+	// 			for _, val := range list {
+	// 				fmt.Println(val.OutputXML(true))
+	// 			}
+	// 		}
+	// 		fmt.Println()
+	// 	}
+	// 	// if xmlNode != nil {
+	// 	// 	fmt.Println("HERE!!!!!")
+	// 	// 	fmt.Println(xmlNode.OutputXML(true))
+	// 	// 	rest := xpathToQuery[:len(xpathToQuery)-1]
+	// 	// 	fmt.Println(rest)
 
-		// 	for _, value := range rest {
-		// 		fmt.Print("Rest of the Values: ")
-		// 		fmt.Println(value)
-		// 		// valueNode := xmlquery.FindOne(xmlNode, value)
-		// 		// if valueNode != nil {
-		// 		// 	fmt.Println(valueNode.OutputXML(true))
-		// 		// }
-		// 	}
-		// }
-	}
+	// 	// 	for _, value := range rest {
+	// 	// 		fmt.Print("Rest of the Values: ")
+	// 	// 		fmt.Println(value)
+	// 	// 		// valueNode := xmlquery.FindOne(xmlNode, value)
+	// 	// 		// if valueNode != nil {
+	// 	// 		// 	fmt.Println(valueNode.OutputXML(true))
+	// 	// 		// }
+	// 	// 	}
+	// 	// }
+	// }
 
 	// 		values = queryXpath(joinedResult, key, true)
 
