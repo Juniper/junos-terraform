@@ -1778,14 +1778,14 @@ func createTerraform(strSchema string, jcfg cfg.Config) {
 		xpathToQuery = append(xpathToQuery, joinedResult)
 	}
 
-	// Prints out all of the xapths needed to query for this particular resource
-	fmt.Println("List of all xpaths to query for keys given resource")
-	for _, path := range xpathToQuery {
-		fmt.Println(path)
-	}
-	fmt.Println()
-	fmt.Println()
-	fmt.Println()
+	// // Prints out all of the xapths needed to query for this particular resource
+	// fmt.Println("List of all xpaths to query for keys given resource")
+	// for _, path := range xpathToQuery {
+	// 	fmt.Println(path)
+	// }
+	// fmt.Println()
+	// fmt.Println()
+	// fmt.Println()
 
 	//1.  compile list of all xpath in list of array
 	//2. outside that loop, do the lookup
