@@ -164,14 +164,28 @@ EOF
 
     junos_version_combined="${junos_version}R1"
 
-    # Populate the associative array with mappings
-    device_mappings["vmx"]="junos"
-    device_mappings["vptx"]="junos"
-    device_mappings["vsrx"]="junos-es"
-    device_mappings["vqfx"]="junos-qfx"
+    device_names=("vmx" "vptx" "vsrx" "vqfx")
+    device_mappings=("junos" "junos" "junos-es" "junos-qfx")
+
+    # Find the index of the input device name in the device_names array
+    index=-1
+    for ((i=0; i<${#device_names[@]}; i++)); do
+        if [ "${device_names[$i]}" = "$user_input" ]; then
+            index=$i
+            break
+        fi
+    done
+
+    # Output the corresponding mapping if found
+    if [ $index -ne -1 ]; then
+        supported_devices="${device_mappings[$index]}"
+        echo $supported_devices
+    else
+        echo "Device mapping not found."
+    fi
 
     # Use the user's input to look up the supported devices
-    supported_devices="${device_mappings[$selected_device]}"
+    supported_devices="${device_mappings[${user_input}]}"
 
     # Check if the device name exists in the mapping
     if [ -z "$supported_devices" ]; then
@@ -182,9 +196,16 @@ EOF
     # # Output the supported devices
     # echo "Supported devices for $selected_device: $supported_devices"
 
+    echo ""
+    echo ""
+    echo $supported_devices
+
     common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2023-01-01.yang"
     path_to="yang/$junos_version/$junos_version_combined/$supported_devices/conf/"
 
+    echo ""
+    echo ""
+    echo $path_to
 
     # Define the target directory in the home directory
     target_dir="$home_dir/yang_files"

@@ -28,7 +28,7 @@ BGP Configuration: https://youtu.be/nQVNCNCJZRc
 * [Question & Answers/ Common Problems](#questions)
 
 <a id="demo"></a>
-# Junos-Terraform Demo
+# Junos-Terraform Demo (Build from scratch)
 
 Following this demo, developers will learn to be able to manually create custom junos-terrraform providers with the ability to configure any junos device given explicitly defined xpaths and yang files.
 
@@ -272,7 +272,7 @@ The binary file `terraform-provider-junos-vsrx` is actually our fresh new and sh
 
 
 <a id="guide"></a>
-# Junos-Terraform Developer Guide
+# Junos-Terraform Developer Guide (Build from pre-existing junos config)
 
 This section is aimed at users who are a little more comfortable with the way junos-terraform works and want to develop, test, configure Juniper devices with a pre-existing configuration.
 
