@@ -6,6 +6,22 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+retry_script() {
+  while true; do
+    ./generateFiles.sh
+    
+    # Check the exit status of the script
+    if [ $? -eq 0 ]; then
+        # Script ran successfully, exit the loop
+        break
+    else
+        # Script failed, display an error message
+        echo "Script failed. Retrying in 5 seconds..."
+        sleep 5
+    fi
+  done
+}
+
 # caputres the user's home directory
 home_dir="$PWD"
 
@@ -148,14 +164,28 @@ EOF
 
     junos_version_combined="${junos_version}R1"
 
-    # Populate the associative array with mappings
-    device_mappings["vmx"]="junos"
-    device_mappings["vptx"]="junos"
-    device_mappings["vsrx"]="junos-es"
-    device_mappings["vqfx"]="junos-qfx"
+    device_names=("vmx" "vptx" "vsrx" "vqfx")
+    device_mappings=("junos" "junos" "junos-es" "junos-qfx")
+
+    # Find the index of the input device name in the device_names array
+    index=-1
+    for ((i=0; i<${#device_names[@]}; i++)); do
+        if [ "${device_names[$i]}" = "$user_input" ]; then
+            index=$i
+            break
+        fi
+    done
+
+    # Output the corresponding mapping if found
+    if [ $index -ne -1 ]; then
+        supported_devices="${device_mappings[$index]}"
+        echo $supported_devices
+    else
+        echo "Device mapping not found."
+    fi
 
     # Use the user's input to look up the supported devices
-    supported_devices="${device_mappings[$selected_device]}"
+    supported_devices="${device_mappings[${user_input}]}"
 
     # Check if the device name exists in the mapping
     if [ -z "$supported_devices" ]; then
@@ -166,9 +196,16 @@ EOF
     # # Output the supported devices
     # echo "Supported devices for $selected_device: $supported_devices"
 
+    echo ""
+    echo ""
+    echo $supported_devices
+
     common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2023-01-01.yang"
     path_to="yang/$junos_version/$junos_version_combined/$supported_devices/conf/"
 
+    echo ""
+    echo ""
+    echo $path_to
 
     # Define the target directory in the home directory
     target_dir="$home_dir/yang_files"
@@ -212,31 +249,31 @@ EOF
       target_dir="$home_dir/yang"
 
       rm -rf $target_dir
-    else 
-      # Find at least one .yang file in yang_files folder
-      yang_files=$(find yang_files -name "*.yang")
-      # If YANG files are found, generate YIN and Xpath Files
-      if [ -n "$yang_files" ]; then
-        echo "Found .yang files in yang_files folder."
-        # Change directory to /cmd/processYang
-        cd $home_dir/cmd/processYang || exit 1
-        # Activate venv
-        python3 -m venv venv
-        source venv/bin/activate
-        # Check and install pyang if needed
-        if ! command_exists pyang; then
-          echo "pyang is not installed. Installing pyang..."
-          pip install pyang
-          pyang -v
-        fi
-        # Run go build command and generate YIN and Xpath Files
-        go build
-        ./processYang -config $home_dir/config.toml
-        deactivate
-        # go run $home_dir/Internal/processYang/createXpathInputs.go
-      else
-        echo "No .yang files found in yang_files folder. Add files and re-run script"
+    fi
+
+    # Find at least one .yang file in yang_files folder
+    yang_files=$(find yang_files -name "*.yang")
+    # If YANG files are found, generate YIN and Xpath Files
+    if [ -n "$yang_files" ]; then
+      echo "Found .yang files in yang_files folder."
+      # Change directory to /cmd/processYang
+      cd $home_dir/cmd/processYang || exit 1
+      # Activate venv
+      python3 -m venv venv
+      source venv/bin/activate
+      # Check and install pyang if needed
+      if ! command_exists pyang; then
+        echo "pyang is not installed. Installing pyang..."
+        pip install pyang
+        pyang -v
       fi
+      # Run go build command and generate YIN and Xpath Files
+      go build
+      ./processYang -config $home_dir/config.toml
+      deactivate
+      # go run $home_dir/Internal/processYang/createXpathInputs.go
+    else
+      echo "No .yang files found in yang_files folder. Add files and re-run script"
     fi
 
     cd "$home_dir"
@@ -260,7 +297,6 @@ EOF
     else
         echo "Folder '$folderName' already exists to store .tf templates"
     fi
-
 
     # Check if any matching XML files were found
     if [ -n "$xml_files" ]; then
