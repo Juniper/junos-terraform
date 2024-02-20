@@ -179,7 +179,6 @@ EOF
     # Output the corresponding mapping if found
     if [ $index -ne -1 ]; then
         supported_devices="${device_mappings[$index]}"
-        echo $supported_devices
     else
         echo "Device mapping not found."
     fi
@@ -196,16 +195,8 @@ EOF
     # # Output the supported devices
     # echo "Supported devices for $selected_device: $supported_devices"
 
-    echo ""
-    echo ""
-    echo $supported_devices
-
     common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2023-01-01.yang"
     path_to="yang/$junos_version/$junos_version_combined/$supported_devices/conf/"
-
-    echo ""
-    echo ""
-    echo $path_to
 
     # Define the target directory in the home directory
     target_dir="$home_dir/yang_files"

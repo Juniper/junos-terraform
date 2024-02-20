@@ -896,7 +896,7 @@ __4. Running `terraform init` is giving me errors regarding the location of the 
 * Once this is double-checked, check the `main.tf` to ensure that the terrafrom `required_providers` matches the naming of the path and try again. 
 
 
-__5. Running `terraform apply` is giving me errors realted to Plugin not Responding. How do I fix this?__
+__5. Running `terraform apply` is giving me errors related to Plugin not Responding. How do I fix this?__
 > This only applies when NOT using the `$MOCK_FILE` testing env variable 
 * If terrafrom cannot connect to a Juniper Device during the `apply` stage, the message `Error: Plugin did not respond` will occur.
   * To fix this issue, ensure that the `provider "junos-deviceName"` section in the `main.tf` file is correctly filled out and matches a running Junos device which can recieves data. If the host and port does not connect to a running device, the `terraform apply` will not work.
