@@ -2,3 +2,9 @@ cmd/processProviders/processProviders
 cmd/processYang/processYang
 terraform_providers/terraform-provider-junos-device
 venv/
+terraform_providers/dist/
+xpath_inputs.xml
+yang/
+yang_files/
+config.toml
+TFtemplates/
