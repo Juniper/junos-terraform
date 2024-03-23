@@ -1,0 +1,43 @@
+before:
+  hooks:
+    - go mod tidy
+    - shasum -a 256 ../xpath_inputs.xml
+
+snapshot:
+  name_template: '{{ .Version }}'
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - '-s -w'
+    binary: 'terraform-provider-junos-{{.Env.PNAME}}_v{{ .Version }}'
+
+archives:
+  - format: zip
+    name_template: 'terraform-provider-junos-{{.Env.PNAME}}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+checksum:
+  extra_files:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
+  algorithm: sha256
+signs:
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+changelog:
+  skip: true
