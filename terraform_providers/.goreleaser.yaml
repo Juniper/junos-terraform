@@ -18,14 +18,14 @@ builds:
       - -trimpath
     ldflags:
       - '-s -w'
-    binary: 'terraform-provider-junos-{{.Env.PNAME}}_v{{ .Version }}'
+    binary: 'terraform-provider-{{.Env.PNAME}}_v{{ .Version }}'
 
 archives:
   - format: zip
-    name_template: 'terraform-provider-junos-{{.Env.PNAME}}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    name_template: 'terraform-provider-{{.Env.PNAME}}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 checksum:
   extra_files:
-  name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
+  name_template: 'terraform-provider-{{.Env.PNAME}}_{{ .Version }}_SHA256SUMS'
   algorithm: sha256
 signs:
   - artifacts: checksum
