@@ -1,7 +1,6 @@
 before:
   hooks:
     - go mod tidy
-    - shasum -a 256 ../xpath_inputs.xml
 
 snapshot:
   name_template: '{{ .Version }}'
