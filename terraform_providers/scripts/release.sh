@@ -11,3 +11,5 @@ go run github.com/goreleaser/goreleaser release --clean --snapshot
 
 gpg --armor --export "$GPG_FINGERPRINT" > "$DIST_DIR/gpg_key.asc"
 echo "$GPG_FINGERPRINT" > "$DIST_DIR/gpg_key.id"
+
+go run github.com/chrismarget/lambda-tf-registry/cmd/register
