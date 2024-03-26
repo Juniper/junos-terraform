@@ -6,7 +6,7 @@ module terraform-provider-junos-%+v
 go 1.22
 
 require (
-        github.com/chrismarget/lambda-tf-registry v0.0.0-20240325230007-3e6f86f6e9c2
+        github.com/chrismarget/lambda-tf-registry v0.0.1
         github.com/goreleaser/goreleaser v1.24.0
         github.com/hashicorp/terraform-plugin-log v0.4.0
         github.com/hashicorp/terraform-plugin-sdk/v2 v2.16.0

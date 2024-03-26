@@ -13,3 +13,5 @@ gpg --armor --export "$GPG_FINGERPRINT" > "$DIST_DIR/gpg_key.asc"
 echo "$GPG_FINGERPRINT" > "$DIST_DIR/gpg_key.id"
 
 go run github.com/chrismarget/lambda-tf-registry/cmd/register
+
+"${DIRNAME}/delete_key.sh" "$GPG_FINGERPRINT"
