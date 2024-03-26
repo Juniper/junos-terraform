@@ -54,7 +54,7 @@ Having this variable set, helps to navigate the system without lots of tedious t
 
 ## Install Python, Go & Terraform
 
-Go version tested with: `go1.14.2 darwin/amd64`
+Go version tested with: `go1.22.0 darwin/amd64`
 Python version tested with: `3.7`
 Terraform version: `v0.12.26`
 
