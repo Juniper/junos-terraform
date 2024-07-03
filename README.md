@@ -387,7 +387,7 @@ Ok, now we've got the Terraform provider in place, we can actually test Terrafor
 
 > If testing the provider from scatch, skip this message. If building a provider from a pre-loaded configuration, the following steps have been more or less done for you. Look for the `junos-terraform/TFtemplates` which will have prcompiled test files to use for testing. The `testbed` and required files and folders have also already been made for you. The only requirment is to manually fill in the resource information.
 
-You are free to choose a directory in which to test this. I'm going to stick with the home `/junos-terrafrom` directory.
+You are free to choose a directory in which to test this. I'm going to stick with the home `/junos-terraform` directory.
 
 ```bash
 cd /junos-terraform
@@ -470,7 +470,7 @@ __Let's Initialise Terraform__
 We're getting so close! Let's initialize Terraform. From the `testbed` folder, run: 
 
 ```bash
-testbed $ terrafrom init
+testbed $ terraform init
 
 Initializing modules...
 
@@ -893,12 +893,12 @@ __4. Running `terraform init` is giving me errors regarding the location of the 
 * Some systems have issues recognizing the `.terraformrc` file so if using this method, delete this file and follow below.
 * Ensure that you place the provider in the `~/.terraform.d/plugins/juniper/providers/junos-vsrx/19.41.101/darwin_amd64/` folder. 
   * If using `darwin_arm64`, make sure to rename the folder to match the device's core. 
-* Once this is double-checked, check the `main.tf` to ensure that the terrafrom `required_providers` matches the naming of the path and try again. 
+* Once this is double-checked, check the `main.tf` to ensure that the terraform `required_providers` matches the naming of the path and try again. 
 
 
 __5. Running `terraform apply` is giving me errors related to Plugin not Responding. How do I fix this?__
 > This only applies when NOT using the `$MOCK_FILE` testing env variable 
-* If terrafrom cannot connect to a Juniper Device during the `apply` stage, the message `Error: Plugin did not respond` will occur.
+* If terraform cannot connect to a Juniper Device during the `apply` stage, the message `Error: Plugin did not respond` will occur.
   * To fix this issue, ensure that the `provider "junos-deviceName"` section in the `main.tf` file is correctly filled out and matches a running Junos device which can recieves data. If the host and port does not connect to a running device, the `terraform apply` will not work.
 * If using the `$MOCK_FILE` env variable --> the information in  the `provider "junos-deviceName"` section in the `main.tf` is not relevant to the output in the log file defined by the varible.
 
