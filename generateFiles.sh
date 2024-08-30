@@ -195,7 +195,7 @@ EOF
     # # Output the supported devices
     # echo "Supported devices for $selected_device: $supported_devices"
 
-    common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2023-01-01.yang"
+    common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2022-01-01.yang"
     path_to="yang/$junos_version/$junos_version_combined/$supported_devices/conf/"
 
     # Define the target directory in the home directory
