@@ -195,7 +195,8 @@ EOF
     # # Output the supported devices
     # echo "Supported devices for $selected_device: $supported_devices"
 
-    common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2023-01-01.yang"
+    # common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2023-01-01.yang"
+    common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2022-01-01.yang"
     path_to="yang/$junos_version/$junos_version_combined/$supported_devices/conf/"
 
     # Define the target directory in the home directory
@@ -296,7 +297,8 @@ EOF
         go build
         ./processProviders -config $home_dir/config.toml
         cd $home_dir/terraform_providers
-        go mod tidy -go=1.16 && go mod tidy -go=1.17
+        # go mod tidy -go=1.16 && go mod tidy -go=1.17
+        go mod tidy -go=1.23
         go build
     else
         echo "No XML xpath file found. Try renaming the xpath file to include 'xpath' in the name."
