@@ -28,11 +28,11 @@ This is an example that demonstrates how to use JTAF on the Static VXLAN Sandbox
     rm generateFiles.sh
     mv Samples/static_vxlan/generateFiles.sh junos-terraform
 ```
-    This updates the two lines below. You could also use vim to update these lines. 
-        Line 198: # common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2023-01-01.yang"
-                    common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2022-01-01.yang"
-        Line 299: # go mod tidy -go=1.16 && go mod tidy -go=1.17
-                    go mod tidy -go=1.23
+This updates the two lines below. You could also use vim to update these lines. 
+    Line 198: # common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2023-01-01.yang"
+                common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2022-01-01.yang"
+    Line 299: # go mod tidy -go=1.16 && go mod tidy -go=1.17
+                go mod tidy -go=1.23
 * Move the vMX-A1 configuration file into to a directory titled user_config_files.
 ```bash
     mkdir user_config_files
