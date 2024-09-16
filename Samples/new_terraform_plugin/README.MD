@@ -6,29 +6,51 @@ After successful installation of JTAF (using either option 1 or option 2 within 
 
 Below files are to be copied into the respective folders within the junos-terraform folder.
 
-    junos-terraform\
-        |
-        ------ terraform_providers\
-                    |
-                    ------------ config.go
-                    |
-                    ------------ provider.go
-                    |
-                    ------------ resource_InterfacesInterfaceUnitFamilyInetAddressName.go
-                    |
-                    ------------ resource_junos_destroy_commit.go
-                    |
-                    ------------ resource_junos_device_commit.go
-                    |
-                    ------------ main.go
-        |
-        ------- testbed\
-                  |
-                  ----------- main.tf
-                  |
-                  ----------- vsrx_1\
-                                |
-                                ------- main.tf
+
+junos-terraform\                                                                                     
+       |                                                                                             
+       |                                                                                             
+       |                                                                                             
+       +----------- terraform_providers\                                                             
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   +--------------- main.go                                                  
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   +--------------- config.go                                                
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   +---------------- provider.go                                             
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   +---------------- resource_InterfacesInterfaceUnitFamilyInetAddressName.go
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   +---------------- resource_junos_destroy_commit.go                        
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   +---------------- resource_junos_device_commit.go                         
+       |                                                                                             
+       |                                                                                             
+       |                                                                                             
+       |                                                                                             
+       |                                                                                             
+       +----------testbed\                                                                           
+                    |                                                                                
+                    |                                                                                
+                    +--------- main.tf                                                               
+                    |                                                                                
+                    |                                                                                
+                    |                                                                                
+                    +---------vsrx_1\                                                                
+                                |                                                                    
+                                |                                                                    
+                                +--------                                                            
 ## Steps ##
 After copying the above files, follow below procedure to generate the terraform provider for junos-vsrx
 
