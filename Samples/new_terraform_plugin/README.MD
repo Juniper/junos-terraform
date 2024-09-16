@@ -70,6 +70,6 @@ Now that new terraform provider has been build and copied into the respective lo
 
 With a clean slate below commands can now be executed from `junos-terraform\testbed` folder.
 
-        `terraform init`
-        `terraform plan`
-        `terraform apply -auto-approve`
+        terraform init
+        terraform plan
+        terraform apply -auto-approve
