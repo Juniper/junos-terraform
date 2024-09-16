@@ -65,8 +65,8 @@ After copying the above files, follow below procedure to generate the terraform 
 
 Now that new terraform provider has been build and copied into the respective location, IP address configuration can be pushed to Junos device using terraform. Before pushing the configuration, any old state needs to be removed with the help below commands that needs to be executed within testbed folder.
 
-        `rm -rf .terraform`
-        `rm .terraform.lock.hcl`
+        rm -rf .terraform
+        rm .terraform.lock.hcl
 
 With a clean slate below commands can now be executed from `junos-terraform\testbed` folder.
 
