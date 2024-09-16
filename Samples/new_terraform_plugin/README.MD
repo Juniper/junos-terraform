@@ -1,4 +1,8 @@
-Terraform has introduced plugin framework to develop custom providers. This example uses the new terraform plugin framework to generate a provider for junos-vsrx. After successful installation of JTAF (using either option 1 or option 2 within generateFiles.sh script) follow below procedure to use new terraform plugin for provider generation.
+## Introduction ##
+Terraform has introduced plugin framework to develop custom providers. This example uses the new terraform plugin framework to generate a provider for junos-vsrx. This example demonstrates configuring IP address to an interface. 
+
+## Summary ##
+After successful installation of JTAF (using either option 1 or option 2 within generateFiles.sh script) follow below procedure to use new terraform plugin for provider generation.
 
 Below files are to be copied into the respective folders within the junos-terraform folder.
 
@@ -25,7 +29,7 @@ Below files are to be copied into the respective folders within the junos-terraf
                   ----------- vsrx_1\
                                 |
                                 ------- main.tf
-
+## Steps ##
 After copying the above files, follow below procedure to generate the terraform provider for junos-vsrx
 
 1. Run command `go mod tidy -go={GO_VERSION}` from junos-terraform\terraform_providers folder. This will install the dependencies needed for the new terraform plugin framework.
