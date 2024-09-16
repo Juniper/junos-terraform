@@ -63,11 +63,13 @@ After copying the above files, follow below procedure to generate the terraform 
 
 4. Copy the newly generated terraform provider binary file into `~/.terraform.d/plugins/juniper/providers/junos-vsrx/<version>/(linux_amd64|darwin_arm64)` folder.
 
+### Clean up old state ###
 Now that new terraform provider has been build and copied into the respective location, IP address configuration can be pushed to Junos device using terraform. Before pushing the configuration, any old state needs to be removed with the help below commands that needs to be executed within testbed folder.
 
         rm -rf .terraform
         rm .terraform.lock.hcl
 
+### Push Configuration ###
 With a clean slate below commands can now be executed from `junos-terraform\testbed` folder.
 
         terraform init
