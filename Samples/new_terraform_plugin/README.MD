@@ -6,7 +6,7 @@ After successful installation of JTAF (using either option 1 or option 2 within 
 
 Below files are to be copied into the respective folders within the junos-terraform folder.
 
-
+```
 junos-terraform\                                                                                     
        |                                                                                             
        |                                                                                             
@@ -50,7 +50,8 @@ junos-terraform\
                     +---------vsrx_1\                                                                
                                 |                                                                    
                                 |                                                                    
-                                +--------                                                            
+                                +-------- main.tf
+```
 ## Steps ##
 After copying the above files, follow below procedure to generate the terraform provider for junos-vsrx
 
