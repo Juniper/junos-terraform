@@ -35,10 +35,10 @@ junos-terraform\
        |                   |                                                                         
        |                   |                                                                         
        |                   +---------------- resource_junos_device_commit.go                         
-       |                                                                                             
-       |                                                                                             
-       |                                                                                             
-       |                                                                                             
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   |                                                                         
+       |                   +---------------- resource.go                                                        
        |                                                                                             
        +----------testbed\                                                                           
                     |                                                                                
@@ -50,7 +50,7 @@ junos-terraform\
                     +---------vsrx_1\                                                                
                                 |                                                                    
                                 |                                                                    
-                                +-------- main.tf
+                                +--------main.tf                                                     
 ```
 ## Steps ##
 After copying the above files, follow below procedure to generate the terraform provider for junos-vsrx
