@@ -18,65 +18,84 @@ package main
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func junosDestroyCommitCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-
-	// var err error
-	id := d.Get("resource_name").(string)
-
-	client := m.(*ProviderConfig)
-
-	d.SetId(fmt.Sprintf("%s_%s", client.Host, id))
-
-	// err = client.Close()
-	// if err != nil {
-	// 	return err
-	// }
-
-	return nil
+// Collects the objects from the .tf file
+type destoryCommitModel struct {
+	ResourceName types.String `tfsdk:"resource_name"`
 }
 
-func junosDestroyCommitRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-
-	return nil
+// Collects the data for the crud work
+type resourceDestoryCommit struct {
+	client ProviderConfig
 }
 
-func junosDestroyCommitUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+var _ resource.ResourceWithConfigure = new(resourceDestoryCommit)
 
-	return nil
-}
-
-func junosDestroyCommitDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-
-	client := m.(*ProviderConfig)
-
-	if err := client.SendCommit(); err != nil {
-		return diag.FromErr(err)
+func (r *resourceDestoryCommit) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
 	}
-
-	if err := client.Close(); err != nil {
-		return diag.FromErr(err)
-	}
-	return nil
+	r.client = req.ProviderData.(ProviderConfig)
 }
 
-func junosDestroyCommit() *schema.Resource {
-	return &schema.Resource{
-		CreateContext: junosDestroyCommitCreate,
-		ReadContext:   junosDestroyCommitRead,
-		UpdateContext: junosDestroyCommitUpdate,
-		DeleteContext: junosDestroyCommitDelete,
+// Metadata implements resource.Resource.
+func (r *resourceDestoryCommit) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_JunosDestroyCommit"
+}
 
-		Schema: map[string]*schema.Schema{
-			"resource_name": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
+func (r *resourceDestoryCommit) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"resource_name": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
+	}
+}
+
+// Create implements resource.Resource.
+func (r *resourceDestoryCommit) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	// Get the data and set
+	var plan destoryCommitModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	// Check for errors
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+func (r *resourceDestoryCommit) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+
+}
+
+func (r *resourceDestoryCommit) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+
+}
+
+func (r *resourceDestoryCommit) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+
+	var state destoryCommitModel
+	d := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(d...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if err := r.client.SendCommit(); err != nil {
+		return
+	}
+
+	if err := r.client.Close(); err != nil {
+		return
 	}
 }
