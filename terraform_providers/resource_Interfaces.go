@@ -60,19 +60,19 @@ type InterfacesModel struct {
 	Description  types.String `tfsdk:"description"`
 	Mtu          types.Int64  `tfsdk:"mtu"`
 	Vlan_tagging types.Bool   `tfsdk:"vlan_tagging"`
-	Units        []UnitsModel `tfsdk:"units"`
+	Units        types.List   `tfsdk:"units"`
 }
 
 type UnitsModel struct {
-	Name        types.String  `tfsdk:"name"`
-	Description types.String  `tfsdk:"description"`
-	Vlan_id     types.Int32   `tfsdk:"vlan_id"`
-	Family      []FamilyModel `tfsdk:"family"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	Vlan_id     types.Int32  `tfsdk:"vlan_id"`
+	Family      types.List   `tfsdk:"family"`
 }
 
 type FamilyModel struct {
-	Inet  types.List   `tfsdk:"inet"`
-	Inet6 []Inet6Model `tfsdk:"inet6"`
+	Inet  types.List `tfsdk:"inet"`
+	Inet6 types.List `tfsdk:"inet6"`
 }
 
 type InetModel struct {
@@ -240,20 +240,39 @@ func (r *resourceInterfaces) Create(ctx context.Context, req resource.CreateRequ
 		empty := ""
 		config.Groups.V_interface.V_vlan_tagging = &empty
 	}
-	for _, unit := range plan.Units {
+	var units []UnitsModel
+	resp.Diagnostics.Append(plan.Units.ElementsAs(ctx, &units, false)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	for _, unit := range units {
 		config.Groups.V_interface.V_units.V_name = unit.Name.ValueStringPointer()
 		config.Groups.V_interface.V_units.V_description = unit.Description.ValueStringPointer()
 		config.Groups.V_interface.V_units.V_vlan_id = unit.Vlan_id.ValueInt32Pointer()
-		var inets []InetModel
-		resp.Diagnostics.Append(unit.Family[0].Inet.ElementsAs(ctx, &inets, false)...)
+
+		var families []FamilyModel
+		resp.Diagnostics.Append(unit.Family.ElementsAs(ctx, &families, false)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		for _, inet := range inets {
-			config.Groups.V_interface.V_units.V_family.V_inet.V_address.V_name = inet.Address.ValueStringPointer()
-		}
-		for _, addrv6 := range unit.Family[0].Inet6 {
-			config.Groups.V_interface.V_units.V_family.V_inet6.V_address.V_name = addrv6.Address.ValueStringPointer()
+		for _, family := range families {
+			var inets []InetModel
+			resp.Diagnostics.Append(family.Inet.ElementsAs(ctx, &inets, false)...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			for _, inet := range inets {
+				config.Groups.V_interface.V_units.V_family.V_inet.V_address.V_name = inet.Address.ValueStringPointer()
+			}
+			var inet6 []Inet6Model
+			resp.Diagnostics.Append(family.Inet6.ElementsAs(ctx, &inet6, false)...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+
+			for _, addrv6 := range inet6 {
+				config.Groups.V_interface.V_units.V_family.V_inet6.V_address.V_name = addrv6.Address.ValueStringPointer()
+			}
 		}
 
 		err := r.client.SendTransaction("", config, false)
