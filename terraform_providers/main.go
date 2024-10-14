@@ -17,11 +17,20 @@
 package main
 
 import (
-	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
+	"context"
+	"log"
+
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
 func main() {
-	opts := &plugin.ServeOpts{ProviderFunc: Provider}
-	plugin.Serve(opts)
-	//os.WriteFile("/tmp/text.txt", []byte(fmt.Sprintf("%v", mockMap)), 0644)
+	ctx := context.Background()
+	opts := providerserver.ServeOpts{
+		Address: "registry.terraform.io/patelv/InterfaceTest",
+	}
+
+	err := providerserver.Serve(ctx, newProvider, opts)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
