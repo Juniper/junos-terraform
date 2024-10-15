@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"encoding/xml"
+	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -13,47 +17,50 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+type xmlInterfaceUnitAddr struct {
+	XMLName xml.Name `xml:"address,omitempty"`
+	V_name  *string  `xml:"name,omitempty"`
+}
+
+type xmlInterfaceUnit struct {
+	XMLName       xml.Name `xml:"unit"`
+	V_name        *string  `xml:"name,omitempty"`
+	V_description *string  `xml:"description,omitempty"`
+	V_vlan_id     *int32   `xml:"vlan-id,omitempty"`
+	V_family      struct {
+		XMLName xml.Name `xml:"family,omitempty"`
+		V_inet  struct {
+			XMLName   xml.Name               `xml:"inet,omitempty"`
+			V_address []xmlInterfaceUnitAddr `xml:"address"`
+		} `xml:"inet"`
+		V_inet6 struct {
+			XMLName   xml.Name               `xml:"inet6,omitempty"`
+			V_address []xmlInterfaceUnitAddr `xml:"address"`
+		} `xml:"inet6"`
+	} `xml:"family"`
+}
+
 // v_ is appended before every variable so it doesn't give any conflict
 // with any keyword in golang. ex - interface is keyword in golang
-type xmlInterfaces struct {
+type xmlInterface struct {
 	XMLName xml.Name `xml:"configuration"`
 	Groups  struct {
 		XMLName     xml.Name `xml:"groups"`
 		Name        string   `xml:"name"`
 		V_interface struct {
-			XMLName        xml.Name `xml:"interface"`
-			V_name         *string  `xml:"name,omitempty"`
-			V_description  *string  `xml:"description,omitempty"`
-			V_mtu          *int64   `xml:"mtu,omitempty"`
-			V_vlan_tagging *string  `xml:"vlan-tagging,omitempty"`
-			V_units        struct {
-				XMLName       xml.Name `xml:"unit"`
-				V_name        *string  `xml:"name,omitempty"`
-				V_description *string  `xml:"description,omitempty"`
-				V_vlan_id     *int32   `xml:"vlan-id,omitempty"`
-				V_family      struct {
-					XMLName xml.Name `xml:"family,omitempty"`
-					V_inet  struct {
-						XMLName   xml.Name `xml:"inet,omitempty"`
-						V_address struct {
-							XMLName xml.Name `xml:"address,omitempty"`
-							V_name  *string  `xml:"name,omitempty"`
-						} `xml:"address"`
-					} `xml:"inet"`
-					V_inet6 struct {
-						XMLName   xml.Name `xml:"inet6,omitempty"`
-						V_address struct {
-							XMLName xml.Name `xml:"address,omitempty"`
-							V_name  *string  `xml:"name,omitempty"`
-						} `xml:"address"`
-					} `xml:"inet6"`
-				} `xml:"family"`
-			} `xml:"unit"`
+			XMLName        xml.Name           `xml:"interface"`
+			V_name         *string            `xml:"name,omitempty"`
+			V_description  *string            `xml:"description,omitempty"`
+			V_mtu          *int64             `xml:"mtu,omitempty"`
+			V_vlan_tagging *string            `xml:"vlan-tagging,omitempty"`
+			V_units        []xmlInterfaceUnit `xml:"unit"`
 		} `xml:"interfaces>interface"`
 	} `xml:"groups"`
 }
 
 // Collects the objects from the .tf file
+
+// InterfacesModel is very important for xyz reason
 type InterfacesModel struct {
 	ResourceName types.String `tfsdk:"resource_name"`
 	Name         types.String `tfsdk:"name"`
@@ -67,7 +74,7 @@ type UnitsModel struct {
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
 	Vlan_id     types.Int32  `tfsdk:"vlan_id"`
-	Family      types.List   `tfsdk:"family"`
+	Family      types.Object `tfsdk:"family"`
 }
 
 type FamilyModel struct {
@@ -97,11 +104,10 @@ func (o UnitsModel) Attributes() map[string]schema.Attribute {
 			Optional:            true,
 			MarkdownDescription: "xpath is `config.Groups.V_units.V_vlan-id`",
 		},
-		"family": schema.ListNestedAttribute{
-			Optional: true,
-			NestedObject: schema.NestedAttributeObject{
-				Attributes: FamilyModel{}.Attributes(),
-			},
+		"family": schema.SingleNestedAttribute{
+			Attributes:          FamilyModel{}.Attributes(),
+			Optional:            true,
+			MarkdownDescription: "xpath is `config.Groups.V_units.family`",
 		},
 	}
 }
@@ -222,7 +228,6 @@ func (r *resourceInterfaces) Schema(_ context.Context, req resource.SchemaReques
 
 // Create implements resource.Resource.
 func (r *resourceInterfaces) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-
 	// Get the Interfaces Model data and set
 	var plan InterfacesModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -231,8 +236,8 @@ func (r *resourceInterfaces) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	var config xmlInterfaces
-	config.Groups.Name = plan.ResourceName.ValueString()
+	var config xmlInterface
+	config.Groups.Name = plan.Name.ValueString()
 	config.Groups.V_interface.V_name = plan.Name.ValueStringPointer()
 	config.Groups.V_interface.V_description = plan.Description.ValueStringPointer()
 	config.Groups.V_interface.V_mtu = plan.Mtu.ValueInt64Pointer()
@@ -240,54 +245,64 @@ func (r *resourceInterfaces) Create(ctx context.Context, req resource.CreateRequ
 		empty := ""
 		config.Groups.V_interface.V_vlan_tagging = &empty
 	}
+
+	// unpack units (types.List) into []UnitsModel
 	var units []UnitsModel
 	resp.Diagnostics.Append(plan.Units.ElementsAs(ctx, &units, false)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	for _, unit := range units {
-		config.Groups.V_interface.V_units.V_name = unit.Name.ValueStringPointer()
-		config.Groups.V_interface.V_units.V_description = unit.Description.ValueStringPointer()
-		config.Groups.V_interface.V_units.V_vlan_id = unit.Vlan_id.ValueInt32Pointer()
 
-		var families []FamilyModel
-		resp.Diagnostics.Append(unit.Family.ElementsAs(ctx, &families, false)...)
+	// make xml thingy have the right number of units and copy values into it
+	config.Groups.V_interface.V_units = make([]xmlInterfaceUnit, len(units))
+	for i, unit := range units {
+		config.Groups.V_interface.V_units[i].V_name = unit.Name.ValueStringPointer()
+		config.Groups.V_interface.V_units[i].V_description = unit.Description.ValueStringPointer()
+		config.Groups.V_interface.V_units[i].V_vlan_id = unit.Vlan_id.ValueInt32Pointer()
+
+		var family FamilyModel
+		resp.Diagnostics.Append(unit.Family.As(ctx, &family, basetypes.ObjectAsOptions{})...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		for _, family := range families {
-			var inets []InetModel
-			resp.Diagnostics.Append(family.Inet.ElementsAs(ctx, &inets, false)...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			for _, inet := range inets {
-				config.Groups.V_interface.V_units.V_family.V_inet.V_address.V_name = inet.Address.ValueStringPointer()
-			}
-			var inet6 []Inet6Model
-			resp.Diagnostics.Append(family.Inet6.ElementsAs(ctx, &inet6, false)...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
 
-			for _, addrv6 := range inet6 {
-				config.Groups.V_interface.V_units.V_family.V_inet6.V_address.V_name = addrv6.Address.ValueStringPointer()
-			}
-		}
-
-		err := r.client.SendTransaction("", config, false)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed while Sending", err.Error())
+		var inets []InetModel
+		resp.Diagnostics.Append(family.Inet.ElementsAs(ctx, &inets, false)...)
+		if resp.Diagnostics.HasError() {
 			return
 		}
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
-	// resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		config.Groups.V_interface.V_units[i].V_family.V_inet.V_address = make([]xmlInterfaceUnitAddr, len(inets))
+		for j, inet := range inets {
+			config.Groups.V_interface.V_units[i].V_family.V_inet.V_address[j] = xmlInterfaceUnitAddr{
+				V_name: inet.Address.ValueStringPointer(),
+			}
+		}
 
+		var inet6s []Inet6Model
+		resp.Diagnostics.Append(family.Inet6.ElementsAs(ctx, &inet6s, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		config.Groups.V_interface.V_units[i].V_family.V_inet6.V_address = make([]xmlInterfaceUnitAddr, len(inets))
+		for j, inet6 := range inet6s {
+			config.Groups.V_interface.V_units[i].V_family.V_inet6.V_address[j] = xmlInterfaceUnitAddr{
+				V_name: inet6.Address.ValueStringPointer(),
+			}
+		}
+	}
+
+	err := r.client.SendTransaction("", config, false)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed while Sending", err.Error())
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 // Read implements resource.Resource.
 func (r *resourceInterfaces) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var d diag.Diagnostics
 
 	// Get the data and set
 	var state InterfacesModel
@@ -298,92 +313,107 @@ func (r *resourceInterfaces) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	// Marshall group and check
-	var config xmlInterfaces
+	var config xmlInterface
 	id := config.Groups.Name
-	err := r.client.MarshalGroup(id, config)
+	err := r.client.MarshalGroup(id, &config)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed while Reading", err.Error())
 		return
 	}
 
-	var newstate InterfacesModel
-	newstate.ResourceName = types.StringValue(config.Groups.Name)
-	newstate.Name = types.StringPointerValue(config.Groups.V_interface.V_name)
-	newstate.Description = types.StringPointerValue(config.Groups.V_interface.V_description)
-	var units []UnitsModel
-	for i, xmlunit := range config.Groups.V_interface.V_units {
-		var unit UnitsModel
-		for m, xmlfamily := range xmlunit.V_family {
+	state.Description = types.StringPointerValue(config.Groups.V_interface.V_description)
+	state.Mtu = types.Int64PointerValue(config.Groups.V_interface.V_mtu)
 
+	var vlanTagging *bool
+	if config.Groups.V_interface.V_vlan_tagging != nil {
+		b, err := strconv.ParseBool(*config.Groups.V_interface.V_vlan_tagging)
+		if err != nil {
+			resp.Diagnostics.AddError(fmt.Sprintf("failed to parse vlan_tagging value %q", *config.Groups.V_interface.V_vlan_tagging), err.Error())
+			return
 		}
-		units = append(units, unit)
+		vlanTagging = &b
 	}
-	units_list, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: UnitsModel{}.AttrTypes()}, units)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	newstate.Units = units_list
-	config.Groups.V_interface.V_mtu = plan.Mtu.ValueInt64Pointer()
+	state.Vlan_tagging = types.BoolPointerValue(vlanTagging)
 
-	// Check values
-	if err := resp.State.Set(ctx, config.Groups.V_interface.V_name); err != nil {
-		return
+	units := make([]UnitsModel, len(config.Groups.V_interface.V_units))
+	for i, xmlUnit := range config.Groups.V_interface.V_units {
+
+		inets := make([]InetModel, len(xmlUnit.V_family.V_inet.V_address))
+		for j, xmlInet := range xmlUnit.V_family.V_inet.V_address {
+			inets[j].Address = types.StringPointerValue(xmlInet.V_name)
+		}
+
+		inet6s := make([]InetModel, len(xmlUnit.V_family.V_inet6.V_address))
+		for j, xmlInet := range xmlUnit.V_family.V_inet6.V_address {
+			inet6s[j].Address = types.StringPointerValue(xmlInet.V_name)
+		}
+
+		var family FamilyModel
+		family.Inet, d = types.ListValueFrom(ctx, types.StringType, inets)
+		resp.Diagnostics.Append(d...)
+		family.Inet6, d = types.ListValueFrom(ctx, types.StringType, inet6s)
+		resp.Diagnostics.Append(d...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		familyAttrVal, d := types.ObjectValueFrom(ctx, FamilyModel{}.AttrTypes(), family)
+		resp.Diagnostics.Append(d...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		units[i] = UnitsModel{
+			Name:        types.StringPointerValue(xmlUnit.V_name),
+			Description: types.StringPointerValue(xmlUnit.V_description),
+			Vlan_id:     types.Int32PointerValue(xmlUnit.V_vlan_id),
+			Family:      familyAttrVal,
+		}
 	}
-	if err := resp.State.Set(ctx, config.Groups.V_interface.V_description); err != nil {
-		return
-	}
-	if err := resp.State.Set(ctx, config.Groups.V_interface.V_mtu); err != nil {
-		return
-	}
-	if err := resp.State.Set(ctx, config.Groups.V_interface.V_units.V_name); err != nil {
-		return
-	}
-	if err := resp.State.Set(ctx, config.Groups.V_interface.V_units.V_description); err != nil {
-		return
-	}
+
+	state.Units, d = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: UnitsModel{}.AttrTypes()}, units)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Update implements resource.Resource.
 func (r *resourceInterfaces) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// Get the data and set
-	var plan InterfacesModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	// Check for errors
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	var config xmlInterfaces
-	config.Groups.Name = plan.ResourceName.ValueString()
-	config.Groups.V_interface.V_name = plan.Name.ValueStringPointer()
-	config.Groups.V_interface.V_description = plan.Description.ValueStringPointer()
-	config.Groups.V_interface.V_mtu = plan.Mtu.ValueInt64Pointer()
-	if plan.Vlan_tagging.ValueBool() {
-		empty := ""
-		config.Groups.V_interface.V_vlan_tagging = &empty
-	}
-	for _, unit := range plan.Units {
-		config.Groups.V_interface.V_units.V_name = unit.Name.ValueStringPointer()
-		config.Groups.V_interface.V_units.V_description = unit.Description.ValueStringPointer()
-		config.Groups.V_interface.V_units.V_vlan_id = unit.Vlan_id.ValueInt32Pointer()
-		for _, addr := range unit.Family[0].Inet {
-			config.Groups.V_interface.V_units.V_family.V_inet.V_address.V_name = addr.Address.ValueStringPointer()
-		}
-		for _, addrv6 := range unit.Family[0].Inet6 {
-			config.Groups.V_interface.V_units.V_family.V_inet6.V_address.V_name = addrv6.Address.ValueStringPointer()
-		}
-
-		err := r.client.SendTransaction("", config, false)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed while Sending", err.Error())
-			return
-		}
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-	}
-	// resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	//// Get the data and set
+	//var plan InterfacesModel
+	//resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	//// Check for errors
+	//if resp.Diagnostics.HasError() {
+	//	return
+	//}
+	//
+	//var config xmlInterface
+	//config.Groups.Name = plan.ResourceName.ValueString()
+	//config.Groups.V_interface.V_name = plan.Name.ValueStringPointer()
+	//config.Groups.V_interface.V_description = plan.Description.ValueStringPointer()
+	//config.Groups.V_interface.V_mtu = plan.Mtu.ValueInt64Pointer()
+	//if plan.Vlan_tagging.ValueBool() {
+	//	empty := ""
+	//	config.Groups.V_interface.V_vlan_tagging = &empty
+	//}
+	//for _, unit := range plan.Units {
+	//	config.Groups.V_interface.V_units.V_name = unit.Name.ValueStringPointer()
+	//	config.Groups.V_interface.V_units.V_description = unit.Description.ValueStringPointer()
+	//	config.Groups.V_interface.V_units.V_vlan_id = unit.Vlan_id.ValueInt32Pointer()
+	//	for _, addr := range unit.Family[0].Inet {
+	//		config.Groups.V_interface.V_units.V_family.V_inet.V_address.V_name = addr.Address.ValueStringPointer()
+	//	}
+	//	for _, addrv6 := range unit.Family[0].Inet6 {
+	//		config.Groups.V_interface.V_units.V_family.V_inet6.V_address.V_name = addrv6.Address.ValueStringPointer()
+	//	}
+	//
+	//	err := r.client.SendTransaction("", config, false)
+	//	if err != nil {
+	//		resp.Diagnostics.AddError("Failed while Sending", err.Error())
+	//		return
+	//	}
+	//	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	//}
+	//// resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 // Delete implements resource.Resource.

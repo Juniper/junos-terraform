@@ -77,7 +77,7 @@ func (p Provider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *
 func (p Provider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		func() resource.Resource { return new(resourceInterfaces) },
-		func() resource.Resource { return new(resourceTest) },
+		//func() resource.Resource { return new(resourceTest) },
 		func() resource.Resource { return new(resourceDestoryCommit) },
 		func() resource.Resource { return new(resourceDeviceCommit) },
 	}
