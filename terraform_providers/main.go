@@ -18,15 +18,21 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
 func main() {
+	var debug bool
+	flag.BoolVar(&debug, "debug", false, "set to true to run the provider with support for debuggers like delve")
+	flag.Parse()
+
 	ctx := context.Background()
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/patelv/InterfaceTest",
+		Address: "tf-registry.click/juniper/jtaf670ffa332c26b46b",
+		Debug:   debug,
 	}
 
 	err := providerserver.Serve(ctx, newProvider, opts)

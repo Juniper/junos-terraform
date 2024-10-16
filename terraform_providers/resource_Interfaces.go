@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/xml"
-	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"strconv"
@@ -116,7 +115,7 @@ func (o UnitsModel) AttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
 		"name":        types.StringType,
 		"description": types.StringType,
-		"vlan_id":     types.StringType,
+		"vlan_id":     types.Int32Type,
 		"family":      types.ObjectType{AttrTypes: FamilyModel{}.AttrTypes()},
 	}
 }
@@ -237,7 +236,7 @@ func (r *resourceInterfaces) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	var config xmlInterface
-	config.Groups.Name = plan.Name.ValueString()
+	config.Groups.Name = plan.ResourceName.ValueString()
 	config.Groups.V_interface.V_name = plan.Name.ValueStringPointer()
 	config.Groups.V_interface.V_description = plan.Description.ValueStringPointer()
 	config.Groups.V_interface.V_mtu = plan.Mtu.ValueInt64Pointer()
@@ -314,8 +313,7 @@ func (r *resourceInterfaces) Read(ctx context.Context, req resource.ReadRequest,
 
 	// Marshall group and check
 	var config xmlInterface
-	id := config.Groups.Name
-	err := r.client.MarshalGroup(id, &config)
+	err := r.client.MarshalGroup(state.ResourceName.ValueString(), &config)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed while Reading", err.Error())
 		return
@@ -327,11 +325,9 @@ func (r *resourceInterfaces) Read(ctx context.Context, req resource.ReadRequest,
 	var vlanTagging *bool
 	if config.Groups.V_interface.V_vlan_tagging != nil {
 		b, err := strconv.ParseBool(*config.Groups.V_interface.V_vlan_tagging)
-		if err != nil {
-			resp.Diagnostics.AddError(fmt.Sprintf("failed to parse vlan_tagging value %q", *config.Groups.V_interface.V_vlan_tagging), err.Error())
-			return
+		if err == nil {
+			vlanTagging = &b // vlanTagging remains nil unless parsing completed without error
 		}
-		vlanTagging = &b
 	}
 	state.Vlan_tagging = types.BoolPointerValue(vlanTagging)
 
@@ -349,9 +345,9 @@ func (r *resourceInterfaces) Read(ctx context.Context, req resource.ReadRequest,
 		}
 
 		var family FamilyModel
-		family.Inet, d = types.ListValueFrom(ctx, types.StringType, inets)
+		family.Inet, d = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: InetModel{}.AttrTypes()}, inets)
 		resp.Diagnostics.Append(d...)
-		family.Inet6, d = types.ListValueFrom(ctx, types.StringType, inet6s)
+		family.Inet6, d = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Inet6Model{}.AttrTypes()}, inet6s)
 		resp.Diagnostics.Append(d...)
 		if resp.Diagnostics.HasError() {
 			return
