@@ -117,7 +117,7 @@ func (o UnitsModel) AttrTypes() map[string]attr.Type {
 		"name":        types.StringType,
 		"description": types.StringType,
 		"vlan_id":     types.StringType,
-		"family":      types.ListType{ElemType: types.ObjectType{AttrTypes: FamilyModel{}.AttrTypes()}},
+		"family":      types.ObjectType{AttrTypes: FamilyModel{}.AttrTypes()},
 	}
 }
 
