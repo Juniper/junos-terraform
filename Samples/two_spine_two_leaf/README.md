@@ -6,6 +6,7 @@ Here are the details of this example:
 * Spine2: 10.56.12.9
 * Leaf1: 10.56.17.17
 * Leaf2: 10.56.16.194
+
 Credentials:
 * Username: regress
 * Password: MaRtInI
