@@ -1,10 +1,18 @@
-# VMX - Static VXLAN with IPSEC
+# VMX - Two Spine Two Leaf
 
-This is an example that demonstrates how to use JTAF on the Static VXLAN Sandbox available in JCL. 
+This is an example that demonstrates how to use JTAF on a two spine two leaf VMX setup.
+Here are the details of this example:
+* Spine1: 10.56.16.246
+* Spine2: 10.56.12.9
+* Leaf1: 10.56.17.17
+* Leaf2: 10.56.16.194
+Credentials:
+* Username: regress
+* Password: MaRtInI
+
 
 # Setup
-* Create a JCL sandbox of the 'VMX - Static VXLAN with IPSEC' blueprint. Select 22.3 for the device version. 
-* Install Go on the Helper VM by running the following commands:
+* Install Go on your machine by running the following commands. Commands may vary by machine.
 ```bash
     wget https://go.dev/dl/go1.23.0.linux-amd64.tar.gz
     sudo rm -rf /usr/local/go
@@ -12,7 +20,7 @@ This is an example that demonstrates how to use JTAF on the Static VXLAN Sandbox
     echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
     source ~/.bashrc
 ```
-* Install Terraform on the Helper VM by running the following commands:  
+* Install Terraform on your machine by running the following commands. Commands may vary by machine.
 ```bash
     wget https://releases.hashicorp.com/terraform/1.5.0/terraform_1.5.0_linux_amd64.zip
     unzip terraform_1.5.0_linux_amd64.zip
@@ -23,24 +31,24 @@ This is an example that demonstrates how to use JTAF on the Static VXLAN Sandbox
     git clone https://github.com/Juniper/junos-terraform.git
     cd junos-terraform
 ```
-* Remove the current generateFiles.sh and replace it with Samples/static_vxlan/generateFiles.sh
+* Remove the current generateFiles.sh and replace it with Samples/two_spine_two_leaf/generateFiles.sh
 ```bash
     rm generateFiles.sh
-    mv Samples/static_vxlan/generateFiles.sh junos-terraform
+    mv Samples/two_spine_two_leaf/generateFiles.sh .
 ```
 This updates the two lines below. You could also use vim to update these lines. 
 ```bash
-Line 198
+# Line 198
 # common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2023-01-01.yang"
-common_path="yang/$junos_version/$junos_version_combined/common/junos-common-types@2022-01-01.yang"
-Line 299 
+common_path="yang/22.3/22.3R1/common/junos-common-types@2022-01-01.yang"
+# Line 299 
 # go mod tidy -go=1.16 && go mod tidy -go=1.17
 go mod tidy -go=1.23
 ```
-* Move the vMX-A1 configuration file into to a directory titled user_config_files.
+* Move the VMX configuration file into to a directory titled user_config_files.
 ```bash
     mkdir user_config_files
-    mv Samples/static_vxlan/vmx_config.xml user_config_files
+    mv Samples/two_spine_two_leaf/config_files/spine1-config.xml user_config_files
 ```
 **OR** if you feel adventurous, you can retrieve the configuration from the vmx device itself.
 ```bash
@@ -60,7 +68,7 @@ Do you want to:
 Enter your choice (1/2): 2
 You chose to provide a configuration.
 
-Enter the configuration file name: vmx_config.xml
+Enter the configuration file name: spine1-config.xml
 Enter a valid device option (vsrx, vmx, vqfx, vptx): vmx
 Enter the Junos version: 22.3
 ```
@@ -69,12 +77,14 @@ This takes a LONG time, so don't worry if it is taking a while! That just means 
 # Using the Provider 
 Yay! The provider has now been created and can be found in terraform_providers/terraform-provider-junos-vmx. 
 
-Enable terraform to find the provider locally.
+Enable terraform to find the provider locally. 
 ```bash
 mkdir -p ~/.terraform.d/plugins/juniper/providers/junos-vmx/22.3/linux_amd64
-mv terraform_providers/terraform-provider-junos-vmx ~/.terraform.d/plugins/juniper/providers/junos-vmx/22.3/linux_amd64
+mv terraform_providers/terraform-provider-junos-vmx ~/.terraform.d/plugins/juniper/providers/junos-vmx/22.3/darwin_arm64
 ```
 # Testing 
 Testing with Terraform: https://github.com/Juniper/junos-terraform?tab=readme-ov-file#testing
 
 For this portion, you can find the main.tf and vmx_1/main.tf files located in Samples/static_vxlan/testbed.
+
+An example change is changing a device name in vmx_1/main.tf 
