@@ -1,6 +1,6 @@
 # VMX - Two Spine Two Leaf
 
-This is an example that demonstrates how to use JTAF on a two spine two leaf VMX setup.
+This is an example that demonstrates how to use JTAF on a two spine two leaf VMX setup. This topology was built using Apstra, which is an automation that builds data center fabrics from the ground up. Currently, this topology is two spine two leaf only, but it can be easily scaled horizantally and vertically. 
 Here are the details of this example:
 * Spine1: 10.56.16.246
 * Spine2: 10.56.12.9
@@ -88,4 +88,10 @@ Testing with Terraform: https://github.com/Juniper/junos-terraform?tab=readme-ov
 
 For this portion, you can find the main.tf and vmx_1/main.tf files located in Samples/static_vxlan/testbed.
 
-An example change is changing a device name in vmx_1/main.tf 
+An example change is changing a device name in vmx_1/main.tf. You can see this change reflected in the configuration of the device. 
+```bash
+resource "junos-vmx_InterfacesInterfaceName" "vmx_1_new_name" {
+	resource_name = "vmx_1_new_name"
+	name = "/interfaces/interface/vmx_1_new_name"
+}
+```
