@@ -63,7 +63,7 @@ Other versions beyond these will work, but this is what was tested for the writi
 ## Copy the YANG Files 
 For our example, our provider will only be able to create an interface description and place an inet address on a sub-interface. We only need a handful of YANG models for this.
 
- > For developers wanting to add more capabilities to the provider, they will need to also add the neccesary `yang_files` required for those capabilites outlined by the `xpath` inputs which are listed in the `xpath_inputs.xml` file created later on 
+ > For developers wanting to add more capabilities to the provider, they will need to also add the necessary `yang_files` required for those capabilities outlined by the `xpath` inputs which are listed in the `xpath_inputs.xml` file created later on 
  > * say you want to add firewalls or policy-option options in addition to interfaces; you will need to add the yang files along with the xpaths associated with the custom capability (See `/Samples/vsrx_tf_module_template` directory for examples of an xpath file, `xpath_example.xml`, and the corresponding `yang_files` directory)
 
 Let's put the YANG files from [Juniper's YANG GitHub repository](https://github.com/Juniper/yang.git) in to a memorable location. Let's use the home directory `/junos-terraform`. Don't worry, once the necesary files are copied over, the `/yang` folder can be removed.
@@ -104,7 +104,7 @@ rm -rf yang
 
 ### 1. Generates a `config.toml` File
 
-*If you've never seen a TOML file before, don't worry! It's just a structured file containing configuration that can be parsed by a program, in this case the two main compiled programs that form JTAF. TOML stands for Tom's Obvious Minimal Langage.*
+*If you've never seen a TOML file before, don't worry! It's just a structured file containing configuration that can be parsed by a program, in this case the two main compiled programs that form JTAF. TOML stands for Tom's Obvious Minimal Language.*
 
 Creates a config file in the home directory. Don't worry about the xPath or fileType keys. They'll be explained shortly.
 You can find this file `config.toml` in the home directory (/junos-terraform)
@@ -122,7 +122,7 @@ You can also replace the fileType field to `text` or `xml`. The text files are f
 ### 2. Generates the YIN and XPath Files based on YANG files
 
 The next step, depending on the size of YANG model/s, **may take some time**. Prepare some popcorn!
-This step will activate a python vitual enviornment (make sure python is downloaded) and install `pyang` so it can be used
+This step will activate a python virtual enviornment (make sure python is downloaded) and install `pyang` so it can be used
 to generate the `yin` files.
 
 ```bash
