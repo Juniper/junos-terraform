@@ -1,12 +1,12 @@
 package main
 
 import (
-    "encoding/xml"
-    "fmt"
-    "log"
-    "os"
-    "path/filepath"
-    "strings"
+	"encoding/xml"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 // XMLData represents XML data with XPath-like keys
@@ -14,97 +14,132 @@ type XMLData map[string][]string
 
 func main() {
 
-    // Directory where XML files are located
-    dir := "user_config_files"
+	// Directory where XML files are located
+	dir := "user_config_files"
 
-    // Read the directory
-    files, err := os.ReadDir(dir)
-    if err != nil {
-        log.Fatal(err)
-    }
+	// Read the directory
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    for _, file := range files {
-        if file.IsDir() {
-            continue
-        }
+	// Iterate through the files in the directory
+	for _, file := range files {
+		if file.IsDir() {
+			// Skip directories
+			continue
+		}
 
-        if filepath.Ext(file.Name()) == ".xml" {
-            xmlFile, err := os.Open(filepath.Join(dir, file.Name()))
-            if err != nil {
-                log.Fatal(err)
-            }
-            defer xmlFile.Close()
+		// Check if the file has a .xml extension
+		if filepath.Ext(file.Name()) == ".xml" {
+			// Open the XML file
+			xmlFile, err := os.Open(filepath.Join(dir, file.Name()))
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer xmlFile.Close()
 
-            xpathMap := make(map[string]bool)
-            data := make(XMLData)
+			// Initialize a map to store XPaths
+			xpathMap := make(map[string]bool)
 
-            // Extract XPaths and populate XMLData map
-            getXPathsAndDataFromXML(xpathMap, data, xmlFile)
+			// Initialize an empty XMLData map
+			data := make(XMLData)
 
-            // Create filtered unique Xpath inputs file
-            createUniqueXpathInputsFile(xpathMap)
-        }
-    }
+			// Convert XML to XPaths and populate the XMLData map
+			getXPathsAndDataFromXML(xpathMap, data, xmlFile)
+
+			// Create Xpath Input file
+			createXpathInputsFile(xpathMap)
+
+			// Extract and print top-level elements
+			topLevelElements := extractTopLevelElements(xpathMap)
+			fmt.Println("Required YANG files:")
+			for _, element := range topLevelElements {
+				fmt.Println(element)
+			}
+		}
+	}
 }
 
-// createUniqueXpathInputsFile filters unique top-level elements and writes them to an output file
-func createUniqueXpathInputsFile(xpathMap map[string]bool) {
-    uniqueTopLevel := make(map[string]bool)
-    for xpath := range xpathMap {
-        elements := strings.Split(xpath, "/")
-        if len(elements) > 1 {
-            uniqueTopLevel[elements[1]] = true
-        }
-    }
-
-    // Create the output file with <file-list> wrapper
-    outputFile, err := os.Create("filtered_xpath_inputs.txt")
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer outputFile.Close()
-
-    // Write opening tag for file-list
-    _, err = outputFile.WriteString("<file-list>\n")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Write each unique top-level element as an <xpath> entry
-    for topElement := range uniqueTopLevel {
-        _, err := outputFile.WriteString(fmt.Sprintf("   <xpath name=\"/%s\"/>\n", topElement))
-        if err != nil {
-            log.Fatal(err)
-        }
-    }
-
-    // Write closing tag for file-list
-    _, err = outputFile.WriteString("</file-list>\n")
-    if err != nil {
-        log.Fatal(err)
-    }
-}
-
-// Function to extract XPaths from XML file
+// Function traverses XML file, adds XPaths to the map, and stores XML data
 func getXPathsAndDataFromXML(xpathMap map[string]bool, data XMLData, xmlFile *os.File) {
-    doc := xml.NewDecoder(xmlFile)
-    currentPath := []string{}
+	doc := xml.NewDecoder(xmlFile)
+	currentPath := []string{}
+	currentDataKey := []string{} // Keeps track of the current data key
 
-    for {
-        t, err := doc.Token()
-        if err != nil {
-            break
-        }
+	// Start decoding the XML file
+	for {
+		t, err := doc.Token()
+		if err != nil {
+			break
+		}
 
-        switch se := t.(type) {
-        case xml.StartElement:
-            currentPath = append(currentPath, se.Name.Local)
-            xpath := strings.Join(currentPath, "/")
-            xpathMap[xpath] = true
-        case xml.EndElement:
-            if len(currentPath) > 0 {
-                currentPath = currentPath[:len(currentPath)-1]
-            }
-        }
-    }
+		switch se := t.(type) {
+		case xml.StartElement:
+			currentPath = append(currentPath, se.Name.Local)
+			xpath := strings.Join(currentPath, "/")
+			xpathMap[xpath] = true
+			// Append the XPath to the data map with an empty value
+			data[xpath] = append(data[xpath], "")
+			// Append the current element to the currentDataKey
+			currentDataKey = append(currentDataKey, se.Name.Local)
+		case xml.CharData:
+			// Get the text content and build the XPath-like key
+			content := strings.TrimSpace(string(se))
+			if len(content) > 0 {
+				key := strings.Join(currentDataKey, "/")
+				content = content + ","
+				data[key] = append(data[key], content)
+			}
+		case xml.EndElement:
+			currentPath = currentPath[:len(currentPath)-1]
+			// Remove the last element from the currentDataKey
+			currentDataKey = currentDataKey[:len(currentDataKey)-1]
+		}
+	}
+}
+
+func createXpathInputsFile(xpathMap map[string]bool) {
+	// Create a new file for formatted output
+	formattedXpathFile, err := os.Create("xpath_inputs.xml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer formattedXpathFile.Close()
+
+	// Create an opening <file-list> tag
+	fmt.Fprintf(formattedXpathFile, "<file-list>\n")
+
+	// Iterate over the extracted XPaths and format them
+	for xpath := range xpathMap {
+		if strings.Contains(xpath, "/") {
+			// Format the line into XPath
+			formattedLine := fmt.Sprintf("    <xpath name=\"/%s\"/>\n", xpath)
+			// Write the formatted line to the output file
+			fmt.Fprintf(formattedXpathFile, formattedLine)
+		}
+	}
+
+	// Create a closing </file-list> tag
+	fmt.Fprintf(formattedXpathFile, "</file-list>\n")
+
+	fmt.Println("Xpath file written successfully in xpath_inputs.xml")
+}
+
+// Function to extract top-level elements from XPaths
+func extractTopLevelElements(xpathMap map[string]bool) []string {
+	topLevelSet := make(map[string]bool)
+	for xpath := range xpathMap {
+		parts := strings.Split(xpath, "/")
+		if len(parts) > 0 && parts[0] != "" {
+			topLevelSet[parts[0]] = true
+		}
+	}
+
+	// Convert the set to a sorted slice
+	topLevelElements := make([]string, 0, len(topLevelSet))
+	for element := range topLevelSet {
+		topLevelElements = append(topLevelElements, element)
+	}
+	return topLevelElements
 }
