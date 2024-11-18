@@ -1,0 +1,50 @@
+// Collecting objects from the .tf file
+
+{%- for ele in data %}
+{%- for key, value in ele.items() %}
+type {{key|capitalize}}Model struct {
+	{%- if data.index(ele) == 0 %}
+	ResourceName types.String `tfsdk:"resource_name"`
+	{%- endif %}
+	{%- for attr in value.attributes %}
+	{{attr.attr_name|capitalize}}        types.{{attr.attr_type|capitalize}} `tfsdk:"{{attr.attr_name}}"`
+	{%- endfor %}
+}
+func (o {{key|capitalize}}Model) Attributes() map[string]schema.Attributes {
+    return map[string]schema.Attribute {
+        {%- for attr in value.attributes %}
+        {%- if attr.attr_type == 'list' or attr.attr_type == 'object' %}
+        "{{attr.attr_name}}": schema.{{attr.attr_type|capitalize}}NestedAttribute {
+            Optional : true,
+            NestedObject: schema.NestedAttributeObject {
+                Attributes: {{attr.attr_name|capitalize}}Model{}.Attributes(),
+            },
+        },
+        {%- else %}
+        "{{attr.attr_name}}": schema.{{attr.attr_type|capitalize}}Attribute {
+            {%- if attr.attr_name == 'name' %}
+            Required : true,
+            {%- else %}
+            Optional: true,
+            {%- endif %}
+            MarkdownDescription: "xpath is `config.Groups.{{key|capitalize}}.{{attr.attr_name|capitalize}}",
+        }
+        {%- endif %}
+        {%- endfor %}
+    }
+}
+func (o {{key|capitalize}}Model) AttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+	    {%- for attr in value.attributes %}
+		{%- if attr.attr_type == 'list' %}
+		"{{attr.attr_name}}":    types.{{attr.attr_type|capitalize}}Type{ElemType: types.ObjectType{AttrTypes: {{attr.attr_name|capitalize}}.AttrTypes()}}
+		{%- elif attr.attr_type == 'object' %}
+		"{{kid.name}}":      types.{{kid.type|capitalize}}Type{AttrTypes: {{kid.name|capitalize}}Model{}.AttrTypes()},
+		{%- else %}
+		"{{attr.attr_name}}":        types.{{attr.attr_type|capitalize}}Type,
+		{%- endif %}
+		{%- endfor %}
+	}
+}
+{%- endfor %}
+{%- endfor %}
