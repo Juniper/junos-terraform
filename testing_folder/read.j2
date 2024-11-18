@@ -1,0 +1,69 @@
+{% macro inner_loop(data, parent) %}
+{%- for key, value in data.items() %}
+    for i, xml{{key|capitalize}} := range config.Groups.{{parent|capitalize}}.{{key|capitalize}} {
+        {{key}}[i] = {{key|capitalize}}Model {
+            {%- for attr in value.attributes %}
+            {{attr.attr_name|capitalize}}:      types.{{attr.attr_type|capitalize}}PointerValue(xml{{key|capitalize}}.{{attr.attr_name|capitalize}}),
+            {%- endfor %}
+        }
+    }
+
+{%- endfor %}
+{% endmacro %}
+// Read implements resource.Resource.
+func (r *resource{{parent|capitalize}}) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var d diag.Diagnostics
+
+	// Get the data and set
+	var state {{parent|capitalize}}Model
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	// Check for errors
+	if resp.Diagnostics.HasError() {
+		return
+	}
+        // Marshall group and check
+	var config xml{{parent|capitalize}}
+	err := r.client.MarshalGroup(state.ResourceName.ValueString(), &config)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed while Reading", err.Error())
+		return
+	}
+
+	{% set flag = [] %}
+	{%- for ele in data[1:] %}
+	{%- if not flag  %}
+	{%- set current_index = loop.index %}
+	{%- for key, value in ele.items() %}
+	{%- if value.type == 'list' %}
+	var config []xml{{key|capitalize}}
+    {%- else %}
+    var {{key}} xml{{key|capitalize}}
+    {%- endif %}
+    resp.Diagnostics.Append({{key|capitalize}}.ElementAs(ctx, &{{key}})..)
+    if resp.Diagnostics.HasError(){
+        return
+    }
+	{%- for attr in value.attributes %}
+	{%- if attr.attr_type == 'bool' %}
+	var {{attr.attr_name|replace("_", "")}} *bool
+    if config.Groups.{{key|capitalize}}.{{attr.attr_name|capitalize}} != nil {
+        b, err := strconv.ParseBool(*config.Groups.{{key|capitalize}}.{{attr.attr_name|capitalize}})
+        if err == nil {
+            {{attr.attr_name|replace("_", "")}} = &b
+        }
+    }
+    state.{{key|capitalize}}.{{attr.attr_name|capitalize}} = types.{{attr.attr_type|capitalize}}PointerValue({{attr.attr_name|replace("_", "")}})
+    {%- elif attr.attr_type == 'list' %}
+    {%- set _ = flag.append(1) %}
+    {%- set current_index = current_index + 1 %}
+    var {{attr.attr_name}} = make([]{{key|capitalize}}Model, len(config.Groups.{{key|capitalize}}.{{attr.attr_name|capitalize}}
+    {{inner_loop(data[current_index], key)}}
+    {%- else %}
+    state.{{key|capitalize}}.{{attr.attr_name|capitalize}} = types.{{attr.attr_type|capitalize}}PointerValue(config.Groups.{{key|capitalize}}.{{attr.attr_name|capitalize}})
+    {%- endif %}
+    {%- endfor %}
+    {%- endfor %}
+    {%- endif %}
+    {%- endfor %}
+    resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
