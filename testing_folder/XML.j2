@@ -1,0 +1,47 @@
+{%- set keys_of_data = data[0].keys()|list %}
+package main
+
+import (
+	"context"
+	"encoding/xml"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"strconv"
+	"strings"
+
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+// Junos XML Hierarchy
+
+type xmlConfiguration struct {
+	XMLName xml.Name `xml:"configuration"`
+	Groups xmlGroups `xml:"groups"`
+}
+
+type xmlGroups struct {
+	XMLName xml.Name `xml:"groups"`
+	Name string   `xml:"name"`
+	{{parent|capitalize}} xml{{parent|capitalize}} `xml:"{{parent}}"`
+}
+
+{%- for ele in data %}
+{%- for key, value in ele.items() %}
+type xml{{key|capitalize}} struct {
+    XMLName        xml.Name           `xml:"{{key}}"`
+	{%- for attr in value.attributes %}
+	{%- if attr.attr_type  == 'list' %}
+    {{attr.attr_name|capitalize}} []xml{{attr.attr_name|capitalize}} `xml:"{{attr.attr_name}}"`
+	{%- else %}
+    {{attr.attr_name|capitalize}}         *{{attr.attr_type}}            `xml:"{{attr.attr_name|replace("_", "-")}},omitempty"`
+	{%- endif %}
+	{%- endfor %}
+}
+{%- endfor %}
+{%- endfor %}
+
