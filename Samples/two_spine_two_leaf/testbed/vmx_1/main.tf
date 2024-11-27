@@ -64,7 +64,7 @@ resource "junos-vmx_GroupsSystem" "vmx_9"{
 	domain-search__1 = "juniper.net"
 	domain-search__2 = "jnpr.net"
 	time-zone = "American/Los_Angeles"
-	authentication-order = "password
+	authentication-order = "password"
 	authentication_order__1 = "radius"
 }
 
@@ -90,49 +90,49 @@ resource "junos-vmx_GroupsSystemRadius-server" "vmx_13"{
 	secret = "$9$GqUqf3nCApOPfQn690ORhSeWL7-boZDylsgoGHk"
 }
 
-resource "junos-vmx_GroupsSystemSyslogHostContents "vmx_14"{
+resource "junos-vmx_GroupsSystemSyslogHostContents" "vmx_14"{
 	resource_name = "vmx_14"
 	name = "log"
 	name__1 = "kernel"
 }
 
-resource "junos-vmx_GroupsSystemSyslogHostContents "vmx_15"{
+resource "junos-vmx_GroupsSystemSyslogHostContents" "vmx_15"{
 	resource_name = "vmx_15"
 	name = "any"
 }
 
-resource "junos-vmx_GroupsSystemSyslogHostContents "vmx_16"{
+resource "junos-vmx_GroupsSystemSyslogHostContents" "vmx_16"{
 	resource_name = "vmx_16"
 	name = "pfe"
 }
 
-resource "junos-vmx_GroupsSystemSyslogHostContents "vmx_17"{
+resource "junos-vmx_GroupsSystemSyslogHostContents" "vmx_17"{
 	resource_name = "vmx_17"
 	name = "interactive-commands"
 }
 
-resource "junos-vmx_GroupsSystemSyslogFileContents "vmx_18"{
+resource "junos-vmx_GroupsSystemSyslogFileContents" "vmx_18"{
 	resource_name = "vmx_18"
 	name = "messages"
 	name__1 = "kernel"
 }
 
-resource "junos-vmx_GroupsSystemSyslogFileContents "vmx_19"{
+resource "junos-vmx_GroupsSystemSyslogFileContents" "vmx_19"{
 	resource_name = "vmx_19"
 	name = "any"
 }
 
-resource "junos-vmx_GroupsSystemSyslogFileContents "vmx_20"{
+resource "junos-vmx_GroupsSystemSyslogFileContents" "vmx_20"{
 	resource_name = "vmx_20"
 	name = "authorization"
 }
 
-resource "junos-vmx_GroupsSystemSyslogFileContents "vmx_21"{
+resource "junos-vmx_GroupsSystemSyslogFileContents" "vmx_21"{
 	resource_name = "vmx_21"
 	name = "pfe"
 }
 
-resource "junos-vmx_GroupsSystemSyslogFileContents "vmx_22"{
+resource "junos-vmx_GroupsSystemSyslogFileContents" "vmx_22"{
 	resource_name = "vmx_22"
 	name = "security"
 	name__1 = "interactive-commands"
@@ -277,7 +277,7 @@ resource "junos-vmx_InterfacesInterfaceUnitFamilyInetAddressName" "vmx_44" {
 	name__2 = "10.10.10.6/31"
 }
 
-resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_45" {
+resource "junos-vmx_InterfacesInterfaceUnit" "vmx_45" {
 	resource_name = "vmx_45"
 	name = "ge-0/0/3"
 	description = "facing_mayank-rack-001-leaf2:ge-0/0/0"
@@ -287,67 +287,67 @@ resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_45" {
 	name__2 = "10.10.10.2/31"
 }
 
-resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_46" {
+resource "junos-vmx_InterfacesInterfaceUnit" "vmx_46" {
 	resource_name = "vmx_46"
 	name = "ge-0/0/4"
 	name__1 = "0"
 }
 
-resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_47" {
+resource "junos-vmx_InterfacesInterfaceUnit" "vmx_47" {
 	resource_name = "vmx_47"
 	name = "ge-0/0/5"
 	name__1 = "0"
 }
 
-resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_48" {
+resource "junos-vmx_InterfacesInterfaceUnit" "vmx_48" {
 	resource_name = "vmx_48"
 	name = "ge-0/0/6"
 	name__1 = "0"
 }
 
-resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_49" {
+resource "junos-vmx_InterfacesInterfaceUnit" "vmx_49" {
 	resource_name = "vmx_49"
 	name = "ge-0/0/7"
 	name__1 = "0"
 }
 
-resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_50" {
+resource "junos-vmx_InterfacesInterfaceUnit" "vmx_50" {
 	resource_name = "vmx_50"
 	name = "ge-0/0/8"
 	name__1 = "0"
 }
 
-resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_51" {
+resource "junos-vmx_InterfacesInterfaceUnit" "vmx_51" {
 	resource_name = "vmx_51"
 	name = "ge-0/0/9"
 	name__1 = "0"
 }
 
-resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_52" {
+resource "junos-vmx_InterfacesInterfaceUnit" "vmx_52" {
 	resource_name = "vmx_52"
 	name = "ge-0/0/10"
 	name__1 = "0"
 }
 
-resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_53" {
+resource "junos-vmx_InterfacesInterfaceUnit" "vmx_53" {
 	resource_name = "vmx_53"
 	name = "ge-0/0/11"
 	name__1 = "0"
 }
 
-resource "InterfacesInterfaceUnitFamilyInet" "vmx_54" {
+resource "InterfacesInterfaceUnit" "vmx_54" {
 	resource_name = "vmx_54"
 	name = "ge-0/0/12"
 	name__1 = "0"
 }
 
-resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_55" {
+resource "junos-vmx_InterfacesInterfaceUnit" "vmx_55" {
 	resource_name = "vmx_55"
 	name = "ge-0/0/13"
 	name__1 = "0"
 }
 
-resource "junos-vmx_InterfacesInterfaceUnitFamilyInet" "vmx_56" {
+resource "junos-vmx_InterfacesInterfaceUnit" "vmx_56" {
 	resource_name = "vmx_56"
 	name = "ge-0/0/14"
 	name__1 = "0"
