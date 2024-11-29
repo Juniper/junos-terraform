@@ -1,11 +1,8 @@
-
 package main
 
 import (
 	"context"
 	"encoding/xml"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"strconv"
 	"strings"
 
@@ -19,137 +16,76 @@ import (
 
 // Junos XML Hierarchy
 
-type xmlConfiguration struct {
+type xmlInterfaces struct {
 	XMLName xml.Name `xml:"configuration"`
-	Groups xmlGroups `xml:"groups"`
+	Groups  struct {
+		XMLName   xml.Name `xml:"groups"`
+		Name      string   `xml:"name"`
+		Interface struct {
+			XMLName      xml.Name `xml:"interface"`
+			Name         *string  `xml:"name,omitempty"`
+			Description  *string  `xml:"description,omitempty"`
+			Mtu          *int64   `xml:"mtu,omitempty"`
+			Vlan_tagging *string  `xml:"vlan-tagging,omitempty"`
+		} `xml:"interfaces>interface"`
+	} `xml:"groups"`
 }
 
-type xmlGroups struct {
-	XMLName xml.Name `xml:"groups"`
-	Name string   `xml:"name"`
-	 xml `xml:""`
-}
-type xmlInterfaces struct {
-    XMLName        xml.Name           `xml:"interfaces"`
-    Interface []xmlInterface `xml:"interface"`
-}
-type xmlInterface struct {
-    XMLName        xml.Name           `xml:"interface"`
-    Name         *string            `xml:"name,omitempty"`
-    Description         *string            `xml:"description,omitempty"`
-    Mtu         *int64            `xml:"mtu,omitempty"`
-    Vlan_tagging         *bool            `xml:"vlan-tagging,omitempty"`
-    Unit []xmlUnit `xml:"unit"`
-}
-type xmlUnit struct {
-    XMLName        xml.Name           `xml:"unit"`
-    Name         *string            `xml:"name,omitempty"`
-    Description         *string            `xml:"description,omitempty"`
-    Vlan_id         *int32            `xml:"vlan-id,omitempty"`
-}
 // Collecting objects from the .tf file
 type InterfacesModel struct {
 	ResourceName types.String `tfsdk:"resource_name"`
-	Interface        types.List `tfsdk:"interface"`
+	Name         types.String `tfsdk:"name"`
+	Description  types.String `tfsdk:"description"`
+	Mtu          types.Int64  `tfsdk:"mtu"`
+	Vlan_tagging types.Bool   `tfsdk:"vlan_tagging"`
 }
-func (o InterfacesModel) Attributes() map[string]schema.Attributes {
-    return map[string]schema.Attribute {
-        "interface": schema.ListNestedAttribute {
-            Optional : true,
-            NestedObject: schema.NestedAttributeObject {
-                Attributes: InterfaceModel{}.Attributes(),
-            },
-        },
-    }
-}
+
 func (o InterfacesModel) AttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"interface":    types.ListType{ElemType: types.ObjectType{AttrTypes: Interface.AttrTypes()}}
+		"name":         types.StringType,
+		"description":  types.StringType,
+		"mtu":          types.Int64Type,
+		"vlan_tagging": types.BoolType,
 	}
 }
-type InterfaceModel struct {
-	Name        types.String `tfsdk:"name"`
-	Description        types.String `tfsdk:"description"`
-	Mtu        types.Int64 `tfsdk:"mtu"`
-	Vlan_tagging        types.Bool `tfsdk:"vlan_tagging"`
-	Unit        types.List `tfsdk:"unit"`
-}
-func (o InterfaceModel) Attributes() map[string]schema.Attributes {
-    return map[string]schema.Attribute {
-        "name": schema.StringAttribute {
-            Required : true,
-            MarkdownDescription: "xpath is `config.Groups.Interface.Name",
-        }
-        "description": schema.StringAttribute {
-            Optional: true,
-            MarkdownDescription: "xpath is `config.Groups.Interface.Description",
-        }
-        "mtu": schema.Int64Attribute {
-            Optional: true,
-            MarkdownDescription: "xpath is `config.Groups.Interface.Mtu",
-        }
-        "vlan_tagging": schema.BoolAttribute {
-            Optional: true,
-            MarkdownDescription: "xpath is `config.Groups.Interface.Vlan_tagging",
-        }
-        "unit": schema.ListNestedAttribute {
-            Optional : true,
-            NestedObject: schema.NestedAttributeObject {
-                Attributes: UnitModel{}.Attributes(),
-            },
-        },
-    }
-}
-func (o InterfaceModel) AttrTypes() map[string]attr.Type {
-	return map[string]attr.Type{
-		"name":        types.StringType,
-		"description":        types.StringType,
-		"mtu":        types.Int64Type,
-		"vlan_tagging":        types.BoolType,
-		"unit":    types.ListType{ElemType: types.ObjectType{AttrTypes: Unit.AttrTypes()}}
+func (o InterfacesModel) Attributes() map[string]schema.Attribute {
+	return map[string]schema.Attribute{
+		"name": schema.StringAttribute{
+			Required:            true,
+			MarkdownDescription: "xpath is `config.Groups.Interface.Name",
+		},
+		"description": schema.StringAttribute{
+			Optional:            true,
+			MarkdownDescription: "xpath is `config.Groups.Interface.Description",
+		},
+		"mtu": schema.Int64Attribute{
+			Optional:            true,
+			MarkdownDescription: "xpath is `config.Groups.Interface.Mtu",
+		},
+		"vlan_tagging": schema.BoolAttribute{
+			Optional:            true,
+			MarkdownDescription: "xpath is `config.Groups.Interface.Vlan_tagging",
+		},
 	}
 }
-type UnitModel struct {
-	Name        types.String `tfsdk:"name"`
-	Description        types.String `tfsdk:"description"`
-	Vlan_id        types.Int32 `tfsdk:"vlan_id"`
-}
-func (o UnitModel) Attributes() map[string]schema.Attributes {
-    return map[string]schema.Attribute {
-        "name": schema.StringAttribute {
-            Required : true,
-            MarkdownDescription: "xpath is `config.Groups.Unit.Name",
-        }
-        "description": schema.StringAttribute {
-            Optional: true,
-            MarkdownDescription: "xpath is `config.Groups.Unit.Description",
-        }
-        "vlan_id": schema.Int32Attribute {
-            Optional: true,
-            MarkdownDescription: "xpath is `config.Groups.Unit.Vlan_id",
-        }
-    }
-}
-func (o UnitModel) AttrTypes() map[string]attr.Type {
-	return map[string]attr.Type{
-		"name":        types.StringType,
-		"description":        types.StringType,
-		"vlan_id":        types.Int32Type,
-	}
-}// Collects the data for the crud work
+
+// Collects the data for the crud work
 type resourceInterfaces struct {
-    client ProviderConfig
+	client ProviderConfig
 }
+
 func (r *resourceInterfaces) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 	r.client = req.ProviderData.(ProviderConfig)
 }
+
 // Metadata implements resource.Resource.
 func (r *resourceInterfaces) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_Interfaces"
 }
+
 // Schema implements resource.Resource.
 func (r *resourceInterfaces) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
@@ -158,47 +94,45 @@ func (r *resourceInterfaces) Schema(_ context.Context, req resource.SchemaReques
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"interface": schema.ListNestedAttribute{
-				Optional: true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: InterfaceModel{}.Attributes(),
-				},
+			"name": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "xpath is: `config.Groups.Interface`",
+			},
+			"description": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "xpath is: `config.Groups.Description`",
+			},
+			"mtu": schema.Int64Attribute{
+				Optional:            true,
+				MarkdownDescription: "xpath is: `config.Groups.Mtu`",
+			},
+			"vlan_tagging": schema.BoolAttribute{
+				Optional:            true,
+				MarkdownDescription: "xpath is: `config.Groups.Vlan_tagging`",
 			},
 		},
 	}
 }
 
 // Create implements resource.Resource.
-func (r *resource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *resourceInterfaces) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Get the  Model data and set
-	var plan Model
+	var plan InterfacesModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	// Check for errors
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	var config xml
+
+	var config xmlInterfaces
 	config.Groups.Name = plan.ResourceName.ValueString()
-
-    
-    var interface xmlInterface
-        config.Groups..Interface.Name = plan.Interface.Name.ValueStringPointer()
-        config.Groups..Interface.Description = plan.Interface.Description.ValueStringPointer()
-        config.Groups..Interface.Mtu = plan.Interface.Mtu.ValueInt64Pointer()
-	if plan.Interface.Vlan_tagging.ValueBool(){
-                empty := ""
-                config.Groups.Interface.vlan_tagging = $empty
+	config.Groups.Interface.Name = plan.Name.ValueStringPointer()
+	config.Groups.Interface.Description = plan.Description.ValueStringPointer()
+	config.Groups.Interface.Mtu = plan.Mtu.ValueInt64Pointer()
+	if plan.Vlan_tagging.ValueBool() {
+		empty := ""
+		config.Groups.Interface.Vlan_tagging = &empty
 	}
-	
-            var unit []xmlUnit
-            config.Groups..Unit = make([]xmlUnit, len(&unit))
-            for m, n := range unit {
-                config.Groups.Unit[m].Name = n.Name.ValueStringPointer()
-                config.Groups.Unit[m].Description = n.Description.ValueStringPointer()
-                config.Groups.Unit[m].Vlan_id = n.Vlan_id.ValueInt32Pointer()
-            }
-
-
 	err := r.client.SendTransaction("", config, false)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed while Sending", err.Error())
@@ -208,53 +142,37 @@ func (r *resource) Create(ctx context.Context, req resource.CreateRequest, resp 
 }
 
 // Read implements resource.Resource.
-func (r *resource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var d diag.Diagnostics
+func (r *resourceInterfaces) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 
 	// Get the data and set
-	var state Model
+	var state InterfacesModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	// Check for errors
 	if resp.Diagnostics.HasError() {
 		return
 	}
-        // Marshall group and check
-	var config xml
+	// Marshall group and check
+	var config xmlInterfaces
 	err := r.client.MarshalGroup(state.ResourceName.ValueString(), &config)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed while Reading", err.Error())
 		return
 	}
 
-	
-    var interface xmlInterface
-    resp.Diagnostics.Append(Interface.ElementAs(ctx, &interface)..)
-    if resp.Diagnostics.HasError(){
-        return
-    }
-    state.Interface.Name = types.StringPointerValue(config.Groups.Interface.Name)
-    state.Interface.Description = types.StringPointerValue(config.Groups.Interface.Description)
-    state.Interface.Mtu = types.Int64PointerValue(config.Groups.Interface.Mtu)
-	var vlantagging *bool
-    if config.Groups.Interface.Vlan_tagging != nil {
-        b, err := strconv.ParseBool(*config.Groups.Interface.Vlan_tagging)
-        if err == nil {
-            vlantagging = &b
-        }
-    }
-    state.Interface.Vlan_tagging = types.BoolPointerValue(vlantagging)
-    var unit = make([]InterfaceModel, len(config.Groups.Interface.Unit
-    
-    for i, xmlUnit := range config.Groups.Interface.Unit {
-        unit[i] = UnitModel {
-            Name:      types.StringPointerValue(xmlUnit.Name),
-            Description:      types.StringPointerValue(xmlUnit.Description),
-            Vlan_id:      types.Int32PointerValue(xmlUnit.Vlan_id),
-        }
-    }
-
-    resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	state.Name = types.StringPointerValue(config.Groups.Interface.Name)
+	state.Description = types.StringPointerValue(config.Groups.Interface.Description)
+	state.Mtu = types.Int64PointerValue(config.Groups.Interface.Mtu)
+	var vlanTagging *bool
+	if config.Groups.Interface.Vlan_tagging != nil {
+		b, err := strconv.ParseBool(*config.Groups.Interface.Vlan_tagging)
+		if err == nil {
+			vlanTagging = &b
+		}
+	}
+	state.Vlan_tagging = types.BoolPointerValue(vlanTagging)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
+
 // Update implements resource.Resource.
 func (r *resourceInterfaces) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 
