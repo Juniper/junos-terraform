@@ -1,4 +1,4 @@
-### Coverting Junos YANG Models to JSON
+## Coverting Junos YANG Models to JSON
 
 Below are the steps to convert Junos YANG models into respective JSON data structure, these steps have been verified on Ubuntu OS 22.04
 
