@@ -37,22 +37,22 @@ resource "junos-vmx_GroupsSystemLoginClassPermissions" "vmx_5"{
 }
 
 
-resource "junos-vmx_GroupsSystemLoginUserName "vmx_6"{
+resource "junos-vmx_GroupsSystemLoginUserName" "vmx_6"{
 	resource_name = "vmx_6"
 	name = "regress"
 }
 
-resource "junos-vmx_GroupsSystemLoginUserUid "vmx_7"{
+resource "junos-vmx_GroupsSystemLoginUserUid" "vmx_7"{
 	resource_name = "vmx_7"
 	uid = "928"
 }
 
-resource "junos-vmx_GroupsSystemLoginUserClass "vmx_8"{
+resource "junos-vmx_GroupsSystemLoginUserClass" "vmx_8"{
 	resource_name = "vmx_8"
 	class = "superuser"
 }
 
-resource "junos-vmx_GroupsSystemLoginUserUndocumentedShell "vmx_9"{
+resource "junos-vmx_GroupsSystemLoginUserUndocumentedShell" "vmx_9"{
 	resource_name = "vmx_9"
 	shell = "csh"
 }
@@ -190,7 +190,7 @@ resource "junos-vmx_GroupsSystemSyslogFileContentsName" "vmx_35"{
 	name = "any"
 }
 
-resource "junos-vmx_GroupsSystemSyslogFileContentsNAme" "vmx_36"{
+resource "junos-vmx_GroupsSystemSyslogFileContentsName" "vmx_36"{
 	resource_name = "vmx_36"
 	name = "authorization"
 }
@@ -330,7 +330,7 @@ resource "junos-vmx_Apply-groups" "vmx_63"{
 	apply-groups = "member0"
 }
 
-resource "junos-vmxSystemHost-name" "vmx_64"{
+resource "junos-vmx_SystemHost-name" "vmx_64"{
 	resource_name = "vmx_64"
 	host-name = "spine1"
 }
@@ -752,12 +752,12 @@ resource "junos-vmx_Routing-instancesInstanceName" "vmx_147"{
 	name = "mgmt_junos"
 }
 
-resource "junos-vmx_Routing-instancesInstanceRouting-optionsStaticRouteName "vmx_148"{
+resource "junos-vmx_Routing-instancesInstanceRouting-optionsStaticRouteName" "vmx_148"{
 	resource_name = "vmx_148"
 	name = "0.0.0.0/0"
 }
 
-resource "junos-vmx_Routing-instancesInstanceRouting-optionsStaticRouteNext-hop "vmx_149"{
+resource "junos-vmx_Routing-instancesInstanceRouting-optionsStaticRouteNext-hop" "vmx_149"{
 	resource_name = "vmx_149"
 	next-hop = "10.56.31.254"
 }
