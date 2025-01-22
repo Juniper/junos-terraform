@@ -32,7 +32,7 @@ With above repoistories cloned and pyang installed, follow below steps to conver
     ```
 5. Go to the respective Junos version directory whose YANG models need to be converted, below is an example for version 22.3
     ```
-    root@ubuntu:~/junos-terraform# cd../yang/22.3/22.3R1/common/
+    root@ubuntu:~/junos-terraform# cd../yang/22.3/22.3R1/conf/
     ```
 6. Execute the pyang command, by providing the `plugindir` option and all the Junos YANG files, using `-f`, which are to be convereted. For below case interfaces and root YANG models are considered.
    In addition, common yang models are to be provided to the plugin for successful conversion, they can provided with `-p` option. Since the data is a lot to be printed on screen hence its
