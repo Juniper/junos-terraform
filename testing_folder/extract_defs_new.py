@@ -4,6 +4,7 @@ from copy import copy
 import json
 import argparse
 import sys
+
 def get_paths(root):
     # defined a recursive funciton to walk the xml and populate result[]
     def recurse_children(node, result = {}, path = []):
@@ -17,6 +18,16 @@ def get_paths(root):
         return result
     # run the search and return the result
     return recurse_children(root)
+
+def unique_paths(paths):
+    path_dict = {}
+    result = []
+    for path in paths:
+        path_dict["/".join(path)] = path
+    for key in path_dict.keys():
+        result.append(path_dict[key])
+    return result
+
 def kid_by_name(node, name):
     if "kids" in node.keys():
         for kid in node["kids"]:
@@ -35,73 +46,98 @@ def get_def(schema, path):
         if kid == None:
             break
     return kid
+
 def calculate_path(node, parent):
     pass
-def debug_print(parent):
+
+def get_path(parent):
     path = ''
     for i in parent:
-        # if isinstance(i, list):
-        #     # pass
-        #     print("/kids", file=sys.stderr, end='')
         if isinstance(i, dict) and "name" in i:
             path += "/"+i["name"]
-            # print(, file=sys.stderr, end='')
     tmp_list = path.split("/")[3:]
     path = "/".join(tmp_list)
-    print(path+"\n", file=sys.stderr)
-def walk_schema(node, indent = '', parent = []):
+    # print("*******"+path)
+    return path
+def check_path(node):
+    flag = False
+    path = get_path(node)
+    if path in paths or path == '':
+        # print("matched")
+        flag = True
+    return flag
+def walk_schema(node, indent = '', parent = [], parent_flag = False):
     indent += '  '
+    flag = check_path(parent)
     if isinstance(node, dict):
         dict_len = len(node.keys())
         local_indent = ''
-        debug_print(parent)
         if len(parent) > 0 and isinstance(parent[-1], list):
             local_indent = indent
-        print(local_indent+"{")
+        if flag:
+            print(local_indent+"{")
         parent.append(node)
         k_count = 1
         for k in node.keys():
-            print(indent+"  "+f'"{k}": ', end='')
-            walk_schema(node[k], indent+"  ", parent)
+            if flag:
+                print(indent+"  "+f'"{k}": ', end='')
+            walk_schema(node[k], indent+"  ", parent, flag)
             if k_count < dict_len:
-                print(",")
+                if flag:
+                    print(",")
             k_count += 1
         parent.pop()
-        print("\n"+indent+"}", end='')
+        if flag:
+            print("\n"+indent+"}", end='')
     elif isinstance(node, list):
         list_len = len(node)
-        print("[")
+        if flag:
+            print("[")
         parent.append(node)
         i = 1
         for elem in node:
-            walk_schema(elem, indent, parent)
+            # print(get_path(elem))
+            # if check_path(node):
+                # print("***********")
+            walk_schema(elem, indent, parent, flag)
             if i < list_len:
-                print(",")
+                if flag:
+                    print(",")
             i += 1
         parent.pop()
-        print("\n"+indent+"]", end='')
+        if flag:
+            print("\n"+indent+"]", end='')
     else:
         if isinstance(node, str):
-            print(f'"{node}"', end='')
+            # print(flag)
+            if parent_flag:
+                print(f'"{node}"', end='')
         elif isinstance(node, bool):
-            if node:
-                print("true")
-            else:
-                print("false")
+            if parent_flag:
+                if node:
+                    print("true")
+                else:
+                    print("false")
         elif node == None:
-            print('null')
+            if parent_flag:
+                print('null')
         else:
-            print(f'"{node}"')
+            if parent_flag:
+                print(f'"{node}"')
+
 def get_xml_config_resources(schema, xml):
+    global paths
     with open(schema) as f:
         schema = json.loads(f.read())
     with open(xml) as f:
         xml_text = f.read()
     root = ElementTree.fromstring(f"<root>{xml_text}</root>")
     resources = []
-    paths = get_paths(root)
+    paths = unique_paths(get_paths(root))
+    del paths[-1]
     walk_schema(schema)
     return resources
+
 def main():
     # other arguments
     parser = argparse.ArgumentParser(exit_on_error=True)
