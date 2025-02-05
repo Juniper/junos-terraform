@@ -61,6 +61,28 @@ def check_path(node):
     if path in paths or path =='':
         return True
     return False
+def check_kids(elem, node_parent, current_path):
+    if isinstance(node_parent[-2], dict):
+        if "kids" in node_parent[-2].keys():
+            if isinstance(elem, dict):
+                elem_path = ''
+                if current_path == '':
+                    elem_path = elem['name']
+                else:
+                    elem_path = current_path+"/"+elem["name"]
+            if elem_path in paths or elem_path == 'configuration':
+                return True
+        else:
+            return True
+    else:
+        return True
+    return False
+def count_elems(node, parent, current_path):
+    i = 0
+    for elem in node:
+        if check_kids(elem, parent, current_path):
+            i+=1      
+    return i
 
 def walk_schema(node, indent = '', parent = [], parent_flag = False):
     indent += '  '
@@ -78,7 +100,6 @@ def walk_schema(node, indent = '', parent = [], parent_flag = False):
         for k in node.keys():
             if flag:
                 print(indent+"  "+f'"{k}": ', end='')
-                
             walk_schema(node[k], indent+"  ", parent, flag)
             if k_count < dict_len:
                 if flag:
@@ -88,31 +109,18 @@ def walk_schema(node, indent = '', parent = [], parent_flag = False):
         if flag:
             print("\n"+indent+"}", end='')
     elif isinstance(node, list):
-        list_len = len(node)
         if flag:
             print("[")
         parent.append(node)
+        list_len = count_elems(node, parent, current_path)
         i = 1
         for elem in node:
-            include_elem = False
-            if isinstance(parent[-2], dict):
-                if "kids" in parent[-2].keys():
-                    if isinstance(elem, dict):
-                        elem_path = ''
-                        if current_path == '':
-                            elem_path = elem['name']
-                        else:
-                            elem_path = current_path+"/"+elem["name"]
-                    if elem_path in paths or elem_path == 'configuration':
-                        include_elem = True
-            else:
-                include_elem = True
-            if include_elem:
+            if check_kids(elem, parent, current_path):
                 walk_schema(elem, indent, parent, flag)
                 if i < list_len:
                     if flag:
                         print(",")
-            i += 1
+                i += 1
         parent.pop()
         if flag:
             print("\n"+indent+"]", end='')
