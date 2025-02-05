@@ -47,9 +47,6 @@ def get_def(schema, path):
             break
     return kid
 
-def calculate_path(node, parent):
-    pass
-
 def get_path(parent):
     path = ''
     for i in parent:
@@ -58,23 +55,17 @@ def get_path(parent):
     tmp_list = path.split("/")[3:]
     path = "/".join(tmp_list)
     return path
+
 def check_path(node):
     path = get_path(node)
-    # print(path)
     if path in paths or path =='':
         return True
-    # for match_path in paths:
-    #     if path == match_path:
-    #         return True
     return False
 
 def walk_schema(node, indent = '', parent = [], parent_flag = False):
     indent += '  '
     flag = check_path(parent)
     current_path = get_path(parent)
-    if not flag:
-        return
-    # print(flag)
     if isinstance(node, dict):
         dict_len = len(node.keys())
         local_indent = ''
@@ -103,8 +94,6 @@ def walk_schema(node, indent = '', parent = [], parent_flag = False):
         parent.append(node)
         i = 1
         for elem in node:
-            # print(get_path(elem))
-            # print(elem)
             include_elem = False
             if isinstance(parent[-2], dict):
                 if "kids" in parent[-2].keys():
@@ -114,12 +103,10 @@ def walk_schema(node, indent = '', parent = [], parent_flag = False):
                             elem_path = elem['name']
                         else:
                             elem_path = current_path+"/"+elem["name"]
-                        # print(elem_path, type(parent[-2]))
                     if elem_path in paths or elem_path == 'configuration':
                         include_elem = True
             else:
                 include_elem = True
-            # print(include_elem)
             if include_elem:
                 walk_schema(elem, indent, parent, flag)
                 if i < list_len:
