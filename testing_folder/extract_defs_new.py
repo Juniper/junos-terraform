@@ -5,8 +5,8 @@ import json
 import argparse
 import sys
 
-def get_paths(root):
-    # defined a recursive funciton to walk the xml and populate result[]
+def get_xpaths(root):
+    # defined a recursive function to walk the xml and populate result[]
     def recurse_children(node, result = {}, path = []):
         for child in node:
             path.append(child.tag)
@@ -19,7 +19,7 @@ def get_paths(root):
     # run the search and return the result
     return recurse_children(root)
 
-def unique_paths(paths):
+def unique_xpaths(paths):
     path_dict = {}
     result = []
     for path in paths:
@@ -28,40 +28,22 @@ def unique_paths(paths):
         result.append(path_dict[key])
     return result
 
-def kid_by_name(node, name):
-    if "kids" in node.keys():
-        for kid in node["kids"]:
-            if "name" in kid.keys() and kid["name"] == name:
-                return kid
-def get_base(schema):
-    root = schema["root"]
-    conf = kid_by_name(root, "configuration")
-    if conf == None:
-        conf = root["kids"][0]["configuration"]
-    return conf
-def get_def(schema, path):
-    kid = get_base(schema)
-    for elem in path:
-        kid = kid_by_name(kid, elem)
-        if kid == None:
-            break
-    return kid
-
 def get_path(parent):
     path = ''
     for i in parent:
         if isinstance(i, dict) and "name" in i:
-            path += "/"+i["name"]
+            path += "/" + i["name"]
     tmp_list = path.split("/")[3:]
     path = "/".join(tmp_list)
     return path
 
-def check_path(node):
+def check_path(paths, node):
     path = get_path(node)
     if path in paths or path =='':
         return True
     return False
-def check_kids(elem, node_parent, current_path):
+
+def check_kids(paths, elem, node_parent, current_path):
     if isinstance(node_parent[-2], dict):
         if "kids" in node_parent[-2].keys():
             if isinstance(elem, dict):
@@ -69,7 +51,7 @@ def check_kids(elem, node_parent, current_path):
                 if current_path == '':
                     elem_path = elem['name']
                 else:
-                    elem_path = current_path+"/"+elem["name"]
+                    elem_path = current_path + "/" + elem["name"]
             if elem_path in paths or elem_path == 'configuration':
                 return True
         else:
@@ -77,82 +59,37 @@ def check_kids(elem, node_parent, current_path):
     else:
         return True
     return False
-def count_elems(node, parent, current_path):
-    i = 0
-    for elem in node:
-        if check_kids(elem, parent, current_path):
-            i+=1      
-    return i
 
-def walk_schema(node, indent = '', parent = [], parent_flag = False):
-    indent += '  '
-    flag = check_path(parent)
+def walk_schema(paths, node, parent = []):
+    result = None
+    emit_data = check_path(paths, parent)
     current_path = get_path(parent)
     if isinstance(node, dict):
-        dict_len = len(node.keys())
-        local_indent = ''
-        if len(parent) > 0 and isinstance(parent[-1], list):
-            local_indent = indent
-        if flag:
-            print(local_indent+"{")
+        result = {}
         parent.append(node)
-        k_count = 1
         for k in node.keys():
-            if flag:
-                print(indent+"  "+f'"{k}": ', end='')
-            walk_schema(node[k], indent+"  ", parent, flag)
-            if k_count < dict_len:
-                if flag:
-                    print(",")
-            k_count += 1
+            if emit_data:
+                result[k] = walk_schema(paths, node[k], parent)
         parent.pop()
-        if flag:
-            print("\n"+indent+"}", end='')
     elif isinstance(node, list):
-        if flag:
-            print("[")
+        result = []
         parent.append(node)
-        list_len = count_elems(node, parent, current_path)
-        i = 1
         for elem in node:
-            if check_kids(elem, parent, current_path):
-                walk_schema(elem, indent, parent, flag)
-                if i < list_len:
-                    if flag:
-                        print(",")
-                i += 1
+            if check_kids(paths, elem, parent, current_path):
+                result.append(walk_schema(paths, elem, parent))
         parent.pop()
-        if flag:
-            print("\n"+indent+"]", end='')
     else:
-        if isinstance(node, str):
-            if parent_flag and flag:
-                print(f'"{node}"', end='')
-        elif isinstance(node, bool):
-            if parent_flag:
-                if node:
-                    print("true")
-                else:
-                    print("false")
-        elif node == None:
-            if parent_flag:
-                print('null')
-        else:
-            if parent_flag:
-                print(f'"{node}"')
+        result = node
+    return result
 
-def get_xml_config_resources(schema, xml):
-    global paths
+def filter_json_using_xml(schema, xml):
     with open(schema) as f:
         schema = json.loads(f.read())
     with open(xml) as f:
         xml_text = f.read()
     root = ElementTree.fromstring(f"<root>{xml_text}</root>")
-    resources = []
-    paths = unique_paths(get_paths(root))
-    del paths[-1]
-    walk_schema(schema)
-    return resources
+    paths = unique_xpaths(get_xpaths(root))
+    return walk_schema(paths, schema)
 
 def main():
     # other arguments
@@ -160,8 +97,9 @@ def main():
     parser.add_argument('-j', '--json-schema', required=True, help='specify the json schema file')
     parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
     args = parser.parse_args()
-    resources = get_xml_config_resources(args.json_schema, args.xml_config)
+    resources = filter_json_using_xml(args.json_schema, args.xml_config)
     print(json.dumps(resources, indent=2))
+    
 # run main()
 if __name__ == "__main__":
     main()
