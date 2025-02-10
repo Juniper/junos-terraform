@@ -1,0 +1,92 @@
+{%- macro string_macro(ele) -%}
+		{{ele.name|capitalize}}         *string  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+{%- endmacro -%}
+
+{%- macro int32_macro(ele) -%}
+		{{ele.name|capitalize}}         *Int32  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+{%- endmacro -%}
+
+{%- macro int64_macro(ele) -%}
+	{{ele.name|capitalize}}         *Int64  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+{%- endmacro -%}
+
+{%- macro list_macro(ele) -%}
+		{{ele.name|capitalize}} struct {
+		{%- if ele.kids %}
+			{%- for kid in ele['kids'] %}
+			{%- if (kid['leaf-type'] == 'string') or (kid['base-type'] == 'string') %}
+			 	{{string_macro(kid)}}
+			{%- endif %}
+			{%- if kid['type'] == 'container' %}
+				{{container_macro(kid)}}
+			{%- endif %}
+			{%- if kid['type'] == 'list' %}
+				{{list_macro(kid)}}
+			{%- endif %}
+			{%- endfor %}
+		{%- endif %}
+		}
+{%- endmacro -%}
+
+{%- macro container_macro(ele) -%}
+		{{ele.name|capitalize}} struct {
+		{%- if ele.kids %}
+			{%- for kid in ele['kids'] %}
+				{%- if (kid['leaf-type'] == 'string') or (kid['base-type'] == 'string') %}
+					{{ string_macro(kid) }}
+				{%- endif %}
+				{%- if kid['leaf-type'] == 'union' %}
+					{{ int32_macro(kid) }}
+				{%- endif %} 
+				{%- if kid['type'] == 'list' %}
+					{{ list_macro(kid) }}
+				{%- endif %}
+				{%- if kid['type'] == 'container' %}
+					{{ container_macro(kid) }}
+				{%- endif %}
+			{%- endfor %}
+		{%- endif %}
+		}
+{%- endmacro -%}
+
+package main
+
+import (
+	"context"
+	"encoding/xml"
+	"strconv"
+	"strings"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+// Junos XML Hierarchy
+{%- set parent = data['root']['kids'][0]['kids'][0] %}
+type xml{{parent.name|capitalize}} struct {
+	XMLName xml.Name `xml:"configuration"`
+	Groups  struct {
+		XMLName   xml.Name `xml:"groups"`
+		Name      string   `xml:"name"`
+		{%- for kid in parent['kids'] %}
+		{{kid.name|capitalize}} struct {
+		XMLName      xml.Name `xml:"{{kid.name}}"`
+		{%- set grandkid = kid['kids'] %}
+		{%- for ele in grandkid %}
+			{%- if ele['leaf-type'] == 'string' %}
+				{{ string_macro(ele) }}
+			{%- endif %}
+			{%- if ele['leaf-type'] == 'union' %}
+				{{ int32_macro(ele) }}
+			{%- endif %} 
+			{%- if ele['type'] == 'list' %}
+				{{ list_macro(ele) }}
+			{%- endif %}
+		{%- endfor %}
+		} `xml:"{{parent.name}}>{{kid.name}}"`
+		{%- endfor %}
+	} `xml:"groups"`
+}
