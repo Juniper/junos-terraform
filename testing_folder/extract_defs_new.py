@@ -4,6 +4,7 @@ from copy import copy
 import json
 import argparse
 import sys
+from jinja2 import Template
 
 def get_xpaths(root):
     # defined a recursive function to walk the xml and populate result[]
@@ -98,7 +99,10 @@ def main():
     parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
     args = parser.parse_args()
     resources = filter_json_using_xml(args.json_schema, args.xml_config)
-    print(json.dumps(resources, indent=2))
+    # print(json.dumps(resources, indent=2))
+    with open('go_template.j2') as jinja_tmpl:
+        tmpl = Template(jinja_tmpl.read())
+    print(tmpl.render(data=resources))
     
 # run main()
 if __name__ == "__main__":
