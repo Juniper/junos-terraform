@@ -1,0 +1,42 @@
+<interfaces>
+	<interface>
+		<name>ge-0/0/0</name>
+		<description>Main Ethernet</description>
+		<mtu>9192</mtu>
+		<vlan-tagging></vlan-tagging>
+		<unit>
+			<name>0</name>
+			<description>unit_desc</description>
+			<vlan-id>10</vlan-id>
+			<family>
+				<inet>
+					<address>
+						<name>192.168.20.1/24</name>
+					</address>
+				</inet>
+				<inet6>
+					<address>
+						<name>2400:9800:7000:1009:1000::/127</name>
+					</address>
+				</inet6>
+			</family>
+		</unit>
+		<unit>
+			<name>1</name>
+			<description>unit_desc</description>
+			<vlan-id>20</vlan-id>
+			<family>
+				<inet>
+					<address>
+						<name>192.169.20.1/24</name>
+					</address>
+				</inet>
+				<inet6>
+					<address>
+						<name>2400:9800:7000:100a:1000::/127</name>
+					</address>
+				</inet6>
+			</family>
+		</unit>
+	</interface>
+</interfaces>
