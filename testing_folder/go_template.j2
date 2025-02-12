@@ -85,6 +85,9 @@ type xml{{parent.name|capitalize}} struct {
 			{%- if ele['type'] == 'list' %}
 				{{ list_macro(ele) }}
 			{%- endif %}
+			{%- if ele['type'] == 'container' %}
+				{{ container_macro(ele) }}
+			{%- endif %}
 		{%- endfor %}
 		} `xml:"{{parent.name}}>{{kid.name}}"`
 		{%- endfor %}
