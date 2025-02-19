@@ -109,13 +109,13 @@ def walk_schema(paths, node, parent = []):
     return result
  
 # Method which starts the walk
-def filter_json_using_xml(schema, xml):
+def filter_json_using_xml(schema, paths):
     with open(schema) as f:
         schema = json.loads(f.read())
-    with open(xml) as f:
-        xml_text = f.read()
-    root = ElementTree.fromstring(f"<root>{xml_text}</root>")
-    paths = unique_xpaths(get_xpaths(root))
+    # with open(xml) as f:
+    #     xml_text = f.read()
+    # root = ElementTree.fromstring(f"<root>{xml_text}</root>")
+    # paths = unique_xpaths(get_xpaths(root))
     return walk_schema(paths, schema)
  
 # Main Method
@@ -125,11 +125,15 @@ def main():
     parser.add_argument('-j', '--json-schema', required=True, help='specify the json schema file')
     parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
     args = parser.parse_args()
-    resources = filter_json_using_xml(args.json_schema, args.xml_config)
+    with open(args.xml_config) as f:
+        xml_text = f.read()
+    root = ElementTree.fromstring(f"<root>{xml_text}</root>")
+    paths = unique_xpaths(get_xpaths(root))
+    resources = filter_json_using_xml(args.json_schema, paths)
     # print(json.dumps(resources, indent=2))
     with open('go_template.j2') as jinja_tmpl:
         tmpl = Template(jinja_tmpl.read())
-    print(tmpl.render(data=resources))
+    print(tmpl.render(data=resources, xml_paths=paths))
     
 # run main()
 if __name__ == "__main__":
