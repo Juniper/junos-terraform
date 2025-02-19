@@ -435,3 +435,58 @@ func (r *resource{{parent.name|capitalize}}) Read(ctx context.Context, req resou
 	{%- endfor %}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
+
+// Update implements resource.Resource.
+func (r *resource{{parent.name|capitalize}}) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	// Get the data and set
+	var plan {{parent.name|capitalize}}Model
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	// Check for errors
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	var config xml{{parent.name|capitalize}}
+	config.Groups.Name = plan.ResourceName.ValueString()
+	{%- for kid in parent['kids']%}
+	{%- for grandkid in kid['kids']%}
+	{%- if grandkid['leaf-type'] == 'string' %}
+	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}} = plan.Name.ValueStringPointer()
+	{%- endif %}
+	{%- if grandkid['leaf-type'] == 'union' %}
+	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}} = plan.{{grandkid.name|capitalize}}.ValueInt64Pointer()
+	{%- endif %}
+	{%- if  grandkid['leaf-type'] ==  'empty' %}
+	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}} = ''
+	{%- endif %}
+	{%- if grandkid['type'] == 'list' %}
+	{{create_resource_list_type(kid.name, grandkid)}}
+	{%- endif %}
+	{%- endfor %}
+	{%- endfor %}
+	
+	err := r.client.SendTransaction("", config, false)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed while Sending", err.Error())
+			return
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// Delete implements resource.Resource.
+func (r *resource{{parent.name|capitalize}}) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state {{parent.name|capitalize}}Model
+	d := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(d...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	_, err := r.client.DeleteConfig(state.ResourceName.ValueString(), false)
+	if err != nil {
+		if strings.Contains(err.Error(), "ound") {
+			return
+		}
+		resp.Diagnostics.AddError("Failed while deleting dile", err.Error())
+		return
+	}
+}
