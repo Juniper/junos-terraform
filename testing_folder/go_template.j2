@@ -1,6 +1,6 @@
 {%- set ele_for_struct = [] %}
 {%- macro string_macro(ele) -%}
-		{{ele.name|capitalize}}         *string  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+		{{ele.name|capitalize|replace('-', '_')}}         *string  `xml:"{{ele.name|replace("_","-")}},omitempty"`
 {%- endmacro -%}
 
 {%- macro int32_macro(ele) -%}
@@ -56,7 +56,7 @@
 type {{kid[0].name|capitalize}}Model struct {
 	{%- for ele in kid[0]['kids'] %}
 	{%- if ele['leaf-type'] == 'string' %}
-	{{ele.name|capitalize}}	types.{{ele['leaf-type']|capitalize}} `tfsdk:"{{ele.name}}"`
+	{{ele.name|capitalize|replace("-", "_")}}	types.{{ele['leaf-type']|capitalize}} `tfsdk:"{{ele.name}}"`
 	{%- endif %}
 	{%- if ele['base-type'] == 'string' %}
 	{{ele.name|capitalize}}	types.{{ele['base-type']|capitalize}} `tfsdk:"{{ele.name}}"`
@@ -140,7 +140,7 @@ func (o {{kid[0].name|capitalize}}Model) Attributes() map[string]schema.Attribut
 {%- if path.split("/")[-1] == kid and path.split("/")[-2] == parent and path.split("/")[-3] == grandparent %}
 {%- set result_list = [] %}
 {%- for item in path.split("/")[1:]%}
-{{- result_list.append(item|capitalize) or ""}}
+{{- result_list.append(item|capitalize|replace("-", "_")) or ""}}
 {%- endfor %}
 {{-result_list|join(".")-}}
 {%- endif %}
