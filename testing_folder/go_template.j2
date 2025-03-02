@@ -1,14 +1,17 @@
 {%- set ele_for_struct = [] %}
 {%- macro string_macro(ele) -%}
-		{{ele.name|capitalize|replace('-', '_')}}         *string  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+		{{ele.name|capitalize|replace("-", "_")}}         *string  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+{%- endmacro -%}
+{%- macro bool_macro(ele) -%}
+		{{ele.name|capitalize|replace("-", "_")}}         *bool  `xml:"{{ele.name|replace("_","-")}},omitempty"`
 {%- endmacro -%}
 
 {%- macro int32_macro(ele) -%}
-		{{ele.name|capitalize}}         *Int32  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+		{{ele.name|capitalize}}         *int32  `xml:"{{ele.name|replace("_","-")}},omitempty"`
 {%- endmacro -%}
 
 {%- macro int64_macro(ele) -%}
-	{{ele.name|capitalize}}         *Int64  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+	{{ele.name|capitalize}}         *int64  `xml:"{{ele.name|replace("_","-")}},omitempty"`
 {%- endmacro -%}
 
 {%- macro list_macro(ele) -%}
@@ -37,7 +40,7 @@
 					{{ string_macro(kid) }}
 				{%- endif %}
 				{%- if kid['leaf-type'] == 'union' %}
-					{{ int32_macro(kid) }}
+					{{ int64_macro(kid) }}
 				{%- endif %} 
 				{%- if kid['type'] == 'list' %}
 					{{ list_macro(kid) }}
@@ -51,32 +54,41 @@
 {%- endmacro -%}
 
 {%- macro create_struct(kid, arg2) %}
-{%- if kid[0] is defined %}
+{%- if kid[0] is defined  %}
+{%- if kid|length > 1%}
+{%- if kid[0].name == kid[1].name %}
+{%- if kid.pop(1)%} {%- endif %}
+{%- endif %}
+{%- endif %}
 {%- set arg2 = []%}
-type {{kid[0].name|capitalize}}Model struct {
-	{%- for ele in kid[0]['kids'] %}
+{%- for grandkid in kid %}
+type {{grandkid.name|capitalize}}Model struct {
+	{%- for ele in grandkid['kids'] %}
 	{%- if ele['leaf-type'] == 'string' %}
 	{{ele.name|capitalize|replace("-", "_")}}	types.{{ele['leaf-type']|capitalize}} `tfsdk:"{{ele.name}}"`
 	{%- endif %}
 	{%- if ele['base-type'] == 'string' %}
 	{{ele.name|capitalize}}	types.{{ele['base-type']|capitalize}} `tfsdk:"{{ele.name}}"`
 	{%- endif %}
+	{%- if ele['leaf-type'] == 'empty'%}
+	{{ele.name|capitalize|replace("-", "_")}} types.Bool `tfsdk:"{{ele.name}}"`
+	{%- endif %}
 	{%- if ele['leaf-type'] == 'union' %}
 	{{ele.name|capitalize}}	types.Int64 `tfsdk:"{{ele.name}}"`
 	{%- endif %}
 	{%- if ele['type'] == 'container' %}
-	{{ele.name|capitalize}}	[]{{ele.name|capitalize}}Model `tfsdk:"{{ele.name}}"`
+	{{ele.name|capitalize}}	types.List `tfsdk:"{{ele.name}}"`
 	{%- if arg2.append(ele) %} {% endif %}
 	{%- endif %}
 	{%- if ele['type'] == 'list' %}
-	{{ele.name|capitalize}}	[]{{ele.name|capitalize}}Model `tfsdk:"{{ele.name}}"`
+	{{ele.name|capitalize}}	types.List `tfsdk:"{{ele.name}}"`
 	{%- if arg2.append(ele) %} {% endif %}
 	{%- endif %}
 	{%- endfor %}
 }
-func (o {{kid[0].name|capitalize}}Model) AttrTypes() map[string]attr.Type {
+func (o {{grandkid.name|capitalize}}Model) AttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-	{%- for ele in kid[0]['kids'] %}
+	{%- for ele in grandkid['kids'] %}
 	{%- if ele['leaf-type'] == 'string' %}
 	"{{ele.name}}": 	types.{{ele['leaf-type']|capitalize}}Type,
 	{%- endif %}
@@ -86,12 +98,15 @@ func (o {{kid[0].name|capitalize}}Model) AttrTypes() map[string]attr.Type {
 	{%- if ele['leaf-type'] == 'union' %}
 	"{{ele.name}}": 	types.Int64Type,
 	{%- endif %}
+	{%- if ele['type'] == 'list' or ele['type'] == 'container'%}
+	"{{ele.name}}": 	types.ListType{ElemType: types.ObjectType{AttrTypes: {{ele.name|capitalize}}Model{}.AttrTypes()}},
+	{%- endif %}
 	{%- endfor %}
 	}
 }
-func (o {{kid[0].name|capitalize}}Model) Attributes() map[string]schema.Attribute {
+func (o {{grandkid.name|capitalize}}Model) Attributes() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
-	{%- for ele in kid[0]['kids'] %}
+	{%- for ele in grandkid['kids'] %}
 	{%- if ele['leaf-type'] == 'string'%}
 	"{{ele.name}}": schema.{{ele['leaf-type']|capitalize}}Attribute{
 		Optional: true,
@@ -110,16 +125,8 @@ func (o {{kid[0].name|capitalize}}Model) Attributes() map[string]schema.Attribut
 		MarkdownDescription: "xpath is `config.Groups.{{kid[0].name|capitalize}}.{{ele.name|capitalize}}`",
 	},
 	{%- endif %}
-	{%- if ele['type'] == 'list' %}
-	"{{ele.name}}": schema.{{ele['leaf-type']|capitalize}}NestedAttribute{
-		Optional: true,
-		NestedObject: schema.NestedAttributeObject{
-			Attributes: {{ele.name|capitalize}}Model{}.Attributes(),
-		},
-	},
-	{%- endif %}
-	{%- if ele['type'] == 'container' %}
-	"{{ele.name}}": schema.{{ele['leaf-type']|capitalize}}NestedAttribute{
+	{%- if ele['type'] == 'list' or ele['type'] == 'container' %}
+	"{{ele.name}}": schema.ListNestedAttribute{
 		Optional: true,
 		NestedObject: schema.NestedAttributeObject{
 			Attributes: {{ele.name|capitalize}}Model{}.Attributes(),
@@ -129,6 +136,7 @@ func (o {{kid[0].name|capitalize}}Model) Attributes() map[string]schema.Attribut
 	{%- endfor %}
 	}
 }
+{%- endfor %}
 {%- if arg2|length > 0 %}
 {{create_struct(arg2, arg3)}}
 {%- endif %}
@@ -149,7 +157,7 @@ func (o {{kid[0].name|capitalize}}Model) Attributes() map[string]schema.Attribut
 
 {%- macro create_resource_list_type(parent, ele) %}
 	var {{ele.name}}s []{{ele.name|capitalize}}Model
-	resp.Diagnostics.Append({{parent}}.{{ele.name}}.ElementsAs(ctx, &{{ele.name}}s, false)...)
+	resp.Diagnostics.Append({{parent|capitalize}}.{{ele.name|capitalize}}.ElementsAs(ctx, &{{ele.name}}s, false)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -213,10 +221,10 @@ type xml{{parent.name|capitalize}} struct {
 				{{ string_macro(ele) }}
 			{%- endif %}
 			{%- if ele['leaf-type'] == 'empty' %}
-				{{ string_macro(ele) }}
+				{{ bool_macro(ele) }}
 			{%- endif %}
 			{%- if ele['leaf-type'] == 'union' %}
-				{{ int32_macro(ele) }}
+				{{ int64_macro(ele) }}
 			{%- endif %} 
 			{%- if ele['type'] == 'list' %}
 				{{ list_macro(ele) }}
@@ -238,11 +246,14 @@ type {{kid.name|capitalize}}Model struct {
 	{%- if grandkid['leaf-type'] == 'string' %}
 	{{grandkid.name|capitalize}}	types.{{grandkid['leaf-type']|capitalize}} `tfsdk:"{{grandkid.name}}"`
 	{%- endif %}
+	{%- if grandkid['leaf-type'] == 'empty'%}
+	{{grandkid.name|capitalize|replace("-", "_")}} types.Bool `tfsdk:"{{grandkid.name}}"`
+	{%- endif %}
 	{%- if grandkid['leaf-type'] == 'union' %}
 	{{grandkid.name|capitalize}}	types.Int64 `tfsdk:"{{grandkid.name}}"`
 	{%- endif %}
 	{%- if grandkid['type'] == 'list' %}
-	{{grandkid.name|capitalize}}	[]{{grandkid.name|capitalize}}Model `tfsdk:"{{grandkid.name}}"`
+	{{grandkid.name|capitalize}}	types.List `tfsdk:"{{grandkid.name}}"`
 	{% if ele_for_struct.append(grandkid) %} {% endif %}
 	{%- endif %}
 	{%- endfor %}
@@ -256,6 +267,9 @@ func (o {{kid.name|capitalize}}Model) AttrTypes() map[string]attr.Type {
 		{%- if grandkid['leaf-type'] == 'union' %}
 		"{{grandkid.name}}": 	types.Int64Type,
 		{%- endif %}
+		{%- if grandkid['type'] == 'list' or grandkid['type'] == 'container'%}
+		"{{grandkid.name}}": 	types.ListType{ElemType: types.ObjectType{AttrTypes: {{grandkid.name|capitalize}}Model{}.AttrTypes()}},
+		{%- endif %}
 	{%- endfor %}
 	}
 }
@@ -265,7 +279,7 @@ func (o {{kid.name|capitalize}}Model) Attributes() map[string]schema.Attribute {
 		{%- if grandkid['leaf-type'] == 'string' %}
 		"{{grandkid.name}}": schema.StringAttribute{
 			Optional: true,
-			MaarkdownDescription: "xpth is `config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}}",
+			MarkdownDescription: "xpth is `config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}}",
 		},
 		{%- endif %}
 		{%- if grandkid['leaf-type'] == 'union' %}
@@ -275,7 +289,7 @@ func (o {{kid.name|capitalize}}Model) Attributes() map[string]schema.Attribute {
 		},
 		{%- endif %}
 		{%- if grandkid['type'] == 'list' %}
-		"{{grandkid.name}}": schema.{{grandkid['leaf-type']|capitalize}}NestedAttribute{
+		"{{grandkid.name}}": schema.ListNestedAttribute{
 			Optional: true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: {{grandkid.name|capitalize}}Model{}.Attributes(),
@@ -283,7 +297,7 @@ func (o {{kid.name|capitalize}}Model) Attributes() map[string]schema.Attribute {
 		},
 		{%- endif %}
 		{%- if grandkid['type'] == 'container' %}
-		"{{grandkid.name}}": schema.{{grandkid['leaf-type']|capitalize}}NestedAttribute{
+		"{{grandkid.name}}": schema.ListNestedAttribute{
 			Optional: true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: {{grandkid.name|capitalize}}Model{}.Attributes(),
@@ -369,7 +383,7 @@ func (r *resource{{parent.name|capitalize}}) Create(ctx context.Context, req res
 	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}} = plan.{{grandkid.name|capitalize}}.ValueInt64Pointer()
 	{%- endif %}
 	{%- if  grandkid['leaf-type'] ==  'empty' %}
-	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}} = ''
+	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize|replace("-", "_")}} = ""
 	{%- endif %}
 	{%- if grandkid['type'] == 'list' %}
 	{{create_resource_list_type(kid.name, grandkid)}}
@@ -428,7 +442,7 @@ func (r *resource{{parent.name|capitalize}}) Read(ctx context.Context, req resou
 
 	{%- for kid in parent['kids'] %}
 	{%- for grandkid in kid['kids'] %}
-	if err := resp.State.Set(ctx, config.Groups.{{kid.name}}.{{grandkid.name}}); err != nil {
+	if err := resp.State.Set(ctx, config.Groups.{{parent.name|capitalize}}.{{kid.name|capitalize}}.{{grandkid.name|capitalize|replace("-","_")}}); err != nil {
 		return
 	}
 	{%- endfor %}
@@ -456,7 +470,7 @@ func (r *resource{{parent.name|capitalize}}) Update(ctx context.Context, req res
 	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}} = plan.{{grandkid.name|capitalize}}.ValueInt64Pointer()
 	{%- endif %}
 	{%- if  grandkid['leaf-type'] ==  'empty' %}
-	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}} = ''
+	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize|replace("-","_")}} = ""
 	{%- endif %}
 	{%- if grandkid['type'] == 'list' %}
 	{{create_resource_list_type(kid.name, grandkid)}}
