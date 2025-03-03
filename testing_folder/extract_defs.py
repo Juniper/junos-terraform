@@ -85,6 +85,7 @@ def walk_schema(paths, node, parent = []):
     emit_data = check_path(paths, parent)
     current_path = get_path(parent)
     if isinstance(node, dict):
+        node['path'] = current_path
         result = {}
         parent.append(node)
         for k in node.keys():
@@ -98,6 +99,7 @@ def walk_schema(paths, node, parent = []):
             # UPDATE: This code now handles choice options --> vlan_tagging and vlan_id now included
             result_val = check_kids(paths, elem, parent, current_path)
             if isinstance(result_val, list):
+                result_val[0]['path'] = current_path
                 result.append(result_val[0])
             else:
                 if isinstance(result_val, bool):
@@ -109,13 +111,13 @@ def walk_schema(paths, node, parent = []):
     return result
  
 # Method which starts the walk
-def filter_json_using_xml(schema, paths):
+def filter_json_using_xml(schema, xml):
     with open(schema) as f:
         schema = json.loads(f.read())
-    # with open(xml) as f:
-    #     xml_text = f.read()
-    # root = ElementTree.fromstring(f"<root>{xml_text}</root>")
-    # paths = unique_xpaths(get_xpaths(root))
+    with open(xml) as f:
+        xml_text = f.read()
+    root = ElementTree.fromstring(f"<root>{xml_text}</root>")
+    paths = unique_xpaths(get_xpaths(root))
     return walk_schema(paths, schema)
  
 # Main Method
@@ -125,15 +127,11 @@ def main():
     parser.add_argument('-j', '--json-schema', required=True, help='specify the json schema file')
     parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
     args = parser.parse_args()
-    with open(args.xml_config) as f:
-        xml_text = f.read()
-    root = ElementTree.fromstring(f"<root>{xml_text}</root>")
-    paths = unique_xpaths(get_xpaths(root))
-    resources = filter_json_using_xml(args.json_schema, paths)
+    resources = filter_json_using_xml(args.json_schema, args.xml_config)
     # print(json.dumps(resources, indent=2))
     with open('go_template.j2') as jinja_tmpl:
         tmpl = Template(jinja_tmpl.read())
-    print(tmpl.render(data=resources, xml_paths=paths))
+    print(tmpl.render(data=resources))
     
 # run main()
 if __name__ == "__main__":
