@@ -90,11 +90,11 @@ type {{grandkid.name|capitalize}}Model struct {
 func (o {{grandkid.name|capitalize}}Model) AttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
 	{%- for ele in grandkid['kids'] %}
-	{%- if ele['leaf-type'] == 'string' %}
-	"{{ele.name}}": 	types.{{ele['leaf-type']|capitalize}}Type,
+	{%- if ele['leaf-type'] == 'string'%}
+	"{{ele.name|replace("-","_")}}": 	types.{{ele['leaf-type']|capitalize}}Type,
 	{%- endif %}
 	{%- if ele['base-type'] == 'string' %}
-	"{{ele.name}}": 	types.{{ele['base-type']|capitalize}}Type,
+	"{{ele.name|replace("-","_")}}": 	types.{{ele['base-type']|capitalize}}Type,
 	{%- endif %}
 	{%- if ele['leaf-type'] == 'union' %}
 	"{{ele.name}}": 	types.Int64Type,
@@ -109,13 +109,13 @@ func (o {{grandkid.name|capitalize}}Model) Attributes() map[string]schema.Attrib
 	return map[string]schema.Attribute{
 	{%- for ele in grandkid['kids'] %}
 	{%- if ele['leaf-type'] == 'string'%}
-	"{{ele.name}}": schema.{{ele['leaf-type']|capitalize}}Attribute{
+	"{{ele.name|replace("-","_")}}": schema.{{ele['leaf-type']|capitalize}}Attribute{
 		Optional: true,
 		MarkdownDescription: "xpath is `config.Groups.{{kid[0].name|capitalize}}.{{ele.name|capitalize}}`",
 	},
 	{%- endif %}
 	{%- if ele['base-type'] == 'string'%}
-	"{{ele.name}}": schema.{{ele['base-type']|capitalize}}Attribute{
+	"{{ele.name|replace("-","_")}}": schema.{{ele['base-type']|capitalize}}Attribute{
 		Optional: true,
 		MarkdownDescription: "xpath is `config.Groups.{{kid[0].name|capitalize}}.{{ele.name|capitalize}}`",
 	},
@@ -197,7 +197,6 @@ package main
 import (
 	"context"
 	"encoding/xml"
-	"strconv"
 	"strings"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -219,11 +218,8 @@ type xml{{parent.name|capitalize}} struct {
 		XMLName      xml.Name `xml:"{{kid.name}}"`
 		{%- set grandkid = kid['kids'] %}
 		{%- for ele in grandkid %}
-			{%- if ele['leaf-type'] == 'string' %}
+			{%- if ele['leaf-type'] == 'string' or ele['leaf-type'] == 'empty'%}
 				{{ string_macro(ele) }}
-			{%- endif %}
-			{%- if ele['leaf-type'] == 'empty' %}
-				{{ bool_macro(ele) }}
 			{%- endif %}
 			{%- if ele['leaf-type'] == 'union' %}
 				{{ int64_macro(ele) }}
@@ -249,7 +245,7 @@ type {{kid.name|capitalize}}sModel struct {
 	{{grandkid.name|capitalize}}	types.{{grandkid['leaf-type']|capitalize}} `tfsdk:"{{grandkid.name}}"`
 	{%- endif %}
 	{%- if grandkid['leaf-type'] == 'empty'%}
-	{{grandkid.name|capitalize|replace("-", "_")}} types.Bool `tfsdk:"{{grandkid.name}}"`
+	{{grandkid.name|capitalize|replace("-", "_")}} types.Bool `tfsdk:"{{grandkid.name|replace("-", "_")}}"`
 	{%- endif %}
 	{%- if grandkid['leaf-type'] == 'union' %}
 	{{grandkid.name|capitalize}}	types.Int64 `tfsdk:"{{grandkid.name}}"`
@@ -268,6 +264,9 @@ func (o {{kid.name|capitalize}}sModel) AttrTypes() map[string]attr.Type {
 		{%- endif %}
 		{%- if grandkid['leaf-type'] == 'union' %}
 		"{{grandkid.name}}": 	types.Int64Type,
+		{%- endif %}
+		{%- if grandkid['leaf-type'] == 'empty'%}
+		"{{grandkid.name|replace("-","_")}}": 	types.BoolType,
 		{%- endif %}
 		{%- if grandkid['type'] == 'list' or grandkid['type'] == 'container'%}
 		"{{grandkid.name}}": 	types.ListType{ElemType: types.ObjectType{AttrTypes: {{grandkid.name|capitalize}}Model{}.AttrTypes()}},
@@ -289,6 +288,14 @@ func (o {{kid.name|capitalize}}sModel) Attributes() map[string]schema.Attribute 
 			Optional: true,
 			MarkdownDescription: "xpath is `config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}}",
 		},
+		{%- endif %}
+		{%- if grandkid['leaf-type'] ==  'empty'%}
+		"{{grandkid.name|replace("-","_")}}":schema.BoolAttribute{
+			Optional: true,
+			MarkdownDescription: "xpath is `config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize|replace("-","_")}}",
+		},
+		{%- endif %}
+		{%- if grandkid['type'] == 'list' %}
 		{%- endif %}
 		{%- if grandkid['type'] == 'list' %}
 		"{{grandkid.name}}": schema.ListNestedAttribute{
@@ -385,8 +392,10 @@ func (r *resource{{parent.name|capitalize}}) Create(ctx context.Context, req res
 	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}} = plan.{{grandkid.name|capitalize}}.ValueInt64Pointer()
 	{%- endif %}
 	{%- if  grandkid['leaf-type'] ==  'empty' %}
-	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize|replace("-", "_")}} = plan.{{grandkid.name|capitalize
-	|replace("-", "_")}}.ValueBoolPointer()
+	if plan.{{grandkid.name|capitalize|replace("-","_")}}.ValueBool() {
+		empty := ""
+		config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize|replace("-", "_")}} = &empty
+	}
 	{%- endif %}
 	{%- if grandkid['type'] == 'list' %}
 	{{create_resource_list_type(parent_var, grandkid, 0)}}
@@ -405,64 +414,19 @@ func (r *resource{{parent.name|capitalize}}) Create(ctx context.Context, req res
 // Read implements resource.Resource.
 func (r *resource{{parent.name|capitalize}}) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	
-	// Get the data and set
-	var state {{parent.name|capitalize}}Model
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	// Check for errors
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Marshall group and check
-	var config xml{{parent.name|capitalize}}
-	id := config.Groups.Name
-	err := r.client.MarshalGroup(id, config)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed while Reading", err.Error())
-		return
-	}
-	var newstate {{parent.name|capitalize}}Model
-	newstate.ResourceName = types.StringValue(config.Groups.Name)
-	{%- for kid in parent['kids'] %}
-	{%- for grandkid in kid['kids'] %}
-	{%- if grandkid['leaf-type'] == 'string' or grandkid['leaf-type'] == 'empty'%}
-	newstate.{{grandkid.name|capitalize}} = types.StringPointerValue(config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}})
-	{%- endif %}
-	{%- if grandkid['leaf-type'] == 'union'%}
-	newstate.{{grandkid.name|capitalize}} = types.Int64PointerValue(config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}})
-	{%- endif %}
-	{%- if grandkid['type'] == 'list'%}
-	{{-read_resource_list(grandkid)}}
-	{{grandkid.name}}_list, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: {{grandkid.name}}sModel{}.AttrTypes()}, {{grandkid.name}}s)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	newstate.{{grandkid.name|capitalize}}s = {{grandkid.name}}s_list
-	
-	{%- endif %}
-	{%- endfor %}
-	{%- endfor %}
-
-	{%- for kid in parent['kids'] %}
-	{%- for grandkid in kid['kids'] %}
-	if err := resp.State.Set(ctx, config.Groups.{{parent.name|capitalize}}.{{kid.name|capitalize}}.{{grandkid.name|capitalize|replace("-","_")}}); err != nil {
-		return
-	}
-	{%- endfor %}
-	{%- endfor %}
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Update implements resource.Resource.
 func (r *resource{{parent.name|capitalize}}) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// Get the data and set
 	{%- set parent_var = 'plan'%}
+	// Get the {{parent.name|capitalize}} Model data and set
 	var {{parent_var}} {{parent.name|capitalize}}Model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	// Check for errors
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 	var config xml{{parent.name|capitalize}}
 	config.Groups.Name = plan.ResourceName.ValueString()
 	{%- for kid in parent['kids']%}
@@ -474,7 +438,10 @@ func (r *resource{{parent.name|capitalize}}) Update(ctx context.Context, req res
 	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize}} = plan.{{grandkid.name|capitalize}}.ValueInt64Pointer()
 	{%- endif %}
 	{%- if  grandkid['leaf-type'] ==  'empty' %}
-	config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize|replace("-","_")}} = ""
+	if plan.{{grandkid.name|capitalize|replace("-","_")}}.ValueBool() {
+		empty := ""
+		config.Groups.{{kid.name|capitalize}}.{{grandkid.name|capitalize|replace("-", "_")}} = &empty
+	}
 	{%- endif %}
 	{%- if grandkid['type'] == 'list' %}
 	{{create_resource_list_type(parent_var, grandkid, 0)}}
