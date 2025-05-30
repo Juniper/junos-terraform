@@ -104,6 +104,90 @@
     </unit>
   </interface>
 </interfaces>
+<snmp>
+  <location>JCL Labs</location>
+  <contact>aburston@juniper.net</contact>
+  <community>
+    <name>public</name>
+    <authorization>read-only</authorization>
+  </community>
+</snmp>
+<forwarding-options>
+  <storm-control-profiles>
+    <name>default</name>
+    <all/>
+  </storm-control-profiles>
+</forwarding-options>
+<routing-options>
+  <static>
+    <route>
+      <name>0.0.0.0/0</name>
+      <next-hop>100.123.0.1</next-hop>
+    </route>
+  </static>
+  <router-id>10.30.100.3</router-id>
+  <forwarding-table>
+    <export>PFE-LB</export>
+    <ecmp-fast-reroute/>
+  </forwarding-table>
+</routing-options>
+<protocols>
+  <bgp>
+    <group>
+      <name>IPCLOS_eBGP</name>
+      <type>external</type>
+      <mtu-discovery/>
+      <import>IPCLOS_BGP_IMP</import>
+      <export>IPCLOS_BGP_EXP</export>
+      <vpn-apply-export/>
+      <local-as>
+        <as-number>65501</as-number>
+      </local-as>
+      <multipath>
+        <multiple-as/>
+      </multipath>
+      <bfd-liveness-detection>
+        <minimum-interval>1000</minimum-interval>
+        <multiplier>3</multiplier>
+      </bfd-liveness-detection>
+      <neighbor>
+        <name>10.30.135.2</name>
+        <description>EBGP peering to 10.30.135.2</description>
+        <peer-as>65503</peer-as>
+      </neighbor>
+      <neighbor>
+        <name>10.30.136.2</name>
+        <description>EBGP peering to 10.30.136.2</description>
+        <peer-as>65504</peer-as>
+      </neighbor>
+      <neighbor>
+        <name>10.30.137.2</name>
+        <description>EBGP peering to 10.30.137.2</description>
+        <peer-as>65505</peer-as>
+      </neighbor>
+      <neighbor>
+        <name>10.30.131.2</name>
+        <description>EBGP peering to 10.30.131.2</description>
+        <peer-as>65506</peer-as>
+      </neighbor>
+      <neighbor>
+        <name>10.30.132.2</name>
+        <description>EBGP peering to 10.30.132.2</description>
+        <peer-as>65507</peer-as>
+      </neighbor>
+    </group>
+  </bgp>
+  <lldp>
+    <interface>
+      <name>all</name>
+    </interface>
+  </lldp>
+  <igmp-snooping>
+    <vlan>
+      <name>default</name>
+    </vlan>
+  </igmp-snooping>
+</protocols>
 <policy-options>
   <policy-statement>
     <name>IPCLOS_BGP_EXP</name>

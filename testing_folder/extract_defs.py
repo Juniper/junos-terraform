@@ -53,7 +53,22 @@ def check_for_choice(elem):
         for case in cases:
             kids.append(case["kids"])
     return kids
- 
+
+def check_for_enums(elem):
+    cases =[]
+    kids = []
+    if elem["name"] == 'choice-ident' and elem["type"] == 'leaf':
+        for k in elem["enums"]:
+            cases.append(k)
+        for case in cases:
+            tmp_dict = {}
+            tmp_dict['name'] = case['id']
+            tmp_dict['type'] = 'leaf'
+            tmp_dict['leaf-type'] = 'empty'
+            kids.append(tmp_dict)
+    return kids
+
+        
 def check_kids(paths, elem, node_parent, current_path):
     if isinstance(node_parent[-2], dict):
         if "kids" in node_parent[-2].keys():
@@ -65,15 +80,25 @@ def check_kids(paths, elem, node_parent, current_path):
                     elem_path = current_path + "/" + elem["name"]
  
             if elem_path in paths or elem_path == 'configuration':
+                    # This code handles the logic for paths that are directly in the config
+                    # and are not choices or enums
                 return True
             else:
                 # This code handles the logic for paths that aren't directly in the config but follow type 'choice' which leads to that path
                 choices = check_for_choice(elem)
+                enums = check_for_enums(elem)
                 if choices:
+                    choice_list =[]
                     for choice in choices:
                         temp_path = current_path + "/" + choice[0]["name"]
                         if temp_path in paths:
-                            return choice
+                            choice_list.append(choice)
+                    return choice_list   
+                if enums:
+                    for enum in enums:
+                        temp_path = current_path + "/" + enum["name"]
+                        if temp_path in paths:
+                            return enum
         else:
             return True
     else:
@@ -99,12 +124,17 @@ def walk_schema(paths, node, parent = []):
             # UPDATE: This code now handles choice options --> vlan_tagging and vlan_id now included
             result_val = check_kids(paths, elem, parent, current_path)
             if isinstance(result_val, list):
-                result_val[0]['path'] = current_path
-                result.append(result_val[0])
+                for item in result_val:
+                    item[0]['path'] = current_path
+                    result.append(item[0])
+            elif isinstance(result_val, dict):
+                result_val['path'] = current_path
+                result.append(result_val)                         
             else:
                 if isinstance(result_val, bool):
                     if result_val:
                         result.append(walk_schema(paths, elem, parent))
+
         parent.pop()
     else:
         result = node
@@ -129,7 +159,7 @@ def main():
     args = parser.parse_args()
     resources = filter_json_using_xml(args.json_schema, args.xml_config)
     # print(json.dumps(resources, indent=2))
-    with open('go_template.j2') as jinja_tmpl:
+    with open('go_template_2.j2') as jinja_tmpl:
         tmpl = Template(jinja_tmpl.read())
     print(tmpl.render(data=resources))
     
