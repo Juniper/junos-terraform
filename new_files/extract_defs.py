@@ -67,7 +67,6 @@ def check_for_enums(elem):
             tmp_dict['leaf-type'] = 'empty'
             kids.append(tmp_dict)
     return kids
-
         
 def check_kids(paths, elem, node_parent, current_path):
     if isinstance(node_parent[-2], dict):
@@ -115,7 +114,12 @@ def walk_schema(paths, node, parent = []):
         parent.append(node)
         for k in node.keys():
             if emit_data:
-                result[k] = walk_schema(paths, node[k], parent)
+                # Convert node with empty kids list to type 'empty'
+                tmp_result = walk_schema(paths, node[k], parent)
+                if isinstance(tmp_result, list) and len(tmp_result) == 0:
+                    result['type'] = 'empty'
+                else:
+                    result[k] = tmp_result                    
         parent.pop()
     elif isinstance(node, list):
         result = []
@@ -158,10 +162,10 @@ def main():
     parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
     args = parser.parse_args()
     resources = filter_json_using_xml(args.json_schema, args.xml_config)
-    # print(json.dumps(resources, indent=2))
-    with open('go_template_2.j2') as jinja_tmpl:
-        tmpl = Template(jinja_tmpl.read())
-    print(tmpl.render(data=resources))
+    print(json.dumps(resources, indent=2))
+    # with open('go_template_2.j2') as jinja_tmpl:
+    #     tmpl = Template(jinja_tmpl.read())
+    # print(tmpl.render(data=resources))
     
 # run main()
 if __name__ == "__main__":
