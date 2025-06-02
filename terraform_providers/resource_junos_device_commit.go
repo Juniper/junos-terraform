@@ -18,56 +18,76 @@ package main
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func junosCommitCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+// Collects the objects from the .tf file
+type deviceCommitModel struct {
+	ResourceName types.String `tfsdk:"resource_name"`
+}
 
-	id := d.Get("resource_name").(string)
+// Collects the data for the crud work
+type resourceDeviceCommit struct {
+	client ProviderConfig
+}
 
-	client := m.(*ProviderConfig)
+var _ resource.ResourceWithConfigure = new(resourceDeviceCommit)
 
-	if err := client.SendCommit(); err != nil {
-		return diag.FromErr(err)
+func (r *resourceDeviceCommit) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
 	}
-	d.SetId(fmt.Sprintf("%s_%s", client.Host, id))
-
-	if err := client.Close(); err != nil {
-		return diag.FromErr(err)
-	}
-	return junosCommitRead(ctx, d, m)
+	r.client = req.ProviderData.(ProviderConfig)
 }
 
-func junosCommitRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-
-	return nil
+// Metadata implements resource.Resource.
+func (r *resourceDeviceCommit) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_JunosDeviceCommit"
 }
 
-func junosCommitUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-
-	return nil
-}
-
-func junosCommitDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-
-	return nil
-}
-
-func junosCommit() *schema.Resource {
-	return &schema.Resource{
-		CreateContext: junosCommitCreate,
-		ReadContext:   junosCommitRead,
-		UpdateContext: junosCommitUpdate,
-		DeleteContext: junosCommitDelete,
-
-		Schema: map[string]*schema.Schema{
-			"resource_name": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
+// Schema implements resource.Resource.
+func (r *resourceDeviceCommit) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"resource_name": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
 	}
+}
+
+func (r *resourceDeviceCommit) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+
+	var plan deviceCommitModel
+	//id := plan.ResourceName.ValueString()
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+
+	if err := r.client.SendCommit(); err != nil {
+
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+
+	if err := r.client.Close(); err != nil {
+
+	}
+
+}
+
+func (r *resourceDeviceCommit) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+
+}
+
+func (r *resourceDeviceCommit) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+
+}
+
+func (r *resourceDeviceCommit) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+
 }

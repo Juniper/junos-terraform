@@ -17,11 +17,26 @@
 package main
 
 import (
-	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
+	"context"
+	"flag"
+	"log"
+
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
 func main() {
-	opts := &plugin.ServeOpts{ProviderFunc: Provider}
-	plugin.Serve(opts)
-	//os.WriteFile("/tmp/text.txt", []byte(fmt.Sprintf("%v", mockMap)), 0644)
+	var debug bool
+	flag.BoolVar(&debug, "debug", false, "set to true to run the provider with support for debuggers like delve")
+	flag.Parse()
+
+	ctx := context.Background()
+	opts := providerserver.ServeOpts{
+		Address: "tf-registry.click/juniper/jtaf670ffa332c26b46b",
+		Debug:   debug,
+	}
+
+	err := providerserver.Serve(ctx, newProvider, opts)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
