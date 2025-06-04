@@ -48,6 +48,9 @@ def check_for_choice(elem):
     cases = []
     kids = []
     if elem["type"] == "choice":
+        # node of type choice but do not have any kids e.g. vstp-flooding-option
+        if "kids" not in elem.keys():
+            return kids
         for k in elem["kids"]:
             cases.append(k)
         for case in cases:
@@ -113,13 +116,13 @@ def walk_schema(paths, node, parent = []):
         result = {}
         parent.append(node)
         for k in node.keys():
-            if emit_data:
-                # Convert node with empty kids list to type 'empty'
+            if emit_data:                
+                # Convert node with empty kids list to type 'empty'       
                 tmp_result = walk_schema(paths, node[k], parent)
                 if isinstance(tmp_result, list) and len(tmp_result) == 0:
                     result['type'] = 'empty'
                 else:
-                    result[k] = tmp_result                    
+                    result[k] = walk_schema(paths, tmp_result, parent)
         parent.pop()
     elif isinstance(node, list):
         result = []
@@ -162,10 +165,10 @@ def main():
     parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
     args = parser.parse_args()
     resources = filter_json_using_xml(args.json_schema, args.xml_config)
-    print(json.dumps(resources, indent=2))
-    # with open('go_template_2.j2') as jinja_tmpl:
-    #     tmpl = Template(jinja_tmpl.read())
-    # print(tmpl.render(data=resources))
+    # print(json.dumps(resources, indent=2))
+    with open('go_template_2.j2') as jinja_tmpl:
+        tmpl = Template(jinja_tmpl.read())
+    print(tmpl.render(data=resources))
     
 # run main()
 if __name__ == "__main__":
