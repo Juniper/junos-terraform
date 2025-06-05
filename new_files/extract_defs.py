@@ -57,17 +57,23 @@ def check_for_choice(elem):
             kids.append(case["kids"])
     return kids
 
-def check_for_enums(elem):
+def check_for_enums(elem, node_parent):
     cases =[]
     kids = []
     if elem["name"] == 'choice-ident' and elem["type"] == 'leaf':
         for k in elem["enums"]:
-            cases.append(k)
+            # this fix for especially for community-name which is present in enums as well kid outside enums
+            if k['id'] not in node_parent[-2]['key']:
+                cases.append(k)
         for case in cases:
             tmp_dict = {}
             tmp_dict['name'] = case['id']
             tmp_dict['type'] = 'leaf'
-            tmp_dict['leaf-type'] = 'empty'
+            # Need to discuss with Ashley
+            if case['id'] == 'prefix-length-range':
+                tmp_dict['leaf-type'] = 'string'
+            else:
+                tmp_dict['leaf-type'] = 'empty'
             kids.append(tmp_dict)
     return kids
         
@@ -88,7 +94,7 @@ def check_kids(paths, elem, node_parent, current_path):
             else:
                 # This code handles the logic for paths that aren't directly in the config but follow type 'choice' which leads to that path
                 choices = check_for_choice(elem)
-                enums = check_for_enums(elem)
+                enums = check_for_enums(elem, node_parent)
                 if choices:
                     choice_list =[]
                     for choice in choices:
@@ -97,10 +103,12 @@ def check_kids(paths, elem, node_parent, current_path):
                             choice_list.append(choice)
                     return choice_list   
                 if enums:
+                    enums_list = []
                     for enum in enums:
                         temp_path = current_path + "/" + enum["name"]
                         if temp_path in paths:
-                            return enum
+                            enums_list.append(enum)
+                    return enums_list
         else:
             return True
     else:
@@ -132,8 +140,12 @@ def walk_schema(paths, node, parent = []):
             result_val = check_kids(paths, elem, parent, current_path)
             if isinstance(result_val, list):
                 for item in result_val:
-                    item[0]['path'] = current_path
-                    result.append(item[0])
+                    if isinstance(item, list):
+                        item[0]['path'] = current_path
+                        result.append(item[0])
+                    elif isinstance(item, dict):
+                        item['path'] = current_path
+                        result.append(item)
             elif isinstance(result_val, dict):
                 result_val['path'] = current_path
                 result.append(result_val)                         
