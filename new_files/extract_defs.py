@@ -69,11 +69,7 @@ def check_for_enums(elem, node_parent):
             tmp_dict = {}
             tmp_dict['name'] = case['id']
             tmp_dict['type'] = 'leaf'
-            # Need to discuss with Ashley
-            if case['id'] == 'prefix-length-range':
-                tmp_dict['leaf-type'] = 'string'
-            else:
-                tmp_dict['leaf-type'] = 'empty'
+            tmp_dict['leaf-type'] = 'string'
             kids.append(tmp_dict)
     return kids
         
