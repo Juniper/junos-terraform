@@ -121,12 +121,13 @@ def walk_schema(paths, node, parent = []):
         parent.append(node)
         for k in node.keys():
             if emit_data:                
-                # Convert node with empty kids list to type 'empty'       
+                # Node with empty kids list is continued as type container or list just that no kids element is missing'       
                 tmp_result = walk_schema(paths, node[k], parent)
                 if isinstance(tmp_result, list) and len(tmp_result) == 0:
-                    result['type'] = 'empty'
+                    continue
                 else:
                     result[k] = walk_schema(paths, tmp_result, parent)
+
         parent.pop()
     elif isinstance(node, list):
         result = []
@@ -147,7 +148,7 @@ def walk_schema(paths, node, parent = []):
                 result.append(result_val)                         
             else:
                 if isinstance(result_val, bool):
-                    if result_val:
+                    if result_val:                          
                         result.append(walk_schema(paths, elem, parent))
 
         parent.pop()
@@ -173,10 +174,10 @@ def main():
     parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
     args = parser.parse_args()
     resources = filter_json_using_xml(args.json_schema, args.xml_config)
-    # print(json.dumps(resources, indent=2))
-    with open('go_template_2.j2') as jinja_tmpl:
-        tmpl = Template(jinja_tmpl.read())
-    print(tmpl.render(data=resources))
+    print(json.dumps(resources, indent=2))
+    # with open('go_template_2.j2') as jinja_tmpl:
+    #     tmpl = Template(jinja_tmpl.read())
+    # print(tmpl.render(data=resources))
     
 # run main()
 if __name__ == "__main__":
