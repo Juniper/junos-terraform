@@ -1,4 +1,6 @@
-// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
+package processProviders
+
+const providerConfigContent = `// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
 //
 // License: Apache 2.0
 //
@@ -16,12 +18,26 @@
 
 package main
 
-import (
-	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
+import(
+	"terraform-provider-junos-%+v/netconf"
 )
 
-func main() {
-	opts := &plugin.ServeOpts{ProviderFunc: Provider}
-	plugin.Serve(opts)
-	//os.WriteFile("/tmp/text.txt", []byte(fmt.Sprintf("%v", mockMap)), 0644)
+// Config is the configuration structure used to instantiate the Netconf provider.
+type Config struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	SSHKey   string
 }
+
+// Client returns a new client for the provider to use
+func (c *Config) Client() (netconf.Client, error) {
+	return newClient(c)
+}
+
+func newClient(c *Config) (netconf.Client, error) {
+
+	client, err := netconf.NewClient(c.Username, c.Password, c.SSHKey, c.Host, c.Port)
+	return client, err
+}`

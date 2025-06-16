@@ -1,4 +1,7 @@
-// Copyright (c) 2017-2022, Juniper Networks Inc. All rights reserved.
+#!/usr/bin/env python3
+
+"""
+// Copyright (c) 2017-2021, Juniper Networks Inc. All rights reserved.
 //
 // License: Apache 2.0
 //
@@ -14,14 +17,14 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-package main
+"""
+import sys
 
-import (
-	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
-)
-
-func main() {
-	opts := &plugin.ServeOpts{ProviderFunc: Provider}
-	plugin.Serve(opts)
-	//os.WriteFile("/tmp/text.txt", []byte(fmt.Sprintf("%v", mockMap)), 0644)
-}
+def getBasePrefix():
+    return getattr(sys, "base_prefix", None) or getattr(sys, "real_prefix", 
+                                                        None) or sys.prefix
+if __name__ == "__main__":
+    if getBasePrefix() != sys.prefix:
+        print('true')
+    else:
+        print('false')
