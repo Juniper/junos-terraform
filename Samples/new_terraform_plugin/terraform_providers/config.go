@@ -16,27 +16,27 @@
 
 package main
 
-import (
-	"context"
-	"flag"
-	"log"
-
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+import(
+//	"terraform-provider-junos-vsrx/netconf"
+        "github.com/Juniper/junos-terraform/terraform_providers/netconf"
 )
 
-func main() {
-	var debug bool
-	flag.BoolVar(&debug, "debug", false, "set to true to run the provider with support for debuggers like delve")
-	flag.Parse()
+// Config is the configuration structure used to instantiate the Netconf provider.
+type Config struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	SSHKey   string
+}
 
-	ctx := context.Background()
-	opts := providerserver.ServeOpts{
-		Address: "tf-registry.click/juniper/jtaf670ffa332c26b46b",
-		Debug:   debug,
-	}
+// Client returns a new client for the provider to use
+func (c *Config) Client() (netconf.Client, error) {
+	return newClient(c)
+}
 
-	err := providerserver.Serve(ctx, newProvider, opts)
-	if err != nil {
-		log.Fatal(err)
-	}
+func newClient(c *Config) (netconf.Client, error) {
+
+	client, err := netconf.NewClient(c.Username, c.Password, c.SSHKey, c.Host, c.Port)
+	return client, err
 }
