@@ -7,7 +7,7 @@ import sys
 from jinja2 import Template
 from go_template_2 import render_template
 import os
- 
+
 def get_xpaths(root):
     # defined a recursive function to walk the xml and populate result[]
     def recurse_children(node, result = {}, path = []):
@@ -124,12 +124,13 @@ def walk_schema(paths, node, parent = []):
         parent.append(node)
         for k in node.keys():
             if emit_data:                
-                # Convert node with empty kids list to type 'empty'       
+                # Node with empty kids list is continued as type container or list just that no kids element is missing'       
                 tmp_result = walk_schema(paths, node[k], parent)
                 if isinstance(tmp_result, list) and len(tmp_result) == 0:
-                    result['type'] = 'empty'
+                    continue
                 else:
                     result[k] = walk_schema(paths, tmp_result, parent)
+
         parent.pop()
     elif isinstance(node, list):
         result = []

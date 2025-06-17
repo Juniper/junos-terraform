@@ -141,9 +141,6 @@ type {{get_full_parent_name(parent, "_", 'True')}}_{{parent.name|capitalize|repl
 	{%- if kid['leaf-type'] == 'string' or kid['base-type'] == 'string' or kid['leaf-type'] == 'union' or kid['type']== 'leaf-list' or kid['leaf-type']== 'enumeration' or kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
 	{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}	types.String `tfsdk:"{{kid.name|replace("-", "_")|replace(".", "_")}}"`
 	{%- endif %}
-	{# {%- if kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
-	{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}} types.Bool `tfsdk:"{{kid.name|replace("-", "_")|replace(".", "_")}}"`
-	{%- endif %} #}
 	{%- if kid['type'] == 'container' or kid['type'] == 'list'%}
 	{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}	types.List `tfsdk:"{{kid.name|replace("-", "_")|replace(".", "_")}}"`
 	{%- if arg2.append(kid) %} {% endif %}
@@ -156,9 +153,6 @@ func (o {{get_full_parent_name(parent, "_", 'True')}}_{{parent.name|capitalize|r
 	    {%- if kid['leaf-type'] == 'string' or kid['base-type'] == 'string' or kid['leaf-type'] == 'union' or kid['type']== 'leaf-list' or kid['leaf-type']== 'enumeration' or kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
 	    "{{kid.name|replace("-", "_")|replace(".", "_")}}": 	types.StringType,
 	    {%- endif %}
-	    {# {%- if kid['leaf-type'] == 'empty' or kid['type'] == 'empty' %}
-	    "{{kid.name|replace("-", "_")|replace(".", "_")}}": 	types.BoolType,
-	    {%- endif %} #}
 	    {%- if kid['type'] == 'list' or kid['type'] == 'container'%}
 	    "{{kid.name|replace("-", "_")|replace(".", "_")}}": 	types.ListType{ElemType: types.ObjectType{AttrTypes: {{get_full_parent_name(kid, "_", 'True')}}_{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}.AttrTypes()}},
 	    {%- endif %}
@@ -174,12 +168,6 @@ func (o {{get_full_parent_name(parent, "_", 'True')}}_{{parent.name|capitalize|r
 		    MarkdownDescription: "xpath is `config.Groups.{{kid.name|capitalize}}.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}`",
 	    },
 	    {%- endif %}
-	    {# {%- if kid['leaf-type'] == 'empty' or kid['type'] == 'empty' %}
-	    "{{kid.name|replace("-", "_")|replace(".", "_")}}": schema.BoolAttribute{
-		    Optional: true,
-		    MarkdownDescription: "xpath is `config.Groups.{{kid.name|capitalize}}.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}`",
-	    },
-	    {%- endif %} #}
 	    {%- if kid['type'] == 'list' or kid['type'] == 'container' %}
 	    "{{kid.name|replace("-", "_")|replace(".", "_")}}": schema.ListNestedAttribute{
 		    Optional: true,
@@ -235,9 +223,6 @@ type {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model struct
 	{%- if kid['leaf-type'] == 'string' or kid['base-type'] == 'string' or kid['leaf-type'] == 'union' or kid['type']== 'leaf-list' or kid['leaf-type']== 'enumeration' or kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
 	{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}	types.String `tfsdk:"{{kid.name|replace("-", "_")}}"`
 	{%- endif %}
-	{# {%- if kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
-	{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}} types.Bool `tfsdk:"{{kid.name|replace("-", "_")}}"`
-	{%- endif %} #}
 	{%- if kid['type'] == 'list' or kid['type']== 'container'%}
 	{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}	types.List `tfsdk:"{{kid.name|replace("-", "_")}}"`
 	{%- if ele_for_struct.append(kid) %} {% endif %}
@@ -250,9 +235,6 @@ func (o {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model) At
 		{%- if kid['leaf-type'] == 'string' or kid['base-type'] == 'string' or kid['leaf-type'] == 'union' or kid['type']== 'leaf-list' or kid['leaf-type']== 'enumeration' or kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
 		"{{kid.name|replace("-", "_")}}": 	types.StringType,
 		{%- endif %}
-		{# {%- if kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
-		"{{kid.name|replace("-","_")}}": 	types.BoolType,
-		{%- endif %} #}
 		{%- if kid['type'] == 'list' or kid['type'] == 'container'%}
 		"{{kid.name|replace("-", "_")}}": 	types.ListType{ElemType: types.ObjectType{AttrTypes: {{get_full_parent_name(kid, "_", "True")}}_{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}.AttrTypes()}},
 		{%- endif %}
@@ -268,12 +250,6 @@ func (o {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model) At
 			MarkdownDescription: "xpth is `config.Groups.{{parent.name|capitalize}}.{{kid.name|capitalize}}",
 		},
 		{%- endif %}
-		{# {%- if kid['leaf-type'] ==  'empty' or kid['type'] == 'empty'%}
-		"{{kid.name|replace("-","_")}}":schema.BoolAttribute{
-			Optional: true,
-			MarkdownDescription: "xpath is `config.Groups.{{parent.name|capitalize}}.{{kid.name|capitalize|replace("-","_")}}",
-		},
-		{%- endif %} #}
 		{%- if (kid['type'] == 'list') or (kid['type'] == 'container') %}
 		"{{kid.name|replace("-", "_")}}": schema.ListNestedAttribute{
 			Optional: true,
@@ -332,17 +308,13 @@ func (r *resource_Apply_Groups) Schema(_ context.Context, req resource.SchemaReq
 
 {%- macro create_method_macro(ele) %}
 	    config.Groups.{{get_parent_list_with_iterator(ele)}}.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} = make([]xml_{{get_full_parent_name(ele, "_", "True")}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}, len(var_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}))
-        for i_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}, v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}} := range var_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}} {
+        {# Below condition is added to skip for loop for nodes which have empty kids #}
+		{%- if ele['kids'] | length > 0%}
+		for i_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}, v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}} := range var_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}} {
             {%- for kid in ele['kids']%}
             {%- if kid['leaf-type'] == 'string' or kid['base-type'] == 'string' or kid['leaf-type'] == 'union' or kid['type']== 'leaf-list' or kid['leaf-type']== 'enumeration' or kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
             config.Groups.{{get_parent_list_with_iterator(kid)}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}} = v_{{get_full_parent_name(kid, "_")}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueStringPointer()
             {%- endif %}
-            {# {%- if kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
-            if v_{{get_full_parent_name(kid, "_")}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueBool() {
-                empty := ""
-                config.Groups.{{get_parent_list_with_iterator(kid)}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}} = &empty
-            }
-            {%- endif %} #}
             {%- if kid['type'] == 'list' or kid['type'] == 'container'%}
             var var_{{get_full_parent_name(kid, "_")}}_{{kid.name|replace("-", "_")|replace(".", "_")}} []{{get_full_parent_name(kid, "_", 'True')}}_{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
             resp.Diagnostics.Append(v_{{get_full_parent_name(kid, "_")}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{get_full_parent_name(kid, "_")}}_{{kid.name|replace("-", "_")|replace(".", "_")}}, false)...)
@@ -385,12 +357,6 @@ func (r *resource_Apply_Groups) Create(ctx context.Context, req resource.CreateR
         {%- if kid['leaf-type'] == 'string' or kid['base-type'] == 'string' or kid['leaf-type'] == 'union' or kid['type']== 'leaf-list' or kid['leaf-type']== 'enumeration' or kid['leaf-type'] == 'empty' or kid ['type'] == 'empty'%}
         config.Groups.{{get_parent_list_with_iterator(kid)}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}} = v_{{get_full_parent_name(kid, "_")}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueStringPointer()
         {%- endif %}
-		{# {%- if kid['leaf-type'] == 'empty' or kid ['type'] == 'empty'%}
-        if v_{{get_full_parent_name(kid, "_")}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueBool() {
-            empty := ""
-            config.Groups.{{get_parent_list_with_iterator(kid)}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}} = &empty
-        }
-        {%- endif %} #}
         {%- if kid['type'] == 'container' or kid['type']== 'list'%}
         var var_{{parent.name|replace("-", "_")}}_{{kid.name|replace("-", "_")}} []{{get_full_parent_name(kid, "_", 'True')}}_{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
         resp.Diagnostics.Append(v_{{parent.name|replace("-", "_")}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}_{{kid.name|replace("-", "_")}}, false)...)
@@ -420,21 +386,21 @@ func (r *resource_Apply_Groups) Create(ctx context.Context, req resource.CreateR
 
 {%- macro read_method_macro(ele) %}
         {{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_List := make([]{{get_full_parent_name(ele, "_", 'True')}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model, len(v_{{get_full_parent_name(ele, "_")}}.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}))
-        for i_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}, v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}} := range v_{{get_full_parent_name(ele, "_")}}.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} {
+        {# Below condition is added to skip for loop for nodes which have empty kids #}
+		{%- if ele['kids'] | length > 0%}
+		for i_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}, v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}} := range v_{{get_full_parent_name(ele, "_")}}.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} {
             var {{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model {{get_full_parent_name(ele, "_", "True")}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
             {%- for kid in ele['kids'] %}
             {%- if kid['leaf-type'] == 'string' or kid['base-type'] == 'string' or kid['leaf-type'] == 'union' or kid['type']== 'leaf-list' or kid['leaf-type']== 'enumeration' or kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
             {{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}} = types.StringPointerValue(v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}})
             {%- endif %}
-            {# {%- if kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
-            {{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")}}_model.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}} = types.BoolValue(v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}} != nil)
-            {%- endif %} #}
             {{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_List[i_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}] = {{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model
             {%- if kid['type'] == 'list' or kid['type'] == 'container'%}
                 {{read_method_macro(kid)}}
             {%- endif %}
             {%- endfor %}
         }
+		{%- endif %}
         {{get_full_parent_name(ele, "_")}}_model.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: {{get_full_parent_name(ele, "_", 'True')}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}.AttrTypes()}, {{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_List)
         {{get_full_parent_name(ele, "_")}}_List[i_{{get_full_parent_name(ele, "_")}}] = {{get_full_parent_name(ele, "_")}}_model
 {%- endmacro %}
@@ -502,12 +468,6 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
         {%- if kid['leaf-type'] == 'string' or kid['base-type'] == 'string' or kid['leaf-type'] == 'union' or kid['type']== 'leaf-list' or kid['leaf-type']== 'enumeration' or kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
         config.Groups.{{get_parent_list_with_iterator(kid)}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}} = v_{{get_full_parent_name(kid, "_")}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueStringPointer()
         {%- endif %}
-		{# {%- if kid['leaf-type'] == 'empty' or kid['type'] == 'empty'%}
-        if v_{{get_full_parent_name(kid, "_")}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueBool() {
-            empty := ""
-            config.Groups.{{get_parent_list_with_iterator(kid)}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}} = &empty
-        }
-        {%- endif %} #}
         {%- if kid['type'] == 'container' or kid['type']== 'list'%}
         var var_{{parent.name|replace("-", "_")}}_{{kid.name|replace("-", "_")}} []{{get_full_parent_name(kid, "_", 'True')}}_{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
         resp.Diagnostics.Append(v_{{parent.name|replace("-", "_")}}.{{kid.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}_{{kid.name|replace("-", "_")}}, false)...)
@@ -559,6 +519,6 @@ func (r *resource_Apply_Groups) Delete(ctx context.Context, req resource.DeleteR
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 {################## DELETE METHOD # ENDS ################}
-    """
+"""
     tmpl = Template(jinja_source)
     return tmpl.render(data=data)
