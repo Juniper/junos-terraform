@@ -5,7 +5,7 @@ import json
 import argparse
 import sys
 from jinja2 import Template
-from go_template_2 import render_template
+from junos_tf.go_template_2 import render_template
 import os
 
 def get_xpaths(root):
@@ -178,14 +178,14 @@ def main():
     args = parser.parse_args()
     resources = filter_json_using_xml(args.json_schema, args.xml_config)
     output = render_template(data=resources)
-    output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "terraform_providers"))
+    output_dir = "terraform_providers"
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "resource_config_provider.go")
 
     # Save the output
     with open(output_path, "w") as f:
         f.write(render_template(data=resources).lstrip())
-    print(f"✅ Plugin created in {os.path.relpath(output_path)}\n")
+    print(f"Plugin created in {os.path.relpath(output_path)}\n")
     
 # run main()
 if __name__ == "__main__":

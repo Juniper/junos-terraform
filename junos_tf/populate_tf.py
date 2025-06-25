@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from lxml import etree
 import sys
 import re
@@ -117,7 +118,7 @@ def main():
         output_path = os.path.join(output_dir, "main.tf")
         with open(output_path, "w") as f:
             f.write(hcl_output)
-        print(f"\n✅ Terraform configuration written to {os.path.relpath(output_path)}\n")
+        print(f"\nTerraform configuration written to {os.path.relpath(output_path)}\n")
 
 if __name__ == "__main__":
     main()

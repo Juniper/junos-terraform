@@ -8,6 +8,7 @@ setup(
     author="Juniper Networks",
     description="Junos Terraform Framework",
     packages=find_packages(),
+    scripts=["junos_tf/generate_plugin.py", "junos_tf/populate_tf.py"],
     install_requires=[
         'pytest',
         'pyang',

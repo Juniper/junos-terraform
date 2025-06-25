@@ -18,4 +18,14 @@ python -m venv venv
 pip install ./junos-terraform
 cd junos-terraform
 pyang --plugindir ./junos_tf/pyang_plugin -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
+cp examples/evpn-vxlan-dc/dc2/dc2-spine1.xml config.xml```
+```
+Edit `config.xml` to remove `<rpc>` and `<configuration>` tags.
+Now run the following commands:
+```bash
+generate_plugin.py -j junos.json -x config.xml
+populate_tf.py config.xml
+cd terraform_providers
+go build
+go install
 ```
