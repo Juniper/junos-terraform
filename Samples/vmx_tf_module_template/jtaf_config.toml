@@ -1,5 +1,0 @@
-yangDir = "/var/tmp/jtaf_demo/yang_files"
-providerDir = "/var/tmp/jtaf_demo/terraform_providers"
-xpathPath = "/var/tmp/jtaf_demo/xpath_example.xml"
-fileType = "both"
-providerName = "vmx"

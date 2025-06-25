@@ -1,5 +1,0 @@
-yangDir = "/var/tmp/junos-terraform/security-routing-instance/yang_files"
-providerDir = "/var/tmp/junos-terraform/security-routing-instance/provider"
-xpathPath = "/var/tmp/junos-terraform/security-routing-instance/xpath_routing.xml"
-fileType = "both"
-providerName = "vsrx"

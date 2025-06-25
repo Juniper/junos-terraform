@@ -1,4 +1,0 @@
-yangDir = "/var/tmp/junos-terraform/Test"
-providerDir = "/var/tmp/junos-terraform/terraform_providers"
-xpathPath = "/var/tmp/junos-terraform/Test/xpath_sample.xml"
-fileType = "text"
