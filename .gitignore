@@ -10,3 +10,7 @@
 /testing_folder/
 /yang/
 /.idea/
+/build/
+/junos_terraform.egg-info/
+/testbed/
+__pycache__/

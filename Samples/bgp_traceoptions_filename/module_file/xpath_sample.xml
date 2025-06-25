@@ -1,4 +1,0 @@
-<!-- this is a sample example. Modify it to your requirements -->
-<file-list>
-    <xpath name="/protocols/bgp/group/traceoptions/file/filename"/>
-</file-list>
