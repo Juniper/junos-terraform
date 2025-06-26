@@ -167,7 +167,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	// Read data from xpath file
 	datIn, err := ioutil.ReadFile(xpathFilePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read file %s - %w", xpathFilePath, err)
 	}
 
 	// XML decoding
@@ -178,7 +178,7 @@ func CreateProviders(jcfg cfg.Config) error {
 	var inNode Node
 	err = decIn.Decode(&inNode)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to decode - %w", err)
 	}
 
 	// parse the xpaths provided to generate terraform based modules
@@ -225,7 +225,7 @@ func CreateProviders(jcfg cfg.Config) error {
 				// Parse data from Yin file
 				dat, err := ioutil.ReadFile(inputYinFile)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to read file %s - %w", inputYinFile, err)
 				}
 				// XML decoding
 				buf := bytes.NewBuffer(dat)
@@ -234,7 +234,7 @@ func CreateProviders(jcfg cfg.Config) error {
 				var n Node
 				err = dec.Decode(&n)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to decode - %w", err)
 				}
 				// Process all the groups in yin file and store them
 				create_group_nodes([]Node{n})
