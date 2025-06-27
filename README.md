@@ -10,22 +10,102 @@ To use JTAF, you'll need machine that can run **Go, Python, Git and Terraform.**
 
 ## Quick start
 
+### <u>Setup</u>
+Run the following commands to set up the Junos-Terraform Environment and Workflow
+
 ```bash
 git clone https://github.com/aburston/junos-terraform
 git clone https://github.com/juniper/yang
-python -m venv venv
+python3 -m venv venv
 . venv/bin/activate
 pip install ./junos-terraform
 cd junos-terraform
-pyang --plugindir ./junos_tf/pyang_plugin -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
-cp examples/evpn-vxlan-dc/dc2/dc2-spine1.xml config.xml```
 ```
-Edit `config.xml` to remove `<rpc>` and `<configuration>` tags.
-Now run the following commands:
+---
+### <u>Yang File(s) to JSON Conversion</u>
+
+Find the device's Junos Version that is running, and locate the corresponding yang and common folders. Run the below `pyang` command to generate a `.json` file containing `.yang` information for that version. [See below example for Junos version 18.2]
+```
+pyang --plugindir ./junos_tf/pyang_plugin -f jtaf -p <path-to-common> <path-to-yang-files> > junos.json
+```
+Example: 
+```
+pyang --plugindir ./junos_tf/pyang_plugin -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
+```
+---
+
+### <u>Add Desired Configuration</u>
+Now copy an example OR add a real desired device configuration to home directory. [See below using example for a dc2 qfx spine]
+```
+cp examples/evpn-vxlan-dc/dc2/dc2-spine1.xml config.xml
+```
+
+---
+
+### <u>Generate Resource Provider</u>
+
+Now run the following command to generate a `resource provider`. 
+
+Example:
 ```bash
 generate_plugin.py -j junos.json -x config.xml
-populate_tf.py config.xml
+```
+
+---
+
+### <u>Build the provider and install</u>
+```
 cd terraform_providers
 go build
 go install
+```
+
+---
+
+### <u>Autogenerate Terraform Testing Files</u>
+
+Run this command to create a `.tf` test file to deploy the terraform provider.
+```
+populate_tf.py config.xml
+cd testbed
+```
+
+In the `/testbed` folder created by the previous command, create a `.terraform.rc` file with `vi` and add the following contents, replacing any `<elements>` tags with your own information. This is to ensure that the terraform plugin you created and installed to `/go/bin` will be read.
+```
+provider_installation {
+	dev_overrides {
+		"registry.terraform.io/hashicorp/junos-<device-type>" = "<path-to-go/bin>"
+	}
+}
+```
+
+Example:
+```
+provider_installation {
+	dev_overrides {
+		"registry.terraform.io/hashicorp/junos-vqfx" = "/Users/patelv/go/bin"
+	}
+}
+```
+
+---
+
+### <u>Update `provider.go`</u>
+
+Line 73 of `provider.go` needs to match the device type you intend to use (from "registry.terraform.io/hashicorp/junos-vqfx"). 
+
+For example, for vsrx devices, update line 73 in `provider.go` to:
+```	
+resp.TypeName = "junos-vsrx"
+```
+
+---
+
+### <u>Edit Test Files, Plan, and Apply</u>
+
+Once the `.terraform.rc` file is set up, and the `main.tf` test file contains access to the provider, information regarding the desired devices to push the configuration to, and the desired config in `HCL` format, we are now ready to use the provider.
+
+```
+terrafrom plan
+terraform apply -auto-approve
 ```

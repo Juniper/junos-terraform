@@ -21,7 +21,8 @@ def convert_to_hcl(value, indent=2):
         return f'"{value}"'
 
 def normalize_tag(tag):
-    return re.sub(r'[-]', '_', tag)  # Replace hyphens with underscores
+    return tag.replace('-', '_').replace('.', '_')  # Replace hyphens with underscores, Also replace dots
+
 
 def parse_element(element):
     """
@@ -33,7 +34,8 @@ def parse_element(element):
 
     # Case: <vlan-tagging></vlan-tagging> → True
     if (not element.text or not element.text.strip()) and len(element) == 0:
-        return True
+        print(f"Empty tag: {element.tag}")
+        return ""
 
     # Case: <name>ge-0/0/3</name> → "ge-0/0/3"
     if element.text and element.text.strip() and len(element) == 0:
@@ -64,8 +66,8 @@ def generate_hcl_resources(parsed_data):
     """
     Generates a single Terraform-style resource block combining all top-level elements.
     """
-    resource_block = 'resource "junos-vsrx" "config_vsrx" {\n'
-    resource_block += '  resource_name = "example_resource"\n'
+    resource_block = 'resource "junos-<device-type>_Apply_Groups" "<device_hostname>" {\n'
+    resource_block += '  resource_name = "JTAF_<device_hostname>"\n'
 
     for key, value in parsed_data.items():
         hcl_value = convert_to_hcl(value, indent=4)

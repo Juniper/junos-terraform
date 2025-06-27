@@ -159,14 +159,36 @@ def walk_schema(paths, node, parent = []):
         result = node
     return result
  
+# # Method which starts the walk
+# def filter_json_using_xml(schema, xml):
+#     with open(schema) as f:
+#         schema = json.loads(f.read())
+#     with open(xml) as f:
+#         xml_text = f.read()
+#     root = ElementTree.fromstring(f"<root>{xml_text}</root>")
+#     paths = unique_xpaths(get_xpaths(root))
+#     print(paths)
+#     return walk_schema(paths, schema)
+
 # Method which starts the walk
 def filter_json_using_xml(schema, xml):
     with open(schema) as f:
         schema = json.loads(f.read())
     with open(xml) as f:
         xml_text = f.read()
+
+    # Parse XML under temporary root
     root = ElementTree.fromstring(f"<root>{xml_text}</root>")
-    paths = unique_xpaths(get_xpaths(root))
+
+    # Try to find the <configuration> node under <rpc-reply>
+    config_node = root.find(".//configuration")
+    if config_node is not None:
+        paths = unique_xpaths(get_xpaths(config_node))
+    else:
+        # Fall back to full tree if <configuration> not found
+        paths = unique_xpaths(get_xpaths(root))
+
+    print(paths)
     return walk_schema(paths, schema)
  
 # Main Method
