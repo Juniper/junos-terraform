@@ -24,19 +24,31 @@ def normalize_tag(tag):
     return tag.replace('-', '_').replace('.', '_')  # Replace hyphens with underscores, Also replace dots
 
 
-def parse_element(element):
+def parse_element(element, explicit_empty_tags):
     """
     Recursively parse an XML element into a nested structure for HCL conversion.
     - Empty tags become `True`
     - Tags with only text return scalar value
     - Tags with children return list[dict] to enforce HCL consistency
     """
+    tag_name = etree.QName(element.tag).localname
+    has_text = element.text is not None and element.text.strip() != ""
+    has_children = len(element) > 0
 
-    # Case: <vlan-tagging></vlan-tagging> → True
-    if (not element.text or not element.text.strip()) and len(element) == 0:
-        print(f"Empty tag: {element.tag}")
-        return ""
+    # Self-closing or empty tag
+    if not has_text and not has_children:
+        if tag_name in explicit_empty_tags:
+            print(f"Explicit empty tag → [{{}}]: <{tag_name}>")
+            return [{}]
+        else:
+            print(f"Self-closing tag → empty string: <{tag_name}>")
+            return ""
 
+    # # Case: <vlan-tagging></vlan-tagging> → True
+    # if (not element.text or not element.text.strip()) and len(element) == 0:
+    #     print(f"Empty tag: {element.tag}")
+    #     return ""
+    
     # Case: <name>ge-0/0/3</name> → "ge-0/0/3"
     if element.text and element.text.strip() and len(element) == 0:
         text_value = element.text.strip()
@@ -48,7 +60,7 @@ def parse_element(element):
     # Default case: has children
     parsed = {}
     for child in element:
-        child_data = parse_element(child)
+        child_data = parse_element(child, explicit_empty_tags)
         tag = normalize_tag(child.tag)
 
         # If tag repeats, group into list
@@ -87,6 +99,10 @@ def parse_xml_to_hcl(xml_file):
         with open(xml_file, 'r') as file:
             xml_content = file.read()
 
+        explicit_empty_tags = set()
+        for match in re.finditer(r"<(\w[\w\-]*)>\s*</\1>", xml_content):
+            explicit_empty_tags.add(match.group(1))
+
         # Wrap the XML content with a single root element
         wrapped_xml = f"<root>{xml_content}</root>"
 
@@ -97,7 +113,7 @@ def parse_xml_to_hcl(xml_file):
         parsed_data = {}
         for elem in tree:
             tag = normalize_tag(elem.tag)
-            parsed_data[tag] = parse_element(elem)
+            parsed_data[tag] = parse_element(elem, explicit_empty_tags)
 
         # Generate the HCL output
         hcl_block = generate_hcl_resources(parsed_data)
