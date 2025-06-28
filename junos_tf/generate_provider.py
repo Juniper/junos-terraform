@@ -7,6 +7,8 @@ import sys
 from jinja2 import Template
 from junos_tf.go_template_2 import render_template
 import os
+import shutil
+
 
 def get_xpaths(root):
     # defined a recursive function to walk the xml and populate result[]
@@ -188,7 +190,6 @@ def filter_json_using_xml(schema, xml):
         # Fall back to full tree if <configuration> not found
         paths = unique_xpaths(get_xpaths(root))
 
-    print(paths)
     return walk_schema(paths, schema)
  
 # Main Method
@@ -197,17 +198,49 @@ def main():
     parser = argparse.ArgumentParser(exit_on_error=True)
     parser.add_argument('-j', '--json-schema', required=True, help='specify the json schema file')
     parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
+    parser.add_argument('-t', '--type', required=True, choices=['vqfx', 'vsrx', 'vptx'], help='device type (vqfx, vsrx, vptx)')
     args = parser.parse_args()
-    resources = filter_json_using_xml(args.json_schema, args.xml_config)
-    output = render_template(data=resources)
-    output_dir = "terraform_providers"
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "resource_config_provider.go")
 
-    # Save the output
+    # Step 1: Filter the schema using the config
+    resources = filter_json_using_xml(args.json_schema, args.xml_config)
+
+    # Step 2: Render the template into Go code
+    output = render_template(data=resources)
+
+    # Step 3: Prepare new output directory based on type
+    base_dir = "terraform_provider"
+    new_dir = f"terraform-provider-junos-{args.type}"
+
+    # Remove existing directory if it exists to ensure clean copy
+    if os.path.exists(new_dir):
+        shutil.rmtree(new_dir)
+    
+    shutil.copytree(base_dir, new_dir)
+
+    # Step 4: Save rendered Go file into new directory
+    output_path = os.path.join(new_dir, "resource_config_provider.go")
     with open(output_path, "w") as f:
         f.write(render_template(data=resources).lstrip())
+
     print(f"Plugin created in {os.path.relpath(output_path)}\n")
+
+    # Update provider.go with correct type
+    provider_path = os.path.join(new_dir, "provider.go")
+    if os.path.exists(provider_path):
+        with open(provider_path, "r") as f:
+            provider_content = f.read()
+
+        updated_content = provider_content.replace(
+            'resp.TypeName = "junos-<device-type>"',
+            f'resp.TypeName = "junos-{args.type}"'
+        )
+
+        with open(provider_path, "w") as f:
+            f.write(updated_content)
+
+        print(f"Updated provider.go with type junos-{args.type}")
+    else:
+        print(f"Warning: provider.go not found in {new_dir}")
     
 # run main()
 if __name__ == "__main__":

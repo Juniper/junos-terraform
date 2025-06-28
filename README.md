@@ -46,17 +46,25 @@ cp examples/evpn-vxlan-dc/dc2/dc2-spine1.xml config.xml
 
 Now run the following command to generate a `resource provider`. 
 
+```bash
+generate_provider.py -j <json-file> -x <xml-configuration> -t <device-type>
+```
+
 Example:
 ```bash
-generate_plugin.py -j junos.json -x config.xml
+generate_provider.py -j junos.json -x config.xml -t vqfx
 ```
 
 ---
 
 ### <u>Build the provider and install</u>
+
+cd into the newly created directory starting with `terraform-provider-junos-` then the device-type and then `go install`
+
+example:
+
 ```
-cd terraform_providers
-go build
+cd terraform-provider-junos-vqfx
 go install
 ```
 
@@ -66,7 +74,7 @@ go install
 
 Run this command to create a `.tf` test file to deploy the terraform provider.
 ```
-populate_tf.py config.xml
+populate-tf.py config.xml
 cd testbed
 ```
 
