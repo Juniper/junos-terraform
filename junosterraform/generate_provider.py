@@ -51,24 +51,24 @@ def check_path(paths, node):
  
 def check_for_choice(elem):
     cases = []
-    kids = []
+    children = []
     if elem["type"] == "choice":
-        # node of type choice but do not have any kids e.g. vstp-flooding-option
-        if "kids" not in elem.keys():
-            return kids
-        for k in elem["kids"]:
+        # node of type choice but do not have any children e.g. vstp-flooding-option
+        if "children" not in elem.keys():
+            return children
+        for k in elem["children"]:
             cases.append(k)
         for case in cases:
-            if "kids" in case.keys():
-                kids.append(case["kids"])
-    return kids
+            if "children" in case.keys():
+                children.append(case["children"])
+    return children
 
 def check_for_enums(elem, node_parent):
     cases =[]
-    kids = []
+    children = []
     if elem["name"] == 'choice-ident' and elem["type"] == 'leaf':
         for k in elem["enums"]:
-            # this fix for especially for community-name which is present in enums as well kid outside enums
+            # this fix for especially for community-name which is present in enums as well child outside enums
             if k['id'] not in node_parent[-2]['key']:
                 cases.append(k)
         for case in cases:
@@ -76,12 +76,12 @@ def check_for_enums(elem, node_parent):
             tmp_dict['name'] = case['id']
             tmp_dict['type'] = 'leaf'
             tmp_dict['leaf-type'] = 'string'
-            kids.append(tmp_dict)
-    return kids
+            children.append(tmp_dict)
+    return children
         
-def check_kids(paths, elem, node_parent, current_path):
+def check_children(paths, elem, node_parent, current_path):
     if isinstance(node_parent[-2], dict):
-        if "kids" in node_parent[-2].keys():
+        if "children" in node_parent[-2].keys():
             if isinstance(elem, dict):
                 elem_path = ''
                 if current_path == '':
@@ -127,7 +127,7 @@ def walk_schema(paths, node, parent = []):
         parent.append(node)
         for k in node.keys():
             if emit_data:                
-                # Node with empty kids list is continued as type container or list just that no kids element is missing'       
+                # Node with empty children list is continued as type container or list just that no children element is missing'       
                 tmp_result = walk_schema(paths, node[k], parent)
                 if isinstance(tmp_result, list) and len(tmp_result) == 0:
                     continue
@@ -140,7 +140,7 @@ def walk_schema(paths, node, parent = []):
         parent.append(node)
         for elem in node:
             # UPDATE: This code now handles choice options --> vlan_tagging and vlan_id now included
-            result_val = check_kids(paths, elem, parent, current_path)
+            result_val = check_children(paths, elem, parent, current_path)
             if isinstance(result_val, list):
                 for item in result_val:
                     if isinstance(item, list):
