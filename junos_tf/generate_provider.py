@@ -198,7 +198,7 @@ def main():
     parser = argparse.ArgumentParser(exit_on_error=True)
     parser.add_argument('-j', '--json-schema', required=True, help='specify the json schema file')
     parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
-    parser.add_argument('-t', '--type', required=True, choices=['vqfx', 'vsrx', 'vptx'], help='device type (vqfx, vsrx, vptx)')
+    parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
     args = parser.parse_args()
 
     # Step 1: Filter the schema using the config
