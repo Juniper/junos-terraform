@@ -26,11 +26,11 @@ cd junos-terraform
 
 Find the device's Junos Version that is running, and locate the corresponding yang and common folders. Run the below `pyang` command to generate a `.json` file containing `.yang` information for that version. [See below example for Junos version 18.2]
 ```
-pyang --plugindir ./junos_tf/pyang_plugin -f jtaf -p <path-to-common> <path-to-yang-files> > junos.json
+pyang --plugindir ./junosterraform/pyang_plugin -f jtaf -p <path-to-common> <path-to-yang-files> > junos.json
 ```
 Example: 
 ```
-pyang --plugindir ./junos_tf/pyang_plugin -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
+pyang --plugindir ./junosterraform/pyang_plugin -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
 ```
 ---
 
