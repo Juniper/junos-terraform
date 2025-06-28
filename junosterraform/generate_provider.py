@@ -175,8 +175,11 @@ def walk_schema(paths, node, parent = []):
 
 # Method which starts the walk
 def filter_json_using_xml(schema, xml):
-    with open(schema) as f:
-        schema = json.loads(f.read())
+    if schema == "-":
+        schema = json.load(sys.stdin)
+    else:
+        with open(schema) as f:
+            schema = json.load(f)
     with open(xml) as f:
         xml_text = f.read()
 
@@ -212,17 +215,18 @@ def main():
     package_dir = os.path.dirname(pkg_resources.resource_filename('junosterraform', '__init__.py'))
     base_dir = f"{package_dir}/terraform_provider"
     new_dir = f"terraform-provider-junos-{args.type}"
-    
-    shutil.copytree(base_dir, new_dir)
 
-    # Step 4: Save rendered Go file into new directory
+    # Step 4: copy the template go files into place
+    shutil.copytree(base_dir, new_dir, dirs_exist_ok=True)
+
+    # Step 5: Save rendered Go file into new directory
     output_path = os.path.join(new_dir, "resource_config_provider.go")
     with open(output_path, "w") as f:
         f.write(render_template(data=resources).lstrip())
 
     print(f"Plugin created in {os.path.relpath(output_path)}\n")
 
-    # Update provider.go with correct type
+    # Step 6: Update provider.go with correct type
     provider_path = os.path.join(new_dir, "provider.go")
     if os.path.exists(provider_path):
         with open(provider_path, "r") as f:
