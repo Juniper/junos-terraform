@@ -26,11 +26,11 @@ cd junos-terraform
 
 Find the device's Junos Version that is running, and locate the corresponding yang and common folders. Run the below `pyang` command to generate a `.json` file containing `.yang` information for that version. [See below example for Junos version 18.2]
 ```
-pyang --plugindir ./junos_tf/pyang_plugin -f jtaf -p <path-to-common> <path-to-yang-files> > junos.json
+pyang --plugindir ./pyang_plugin -f jtaf -p <path-to-common> <path-to-yang-files> > junos.json
 ```
 Example: 
 ```
-pyang --plugindir ./junos_tf/pyang_plugin -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
+pyang --plugindir ./pyang_plugin -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
 ```
 ---
 
@@ -53,6 +53,11 @@ generate_provider.py -j <json-file> -x <xml-configuration> -t <device-type>
 Example:
 ```bash
 generate_provider.py -j junos.json -x config.xml -t vqfx
+```
+
+All in one example (`-j` accepts `-` for `stdin` for `generate_provider.py`):
+```bash
+pyang --plugindir ./pyang_plugin -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang | generate_provider.py -j - -x config.xml -t vqfx
 ```
 
 ---

@@ -124,7 +124,7 @@ def parse_xml_to_hcl(xml_file):
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: populate_tf junos_tf/<config-file.xml>")
+        print("Usage: populate_tf <config-file.xml>")
         sys.exit(1)
 
     xml_file = sys.argv[1]
