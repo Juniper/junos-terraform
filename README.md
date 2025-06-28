@@ -55,6 +55,11 @@ Example:
 generate_provider.py -j junos.json -x config.xml -t vqfx
 ```
 
+All in one example (`-j` accepts `-` for `stdin` for `generate_provider.py`):
+```bash
+pyang --plugindir ./pyang_plugin -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang | generate_provider.py -j - -x config.xml -t vqfx
+```
+
 ---
 
 ### <u>Build the provider and install</u>

@@ -5,7 +5,7 @@ import json
 import argparse
 import sys
 from jinja2 import Template
-from junosterraform.go_template_2 import render_template
+from junosterraform.resource_config_provider_go import render_template
 import os
 import shutil
 import pkg_resources
