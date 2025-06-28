@@ -9,6 +9,9 @@ setup(
     description="Junos Terraform Framework",
     packages=find_packages(),
     scripts=["junosterraform/generate_provider.py", "junosterraform/populate_tf.py"],
+    package_data = {
+        "junosterraform": [ "terraform_provider/*", "terraform_provider/netconf/*" ]
+    },
     install_requires=[
         'pytest',
         'pyang',

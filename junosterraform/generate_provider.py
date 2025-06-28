@@ -8,6 +8,7 @@ from jinja2 import Template
 from junosterraform.go_template_2 import render_template
 import os
 import shutil
+import pkg_resources
 
 
 def get_xpaths(root):
@@ -208,12 +209,9 @@ def main():
     output = render_template(data=resources)
 
     # Step 3: Prepare new output directory based on type
-    base_dir = "terraform_provider"
+    package_dir = os.path.dirname(pkg_resources.resource_filename('junosterraform', '__init__.py'))
+    base_dir = f"{package_dir}/terraform_provider"
     new_dir = f"terraform-provider-junos-{args.type}"
-
-    # Remove existing directory if it exists to ensure clean copy
-    if os.path.exists(new_dir):
-        shutil.rmtree(new_dir)
     
     shutil.copytree(base_dir, new_dir)
 

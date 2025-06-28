@@ -11,6 +11,7 @@
 /yang/
 /.idea/
 /build/
-/junos_terraform.egg-info/
+/junosterraform.egg-info/
 /testbed/
 __pycache__/
+/dist/
