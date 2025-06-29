@@ -188,10 +188,16 @@ def filter_json_using_xml(schema, xml):
     # Try to find the <configuration> node under <rpc-reply>
     config_node = root.find(".//configuration")
     if config_node is not None:
-        paths = unique_xpaths(get_xpaths(config_node))
-    else:
-        # Fall back to full tree if <configuration> not found
-        paths = unique_xpaths(get_xpaths(root))
+        # set the config node to be root
+        root = config_node
+
+    # find and remove any version node
+    version_node = root.find("./version")
+    if version_node is not None:
+        root.remove(version_node)
+
+    # find the unique paths
+    paths = unique_xpaths(get_xpaths(root))
 
     return walk_schema(paths, schema)
  
