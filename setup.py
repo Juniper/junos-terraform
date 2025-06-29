@@ -7,8 +7,9 @@ setup(
     url='https://github.com/aburston/junos-terraform',
     author="Juniper Networks",
     description="Junos Terraform Framework",
-    packages=find_packages(),
-    scripts=["junosterraform/generate_provider.py", "junosterraform/populate_tf.py"],
+    #packages=find_packages(),
+    packages=["junosterraform", "jtaf_pyang_plugin"],
+    scripts=["junosterraform/jtaf-provider", "jtaf_pyang_plugin/jtaf-pyang-plugindir", "junosterraform/jtaf-junos-xml2tf"],
     package_data = {
         "junosterraform": [ "terraform_provider/*", "terraform_provider/netconf/*", "templates/*" ]
     },
