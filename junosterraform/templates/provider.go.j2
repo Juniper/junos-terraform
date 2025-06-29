@@ -70,7 +70,7 @@ func (p Provider) DataSources(_ context.Context) []func() datasource.DataSource 
 
 // Metadata implements provider.Provider.
 func (p Provider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "junos-<device-type>"
+	resp.TypeName = "junos-{{data.device_type}}"
 }
 
 // Resources implements provider.Provider.

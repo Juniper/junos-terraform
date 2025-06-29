@@ -210,8 +210,7 @@ def main():
     # Step 2: Render the template into Go code
     package_dir = os.path.dirname(pkg_resources.resource_filename('junosterraform', '__init__.py'))
     templates_dir = f"{package_dir}/templates"
-    j2_go_file = f"{templates_dir}/resource_config_provider.go.j2"
-    with open(j2_go_file) as f:
+    with open(f"{templates_dir}/resource_config_provider.go.j2") as f:
         jinja2_source = f.read()
     tmpl = Template(jinja2_source)
     resource_config_provider_go = tmpl.render(data=resources).lstrip()
@@ -231,22 +230,15 @@ def main():
     print(f"Plugin created in {os.path.relpath(resource_config_provider_go_fullpath)}\n")
 
     # Step 6: Update provider.go with correct type
+    with open(f"{templates_dir}/provider.go.j2") as f:
+        jinja2_source = f.read()
+    tmpl = Template(jinja2_source)
+    provider_go = tmpl.render(data={"device_type": args.type}).lstrip()
     provider_path = os.path.join(new_dir, "provider.go")
-    if os.path.exists(provider_path):
-        with open(provider_path, "r") as f:
-            provider_content = f.read()
+    with open(provider_path, "w") as f:
+        f.write(provider_go)
 
-        updated_content = provider_content.replace(
-            'resp.TypeName = "junos-<device-type>"',
-            f'resp.TypeName = "junos-{args.type}"'
-        )
-
-        with open(provider_path, "w") as f:
-            f.write(updated_content)
-
-        print(f"Updated provider.go with type junos-{args.type}")
-    else:
-        print(f"Warning: provider.go not found in {new_dir}")
+    print(f"Updated provider.go with type junos-{args.type}")
     
 # run main()
 if __name__ == "__main__":
