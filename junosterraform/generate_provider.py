@@ -5,7 +5,6 @@ import json
 import argparse
 import sys
 from jinja2 import Template
-from junosterraform.resource_config_provider_go import render_template
 import os
 import shutil
 import pkg_resources
@@ -209,10 +208,15 @@ def main():
     resources = filter_json_using_xml(args.json_schema, args.xml_config)
 
     # Step 2: Render the template into Go code
-    output = render_template(data=resources)
+    package_dir = os.path.dirname(pkg_resources.resource_filename('junosterraform', '__init__.py'))
+    templates_dir = f"{package_dir}/templates"
+    j2_go_file = f"{templates_dir}/resource_config_provider.go.j2"
+    with open(j2_go_file) as f:
+        jinja2_source = f.read()
+    tmpl = Template(jinja2_source)
+    resource_config_provider_go = tmpl.render(data=resources).lstrip()
 
     # Step 3: Prepare new output directory based on type
-    package_dir = os.path.dirname(pkg_resources.resource_filename('junosterraform', '__init__.py'))
     base_dir = f"{package_dir}/terraform_provider"
     new_dir = f"terraform-provider-junos-{args.type}"
 
@@ -220,11 +224,11 @@ def main():
     shutil.copytree(base_dir, new_dir, dirs_exist_ok=True)
 
     # Step 5: Save rendered Go file into new directory
-    output_path = os.path.join(new_dir, "resource_config_provider.go")
-    with open(output_path, "w") as f:
-        f.write(render_template(data=resources).lstrip())
+    resource_config_provider_go_fullpath = os.path.join(new_dir, "resource_config_provider.go")
+    with open(resource_config_provider_go_fullpath, "w") as f:
+        f.write(resource_config_provider_go)
 
-    print(f"Plugin created in {os.path.relpath(output_path)}\n")
+    print(f"Plugin created in {os.path.relpath(resource_config_provider_go_fullpath)}\n")
 
     # Step 6: Update provider.go with correct type
     provider_path = os.path.join(new_dir, "provider.go")

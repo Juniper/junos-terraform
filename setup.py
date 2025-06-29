@@ -10,7 +10,7 @@ setup(
     packages=find_packages(),
     scripts=["junosterraform/generate_provider.py", "junosterraform/populate_tf.py"],
     package_data = {
-        "junosterraform": [ "terraform_provider/*", "terraform_provider/netconf/*" ]
+        "junosterraform": [ "terraform_provider/*", "terraform_provider/netconf/*", "templates/*" ]
     },
     install_requires=[
         'pytest',
