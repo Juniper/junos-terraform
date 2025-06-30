@@ -39,10 +39,8 @@ def parse_element(element, explicit_empty_tags):
     # Self-closing or empty tag
     if not has_text and not has_children:
         if tag_name in explicit_empty_tags:
-            print(f"Explicit empty tag → [{{}}]: <{tag_name}>")
             return [{}]
         else:
-            print(f"Self-closing tag → empty string: <{tag_name}>")
             return ""
 
     # # Case: <vlan-tagging></vlan-tagging> → True
