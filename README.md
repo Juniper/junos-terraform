@@ -70,7 +70,13 @@ go install
 
 Run this command to create a `.tf` test file to deploy the terraform provider.
 ```
-populate-tf.py config.xml
+jtaf-junos-xml2tf -x <device-xml-config> -t <device-type> -ho <deivce-host-name>    
+cd testbed
+```
+
+Example: 
+```
+jtaf-junos-xml2tf -x config.xml -t vqfx -ho dc2-spine1    
 cd testbed
 ```
 
@@ -91,18 +97,6 @@ provider_installation {
 	}
 }
 ```
-
----
-
-### <u>Update `provider.go`</u>
-
-Line 73 of `provider.go` needs to match the device type you intend to use (from "registry.terraform.io/hashicorp/junos-vqfx"). 
-
-For example, for vsrx devices, update line 73 in `provider.go` to:
-```	
-resp.TypeName = "junos-vsrx"
-```
-
 ---
 
 ### <u>Edit Test Files, Plan, and Apply</u>
