@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 from lxml import etree
 import sys
 import re
@@ -63,23 +64,84 @@ def parse_element(element, explicit_empty_tags):
         child_data = parse_element(child, explicit_empty_tags)
         tag = normalize_tag(child.tag)
 
-        # If tag repeats, group into list
+        # If tag repeats, make sure it’s a flat list
         if tag in parsed:
             if not isinstance(parsed[tag], list):
                 parsed[tag] = [parsed[tag]]
-            parsed[tag].append(child_data)
+
+            # Flatten if child_data is a single-item list with a dict
+            if isinstance(child_data, list) and len(child_data) == 1 and isinstance(child_data[0], dict):
+                parsed[tag].append(child_data[0])
+            else:
+                parsed[tag].append(child_data)
         else:
-            parsed[tag] = child_data
+            # First occurrence — flatten single-item dict-lists
+            if isinstance(child_data, list) and len(child_data) == 1 and isinstance(child_data[0], dict):
+                parsed[tag] = [child_data[0]]
+            else:
+                parsed[tag] = child_data
 
     return [parsed]  # Always return a list of dict for elements with children
 
+def normalize_from_blocks(data):
+    """
+    Recursively normalize all 'from' blocks:
+    - Any list of scalars inside a `from = [{...}]` block will be split into multiple dicts.
+    Example:
+      { protocol = ["evpn", "ospf"], route_filter = [...] }
+      → becomes
+      [
+        { protocol = "evpn" },
+        { protocol = "ospf" },
+        { route_filter = [...] }
+      ]
+    """
+    if isinstance(data, dict):
+        for key, val in data.items():
+            if key == "from" and isinstance(val, list):
+                new_from_list = []
+                for block in val:
+                    if isinstance(block, dict):
+                        for subkey, subval in block.items():
+                            if isinstance(subval, list) and all(isinstance(item, (str, int, float)) for item in subval):
+                                # Split scalar lists into multiple dicts
+                                new_from_list.extend([{subkey: item} for item in subval])
+                            else:
+                                new_from_list.append({subkey: subval})
+                    else:
+                        new_from_list.append(block)
+                data[key] = new_from_list
+            else:
+                data[key] = normalize_from_blocks(val)
+    elif isinstance(data, list):
+        return [normalize_from_blocks(item) for item in data]
+    return data
 
-def generate_hcl_resources(parsed_data):
+
+def generate_hcl_resources(parsed_data, device_type, hostname):
     """
     Generates a single Terraform-style resource block combining all top-level elements.
     """
-    resource_block = 'resource "junos-<device-type>_Apply_Groups" "<device_hostname>" {\n'
-    resource_block += '  resource_name = "JTAF_<device_hostname>"\n'
+    provider_block = f"""terraform {{
+  required_providers {{
+    junos-{device_type} = {{
+      source = "junos-{device_type}"
+    }}
+  }}
+}}
+
+provider "junos-{device_type}" {{
+  host     = ""
+  port     = 22
+  username = ""
+  password = ""
+  sshkey   = ""
+  alias    = "{hostname}"
+}}
+    """
+    resource_block = provider_block + f'\nresource "junos-{device_type}_Apply_Groups" "{hostname}" {{\n'
+    resource_block += f'  resource_name = "JTAF_{hostname}"\n'
+    resource_block += f'  provider = junos-{device_type}.{hostname}\n'
 
     for key, value in parsed_data.items():
         hcl_value = convert_to_hcl(value, indent=4)
@@ -89,7 +151,7 @@ def generate_hcl_resources(parsed_data):
     return resource_block
 
 
-def parse_xml_to_hcl(xml_file):
+def parse_xml_to_hcl(xml_file, device_type, hostname):
     """
     Parses an XML file and converts it to Terraform-style HCL resources.
     """
@@ -115,20 +177,27 @@ def parse_xml_to_hcl(xml_file):
             tag = normalize_tag(elem.tag)
             parsed_data[tag] = parse_element(elem, explicit_empty_tags)
 
+        # Normalize 'from' blocks globally
+        parsed_data = normalize_from_blocks(parsed_data)
+
         # Generate the HCL output
-        hcl_block = generate_hcl_resources(parsed_data)
+        hcl_block = generate_hcl_resources(parsed_data, device_type, hostname)
         return hcl_block
 
     except Exception as e:
         print(f"Error parsing XML: {e}")
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: populate_tf <config-file.xml>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(exit_on_error=True)
+    parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
+    parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
+    parser.add_argument('-ho', '--hostname', required=True, help='device hostname (i.e. dc2-spine1, dc2-spine2, etc)')
+    args = parser.parse_args()
 
-    xml_file = sys.argv[1]
-    hcl_output = parse_xml_to_hcl(xml_file)
+    xml_file = args.xml_config
+    device_type = args.type
+    hostname = args.hostname
+    hcl_output = parse_xml_to_hcl(xml_file, device_type, hostname)
 
     if hcl_output:
         output_dir = "testbed"
