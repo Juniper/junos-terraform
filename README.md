@@ -26,20 +26,12 @@ cd junos-terraform
 
 Find the device's Junos Version that is running, and locate the corresponding yang and common folders. Run the below `pyang` command to generate a `.json` file containing `.yang` information for that version. [See below example for Junos version 18.2]
 ```
-pyang --plugindir ./pyang_plugin -f jtaf -p <path-to-common> <path-to-yang-files> > junos.json
+pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p <path-to-common> <path-to-yang-files> > junos.json
 ```
 Example: 
 ```
-pyang --plugindir ./pyang_plugin -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
+pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
 ```
----
-
-### <u>Add Desired Configuration</u>
-Now copy an example OR add a real desired device configuration to home directory. [See below using example for a dc2 qfx spine]
-```
-cp examples/evpn-vxlan-dc/dc2/dc2-spine1.xml config.xml
-```
-
 ---
 
 ### <u>Generate Resource Provider</u>
@@ -47,17 +39,16 @@ cp examples/evpn-vxlan-dc/dc2/dc2-spine1.xml config.xml
 Now run the following command to generate a `resource provider`. 
 
 ```bash
-generate_provider.py -j <json-file> -x <xml-configuration> -t <device-type>
+jtaf-provider -j <json-file> -x <xml-configuration> -t <device-type>
 ```
 
 Example:
 ```bash
-generate_provider.py -j junos.json -x config.xml -t vqfx
+jtaf-provider -j junos.json -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx
 ```
-
-All in one example (`-j` accepts `-` for `stdin` for `generate_provider.py`):
+All in one example (`-j` accepts `-` for `stdin` for `jtaf-provider`):
 ```bash
-pyang --plugindir ./pyang_plugin -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang | generate_provider.py -j - -x config.xml -t vqfx
+pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang | jtaf-provider -j - -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx
 ```
 
 ---

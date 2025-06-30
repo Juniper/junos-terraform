@@ -1,7 +1,3 @@
-from jinja2 import Template
-
-def render_template(data):
-    jinja_source = """
 {############# COMMON VARIABLES # STARTS ################}
 {%- set parent_list = data['root']['children'][0]['children']%}
 
@@ -519,6 +515,3 @@ func (r *resource_Apply_Groups) Delete(ctx context.Context, req resource.DeleteR
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 {################## DELETE METHOD # ENDS ################}
-"""
-    tmpl = Template(jinja_source)
-    return tmpl.render(data=data)
