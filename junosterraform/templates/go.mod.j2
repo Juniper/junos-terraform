@@ -1,19 +1,15 @@
-module terraform_providers
+module terraform-provider-junos-{{data.device_type}}
 
 go 1.23.8
 
 require (
-	github.com/Juniper/junos-terraform v0.0.0-20240722162049-70b25efa5392
+	github.com/Juniper/junos-terraform v0.0.0-20250626082507-94d2c2fd6b60
 	github.com/chrismarget/lambda-tf-registry v0.0.1
 	github.com/goreleaser/goreleaser v1.26.2
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	github.com/vinpatel24/go-netconf v0.1.3
 	golang.org/x/crypto v0.39.0
 )
-
-replace github.com/vinpatel24/go-netconf => ./terraform_providers/go-netconf
-
-replace github.com/Juniper/junos-terraform/terraform_providers/netconf => ./terraform_providers/netconf
 
 require (
 	cloud.google.com/go v0.112.1 // indirect
@@ -46,7 +42,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.3 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/ProtonMail/go-crypto v1.0.0 // indirect
+	github.com/ProtonMail/go-crypto v1.1.0-alpha.2 // indirect
 	github.com/alessio/shellescape v1.4.1 // indirect
 	github.com/anchore/bubbly v0.0.0-20230518153401-87b6af8ccf22 // indirect
 	github.com/anchore/go-logger v0.0.0-20230725134548-c21dafa1ec5a // indirect
@@ -123,7 +119,7 @@ require (
 	github.com/elliotchance/orderedmap/v2 v2.2.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
-	github.com/fatih/color v1.15.0 // indirect
+	github.com/fatih/color v1.16.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect

@@ -27,7 +27,7 @@ class FNode:
     def __init__(self, name):
         self.name = name
         self.type = "container"
-        self.kids = []
+        self.children = []
         
     def __setitem__(self, a, v):
         """To allow setting of attributes directly
@@ -55,15 +55,15 @@ class FNode:
             if not k in keys:
                 keys.append(k)
 
-        # make kids last
-        keys.append("kids")
+        # make children last
+        keys.append("children")
         
         d = OrderedDict()
         for k in keys:
             kk = k.replace("_", "-")
             if k in self.__dict__:
-                # if kids, output only if kids is not empty
-                if k != "kids" or len(self.__dict__[k]) > 0:
+                # if children, output only if children is not empty
+                if k != "children" or len(self.__dict__[k]) > 0:
                     d[kk] = self.__dict__[k]
                 
         return d
@@ -85,16 +85,16 @@ class FNodeTree:
         self.tree["identities"].append(ident)
     
     def push(self, name):
-        kid = FNode(name)
+        child = FNode(name)
         if self.cur == None:
-            self.tree["root"] = kid
+            self.tree["root"] = child
         else:
-            self.cur.kids.append(kid)
+            self.cur.children.append(child)
             
-        self.cur = kid
-        self.stack.append(kid)
+        self.cur = child
+        self.stack.append(child)
         
-        return kid
+        return child
 
     def pop(self):
         if len(self.stack) > 0:

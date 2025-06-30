@@ -5,8 +5,10 @@ import json
 import argparse
 import sys
 from jinja2 import Template
-from junos_tf.go_template_2 import render_template
 import os
+import shutil
+import pkg_resources
+
 
 def get_xpaths(root):
     # defined a recursive function to walk the xml and populate result[]
@@ -48,24 +50,24 @@ def check_path(paths, node):
  
 def check_for_choice(elem):
     cases = []
-    kids = []
+    children = []
     if elem["type"] == "choice":
-        # node of type choice but do not have any kids e.g. vstp-flooding-option
-        if "kids" not in elem.keys():
-            return kids
-        for k in elem["kids"]:
+        # node of type choice but do not have any children e.g. vstp-flooding-option
+        if "children" not in elem.keys():
+            return children
+        for k in elem["children"]:
             cases.append(k)
         for case in cases:
-            if "kids" in case.keys():
-                kids.append(case["kids"])
-    return kids
+            if "children" in case.keys():
+                children.append(case["children"])
+    return children
 
 def check_for_enums(elem, node_parent):
     cases =[]
-    kids = []
+    children = []
     if elem["name"] == 'choice-ident' and elem["type"] == 'leaf':
         for k in elem["enums"]:
-            # this fix for especially for community-name which is present in enums as well kid outside enums
+            # this fix for especially for community-name which is present in enums as well child outside enums
             if k['id'] not in node_parent[-2]['key']:
                 cases.append(k)
         for case in cases:
@@ -73,12 +75,12 @@ def check_for_enums(elem, node_parent):
             tmp_dict['name'] = case['id']
             tmp_dict['type'] = 'leaf'
             tmp_dict['leaf-type'] = 'string'
-            kids.append(tmp_dict)
-    return kids
+            children.append(tmp_dict)
+    return children
         
-def check_kids(paths, elem, node_parent, current_path):
+def check_children(paths, elem, node_parent, current_path):
     if isinstance(node_parent[-2], dict):
-        if "kids" in node_parent[-2].keys():
+        if "children" in node_parent[-2].keys():
             if isinstance(elem, dict):
                 elem_path = ''
                 if current_path == '':
@@ -124,7 +126,7 @@ def walk_schema(paths, node, parent = []):
         parent.append(node)
         for k in node.keys():
             if emit_data:                
-                # Node with empty kids list is continued as type container or list just that no kids element is missing'       
+                # Node with empty children list is continued as type container or list just that no children element is missing'       
                 tmp_result = walk_schema(paths, node[k], parent)
                 if isinstance(tmp_result, list) and len(tmp_result) == 0:
                     continue
@@ -137,7 +139,7 @@ def walk_schema(paths, node, parent = []):
         parent.append(node)
         for elem in node:
             # UPDATE: This code now handles choice options --> vlan_tagging and vlan_id now included
-            result_val = check_kids(paths, elem, parent, current_path)
+            result_val = check_children(paths, elem, parent, current_path)
             if isinstance(result_val, list):
                 for item in result_val:
                     if isinstance(item, list):
@@ -159,14 +161,44 @@ def walk_schema(paths, node, parent = []):
         result = node
     return result
  
+# # Method which starts the walk
+# def filter_json_using_xml(schema, xml):
+#     with open(schema) as f:
+#         schema = json.loads(f.read())
+#     with open(xml) as f:
+#         xml_text = f.read()
+#     root = ElementTree.fromstring(f"<root>{xml_text}</root>")
+#     paths = unique_xpaths(get_xpaths(root))
+#     print(paths)
+#     return walk_schema(paths, schema)
+
 # Method which starts the walk
 def filter_json_using_xml(schema, xml):
-    with open(schema) as f:
-        schema = json.loads(f.read())
+    if schema == "-":
+        schema = json.load(sys.stdin)
+    else:
+        with open(schema) as f:
+            schema = json.load(f)
     with open(xml) as f:
         xml_text = f.read()
+
+    # Parse XML under temporary root
     root = ElementTree.fromstring(f"<root>{xml_text}</root>")
+
+    # Try to find the <configuration> node under <rpc-reply>
+    config_node = root.find(".//configuration")
+    if config_node is not None:
+        # set the config node to be root
+        root = config_node
+
+    # find and remove any version node
+    version_node = root.find("./version")
+    if version_node is not None:
+        root.remove(version_node)
+
+    # find the unique paths
     paths = unique_xpaths(get_xpaths(root))
+
     return walk_schema(paths, schema)
  
 # Main Method
@@ -175,17 +207,52 @@ def main():
     parser = argparse.ArgumentParser(exit_on_error=True)
     parser.add_argument('-j', '--json-schema', required=True, help='specify the json schema file')
     parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
+    parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
     args = parser.parse_args()
-    resources = filter_json_using_xml(args.json_schema, args.xml_config)
-    output = render_template(data=resources)
-    output_dir = "terraform_providers"
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "resource_config_provider.go")
 
-    # Save the output
-    with open(output_path, "w") as f:
-        f.write(render_template(data=resources).lstrip())
-    print(f"Plugin created in {os.path.relpath(output_path)}\n")
+    # Step 1: Filter the schema using the config
+    resources = filter_json_using_xml(args.json_schema, args.xml_config)
+
+    # Step 2: Render the template into Go code
+    package_dir = os.path.dirname(pkg_resources.resource_filename('junosterraform', '__init__.py'))
+    templates_dir = f"{package_dir}/templates"
+    with open(f"{templates_dir}/resource_config_provider.go.j2") as f:
+        jinja2_source = f.read()
+    tmpl = Template(jinja2_source)
+    resource_config_provider_go = tmpl.render(data=resources).lstrip()
+
+    # Step 3: Prepare new output directory based on type
+    go_dir = os.path.dirname(pkg_resources.resource_filename('terraform_provider', '__init__.py'))
+    new_dir = f"terraform-provider-junos-{args.type}"
+
+    # Step 4: copy the template go files into place
+    shutil.copytree(go_dir, new_dir, dirs_exist_ok=True)
+
+    # Step 5: Save rendered Go file into new directory
+    resource_config_provider_go_fullpath = os.path.join(new_dir, "resource_config_provider.go")
+    with open(resource_config_provider_go_fullpath, "w") as f:
+        f.write(resource_config_provider_go)
+    print(f"Plugin created in {os.path.relpath(resource_config_provider_go_fullpath)}\n")
+
+    # Step 6: Update provider.go with correct type
+    with open(f"{templates_dir}/provider.go.j2") as f:
+        jinja2_source = f.read()
+    tmpl = Template(jinja2_source)
+    provider_go = tmpl.render(data={"device_type": args.type}).lstrip()
+    provider_path = os.path.join(new_dir, "provider.go")
+    with open(provider_path, "w") as f:
+        f.write(provider_go)
+    print(f"Updated provider.go with type junos-{args.type}")
+
+    # Step 7: Update go.mod with correct type
+    with open(f"{templates_dir}/go.mod.j2") as f:
+        jinja2_source = f.read()
+    tmpl = Template(jinja2_source)
+    go_mod = tmpl.render(data={"device_type": args.type}).lstrip()
+    go_mod_path = os.path.join(new_dir, "go.mod")
+    with open(go_mod_path, "w") as f:
+        f.write(go_mod)
+    print(f"Updated go.mod with name template-provider-junos-{args.type}")
     
 # run main()
 if __name__ == "__main__":

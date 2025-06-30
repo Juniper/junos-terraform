@@ -4,7 +4,7 @@ import os
 from glob import glob
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "lib")))
-from generate_plugin import filter_json_using_xml
+from generate_provider import filter_json_using_xml
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "tests", "data_tests")
 
