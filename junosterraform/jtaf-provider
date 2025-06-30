@@ -222,17 +222,16 @@ def main():
     resource_config_provider_go = tmpl.render(data=resources).lstrip()
 
     # Step 3: Prepare new output directory based on type
-    base_dir = f"{package_dir}/terraform_provider"
+    go_dir = os.path.dirname(pkg_resources.resource_filename('terraform_provider', '__init__.py'))
     new_dir = f"terraform-provider-junos-{args.type}"
 
     # Step 4: copy the template go files into place
-    shutil.copytree(base_dir, new_dir, dirs_exist_ok=True)
+    shutil.copytree(go_dir, new_dir, dirs_exist_ok=True)
 
     # Step 5: Save rendered Go file into new directory
     resource_config_provider_go_fullpath = os.path.join(new_dir, "resource_config_provider.go")
     with open(resource_config_provider_go_fullpath, "w") as f:
         f.write(resource_config_provider_go)
-
     print(f"Plugin created in {os.path.relpath(resource_config_provider_go_fullpath)}\n")
 
     # Step 6: Update provider.go with correct type
@@ -243,8 +242,17 @@ def main():
     provider_path = os.path.join(new_dir, "provider.go")
     with open(provider_path, "w") as f:
         f.write(provider_go)
-
     print(f"Updated provider.go with type junos-{args.type}")
+
+    # Step 7: Update go.mod with correct type
+    with open(f"{templates_dir}/go.mod.j2") as f:
+        jinja2_source = f.read()
+    tmpl = Template(jinja2_source)
+    go_mod = tmpl.render(data={"device_type": args.type}).lstrip()
+    go_mod_path = os.path.join(new_dir, "go.mod")
+    with open(go_mod_path, "w") as f:
+        f.write(go_mod)
+    print(f"Updated go.mod with name template-provider-junos-{args.type}")
     
 # run main()
 if __name__ == "__main__":
