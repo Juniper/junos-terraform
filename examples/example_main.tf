@@ -1,9 +1,7 @@
 terraform {
   required_providers {
     junos-vqfx = {
-      # source = "juniper/providers/junos-vqfx"
       source = "junos-vqfx"
-      # version = "1.0.0"
     }
   }
 }
@@ -15,15 +13,6 @@ provider "junos-vqfx" {
     password = "MaRtInI"
     sshkey = ""
     alias = "dc2-spine1"
-}
-
-provider "junos-vqfx" {
-    host = "10.52.53.164"
-    port = 22
-    username = "regress"
-    password = "MaRtInI"
-    sshkey = ""
-    alias = "dc2-spine2"
 }
 
 resource "junos-vqfx_Apply_Groups" "dc2-spine1" {
@@ -223,50 +212,6 @@ resource "junos-vqfx_Apply_Groups" "dc2-spine1" {
           ]
         },
         {
-          name = "em0"
-          unit = [
-            {
-              name = 0
-              description = "*** management ***"
-              family = [
-                {
-                  inet = [
-                    {
-                      address = [
-                        {
-                          name = "100.123.24.8/16"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          name = "em1"
-          unit = [
-            {
-              name = 0
-              description = "*** to pfe ***"
-              family = [
-                {
-                  inet = [
-                    {
-                      address = [
-                        {
-                          name = "169.254.0.2/24"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
           name = "irb"
           unit = [
             {
@@ -347,7 +292,11 @@ resource "junos-vqfx_Apply_Groups" "dc2-spine1" {
       storm_control_profiles = [
         {
           name = "default"
-          all = [{}]
+          all = [
+            {
+
+            }
+          ]
         }
       ]
     }
@@ -448,7 +397,11 @@ resource "junos-vqfx_Apply_Groups" "dc2-spine1" {
                 {
                   evpn = [
                     {
-                      signaling = [{}]
+                      signaling = [
+                        {
+
+                        }
+                      ]
                     }
                   ]
                 }
@@ -459,7 +412,11 @@ resource "junos-vqfx_Apply_Groups" "dc2-spine1" {
                   as_number = 65201
                 }
               ]
-              multipath = [{}]
+              multipath = [
+                {
+
+                }
+              ]
               neighbor = [
                 {
                   name = "10.30.100.9"
@@ -637,11 +594,11 @@ resource "junos-vqfx_Apply_Groups" "dc2-spine1" {
               name = "loopback"
               from = [
                 {
-                  protocol = "direct",
+                  protocol = "direct"
                 },
                 {
                   protocol = "bgp"
-                },
+                }
               ]
               then = [
                 {
@@ -676,7 +633,7 @@ resource "junos-vqfx_Apply_Groups" "dc2-spine1" {
                 },
                 {
                   protocol = "direct"
-                },
+                }
               ]
               then = [
                 {
@@ -765,7 +722,7 @@ resource "junos-vqfx_Apply_Groups" "dc2-spine1" {
             },
             {
               name = "lo0.10001"
-            },
+            }
           ]
           route_distinguisher = [
             {
@@ -777,10 +734,18 @@ resource "junos-vqfx_Apply_Groups" "dc2-spine1" {
               community = "target:1:10001"
             }
           ]
-          vrf_table_label = [{}]
+          vrf_table_label = [
+            {
+
+            }
+          ]
           routing_options = [
             {
-              auto_export = [{}]
+              auto_export = [
+                {
+
+                }
+              ]
             }
           ]
           protocols = [
@@ -838,6 +803,11 @@ resource "junos-vqfx_Apply_Groups" "dc2-spine1" {
       vrf_target = [
         {
           community = "target:9999:9999"
+          auto = [
+            {
+
+            }
+          ]
         }
       ]
     }
