@@ -1,8 +1,5 @@
 /venv/
-/terraform_providers/dist/
 /config.toml
-/terraform_providers/terraform*
-/terraform_providers/resource_config_provider.go
 /Samples/
 /dev_files/
 /testbed/
@@ -10,6 +7,7 @@
 /yang/
 /.idea/
 /build/
-/junos_terraform.egg-info/
+/junosterraform.egg-info/
 /testbed/
 __pycache__/
+/dist/
