@@ -1,7 +1,7 @@
 # Go-NETCONF
 
-[![GoDoc](https://godoc.org/github.com/Juniper/go-netconf/netconf?status.svg)](https://godoc.org/github.com/Juniper/go-netconf/netconf)
-[![Go Report Card](https://goreportcard.com/badge/github.com/Juniper/go-netconf)](https://goreportcard.com/report/github.com/Juniper/go-netconf)
+[![GoDoc](https://godoc.org/github.com/vinpatel24/go-netconf/netconf?status.svg)](https://godoc.org/github.com/vinpatel24/go-netconf/netconf)
+[![Go Report Card](https://goreportcard.com/badge/github.com/vinpatel24/go-netconf)](https://goreportcard.com/report/github.com/vinpatel24/go-netconf)
 [![Build Status](https://travis-ci.org/Juniper/go-netconf.svg?branch=master)](https://travis-ci.org/Juniper/go-netconf)
 
 This library is a simple NETCONF client based on [RFC6241](http://tools.ietf.org/html/rfc6241) and [RFC6242](http://tools.ietf.org/html/rfc6242) (although not fully compliant yet).
@@ -20,7 +20,7 @@ This library is a simple NETCONF client based on [RFC6241](http://tools.ietf.org
 * Please use `git clone` because this is a library and not an application
 
 ```bash
-go get github.com/Juniper/go-netconf
+go get github.com/vinpatel24/go-netconf
 ```
 
 ## Example

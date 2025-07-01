@@ -3,7 +3,7 @@ module terraform-provider-junos-vqfx
 go 1.23.8
 
 require (
-	github.com/Juniper/go-netconf v0.1.3
+	github.com/vinpatel24/go-netconf v0.1.3
 	github.com/Juniper/junos-terraform v0.0.0-20250626082507-94d2c2fd6b60
 	github.com/chrismarget/lambda-tf-registry v0.0.1
 	github.com/goreleaser/goreleaser v1.26.2
@@ -11,7 +11,7 @@ require (
 	golang.org/x/crypto v0.39.0
 )
 
-replace github.com/Juniper/go-netconf => ./go-netconf
+replace github.com/vinpatel24/go-netconf => ./go-netconf
 
 require (
 	cloud.google.com/go v0.112.1 // indirect

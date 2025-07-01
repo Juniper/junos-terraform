@@ -4,7 +4,7 @@
 
 package netconf
 
-import rpc "github.com/Juniper/go-netconf/rpc"
+import rpc "github.com/vinpatel24/go-netconf/rpc"
 
 // Driver interface for building drivers that are self-contained from a user's perspective.
 type Driver interface {
