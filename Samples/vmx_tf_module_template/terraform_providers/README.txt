@@ -1,1 +1,0 @@
-This directory is where the .go files magically appear.

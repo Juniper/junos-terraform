@@ -1,5 +1,0 @@
-<!-- this is a sample example. Modify it to your requirements -->
-<file-list>
-    <xpath name="/security/address-book/address-set/address/name"/>
-    <xpath name="/security/nat/source/pool/address/to/ipaddr"/>
-</file-list>

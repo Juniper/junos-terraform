@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+import argparse
+from lxml import etree
+import sys
+import re
+import os
+
+def convert_to_hcl(value, indent=2):
+    """
+    Converts Python dictionary or list into Terraform-compatible HCL syntax.
+    """
+    spaces = " " * indent
+    if isinstance(value, dict):
+        return "{\n" + "\n".join([f'{spaces}{k} = {convert_to_hcl(v, indent + 2)}' for k, v in value.items()]) + f'\n{spaces[:-2]}}}'
+    elif isinstance(value, list):
+        return "[\n" + ",\n".join([spaces + convert_to_hcl(item, indent + 2) for item in value]) + f'\n{spaces[:-2]}]'
+    elif isinstance(value, bool):
+        return "true" if value else "false"
+    elif isinstance(value, (int, float)):
+        return str(value)
+    else:
+        return f'"{value}"'
+
+def normalize_tag(tag):
+    return tag.replace('-', '_').replace('.', '_')  # Replace hyphens with underscores, Also replace dots
+
+
+def parse_element(element, explicit_empty_tags):
+    """
+    Recursively parse an XML element into a nested structure for HCL conversion.
+    - Empty tags become `True`
+    - Tags with only text return scalar value
+    - Tags with children return list[dict] to enforce HCL consistency
+    """
+    tag_name = etree.QName(element.tag).localname
+    has_text = element.text is not None and element.text.strip() != ""
+    has_children = len(element) > 0
+
+    # Self-closing or empty tag
+    if not has_text and not has_children:
+        if tag_name in explicit_empty_tags:
+            return [{}]
+        else:
+            return ""
+
+    # # Case: <vlan-tagging></vlan-tagging> → True
+    # if (not element.text or not element.text.strip()) and len(element) == 0:
+    #     print(f"Empty tag: {element.tag}")
+    #     return ""
+    
+    # Case: <name>ge-0/0/3</name> → "ge-0/0/3"
+    if element.text and element.text.strip() and len(element) == 0:
+        text_value = element.text.strip()
+        try:
+            return int(text_value)
+        except ValueError:
+            return text_value
+
+    # Default case: has children
+    parsed = {}
+    for child in element:
+        child_data = parse_element(child, explicit_empty_tags)
+        tag = normalize_tag(child.tag)
+
+        # If tag repeats, make sure it’s a flat list
+        if tag in parsed:
+            if not isinstance(parsed[tag], list):
+                parsed[tag] = [parsed[tag]]
+
+            # Flatten if child_data is a single-item list with a dict
+            if isinstance(child_data, list) and len(child_data) == 1 and isinstance(child_data[0], dict):
+                parsed[tag].append(child_data[0])
+            else:
+                parsed[tag].append(child_data)
+        else:
+            # First occurrence — flatten single-item dict-lists
+            if isinstance(child_data, list) and len(child_data) == 1 and isinstance(child_data[0], dict):
+                parsed[tag] = [child_data[0]]
+            else:
+                parsed[tag] = child_data
+
+    return [parsed]  # Always return a list of dict for elements with children
+
+def normalize_from_blocks(data):
+    """
+    Recursively normalize all 'from' blocks:
+    - Any list of scalars inside a `from = [{...}]` block will be split into multiple dicts.
+    Example:
+      { protocol = ["evpn", "ospf"], route_filter = [...] }
+      → becomes
+      [
+        { protocol = "evpn" },
+        { protocol = "ospf" },
+        { route_filter = [...] }
+      ]
+    """
+    if isinstance(data, dict):
+        for key, val in data.items():
+            if key == "from" and isinstance(val, list):
+                new_from_list = []
+                for block in val:
+                    if isinstance(block, dict):
+                        for subkey, subval in block.items():
+                            if isinstance(subval, list) and all(isinstance(item, (str, int, float)) for item in subval):
+                                # Split scalar lists into multiple dicts
+                                new_from_list.extend([{subkey: item} for item in subval])
+                            else:
+                                new_from_list.append({subkey: subval})
+                    else:
+                        new_from_list.append(block)
+                data[key] = new_from_list
+            else:
+                data[key] = normalize_from_blocks(val)
+    elif isinstance(data, list):
+        return [normalize_from_blocks(item) for item in data]
+    return data
+
+
+def generate_hcl_resources(parsed_data, device_type, hostname):
+    """
+    Generates a single Terraform-style resource block combining all top-level elements.
+    """
+    provider_block = f"""terraform {{
+  required_providers {{
+    junos-{device_type} = {{
+      source = "junos-{device_type}"
+    }}
+  }}
+}}
+
+provider "junos-{device_type}" {{
+  host     = ""
+  port     = 22
+  username = ""
+  password = ""
+  sshkey   = ""
+  alias    = "{hostname}"
+}}
+    """
+    resource_block = provider_block + f'\nresource "junos-{device_type}_Apply_Groups" "{hostname}" {{\n'
+    resource_block += f'  resource_name = "JTAF_{hostname}"\n'
+    resource_block += f'  provider = junos-{device_type}.{hostname}\n'
+
+    for key, value in parsed_data.items():
+        hcl_value = convert_to_hcl(value, indent=4)
+        resource_block += f'  {key} = {hcl_value}\n'
+
+    resource_block += "}\n"
+    return resource_block
+
+
+def parse_xml_to_hcl(xml_file, device_type, hostname):
+    """
+    Parses an XML file and converts it to Terraform-style HCL resources.
+    """
+    try:
+        # Read the XML file content
+        print(f"Reading XML file: {xml_file}")
+        with open(xml_file, 'r') as file:
+            xml_content = file.read()
+
+        explicit_empty_tags = set()
+        for match in re.finditer(r"<(\w[\w\-]*)>\s*</\1>", xml_content):
+            explicit_empty_tags.add(match.group(1))
+
+        # Wrap the XML content with a single root element
+        wrapped_xml = f"<root>{xml_content}</root>"
+
+        # Parse the wrapped XML content
+        tree = etree.fromstring(wrapped_xml)
+        
+        # Now we can parse the child elements under the root
+        parsed_data = {}
+        for elem in tree:
+            tag = normalize_tag(elem.tag)
+            parsed_data[tag] = parse_element(elem, explicit_empty_tags)
+
+        # Normalize 'from' blocks globally
+        parsed_data = normalize_from_blocks(parsed_data)
+
+        # Generate the HCL output
+        hcl_block = generate_hcl_resources(parsed_data, device_type, hostname)
+        return hcl_block
+
+    except Exception as e:
+        print(f"Error parsing XML: {e}")
+
+def main():
+    parser = argparse.ArgumentParser(exit_on_error=True)
+    parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
+    parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
+    parser.add_argument('-h', '--hostname', required=True, help='device hostname (i.e. dc2-spine1, dc2-spine2, etc)')
+    args = parser.parse_args()
+
+    xml_file = args.xml_config
+    device_type = args.type
+    hostname = args.hostname
+    hcl_output = parse_xml_to_hcl(xml_file, device_type, hostname)
+
+    if hcl_output:
+        output_dir = "testbed"
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, "main.tf")
+        with open(output_path, "w") as f:
+            f.write(hcl_output)
+        print(f"\nTerraform configuration written to {os.path.relpath(output_path)}\n")
+
+if __name__ == "__main__":
+    main()

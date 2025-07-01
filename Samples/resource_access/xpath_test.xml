@@ -1,6 +1,0 @@
-<!-- this is a sample example. Modify it to your requirements -->
-<file-list>
-    <xpath name="/access/domain/map/apply-macro/data"/>
-    <xpath name="/access/gx-plus/partition"/>
-    <xpath name="/access/radsec/destination/dynamic-requests"/>
-</file-list>

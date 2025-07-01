@@ -1,4 +1,0 @@
-<!-- this is a sample example. Modify it to your requirements -->
-<file-list>
-        <xpath name="/policy-options/policy-statement/term/from/route-filter/address"/>
-</file-list>
