@@ -14,7 +14,7 @@ To use JTAF, you'll need machine that can run **Go, Python, Git and Terraform.**
 Run the following commands to set up the Junos-Terraform Environment and Workflow
 
 ```bash
-git clone https://github.com/aburston/junos-terraform
+git clone https://github.com/juniper/junos-terraform
 git clone https://github.com/juniper/yang
 python3 -m venv venv
 . venv/bin/activate
