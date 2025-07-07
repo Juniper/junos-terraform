@@ -1,0 +1,24 @@
+sudo: false
+language: go
+go:
+  - "1.14.x"
+  - master
+matrix:
+  allow_failures:
+    - go: "1.14.x"
+  fast_finish: true
+
+install: 
+  - go get github.com/Juniper/go-netconf/...
+
+before_script:
+  - go get golang.org/x/lint/golint     # Linter
+
+script:
+  - diff -u <(echo -n) <(gofmt -d .)         # Run gofmt and display diff
+
+  #  - go test -v ./...                         # Run all the tests with the race detector enabled
+  - go vet ./...                             # go vet is the official Go static analyzer
+  - golint ./...                             # one last linter
+  - cd examples/driver
+  - go build -v ./...		             # Specifically build the demo

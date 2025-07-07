@@ -3,15 +3,11 @@ module terraform-provider-junos-vqfx
 go 1.23.8
 
 require (
-	github.com/vinpatel24/go-netconf v0.1.3
-	github.com/Juniper/junos-terraform v0.0.0-20250626082507-94d2c2fd6b60
 	github.com/chrismarget/lambda-tf-registry v0.0.1
 	github.com/goreleaser/goreleaser v1.26.2
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	golang.org/x/crypto v0.39.0
 )
-
-replace github.com/vinpatel24/go-netconf => ./go-netconf
 
 require (
 	cloud.google.com/go v0.112.1 // indirect
@@ -272,7 +268,6 @@ require (
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/vbatts/tar-split v0.11.5 // indirect
-	github.com/vinpatel24/go-netconf v0.1.3 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/wagoodman/go-partybus v0.0.0-20230516145632-8ccac152c651 // indirect

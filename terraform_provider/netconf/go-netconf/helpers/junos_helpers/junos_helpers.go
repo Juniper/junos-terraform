@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	driver "github.com/vinpatel24/go-netconf/drivers/driver"
-	sshdriver "github.com/vinpatel24/go-netconf/drivers/ssh"
+	driver "github.com/Juniper/go-netconf/drivers/driver"
+	sshdriver "github.com/Juniper/go-netconf/drivers/ssh"
 
 	"golang.org/x/crypto/ssh"
 )
