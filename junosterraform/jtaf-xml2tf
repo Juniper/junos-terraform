@@ -189,7 +189,7 @@ def main():
     parser = argparse.ArgumentParser(exit_on_error=True)
     parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
     parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
-    parser.add_argument('-ho', '--hostname', required=True, help='device hostname (i.e. dc2-spine1, dc2-spine2, etc)')
+    parser.add_argument('-n', '--hostname', required=True, help='device hostname (i.e. dc2-spine1, dc2-spine2, etc)')
     args = parser.parse_args()
 
     xml_file = args.xml_config

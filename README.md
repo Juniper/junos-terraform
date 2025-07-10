@@ -70,13 +70,13 @@ go install
 
 Run this command to create a `.tf` test file to deploy the terraform provider.
 ```
-jtaf-junos-xml2tf -x <device-xml-config> -t <device-type> -ho <deivce-host-name>
+jtaf-xml2tf -x <device-xml-config> -t <device-type> -n <deivce-host-name>
 cd testbed
 ```
 
 Example: 
 ```
-jtaf-junos-xml2tf -x config.xml -t vqfx -ho dc2-spine1
+jtaf-xml2tf -x config.xml -t vqfx -n dc2-spine1
 cd testbed
 ```
 
