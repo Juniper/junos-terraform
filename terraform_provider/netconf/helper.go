@@ -344,7 +344,7 @@ func NewClient(username string, password string, sshKey string, address string, 
 	// Dummy interface var ready for loading from inputs
 	var nconf driver.Driver
 
-	d := driver.New(sshdriver.New())
+	d := driver.NewDriver(sshdriver.NewSSH())
 
 	nc := d.(*sshdriver.DriverSSH)
 

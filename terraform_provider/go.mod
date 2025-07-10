@@ -1,4 +1,4 @@
-module terraform-provider-junos-vqfx
+module terraform_provider
 
 go 1.23.8
 

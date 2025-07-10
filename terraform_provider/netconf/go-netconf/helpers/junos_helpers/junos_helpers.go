@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	driver "github.com/Juniper/go-netconf/drivers/driver"
-	sshdriver "github.com/Juniper/go-netconf/drivers/ssh"
+	driver "terraform_provider/netconf/go-netconf/drivers/driver"
+	sshdriver "terraform_provider/netconf/go-netconf/drivers/ssh"
 
 	"golang.org/x/crypto/ssh"
 )

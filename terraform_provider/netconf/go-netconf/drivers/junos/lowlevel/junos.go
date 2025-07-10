@@ -7,8 +7,8 @@ package netconf
 import (
 	"os/exec"
 
-	session "github.com/Juniper/go-netconf/session"
-	transport "github.com/Juniper/go-netconf/transport"
+	session "terraform_provider/netconf/go-netconf/session"
+	transport "terraform_provider/netconf/go-netconf/transport"
 )
 
 // TransportJunos maintains the information necessary to communicate with Junos

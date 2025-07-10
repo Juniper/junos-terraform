@@ -5,9 +5,10 @@ import (
 	"net"
 	"time"
 
-	lowlevel "github.com/Juniper/go-netconf/drivers/ssh/lowlevel"
-	rpc "github.com/Juniper/go-netconf/rpc"
-	session "github.com/Juniper/go-netconf/session"
+	lowlevel "terraform_provider/netconf/go-netconf/drivers/ssh/lowlevel"
+	rpc "terraform_provider/netconf/go-netconf/rpc"
+	session "terraform_provider/netconf/go-netconf/session"
+
 	"golang.org/x/crypto/ssh"
 )
 
@@ -25,7 +26,7 @@ type DriverSSH struct {
 }
 
 // New creates a new instance of DriverSSH
-func New() *DriverSSH {
+func NewSSH() *DriverSSH {
 	var t lowlevel.TransportSSH
 	return &DriverSSH{
 		Port:      lowlevel.DefaultPort,

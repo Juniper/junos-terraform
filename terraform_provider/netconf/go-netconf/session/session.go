@@ -13,8 +13,8 @@ package netconf
 import (
 	"encoding/xml"
 
-	rpc "github.com/Juniper/go-netconf/rpc"
-	transport "github.com/Juniper/go-netconf/transport"
+	rpc "terraform_provider/netconf/go-netconf/rpc"
+	transport "terraform_provider/netconf/go-netconf/transport"
 )
 
 // Session defines the necessary components for a NETCONF session

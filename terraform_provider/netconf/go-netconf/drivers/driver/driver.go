@@ -4,7 +4,7 @@
 
 package netconf
 
-import rpc "github.com/Juniper/go-netconf/rpc"
+import rpc "terraform_provider/netconf/go-netconf/rpc"
 
 // Driver interface for building drivers that are self-contained from a user's perspective.
 type Driver interface {
@@ -19,6 +19,6 @@ type Driver interface {
 }
 
 // New is an interface that checks compliancy
-func New(d Driver) Driver {
+func NewDriver(d Driver) Driver {
 	return d
 }

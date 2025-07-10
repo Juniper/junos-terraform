@@ -16,8 +16,9 @@ import (
 	"strings"
 	"time"
 
-	session "github.com/Juniper/go-netconf/session"
-	transport "github.com/Juniper/go-netconf/transport"
+	session "terraform_provider/netconf/go-netconf/session"
+	transport "terraform_provider/netconf/go-netconf/transport"
+
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
