@@ -17,7 +17,7 @@
 package main
 
 import (
-	"terraform_providers/netconf"
+	"terraform_provider/netconf"
 )
 
 // Config is the configuration structure used to instantiate the Netconf provider.

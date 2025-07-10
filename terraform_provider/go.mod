@@ -4,6 +4,7 @@ go 1.23.8
 
 require (
 	github.com/chrismarget/lambda-tf-registry v0.0.1
+	github.com/google/go-cmp v0.7.0
 	github.com/goreleaser/goreleaser v1.26.2
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	golang.org/x/crypto v0.39.0
