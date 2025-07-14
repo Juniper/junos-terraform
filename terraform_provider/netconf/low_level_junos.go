@@ -6,15 +6,12 @@ package netconf
 
 import (
 	"os/exec"
-
-	session "terraform-provider-junos-{{data.device_type}}/netconf/go-netconf/session"
-	transport "terraform-provider-junos-{{data.device_type}}/netconf/go-netconf/transport"
 )
 
 // TransportJunos maintains the information necessary to communicate with Junos
 // via local shell NETCONF interface.
 type TransportJunos struct {
-	transport.TransportBasicIO
+	TransportBasicIO
 	cmd *exec.Cmd
 }
 
@@ -42,20 +39,20 @@ func (t *TransportJunos) Open() error {
 		return err
 	}
 
-	t.ReadWriteCloser = transport.NewReadWriteCloser(r, w)
+	t.ReadWriteCloser = NewReadWriteCloser(r, w)
 	return t.cmd.Start()
 }
 
 // Dial creates a new NETCONF session via Junos local shell
 // NETCONF interface (xml-mode netconf need-trailer).
-func Dial() (*session.Session, error) {
+func lowlevelDial() (*Session, error) {
 	var t TransportJunos
 	err := t.Open()
 	if err != nil {
 		return nil, err
 	}
 
-	session, err := session.NewSession(&t)
+	session, err := NewSession(&t)
 	if err != nil {
 		return nil, err
 	}

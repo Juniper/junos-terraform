@@ -4,18 +4,16 @@
 
 package netconf
 
-import rpc "terraform-provider-junos-{{data.device_type}}/netconf/go-netconf/rpc"
-
 // Driver interface for building drivers that are self-contained from a user's perspective.
 type Driver interface {
-	Lock(ds string) (*rpc.RPCReply, error)
-	Unlock(ds string) (*rpc.RPCReply, error)
+	Lock(ds string) (*RPCReply, error)
+	Unlock(ds string) (*RPCReply, error)
 
 	Close() error
 	Dial() error
 	DialTimeout() error
-	SendRaw(rawxml string) (*rpc.RPCReply, error)
-	GetConfig() (*rpc.RPCReply, error)
+	SendRaw(rawxml string) (*RPCReply, error)
+	GetConfig() (*RPCReply, error)
 }
 
 // New is an interface that checks compliancy

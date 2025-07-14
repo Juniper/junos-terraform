@@ -2,17 +2,13 @@ package netconf
 
 import (
 	"time"
-
-	lowlevel "terraform_provider/netconf/go-netconf/drivers/junos/lowlevel"
-	rpc "terraform_provider/netconf/go-netconf/rpc"
-	session "terraform_provider/netconf/go-netconf/session"
 )
 
 // DriverJunos type is for creating a Junos based driver. Maintains state for session and connection. Implements Driver{}
 type DriverJunos struct {
-	Timeout   time.Duration    // Timeout for SSH timed sessions
-	Datastore string           // NETCONF datastore
-	Session   *session.Session // Session data
+	Timeout   time.Duration // Timeout for SSH timed sessions
+	Datastore string        // NETCONF datastore
+	Session   *Session      // Session data
 }
 
 // New creates a new instance of DriverJunos
@@ -31,7 +27,7 @@ func (d *DriverJunos) Dial() error {
 
 	var err error
 
-	d.Session, err = lowlevel.Dial()
+	d.Session, err = lowlevelDial()
 
 	if err != nil {
 		return err
@@ -64,8 +60,8 @@ func (d *DriverJunos) Close() error {
 }
 
 // Lock the target datastore
-func (d *DriverJunos) Lock(ds string) (*rpc.RPCReply, error) {
-	reply, err := d.Session.Exec(rpc.MethodLock(ds))
+func (d *DriverJunos) Lock(ds string) (*RPCReply, error) {
+	reply, err := d.Session.Exec(MethodLock(ds))
 
 	if err != nil {
 		return reply, err
@@ -75,8 +71,8 @@ func (d *DriverJunos) Lock(ds string) (*rpc.RPCReply, error) {
 }
 
 // Unlock the target datastore
-func (d *DriverJunos) Unlock(ds string) (*rpc.RPCReply, error) {
-	reply, err := d.Session.Exec(rpc.MethodUnlock(ds))
+func (d *DriverJunos) Unlock(ds string) (*RPCReply, error) {
+	reply, err := d.Session.Exec(MethodUnlock(ds))
 
 	if err != nil {
 		return reply, err
@@ -86,8 +82,8 @@ func (d *DriverJunos) Unlock(ds string) (*rpc.RPCReply, error) {
 }
 
 // SendRaw sends a raw XML envelope
-func (d *DriverJunos) SendRaw(rawxml string) (*rpc.RPCReply, error) {
-	reply, err := d.Session.Exec(rpc.RawMethod(rawxml))
+func (d *DriverJunos) SendRaw(rawxml string) (*RPCReply, error) {
+	reply, err := d.Session.Exec(RawMethod(rawxml))
 
 	if err != nil {
 		return reply, err
@@ -97,8 +93,8 @@ func (d *DriverJunos) SendRaw(rawxml string) (*rpc.RPCReply, error) {
 }
 
 // GetConfig requests the contents of a datastore
-func (d *DriverJunos) GetConfig() (*rpc.RPCReply, error) {
-	reply, err := d.Session.Exec(rpc.MethodGetConfig(d.Datastore))
+func (d *DriverJunos) GetConfig() (*RPCReply, error) {
+	reply, err := d.Session.Exec(MethodGetConfig(d.Datastore))
 
 	if err != nil {
 		return reply, err

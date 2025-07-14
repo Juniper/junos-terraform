@@ -1,41 +1,11 @@
-package junos_helpers
+package netconf
 
 import (
 	"bufio"
-	"encoding/xml"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"strings"
-	"sync"
-
-	driver "terraform_provider/netconf/go-netconf/drivers/driver"
-	sshdriver "terraform_provider/netconf/go-netconf/drivers/ssh"
-
-	"golang.org/x/crypto/ssh"
 )
-
-const groupStrXML = `<load-configuration action="merge" format="xml">
-%s
-</load-configuration>
-`
-
-const deleteStr = `<edit-config>
-	<target>
-		<candidate/>
-	</target>
-	<default-operation>none</default-operation> 
-	<config>
-		<configuration>
-			<groups operation="delete">
-				<name>%s</name>
-			</groups>
-			<apply-groups operation="delete">%s</apply-groups>
-		</configuration>
-	</config>
-</edit-config>`
-
-const commitStr = `<commit/>`
 
 const getGroupStr = `<get-configuration database="committed" format="text" >
   <configuration>
@@ -43,25 +13,6 @@ const getGroupStr = `<get-configuration database="committed" format="text" >
   </configuration>
 </get-configuration>
 `
-
-const getGroupXMLStr = `<get-configuration>
-  <configuration>
-  <groups><name>%s</name></groups>
-  </configuration>
-</get-configuration>
-`
-
-// GoNCClient type for storing data and wrapping functions
-type GoNCClient struct {
-	Driver driver.Driver
-	Lock   sync.RWMutex
-}
-
-// Close is a functional thing to close the Driver
-func (g *GoNCClient) Close() error {
-	g.Driver = nil
-	return nil
-}
 
 // parseGroupData is a function that cleans up the returned data for generic config groups
 func parseGroupData(input string) (reply string, err error) {
@@ -187,44 +138,6 @@ func (g *GoNCClient) UpdateRawConfig(applygroup string, netconfcall string, comm
 	return reply.Data, nil
 }
 
-// DeleteConfig is a wrapper for driver.SendRaw()
-func (g *GoNCClient) DeleteConfig(applygroup string) (string, error) {
-
-	deleteString := fmt.Sprintf(deleteStr, applygroup, applygroup)
-
-	g.Lock.Lock()
-	err := g.Driver.Dial()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	reply, err := g.Driver.SendRaw(deleteString)
-	if err != nil {
-		errInternal := g.Driver.Close()
-		g.Lock.Unlock()
-		return "", fmt.Errorf("driver error: %+v, driver close error: %+s", err, errInternal)
-	}
-
-	_, err = g.Driver.SendRaw(commitStr)
-	if err != nil {
-		errInternal := g.Driver.Close()
-		g.Lock.Unlock()
-		return "", fmt.Errorf("driver error: %+v, driver close error: %+s", err, errInternal)
-	}
-
-	output := strings.Replace(reply.Data, "\n", "", -1)
-
-	err = g.Driver.Close()
-
-	g.Lock.Unlock()
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return output, nil
-}
-
 // DeleteConfigNoCommit is a wrapper for driver.SendRaw()
 // Does not provide mandatory commit unlike DeleteConfig()
 func (g *GoNCClient) DeleteConfigNoCommit(applygroup string) (string, error) {
@@ -256,64 +169,6 @@ func (g *GoNCClient) DeleteConfigNoCommit(applygroup string) (string, error) {
 	g.Lock.Unlock()
 
 	return output, nil
-}
-
-// SendCommit is a wrapper for driver.SendRaw()
-func (g *GoNCClient) SendCommit() error {
-	g.Lock.Lock()
-
-	err := g.Driver.Dial()
-
-	if err != nil {
-		g.Lock.Unlock()
-		return err
-	}
-
-	_, err = g.Driver.SendRaw(commitStr)
-	if err != nil {
-		g.Lock.Unlock()
-		return err
-	}
-
-	g.Lock.Unlock()
-	return nil
-}
-
-// MarshalGroup accepts a struct of type X and then marshals data onto it
-func (g *GoNCClient) MarshalGroup(id string, obj interface{}) error {
-
-	reply, err := g.ReadRawGroup(id)
-	if err != nil {
-		return err
-	}
-
-	err = xml.Unmarshal([]byte(reply), &obj)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// SendTransaction is a method that unnmarshals the XML, creates the transaction and passes in a commit
-func (g *GoNCClient) SendTransaction(id string, obj interface{}, commit bool) error {
-	jconfig, err := xml.Marshal(obj)
-
-	if err != nil {
-		return err
-	}
-
-	// UpdateRawConfig deletes old group by, re-creates it then commits.
-	// As far as Junos cares, it's an edit.
-	if id != "" {
-		_, err = g.UpdateRawConfig(id, string(jconfig), commit)
-	} else {
-		_, err = g.SendRawConfig(string(jconfig), commit)
-	}
-
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // SendRawConfig is a wrapper for driver.SendRaw()
@@ -384,53 +239,4 @@ func (g *GoNCClient) ReadRawGroup(applygroup string) (string, error) {
 	}
 
 	return reply.Data, nil
-}
-
-func publicKeyFile(file string) ssh.AuthMethod {
-	buffer, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil
-	}
-
-	key, err := ssh.ParsePrivateKey(buffer)
-	if err != nil {
-		return nil
-	}
-	return ssh.PublicKeys(key)
-}
-
-// NewClient returns gonetconf new client driver
-func NewClient(username string, password string, sshkey string, address string, port int) (*GoNCClient, error) {
-
-	// Dummy interface var ready for loading from inputs
-	var nconf driver.Driver
-
-	d := driver.New(sshdriver.New())
-
-	nc := d.(*sshdriver.DriverSSH)
-
-	nc.Host = address
-	nc.Port = port
-
-	// SSH keys takes priority over password based
-	if sshkey != "" {
-		nc.SSHConfig = &ssh.ClientConfig{
-			User: username,
-			Auth: []ssh.AuthMethod{
-				publicKeyFile(sshkey),
-			},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		}
-	} else {
-		// Sort yourself out with SSH. Easiest to do that here.
-		nc.SSHConfig = &ssh.ClientConfig{
-			User:            username,
-			Auth:            []ssh.AuthMethod{ssh.Password(password)},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		}
-	}
-
-	nconf = nc
-
-	return &GoNCClient{Driver: nconf}, nil
 }

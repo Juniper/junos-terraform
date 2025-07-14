@@ -231,22 +231,12 @@ def main():
     resource_config_provider_go = tmpl.render(data=resources).lstrip()
 
     # Step 3: Prepare new output directory based on type
-    # go_dir = os.path.dirname(pkg_resources.resource_filename('terraform_provider', '__init__.py'))
-    go_dir = os.path.abspath("terraform_provider")
+    go_dir = os.path.dirname(pkg_resources.resource_filename('terraform_provider', '__init__.py'))
     new_dir = f"terraform-provider-junos-{args.type}"
-    netconf_dir = f"{new_dir}/netconf"
-    driver_dir = f"{netconf_dir}/go-netconf/drivers/driver"
-    low_junos_dir = f"{netconf_dir}/go-netconf/drivers/junos/lowlevel"
-    junos_dir = f"{netconf_dir}/go-netconf/drivers/junos"
-    low_ssh_dir = f"{netconf_dir}/go-netconf/drivers/ssh/lowlevel"
-    ssh_dir = f"{netconf_dir}/go-netconf/drivers/ssh"
-    session_dir = f"{netconf_dir}/go-netconf/session"
-    junos_helper_dir = f"{netconf_dir}/go-netconf/helpers/junos_helpers"
 
     # Step 4: copy the template go files into place
     distutils.dir_util.copy_tree(go_dir, new_dir)
     shutil.copytree(go_dir, new_dir, dirs_exist_ok=True)
-    print(go_dir)
 
     # Step 5: Save rendered Go file into new directory
     resource_config_provider_go_fullpath = os.path.join(new_dir, "resource_config_provider.go")
@@ -254,72 +244,22 @@ def main():
         f.write(resource_config_provider_go)
     print(f"Plugin created in {os.path.relpath(resource_config_provider_go_fullpath)}\n")
 
-    files_to_generate = [
-        {
-            "template": f"{templates_dir}/provider.go.j2",
-            "output": os.path.join(new_dir, "provider.go"),
-            "desc": f"provider.go with type junos-{args.type}"
-        },
-        {
-            "template": f"{templates_dir}/go.mod.j2",
-            "output": os.path.join(new_dir, "go.mod"),
-            "desc": f"go.mod with type junos-{args.type}"
-        },
-        {
-            "template": f"{templates_dir}/config.go.j2",
-            "output": os.path.join(new_dir, "config.go"),
-            "desc": f"config.go with type junos-{args.type}"
-        },
-        {
-            "template": f"{templates_dir}/helper.go.j2",
-            "output": os.path.join(netconf_dir, "helper.go"),
-            "desc": f"helper.go with type junos-{args.type}"
-        },
-        {
-            "template": f"{templates_dir}/driver.go.j2",
-            "output": os.path.join(driver_dir, "driver.go"),
-            "desc": f"driver.go with type junos-{args.type}"
-        },
-        {
-            "template": f"{templates_dir}/low_junos.go.j2",
-            "output": os.path.join(low_junos_dir, "junos.go"),
-            "desc": f"low_junos.go with type junos-{args.type}"
-        },
-        {
-            "template": f"{templates_dir}/junos.go.j2",
-            "output": os.path.join(junos_dir, "junos.go"),
-            "desc": f"junos.go with type junos-{args.type}"
-        },
-        {
-            "template": f"{templates_dir}/low_ssh.go.j2",
-            "output": os.path.join(low_ssh_dir, "ssh.go"),
-            "desc": f"low_ssh.go with type junos-{args.type}"
-        },
-        {
-            "template": f"{templates_dir}/ssh.go.j2",
-            "output": os.path.join(ssh_dir, "ssh.go"),
-            "desc": f"ssh.go with type junos-{args.type}"
-        },
-        {
-            "template": f"{templates_dir}/session.go.j2",
-            "output": os.path.join(session_dir, "session.go"),
-            "desc": f"session.go with type junos-{args.type}"
-        },
-        {
-            "template": f"{templates_dir}/junos_helpers.go.j2",
-            "output": os.path.join(junos_helper_dir, "junos_helpers.go"),
-            "desc": f"junos_helpers.go with type junos-{args.type}"
-        }
+    # Step 6-8: Update provider.go, go.mod, and config.go with correct type using a loop
+    files_to_update = [
+        ("provider.go.j2", "provider.go"),
+        ("go.mod.j2", "go.mod"),
+        ("config.go.j2", "config.go"),
     ]
-
-    for file in files_to_generate:
-        render_template_and_write(
-            input_template=file["template"],
-            output_file=file["output"],
-            context={"device_type": args.type},
-            description=file["desc"]
-        )
-
+    for template_name, output_name in files_to_update:
+        with open(f"{templates_dir}/{template_name}") as f:
+            jinja2_source = f.read()
+        tmpl = Template(jinja2_source)
+        rendered = tmpl.render(data={"device_type": args.type}).lstrip()
+        output_path = os.path.join(new_dir, output_name)
+        with open(output_path, "w") as f:
+            f.write(rendered)
+        print(f"Updated {output_name} with type junos-{args.type}")
+    
 # run main()
 if __name__ == "__main__":
     main()

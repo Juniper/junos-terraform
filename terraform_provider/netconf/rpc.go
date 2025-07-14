@@ -61,28 +61,28 @@ type RPCReplyBody struct {
 // RPCReply defines a reply to a RPC request
 type RPCReply struct {
 	RPCReplyBody
-	XMLName  xml.Name   `xml:"rpc-reply"`
+	XMLName xml.Name `xml:"rpc-reply"`
 }
 
 // RPCReply defines a reply to a RPC request
 type RPCReplyCommitResults struct {
-	XMLName  xml.Name   `xml:"rpc-reply"`
+	XMLName       xml.Name     `xml:"rpc-reply"`
 	CommitResults RPCReplyBody `xml:"commit-results,omitempty"`
 }
 
 // RPCReply defines a reply to a RPC request
 type RPCReplyLoadConfigurationResults struct {
-	XMLName  xml.Name   `xml:"rpc-reply"`
+	XMLName                  xml.Name     `xml:"rpc-reply"`
 	LoadConfigurationResults RPCReplyBody `xml:"load-configuration-results,omitempty"`
 }
 
 // NewRPCReply creates a new RPC Reply
 func NewRPCReply(rawXML []byte, ErrOnWarning bool) (*RPCReply, error) {
 	/*
-	f, _ := os.OpenFile("/var/tmp/rpc-reply.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	fmt.Fprintf(f, "RPC reply (%s)\n", string(rawXML))
-	f.Close()
-        */
+		f, _ := os.OpenFile("/var/tmp/rpc-reply.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		fmt.Fprintf(f, "RPC reply (%s)\n", string(rawXML))
+		f.Close()
+	*/
 	reply := &RPCReply{}
 	reply.RawReply = string(rawXML)
 
@@ -108,9 +108,9 @@ func NewRPCReply(rawXML []byte, ErrOnWarning bool) (*RPCReply, error) {
 		return nil, err
 	}
 	/*
-	f, _ = os.OpenFile("/var/tmp/rpc-reply.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	fmt.Fprintf(f, "RPC unmarshal complete (%+v)\n", replyLoadConfigurationResults)
-	f.Close()
+		f, _ = os.OpenFile("/var/tmp/rpc-reply.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		fmt.Fprintf(f, "RPC unmarshal complete (%+v)\n", replyLoadConfigurationResults)
+		f.Close()
 	*/
 
 	if reply.Errors != nil {
