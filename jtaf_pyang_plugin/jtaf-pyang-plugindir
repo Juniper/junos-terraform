@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-import pkg_resources
-import os
 
-package_dir = os.path.dirname(pkg_resources.resource_filename('jtaf_pyang_plugin', '__init__.py'))
+
+import os
+from importlib.resources import files, as_file
+
+with as_file(files('jtaf_pyang_plugin').joinpath('__init__.py')) as init_py:
+    package_dir = os.path.dirname(init_py)
 
 print(f"{package_dir}")
