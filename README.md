@@ -57,7 +57,7 @@ pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/18.2/18.2R3/common 
 
 cd into the newly created directory starting with `terraform-provider-junos-` then the device-type and then `go install`
 
-example:
+Example:
 
 ```
 cd terraform-provider-junos-vqfx
@@ -68,19 +68,34 @@ go install
 
 ### <u>Autogenerate Terraform Testing Files</u>
 
-Run this command to create a `.tf` test file to deploy the terraform provider.
+Run this command to generate a `.tf` test file to deploy the Terraform provider.
+Output will be returned in the terminal.
 ```
 jtaf-xml2tf -x <device-xml-config> -t <device-type> -n <deivce-host-name>
-cd testbed
 ```
 
 Example: 
 ```
 jtaf-xml2tf -x config.xml -t vqfx -n dc2-spine1
-cd testbed
 ```
 
-In the `/testbed` folder created by the previous command, create a `.terraform.rc` file with `vi` and add the following contents, replacing any `<elements>` tags with your own information. This is to ensure that the terraform plugin you created and installed to `/go/bin` will be read.
+Using the output from the terminal, which represents a template for the HCL .tf file, we can create our testing environment and fill in the template with the necessary device information.
+
+### <u>Setting up Testing environment</u>
+
+Create a testing folder which can be used to write .tf files and apply terraform configuration.   
+Example
+	```
+	mkdir testbed
+	```
+
+In the `/testbed` folder created:  
+* Create a `main.tf` file with the content of terminal output from the `jtaf-xml2tf` command.  
+	* Fill in any missing information
+
+Next, create a `.terraform.rc` file with `vi` and add the following contents, replacing any `<elements>` tags with your own information. This is to ensure that the terraform plugin you created and installed to `/go/bin` will be read.
+
+**.terraform.rc example**
 ```
 provider_installation {
 	dev_overrides {
@@ -97,6 +112,15 @@ provider_installation {
 	}
 }
 ```
+
+You should know have a file structure which looks similar to:
+
+```
+/junos-terraform/<testing-folder-name>/
+/junos-terraform/<testing-folder-name>/main.tf.          <-- contents of jtaf-xml2tf command
+/junos-terraform/<testing-folder-name>/.terraform.rc     <-- link to provider created in /usr/go/bin/ [see details above]
+```
+
 ---
 
 ### <u>Edit Test Files, Plan, and Apply</u>

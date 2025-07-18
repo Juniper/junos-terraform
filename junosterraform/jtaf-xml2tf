@@ -4,6 +4,8 @@ from lxml import etree
 import sys
 import re
 import os
+from xml.etree import ElementTree
+
 
 def convert_to_hcl(value, indent=2):
     """
@@ -148,10 +150,32 @@ provider "junos-{device_type}" {{
     resource_block += "}\n"
     return resource_block
 
+def preprocess_xml(xml_file):
+    """Load and normalize the XML to get to the <configuration> section, removing <version> if needed."""
+    with open(xml_file) as f:
+        xml_text = f.read()
+
+    # Wrap the XML with a temporary root in case it doesn't have a single root element
+    root = ElementTree.fromstring(f"<root>{xml_text}</root>")
+
+    # Dive into <rpc-reply>/<configuration> if it exists
+    config_node = root.find(".//configuration")
+    if config_node is not None:
+        root = config_node  # Set config_node as new root
+
+    # Remove <version> if present
+    version_node = root.find("version")
+    if version_node is not None:
+        root.remove(version_node)
+
+    # Convert modified XML tree back to a string
+    return ElementTree.tostring(root, encoding="unicode")
+
 
 def parse_xml_to_hcl(xml_file, device_type, hostname):
     """
     Parses an XML file and converts it to Terraform-style HCL resources.
+    Starts from <configuration> if under <rpc-reply> and removes <version> if present.
     """
     try:
         # Read the XML file content
@@ -159,19 +183,29 @@ def parse_xml_to_hcl(xml_file, device_type, hostname):
         with open(xml_file, 'r') as file:
             xml_content = file.read()
 
+        # Capture explicitly empty tags (e.g. <foo></foo>)
         explicit_empty_tags = set()
         for match in re.finditer(r"<(\w[\w\-]*)>\s*</\1>", xml_content):
             explicit_empty_tags.add(match.group(1))
 
-        # Wrap the XML content with a single root element
+        # Wrap with a temporary root to ensure well-formedness
         wrapped_xml = f"<root>{xml_content}</root>"
+        root = etree.fromstring(wrapped_xml)
 
-        # Parse the wrapped XML content
-        tree = etree.fromstring(wrapped_xml)
-        
-        # Now we can parse the child elements under the root
+        # Try to find the <configuration> node under <rpc-reply>
+        config_node = root.find(".//configuration")
+        if config_node is not None:
+            # Replace root with configuration node
+            root = config_node
+
+        # Remove any <version> tag directly under root
+        version_node = root.find("./version")
+        if version_node is not None:
+            root.remove(version_node)
+
+        # Parse elements starting from the new root
         parsed_data = {}
-        for elem in tree:
+        for elem in root:
             tag = normalize_tag(elem.tag)
             parsed_data[tag] = parse_element(elem, explicit_empty_tags)
 
@@ -184,6 +218,7 @@ def parse_xml_to_hcl(xml_file, device_type, hostname):
 
     except Exception as e:
         print(f"Error parsing XML: {e}")
+        return None
 
 def main():
     parser = argparse.ArgumentParser(exit_on_error=True)
@@ -198,12 +233,8 @@ def main():
     hcl_output = parse_xml_to_hcl(xml_file, device_type, hostname)
 
     if hcl_output:
-        output_dir = "testbed"
-        os.makedirs(output_dir, exist_ok=True)
-        output_path = os.path.join(output_dir, "main.tf")
-        with open(output_path, "w") as f:
-            f.write(hcl_output)
-        print(f"\nTerraform configuration written to {os.path.relpath(output_path)}\n")
+        print("\nGenerated Terraform Configuration:\n")
+        print(hcl_output)   
 
 if __name__ == "__main__":
     main()
