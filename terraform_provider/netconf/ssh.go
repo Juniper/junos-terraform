@@ -5,30 +5,27 @@ import (
 	"net"
 	"time"
 
-	lowlevel "github.com/vinpatel24/go-netconf/drivers/ssh/lowlevel"
-	rpc "github.com/vinpatel24/go-netconf/rpc"
-	session "github.com/vinpatel24/go-netconf/session"
 	"golang.org/x/crypto/ssh"
 )
 
 // DriverSSH type is for creating an SSH based driver. Maintains state for session and connection. Implements Driver{}
 type DriverSSH struct {
-	Timeout   time.Duration          // Timeout for SSH timed sessions
-	Port      int                    // Target port
-	Host      string                 // Target hostname
-	Target    string                 // Target hostname:port
-	Datastore string                 // NETCONF datastore
-	Conn      net.Conn               // Conn for session
-	SSHConfig *ssh.ClientConfig      // SSH Config
-	Transport *lowlevel.TransportSSH // Transport data
-	Session   *session.Session       // Session data
+	Timeout   time.Duration     // Timeout for SSH timed sessions
+	Port      int               // Target port
+	Host      string            // Target hostname
+	Target    string            // Target hostname:port
+	Datastore string            // NETCONF datastore
+	Conn      net.Conn          // Conn for session
+	SSHConfig *ssh.ClientConfig // SSH Config
+	Transport *TransportSSH     // Transport data
+	Session   *Session          // Session data
 }
 
 // New creates a new instance of DriverSSH
-func New() *DriverSSH {
-	var t lowlevel.TransportSSH
+func NewSSH() *DriverSSH {
+	var t TransportSSH
 	return &DriverSSH{
-		Port:      lowlevel.DefaultPort,
+		Port:      LowLevelDefaultPort,
 		Transport: &t,
 	}
 }
@@ -49,7 +46,7 @@ func (d *DriverSSH) Dial() error {
 		return err
 	}
 
-	d.Session, err = session.NewSession(d.Transport)
+	d.Session, err = NewSession(d.Transport)
 
 	if err != nil {
 		return err
@@ -64,7 +61,7 @@ func (d *DriverSSH) DialTimeout() error {
 
 	var err error
 
-	d.Session, err = lowlevel.DialSSHTimeout(d.Target, d.SSHConfig, d.Timeout)
+	d.Session, err = DialSSHTimeout(d.Target, d.SSHConfig, d.Timeout)
 
 	if err != nil {
 		return err
@@ -93,8 +90,8 @@ func (d *DriverSSH) Close() error {
 }
 
 // Lock the target datastore
-func (d *DriverSSH) Lock(ds string) (*rpc.RPCReply, error) {
-	reply, err := d.Session.Exec(rpc.MethodLock(ds))
+func (d *DriverSSH) Lock(ds string) (*RPCReply, error) {
+	reply, err := d.Session.Exec(MethodLock(ds))
 
 	if err != nil {
 		return reply, err
@@ -104,8 +101,8 @@ func (d *DriverSSH) Lock(ds string) (*rpc.RPCReply, error) {
 }
 
 // Unlock the target datastore
-func (d *DriverSSH) Unlock(ds string) (*rpc.RPCReply, error) {
-	reply, err := d.Session.Exec(rpc.MethodUnlock(ds))
+func (d *DriverSSH) Unlock(ds string) (*RPCReply, error) {
+	reply, err := d.Session.Exec(MethodUnlock(ds))
 
 	if err != nil {
 		return reply, err
@@ -115,8 +112,8 @@ func (d *DriverSSH) Unlock(ds string) (*rpc.RPCReply, error) {
 }
 
 // SendRaw sends a raw XML envelope
-func (d *DriverSSH) SendRaw(rawxml string) (*rpc.RPCReply, error) {
-	reply, err := d.Session.Exec(rpc.RawMethod(rawxml))
+func (d *DriverSSH) SendRaw(rawxml string) (*RPCReply, error) {
+	reply, err := d.Session.Exec(RawMethod(rawxml))
 
 	if err != nil {
 		return reply, err
@@ -126,8 +123,8 @@ func (d *DriverSSH) SendRaw(rawxml string) (*rpc.RPCReply, error) {
 }
 
 // GetConfig requests the contents of a datastore
-func (d *DriverSSH) GetConfig() (*rpc.RPCReply, error) {
-	reply, err := d.Session.Exec(rpc.MethodGetConfig(d.Datastore))
+func (d *DriverSSH) GetConfig() (*RPCReply, error) {
+	reply, err := d.Session.Exec(MethodGetConfig(d.Datastore))
 
 	if err != nil {
 		return reply, err

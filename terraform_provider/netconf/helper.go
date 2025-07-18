@@ -8,9 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	driver "github.com/vinpatel24/go-netconf/drivers/driver"
-	sshdriver "github.com/vinpatel24/go-netconf/drivers/ssh"
-
 	"golang.org/x/crypto/ssh"
 )
 
@@ -54,7 +51,7 @@ type configuration struct {
 
 // GoNCClient type for storing data and wrapping functions
 type GoNCClient struct {
-	Driver driver.Driver
+	Driver Driver
 	Lock   sync.RWMutex
 }
 
@@ -342,11 +339,11 @@ func publicKeyFile(file string) ssh.AuthMethod {
 func NewClient(username string, password string, sshKey string, address string, port int) (Client, error) {
 
 	// Dummy interface var ready for loading from inputs
-	var nconf driver.Driver
+	var nconf Driver
 
-	d := driver.New(sshdriver.New())
+	d := NewDriver(NewSSH())
 
-	nc := d.(*sshdriver.DriverSSH)
+	nc := d.(*DriverSSH)
 
 	nc.Host = address
 	nc.Port = port

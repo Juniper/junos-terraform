@@ -12,14 +12,11 @@ package netconf
 
 import (
 	"encoding/xml"
-
-	rpc "github.com/vinpatel24/go-netconf/rpc"
-	transport "github.com/vinpatel24/go-netconf/transport"
 )
 
 // Session defines the necessary components for a NETCONF session
 type Session struct {
-	Transport          transport.Transport
+	Transport          Transport
 	SessionID          int
 	ServerCapabilities []string
 	ErrOnWarning       bool
@@ -31,8 +28,8 @@ func (s *Session) Close() error {
 }
 
 // Exec is used to execute an RPC method or methods
-func (s *Session) Exec(methods ...rpc.RPCMethod) (*rpc.RPCReply, error) {
-	rpcm := rpc.NewRPCMessage(methods)
+func (s *Session) Exec(methods ...RPCMethod) (*RPCReply, error) {
+	rpcm := NewRPCMessage(methods)
 
 	request, err := xml.Marshal(rpcm)
 	if err != nil {
@@ -52,7 +49,7 @@ func (s *Session) Exec(methods ...rpc.RPCMethod) (*rpc.RPCReply, error) {
 		return nil, err
 	}
 
-	reply, err := rpc.NewRPCReply(rawXML, s.ErrOnWarning)
+	reply, err := NewRPCReply(rawXML, s.ErrOnWarning)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +58,7 @@ func (s *Session) Exec(methods ...rpc.RPCMethod) (*rpc.RPCReply, error) {
 }
 
 // NewSession creates a new NETCONF session using the provided transport layer.
-func NewSession(t transport.Transport) (*Session, error) {
+func NewSession(t Transport) (*Session, error) {
 	s := new(Session)
 	s.Transport = t
 
@@ -74,7 +71,7 @@ func NewSession(t transport.Transport) (*Session, error) {
 	s.ServerCapabilities = serverHello.Capabilities
 
 	// Send our hello using default capabilities.
-	t.SendHello(&transport.HelloMessage{Capabilities: transport.DefaultCapabilities})
+	t.SendHello(&HelloMessage{Capabilities: DefaultCapabilities})
 
 	return s, nil
 }

@@ -8,6 +8,7 @@ from jinja2 import Template
 import os
 import shutil
 import pkg_resources
+import distutils.dir_util
 
 
 def get_xpaths(root):
@@ -201,6 +202,14 @@ def filter_json_using_xml(schema, xml):
 
     return walk_schema(paths, schema)
  
+def render_template_and_write(input_template: str, output_file: str, context: dict, description: str):
+    with open(input_template) as f:
+        tmpl = Template(f.read())
+    rendered = tmpl.render(data=context).lstrip()
+    with open(output_file, "w") as f:
+        f.write(rendered)
+    print(f"Updated {description}")
+
 # Main Method
 def main():
     # other arguments
@@ -226,6 +235,7 @@ def main():
     new_dir = f"terraform-provider-junos-{args.type}"
 
     # Step 4: copy the template go files into place
+    distutils.dir_util.copy_tree(go_dir, new_dir)
     shutil.copytree(go_dir, new_dir, dirs_exist_ok=True)
 
     # Step 5: Save rendered Go file into new directory
@@ -234,25 +244,21 @@ def main():
         f.write(resource_config_provider_go)
     print(f"Plugin created in {os.path.relpath(resource_config_provider_go_fullpath)}\n")
 
-    # Step 6: Update provider.go with correct type
-    with open(f"{templates_dir}/provider.go.j2") as f:
-        jinja2_source = f.read()
-    tmpl = Template(jinja2_source)
-    provider_go = tmpl.render(data={"device_type": args.type}).lstrip()
-    provider_path = os.path.join(new_dir, "provider.go")
-    with open(provider_path, "w") as f:
-        f.write(provider_go)
-    print(f"Updated provider.go with type junos-{args.type}")
-
-    # Step 7: Update go.mod with correct type
-    with open(f"{templates_dir}/go.mod.j2") as f:
-        jinja2_source = f.read()
-    tmpl = Template(jinja2_source)
-    go_mod = tmpl.render(data={"device_type": args.type}).lstrip()
-    go_mod_path = os.path.join(new_dir, "go.mod")
-    with open(go_mod_path, "w") as f:
-        f.write(go_mod)
-    print(f"Updated go.mod with name template-provider-junos-{args.type}")
+    # Step 6-8: Update provider.go, go.mod, and config.go with correct type using a loop
+    files_to_update = [
+        ("provider.go.j2", "provider.go"),
+        ("go.mod.j2", "go.mod"),
+        ("config.go.j2", "config.go"),
+    ]
+    for template_name, output_name in files_to_update:
+        with open(f"{templates_dir}/{template_name}") as f:
+            jinja2_source = f.read()
+        tmpl = Template(jinja2_source)
+        rendered = tmpl.render(data={"device_type": args.type}).lstrip()
+        output_path = os.path.join(new_dir, output_name)
+        with open(output_path, "w") as f:
+            f.write(rendered)
+        print(f"Updated {output_name} with type junos-{args.type}")
     
 # run main()
 if __name__ == "__main__":
