@@ -150,27 +150,6 @@ provider "junos-{device_type}" {{
     resource_block += "}\n"
     return resource_block
 
-def preprocess_xml(xml_file):
-    """Load and normalize the XML to get to the <configuration> section, removing <version> if needed."""
-    with open(xml_file) as f:
-        xml_text = f.read()
-
-    # Wrap the XML with a temporary root in case it doesn't have a single root element
-    root = ElementTree.fromstring(f"<root>{xml_text}</root>")
-
-    # Dive into <rpc-reply>/<configuration> if it exists
-    config_node = root.find(".//configuration")
-    if config_node is not None:
-        root = config_node  # Set config_node as new root
-
-    # Remove <version> if present
-    version_node = root.find("version")
-    if version_node is not None:
-        root.remove(version_node)
-
-    # Convert modified XML tree back to a string
-    return ElementTree.tostring(root, encoding="unicode")
-
 
 def parse_xml_to_hcl(xml_file, device_type, hostname):
     """
