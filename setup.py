@@ -30,6 +30,7 @@ setup(
         'pytest',
         'pyang',
         'lxml',
-        'jinja2'
+        'jinja2',
+        'setuptools'
     ]
 )
