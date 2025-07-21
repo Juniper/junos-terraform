@@ -223,7 +223,6 @@ def main():
     resources = filter_json_using_xml(args.json_schema, args.xml_config)
 
     # Step 2: Render the template into Go code
-    #package_dir = os.path.dirname(pkg_resources.resource_filename('junosterraform', '__init__.py'))
 
     with as_file(files('junosterraform').joinpath('__init__.py')) as init_py:
         package_dir = os.path.dirname(init_py)
@@ -234,7 +233,6 @@ def main():
     resource_config_provider_go = tmpl.render(data=resources).lstrip()
 
     # Step 3: Prepare new output directory based on type
-    #go_dir = os.path.dirname(pkg_resources.resource_filename('terraform_provider', '__init__.py'))
     with as_file(files('terraform_provider').joinpath('__init__.py')) as init_py:
         go_dir = os.path.dirname(init_py)
     new_dir = f"terraform-provider-junos-{args.type}"
