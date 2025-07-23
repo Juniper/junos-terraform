@@ -8,7 +8,7 @@ setup(
     author="Juniper Networks",
     description="Junos Terraform Framework",
     packages=["junosterraform", "jtaf_pyang_plugin", "terraform_provider"],
-    scripts=["junosterraform/jtaf-provider", "jtaf_pyang_plugin/jtaf-pyang-plugindir", "junosterraform/jtaf-xml2tf"],
+    scripts=["junosterraform/jtaf-provider", "jtaf_pyang_plugin/jtaf-pyang-plugindir", "junosterraform/jtaf-xml2tf", "junosterraform/jtaf-yang2go"],
     package_data = {
         "terraform_provider": [
             "*",
