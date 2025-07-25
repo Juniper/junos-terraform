@@ -21,34 +21,21 @@ python3 -m venv venv
 pip install ./junos-terraform
 cd junos-terraform
 ```
----
-### <u>Yang File(s) to JSON Conversion</u>
 
-Find the device's Junos Version that is running, and locate the corresponding yang and common folders. Run the below `pyang` command to generate a `.json` file containing `.yang` information for that version. [See below example for Junos version 18.2]
-```
-pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p <path-to-common> <path-to-yang-files> > junos.json
-```
-Example: 
-```
-pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
-```
 ---
 
 ### <u>Generate Resource Provider</u>
 
-Now run the following command to generate a `resource provider`. 
+Find the Junos version running on your device, and locate the corresponding `yang` and `common` folders. Then, run the following command to generate a resource provider, supplying all YANG files with the `-p` option, the device XML configuration with `-x`, and the device type with `-t`.
 
 ```bash
-jtaf-provider -j <json-file> -x <xml-configuration> -t <device-type>
+jtaf-yang2go -p <path-to-common> <path-to-yang-files> -x <xml-configuration> -t <device-type>
 ```
 
 Example:
+
 ```bash
-jtaf-provider -j junos.json -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx
-```
-All in one example (`-j` accepts `-` for `stdin` for `jtaf-provider`):
-```bash
-pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang | jtaf-provider -j - -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx
+jtaf-yang2go -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx
 ```
 
 ---
