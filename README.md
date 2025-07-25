@@ -93,9 +93,9 @@ In the `/testbed` folder created:
 * Create a `main.tf` file with the content of terminal output from the `jtaf-xml2tf` command.  
 	* Fill in any missing information
 
-Next, create a `.terraform.rc` file with `vi` and add the following contents, replacing any `<elements>` tags with your own information. This is to ensure that the terraform plugin you created and installed to `/go/bin` will be read.
+Next, create a `.terraformrc` file in your home directory  with `vi` and add the following contents, replacing any `<elements>` tags with your own information. This is to ensure that the terraform plugin you created and installed to `/go/bin` will be read.
 
-**.terraform.rc example**
+**.terraformrc example**
 ```
 provider_installation {
 	dev_overrides {
@@ -117,8 +117,9 @@ You should know have a file structure which looks similar to:
 
 ```
 /junos-terraform/<testing-folder-name>/
-/junos-terraform/<testing-folder-name>/main.tf.          <-- contents of jtaf-xml2tf command
-/junos-terraform/<testing-folder-name>/.terraform.rc     <-- link to provider created in /usr/go/bin/ [see details above]
+/junos-terraform/<testing-folder-name>/main.tf         <-- contents of jtaf-xml2tf command
+
+/Users/<username>/.terraformrc     <-- link to provider created in /usr/go/bin/ [see details above]
 ```
 
 ---
