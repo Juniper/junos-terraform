@@ -53,6 +53,22 @@ pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/18.2/18.2R3/common 
 
 ---
 
+### <u>Single command to generate resource provider</u>
+
+Use `jtaf-yang2go` command to generate a resource provider in a single step by supplying all YANG files with the `-p` option, the device XML configuration with `-x`, and the device type with `-t`.
+
+```bash
+jtaf-yang2go -p <path-to-common> <path-to-yang-files> -x <xml-configuration> -t <device-type>
+```
+
+Example:
+
+```bash
+jtaf-yang2go -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx
+```
+
+---
+
 ### <u>Build the provider and install</u>
 
 cd into the newly created directory starting with `terraform-provider-junos-` then the device-type and then `go install`
