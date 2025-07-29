@@ -44,6 +44,7 @@ const ApplyGroupXML = `<load-configuration action="merge" format="xml">
 	%s
 </load-configuration>
 `
+const discardChanges = `<discard-changes/>`
 
 type configuration struct {
 	ApplyGroup []string `xml:"apply-groups"`
@@ -158,6 +159,7 @@ func (g *GoNCClient) SendCommit() error {
 		return err
 	}
 	if _, err := g.Driver.SendRaw(commitStr); err != nil {
+		g.Driver.SendRaw(discardChanges)
 		return err
 	}
 	return nil
