@@ -169,11 +169,15 @@ def filter_json_using_xml(schema, xml):
     else:
         with open(schema) as f:
             schema = json.load(f)
-    with open(xml) as f:
-        xml_text = f.read()
 
-    # Parse XML under temporary root
-    root = ElementTree.fromstring(f"<root>{xml_text}</root>")
+    # Check if xml is a single file or merged xml element 
+    if isinstance(xml, str):
+        with open(xml) as f:
+            xml_text = f.read()
+        # Parse XML under temporary root
+        root = ElementTree.fromstring(f"<root>{xml_text}</root>")
+    else:
+        root = xml
 
     # Try to find the <configuration> node under <rpc-reply>
     config_node = root.find(".//configuration")
@@ -199,17 +203,36 @@ def render_template_and_write(input_template: str, output_file: str, context: di
         f.write(rendered)
     print(f"Updated {description}")
 
+def load_and_merge_xmls(xml_file_list):
+    merged_config = ElementTree.Element("configuration")
+
+    # Parse and find <configuration> in each file
+    for path in xml_file_list:
+        with open(path) as f:
+            raw = f.read()
+        root = ElementTree.fromstring(f"<root>{raw}</root>")
+        config = root.find(".//configuration")
+        if config is None:
+            raise ValueError(f"No <configuration> found in {path}")
+        for child in config:
+                merged_config.append(child)
+
+    return merged_config
+
 # Main Method
 def main():
     # other arguments
     parser = argparse.ArgumentParser(exit_on_error=True)
     parser.add_argument('-j', '--json-schema', required=True, help='specify the json schema file')
-    parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
+    parser.add_argument('-x', '--xml-config', required=True, nargs='+', help='specify one or more XML config files to combine')
     parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
     args = parser.parse_args()
 
+    # Merge XML files if multiple are provided 
+    xml_config = args.xml_config[0] if len(args.xml_config) == 1 else load_and_merge_xmls(args.xml_config)
+
     # Step 1: Filter the schema using the config
-    resources = filter_json_using_xml(args.json_schema, args.xml_config)
+    resources = filter_json_using_xml(args.json_schema, xml_config)
 
     # Step 2: Render the template into Go code
 
