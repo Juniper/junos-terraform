@@ -116,6 +116,22 @@ def check_children(paths, elem, node_parent, current_path):
     else:
         return True
     return False
+
+def remove_tags_by_name(root, tag_names):
+    # Recursively remove all nodes with matching tag names 
+    for tag in tag_names:
+        for elem in root.findall(f".//{tag}"):
+            parent = find_parent(root, elem)
+            if parent is not None:
+                parent.remove(elem)
+
+def find_parent(root, child):
+    # Find parent of a given element 
+    for parent in root.iter():
+        for elem in parent:
+            if elem is child:
+                return parent
+    return None
  
 def walk_schema(paths, node, parent = []):
     result = None
@@ -186,9 +202,7 @@ def filter_json_using_xml(schema, xml):
         root = config_node
 
     # find and remove any version node
-    version_node = root.find("./version")
-    if version_node is not None:
-        root.remove(version_node)
+    remove_tags_by_name(root, ["version", "versions", "model"])
 
     # find the unique paths
     paths = unique_xpaths(get_xpaths(root))
@@ -224,13 +238,12 @@ def main():
     # other arguments
     parser = argparse.ArgumentParser(exit_on_error=True)
     parser.add_argument('-j', '--json-schema', required=True, help='specify the json schema file')
-    parser.add_argument('-x', '--xml-config', required=True, action='append', nargs="+", help='specify one or more XML config files to combine')
+    parser.add_argument('-x', '--xml-config', required=True, nargs='+', help='specify one or more XML config files to combine')
     parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
     args = parser.parse_args()
 
     # Merge XML files if multiple are provided 
-    xml_files = [file for group in args.xml_config for file in group]
-    xml_config = xml_files[0] if len(xml_files) == 1 else load_and_merge_xmls(xml_files)
+    xml_config = args.xml_config[0] if len(args.xml_config) == 1 else load_and_merge_xmls(args.xml_config)
 
     # Step 1: Filter the schema using the config
     resources = filter_json_using_xml(args.json_schema, xml_config)
