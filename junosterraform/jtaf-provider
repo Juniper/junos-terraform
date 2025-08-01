@@ -238,12 +238,13 @@ def main():
     # other arguments
     parser = argparse.ArgumentParser(exit_on_error=True)
     parser.add_argument('-j', '--json-schema', required=True, help='specify the json schema file')
-    parser.add_argument('-x', '--xml-config', required=True, nargs='+', help='specify one or more XML config files to combine')
+    parser.add_argument('-x', '--xml-config', required=True, action='append', nargs="+", help='specify one or more XML config files to combine')
     parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
     args = parser.parse_args()
 
     # Merge XML files if multiple are provided 
-    xml_config = args.xml_config[0] if len(args.xml_config) == 1 else load_and_merge_xmls(args.xml_config)
+    xml_files = [file for group in args.xml_config for file in group]
+    xml_config = xml_files[0] if len(xml_files) == 1 else load_and_merge_xmls(xml_files)
 
     # Step 1: Filter the schema using the config
     resources = filter_json_using_xml(args.json_schema, xml_config)
