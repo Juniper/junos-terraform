@@ -76,42 +76,43 @@ func NewRPCReply(rawXML []byte, ErrOnWarning bool) (*RPCReply, error) {
 	// Check errors in the top-level reply
 	if reply.Errors != nil {
 		for _, rpcErr := range reply.Errors {
-			if rpcErr.Severity == "error" || ErrOnWarning {
+			if rpcErr.Severity == "error" {
 				return reply, &rpcErr
 			}
 		}
 	}
 
 	// Check errors in commit-results, if present
+	commitErrors := &RPCReplyBody{}
 	if reply.CommitResults != nil && reply.CommitResults.Errors != nil {
 		reply.Data = reply.CommitResults.Data
 		reply.Ok = reply.CommitResults.Ok
 		// Return if error found
 		for _, rpcErr := range reply.CommitResults.Errors {
-			if rpcErr.Severity == "error" || ErrOnWarning {
-				reply.Errors = reply.CommitResults.Errors
+			if rpcErr.Severity == "error" {
+				commitErrors = reply.CommitResults
 				return reply, &rpcErr
 			}
 		}
 	}
 
 	// Check errors in load-configuration-results, if present
+	loadConfigurationErrors := &RPCReplyBody{}
 	if reply.LoadConfigurationResults != nil && reply.LoadConfigurationResults.Errors != nil {
 		reply.Data = reply.LoadConfigurationResults.Data
 		reply.Ok = reply.LoadConfigurationResults.Ok
 		// Return if error found
 		for _, rpcErr := range reply.LoadConfigurationResults.Errors {
-			if rpcErr.Severity == "error" || ErrOnWarning {
-				reply.Errors = reply.LoadConfigurationResults.Errors
+			if rpcErr.Severity == "error" {
+				loadConfigurationErrors = reply.LoadConfigurationResults
 				return reply, &rpcErr
 			}
 		}
 	}
-	if reply.Errors == nil && reply.Ok == nil &&
-		(reply.CommitResults == nil || reply.CommitResults.Ok == nil) &&
-		(reply.LoadConfigurationResults == nil || reply.LoadConfigurationResults.Ok == nil) &&
-		len(reply.Data) == 0 {
-		panic("Invalid rpc reply received")
+
+	if (commitErrors.Errors != nil && commitErrors.Ok == nil) ||
+		(loadConfigurationErrors.Errors != nil && loadConfigurationErrors.Ok == nil) {
+		panic(fmt.Sprintf("Invalid rpc reply received: %s", string(rawXML)))
 	}
 	return reply, nil
 }
