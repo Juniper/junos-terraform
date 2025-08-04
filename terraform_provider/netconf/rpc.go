@@ -51,38 +51,21 @@ func (m *RPCMessage) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 }
 
 // RPCReply defines a reply to a RPC request
-type RPCReplyBody struct {
-	Errors   []RPCError `xml:"rpc-error,omitempty"`
-	Data     string     `xml:",innerxml"`
-	Ok       bool       `xml:"ok,omitempty"`
-	RawReply string     `xml:"-"`
-}
-
-// RPCReply defines a reply to a RPC request
 type RPCReply struct {
-	RPCReplyBody
 	XMLName xml.Name `xml:"rpc-reply"`
-}
-
-// RPCReply defines a reply to a RPC request
-type RPCReplyCommitResults struct {
-	XMLName       xml.Name     `xml:"rpc-reply"`
-	CommitResults RPCReplyBody `xml:"commit-results,omitempty"`
-}
-
-// RPCReply defines a reply to a RPC request
-type RPCReplyLoadConfigurationResults struct {
-	XMLName                  xml.Name     `xml:"rpc-reply"`
-	LoadConfigurationResults RPCReplyBody `xml:"load-configuration-results,omitempty"`
+	RPCReplyBody
+	CommitResults            *RPCReplyBody `xml:"commit-results,omitempty"`
+	LoadConfigurationResults *RPCReplyBody `xml:"load-configuration-results,omitempty"`
 }
 
 // NewRPCReply creates a new RPC Reply
 func NewRPCReply(rawXML []byte, ErrOnWarning bool) (*RPCReply, error) {
-	/*
-		f, _ := os.OpenFile("/var/tmp/rpc-reply.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		fmt.Fprintf(f, "RPC reply (%s)\n", string(rawXML))
-		f.Close()
-	*/
+	// Check if the log file exists, delete if it does
+	// logFilePath := "/var/tmp/rpc-reply.log"
+	// f, _ := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// fmt.Fprintf(f, "RPC reply (%s)\n", string(rawXML))
+	// f.Close()
+
 	reply := &RPCReply{}
 	reply.RawReply = string(rawXML)
 
@@ -90,59 +73,47 @@ func NewRPCReply(rawXML []byte, ErrOnWarning bool) (*RPCReply, error) {
 		return nil, err
 	}
 
-	replyCommitResults := &RPCReplyCommitResults{}
-	commitResults := RPCReplyBody{}
-	commitResults.RawReply = string(rawXML)
-	replyCommitResults.CommitResults = commitResults
-
-	if err := xml.Unmarshal(rawXML, replyCommitResults); err != nil {
-		return nil, err
-	}
-
-	replyLoadConfigurationResults := &RPCReplyLoadConfigurationResults{}
-	loadConfigurationResults := RPCReplyBody{}
-	loadConfigurationResults.RawReply = string(rawXML)
-	replyLoadConfigurationResults.LoadConfigurationResults = loadConfigurationResults
-
-	if err := xml.Unmarshal(rawXML, replyLoadConfigurationResults); err != nil {
-		return nil, err
-	}
-	/*
-		f, _ = os.OpenFile("/var/tmp/rpc-reply.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		fmt.Fprintf(f, "RPC unmarshal complete (%+v)\n", replyLoadConfigurationResults)
-		f.Close()
-	*/
-
+	// Check errors in the top-level reply
 	if reply.Errors != nil {
 		for _, rpcErr := range reply.Errors {
-			if rpcErr.Severity == "error" || ErrOnWarning {
+			if rpcErr.Severity == "error" {
 				return reply, &rpcErr
 			}
 		}
 	}
 
-	if replyCommitResults.CommitResults.Errors != nil {
-		for _, rpcErr := range replyCommitResults.CommitResults.Errors {
-			if rpcErr.Severity == "error" || ErrOnWarning {
-				reply.Errors = replyCommitResults.CommitResults.Errors
-				reply.Data = replyCommitResults.CommitResults.Data
-				reply.Ok = replyCommitResults.CommitResults.Ok
+	// Check errors in commit-results, if present
+	commitErrors := &RPCReplyBody{}
+	if reply.CommitResults != nil && reply.CommitResults.Errors != nil {
+		reply.Data = reply.CommitResults.Data
+		reply.Ok = reply.CommitResults.Ok
+		// Return if error found
+		for _, rpcErr := range reply.CommitResults.Errors {
+			if rpcErr.Severity == "error" {
+				commitErrors = reply.CommitResults
 				return reply, &rpcErr
 			}
 		}
 	}
 
-	if replyLoadConfigurationResults.LoadConfigurationResults.Errors != nil {
-		for _, rpcErr := range replyLoadConfigurationResults.LoadConfigurationResults.Errors {
-			if rpcErr.Severity == "error" || ErrOnWarning {
-				reply.Errors = replyLoadConfigurationResults.LoadConfigurationResults.Errors
-				reply.Data = replyLoadConfigurationResults.LoadConfigurationResults.Data
-				reply.Ok = replyLoadConfigurationResults.LoadConfigurationResults.Ok
+	// Check errors in load-configuration-results, if present
+	loadConfigurationErrors := &RPCReplyBody{}
+	if reply.LoadConfigurationResults != nil && reply.LoadConfigurationResults.Errors != nil {
+		reply.Data = reply.LoadConfigurationResults.Data
+		reply.Ok = reply.LoadConfigurationResults.Ok
+		// Return if error found
+		for _, rpcErr := range reply.LoadConfigurationResults.Errors {
+			if rpcErr.Severity == "error" {
+				loadConfigurationErrors = reply.LoadConfigurationResults
 				return reply, &rpcErr
 			}
 		}
 	}
 
+	if (commitErrors.Errors != nil && commitErrors.Ok == nil) ||
+		(loadConfigurationErrors.Errors != nil && loadConfigurationErrors.Ok == nil) {
+		panic(fmt.Sprintf("Invalid rpc reply received: %s", string(rawXML)))
+	}
 	return reply, nil
 }
 
@@ -198,4 +169,11 @@ func uuid() string {
 	b[6] = (b[6] & 0x0f) | 0x40
 	b[8] = (b[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
+
+type RPCReplyBody struct {
+	Errors   []RPCError `xml:"rpc-error,omitempty"`
+	Data     string     `xml:",innerxml"`
+	Ok       *bool      `xml:"ok,omitempty"`
+	RawReply string     `xml:"-"`
 }
