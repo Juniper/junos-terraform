@@ -60,11 +60,6 @@ type RPCReply struct {
 
 // NewRPCReply creates a new RPC Reply
 func NewRPCReply(rawXML []byte, ErrOnWarning bool) (*RPCReply, error) {
-	// Check if the log file exists, delete if it does
-	// logFilePath := "/var/tmp/rpc-reply.log"
-	// f, _ := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	// fmt.Fprintf(f, "RPC reply (%s)\n", string(rawXML))
-	// f.Close()
 
 	reply := &RPCReply{}
 	reply.RawReply = string(rawXML)
@@ -83,35 +78,35 @@ func NewRPCReply(rawXML []byte, ErrOnWarning bool) (*RPCReply, error) {
 	}
 
 	// Check errors in commit-results, if present
-	commitErrors := &RPCReplyBody{}
 	if reply.CommitResults != nil && reply.CommitResults.Errors != nil {
 		reply.Data = reply.CommitResults.Data
 		reply.Ok = reply.CommitResults.Ok
 		// Return if error found
 		for _, rpcErr := range reply.CommitResults.Errors {
 			if rpcErr.Severity == "error" {
-				commitErrors = reply.CommitResults
+				reply.Errors = reply.CommitResults.Errors
 				return reply, &rpcErr
 			}
 		}
 	}
 
 	// Check errors in load-configuration-results, if present
-	loadConfigurationErrors := &RPCReplyBody{}
 	if reply.LoadConfigurationResults != nil && reply.LoadConfigurationResults.Errors != nil {
 		reply.Data = reply.LoadConfigurationResults.Data
 		reply.Ok = reply.LoadConfigurationResults.Ok
 		// Return if error found
 		for _, rpcErr := range reply.LoadConfigurationResults.Errors {
 			if rpcErr.Severity == "error" {
-				loadConfigurationErrors = reply.LoadConfigurationResults
+				reply.Errors = reply.LoadConfigurationResults.Errors
 				return reply, &rpcErr
 			}
 		}
 	}
 
-	if (commitErrors.Errors != nil && commitErrors.Ok == nil) ||
-		(loadConfigurationErrors.Errors != nil && loadConfigurationErrors.Ok == nil) {
+	if reply.CommitResults == nil && reply.LoadConfigurationResults == nil && reply.Errors == nil && reply.Ok == nil {
+		if bytes.Contains(rawXML, []byte("<configuration")) {
+			return reply, nil
+		}
 		panic(fmt.Sprintf("Invalid rpc reply received: %s", string(rawXML)))
 	}
 	return reply, nil
