@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 import argparse
+import json
 from lxml import etree
 import sys
 import re
 import os
 from xml.etree import ElementTree
-
 
 def convert_to_hcl(value, indent=2):
     """
@@ -26,8 +26,34 @@ def convert_to_hcl(value, indent=2):
 def normalize_tag(tag):
     return tag.replace('-', '_').replace('.', '_')  # Replace hyphens with underscores, Also replace dots
 
+def build_type_map(node, parent_path=""):
+    type_map = {}
 
-def parse_element(element, explicit_empty_tags):
+    # Normalize node name
+    node_name = normalize_tag(node["name"])
+    path = f"{parent_path}/{node_name}" if parent_path else node_name
+
+    # Strip leading 'root/configuration' to match XML traversal
+    for prefix in ["root/configuration/", "configuration/"]:
+        if path.startswith(prefix):
+            path = path[len(prefix):]
+
+    # Store type info
+    node_info = {"type": node.get("type")}
+    if "leaf-type" in node:
+        node_info["leaf-type"] = node["leaf-type"]
+    if "types" in node:
+        node_info["types"] = node["types"]
+
+    type_map[path] = node_info
+
+    # Recurse into children
+    for child in node.get("children", []):
+        type_map.update(build_type_map(child, path))
+
+    return type_map
+
+def parse_element(element, explicit_empty_tags, type_lookup,parent_path=""):
     """
     Recursively parse an XML element into a nested structure for HCL conversion.
     - Empty tags become `True`
@@ -37,6 +63,12 @@ def parse_element(element, explicit_empty_tags):
     tag_name = etree.QName(element.tag).localname
     has_text = element.text is not None and element.text.strip() != ""
     has_children = len(element) > 0
+    path = f"{parent_path}/{tag_name}" if parent_path and parent_path != tag_name else tag_name
+    normalized_path = normalize_tag(path)
+
+    # Check if this element should be a leaf-list
+    type_info = type_lookup.get(normalized_path, {})
+    is_leaf_list = type_info.get("type") == "leaf-list"
 
     # Self-closing or empty tag
     if not has_text and not has_children:
@@ -45,14 +77,14 @@ def parse_element(element, explicit_empty_tags):
         else:
             return ""
 
-    # # Case: <vlan-tagging></vlan-tagging> → True
-    # if (not element.text or not element.text.strip()) and len(element) == 0:
-    #     print(f"Empty tag: {element.tag}")
-    #     return ""
-    
     # Case: <name>ge-0/0/3</name> → "ge-0/0/3"
     if element.text and element.text.strip() and len(element) == 0:
         text_value = element.text.strip()
+        if is_leaf_list:
+            try:
+                return [int(text_value)]
+            except ValueError:
+                return [text_value]
         try:
             return int(text_value)
         except ValueError:
@@ -61,7 +93,7 @@ def parse_element(element, explicit_empty_tags):
     # Default case: has children
     parsed = {}
     for child in element:
-        child_data = parse_element(child, explicit_empty_tags)
+        child_data = parse_element(child, explicit_empty_tags, type_lookup, path)
         tag = normalize_tag(child.tag)
 
         # If tag repeats, make sure it’s a flat list
@@ -73,7 +105,7 @@ def parse_element(element, explicit_empty_tags):
             if isinstance(child_data, list) and len(child_data) == 1 and isinstance(child_data[0], dict):
                 parsed[tag].append(child_data[0])
             else:
-                parsed[tag].append(child_data)
+                parsed[tag].append(child_data[0])
         else:
             # First occurrence — flatten single-item dict-lists
             if isinstance(child_data, list) and len(child_data) == 1 and isinstance(child_data[0], dict):
@@ -83,42 +115,7 @@ def parse_element(element, explicit_empty_tags):
 
     return [parsed]  # Always return a list of dict for elements with children
 
-def normalize_from_blocks(data):
-    """
-    Recursively normalize all 'from' blocks:
-    - Any list of scalars inside a `from = [{...}]` block will be split into multiple dicts.
-    Example:
-      { protocol = ["evpn", "ospf"], route_filter = [...] }
-      → becomes
-      [
-        { protocol = "evpn" },
-        { protocol = "ospf" },
-        { route_filter = [...] }
-      ]
-    """
-    if isinstance(data, dict):
-        for key, val in data.items():
-            if key == "from" and isinstance(val, list):
-                new_from_list = []
-                for block in val:
-                    if isinstance(block, dict):
-                        for subkey, subval in block.items():
-                            if isinstance(subval, list) and all(isinstance(item, (str, int, float)) for item in subval):
-                                # Split scalar lists into multiple dicts
-                                new_from_list.extend([{subkey: item} for item in subval])
-                            else:
-                                new_from_list.append({subkey: subval})
-                    else:
-                        new_from_list.append(block)
-                data[key] = new_from_list
-            else:
-                data[key] = normalize_from_blocks(val)
-    elif isinstance(data, list):
-        return [normalize_from_blocks(item) for item in data]
-    return data
-
-
-def generate_hcl_resources(parsed_data, device_type, hostname):
+def generate_hcl_resources(parsed_data, device_type, hostname, group_name):
     """
     Generates a single Terraform-style resource block combining all top-level elements.
     """
@@ -136,12 +133,12 @@ provider "junos-{device_type}" {{
   username = ""
   password = ""
   sshkey   = ""
-  alias    = "{hostname}"
+  alias    = "{hostname.replace("-", "_")}"
 }}
     """
-    resource_block = provider_block + f'\nresource "junos-{device_type}_Apply_Groups" "{hostname}" {{\n'
-    resource_block += f'  resource_name = "JTAF_{hostname}"\n'
-    resource_block += f'  provider = junos-{device_type}.{hostname}\n'
+    resource_block = provider_block + f'\nresource "junos-{device_type}-base-config" "{hostname}" {{\n'
+    resource_block += f'  resource_name = "{group_name}"\n'
+    resource_block += f'  provider = junos-{device_type}.{hostname.replace("-", "_")}\n'
 
     for key, value in parsed_data.items():
         hcl_value = convert_to_hcl(value, indent=4)
@@ -151,14 +148,13 @@ provider "junos-{device_type}" {{
     return resource_block
 
 
-def parse_xml_to_hcl(xml_file, device_type, hostname):
+def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
     """
     Parses an XML file and converts it to Terraform-style HCL resources.
     Starts from <configuration> if under <rpc-reply> and removes <version> if present.
     """
     try:
         # Read the XML file content
-        print(f"Reading XML file: {xml_file}")
         with open(xml_file, 'r') as file:
             xml_content = file.read()
 
@@ -176,7 +172,7 @@ def parse_xml_to_hcl(xml_file, device_type, hostname):
         if config_node is not None:
             # Replace root with configuration node
             root = config_node
-
+            
         # Remove any <version> tag directly under root
         version_node = root.find("./version")
         if version_node is not None:
@@ -186,18 +182,67 @@ def parse_xml_to_hcl(xml_file, device_type, hostname):
         parsed_data = {}
         for elem in root:
             tag = normalize_tag(elem.tag)
-            parsed_data[tag] = parse_element(elem, explicit_empty_tags)
+            parsed_data[tag] = parse_element(elem, explicit_empty_tags, type_lookup)
 
-        # Normalize 'from' blocks globally
-        parsed_data = normalize_from_blocks(parsed_data)
+         # Normalize 'from' blocks globally
+        parsed_data = normalize_class_blocks(parsed_data)
 
         # Generate the HCL output
-        hcl_block = generate_hcl_resources(parsed_data, device_type, hostname)
+        hcl_block = generate_hcl_resources(parsed_data, device_type, hostname, group_name="base-config")
         return hcl_block
 
     except Exception as e:
         print(f"Error parsing XML: {e}")
         return None
+
+def normalize_class_blocks(data):
+    # Ensure 'system' exists and is a list
+    systems = data.get("system", [])
+    if not isinstance(systems, list):
+        return data
+
+    for system in systems:
+        logins = system.get("login", [])
+        if not isinstance(logins, list):
+            continue
+
+        for login in logins:
+            classes = login.get("class", [])
+            if not isinstance(classes, list):
+                continue
+
+            normalized = []
+
+            for cls in classes:
+                class_name = cls.get("name")
+                if not class_name:
+                    continue                                                                                                                            
+
+                base_fields = {}
+                list_fields = []
+
+                for key, value in cls.items():
+                    if key == "name":
+                        continue
+                    if isinstance(value, list):
+                        for item in value:
+                            list_fields.append({"name": class_name, key: item})
+                    else:
+                        base_fields[key] = value
+
+                # Add base_fields (if any)
+                if base_fields:
+                    base_fields["name"] = class_name
+                    normalized.append(base_fields)
+
+                # Add all list-derived entries
+                normalized.extend(list_fields)
+            
+             # Replace with normalized output
+            if normalized:
+                login["class"] = normalized
+ 
+    return data
 
 def main():
     parser = argparse.ArgumentParser(exit_on_error=True)
@@ -209,8 +254,22 @@ def main():
     xml_file = args.xml_config
     device_type = args.type
     hostname = args.hostname
-    hcl_output = parse_xml_to_hcl(xml_file, device_type, hostname)
 
+    # --- Load JSON schema ---
+    with open("trimmed_schema.json", 'r') as f:
+        schema = json.load(f)
+
+    config_node = None
+    for child in schema["root"]["children"]:
+        if child["name"] == "configuration":
+            config_node = child
+            break
+    if not config_node:
+        raise ValueError("No configuration node found in JSON schema")
+
+    type_lookup = build_type_map(config_node)
+    
+    hcl_output = parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup)
     if hcl_output:
         print("\nGenerated Terraform Configuration:\n")
         print(hcl_output)   

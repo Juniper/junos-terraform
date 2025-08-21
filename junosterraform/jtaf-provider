@@ -207,7 +207,10 @@ def filter_json_using_xml(schema, xml):
     # find the unique paths
     paths = unique_xpaths(get_xpaths(root))
 
-    return walk_schema(paths, schema)
+    new_schema = walk_schema(paths, schema)
+    with open("trimmed_schema.json", "w") as f:
+        json.dump(new_schema, f, indent=2)
+    return new_schema
  
 def render_template_and_write(input_template: str, output_file: str, context: dict, description: str):
     with open(input_template) as f:
