@@ -23,9 +23,11 @@ def convert_to_hcl(value, indent=2):
     else:
         return f'"{value}"'
 
+# Replace hyphens and dots with underscores
 def normalize_tag(tag):
-    return tag.replace('-', '_').replace('.', '_')  # Replace hyphens with underscores, Also replace dots
+    return tag.replace('-', '_').replace('.', '_') 
 
+# Using trimmed json, build mapping of path and path type
 def build_type_map(node, parent_path=""):
     type_map = {}
 
@@ -115,11 +117,14 @@ def parse_element(element, explicit_empty_tags, type_lookup,parent_path=""):
 
     return [parsed]  # Always return a list of dict for elements with children
 
-def generate_hcl_resources(parsed_data, device_type, hostname, group_name):
+# Generates a Terraform-style resource block for the given parsed data.
+def generate_hcl_resources(parsed_data, device_type, hostname, group_name, apply_group):
     """
     Generates a single Terraform-style resource block combining all top-level elements.
     """
-    provider_block = f"""terraform {{
+    resource_block = ""
+    if group_name == "base-config":
+        provider_block = f"""terraform {{
   required_providers {{
     junos-{device_type} = {{
       source = "junos-{device_type}"
@@ -135,8 +140,13 @@ provider "junos-{device_type}" {{
   sshkey   = ""
   alias    = "{hostname.replace("-", "_")}"
 }}
-    """
-    resource_block = provider_block + f'\nresource "junos-{device_type}-base-config" "{hostname}" {{\n'
+"""
+        resource_block += provider_block + "\n"
+
+    if group_name == "base-config":
+        resource_block += f'resource "junos-{device_type}-base-config" "{group_name}" {{\n'
+    else:
+        resource_block += f'resource "junos_group" "{group_name}" {{\n'
     resource_block += f'  resource_name = "{group_name}"\n'
     resource_block += f'  provider = junos-{device_type}.{hostname.replace("-", "_")}\n'
 
@@ -172,7 +182,25 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
         if config_node is not None:
             # Replace root with configuration node
             root = config_node
-            
+        
+        groups = []
+        apply_groups = []
+
+        # Extract and remove <apply-groups>
+        for ag in root.findall('./apply-groups'):
+            if ag.text:
+                apply_groups.append(ag.text.strip())
+            root.remove(ag)
+
+        # Extract and remove <groups>
+        groups_elem = root.findall('./groups')
+        for group in groups_elem:
+            group_name_elem = group.find('./name')
+            if group_name_elem is not None:
+                group_name = group_name_elem.text.strip()
+                groups.append((group_name, group))
+            root.remove(group)
+
         # Remove any <version> tag directly under root
         version_node = root.find("./version")
         if version_node is not None:
@@ -180,69 +208,41 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
 
         # Parse elements starting from the new root
         parsed_data = {}
+        resources = []
+        # Build base resource from root-level config (now excluding groups and apply-groups)
+        base_data = {}
+        for elem in root:
+            tag = normalize_tag(elem.tag)
+            base_data[tag] = parse_element(elem, explicit_empty_tags, type_lookup)
+
+        resources.append(generate_hcl_resources(base_data, device_type, hostname, group_name="base-config", apply_group=True))
+
+        for group_name, group_node in groups:
+            group_data = {"groups": {}}
+
+            for elem in group_node:
+                tag = normalize_tag(elem.tag)
+                value = parse_element(elem, explicit_empty_tags, type_lookup)
+                group_data["groups"][tag] = value
+
+            # Determine if group should be applied
+            should_apply = group_name in apply_groups and group_name != "base-config"
+
+            group_resource = generate_hcl_resources(group_data, device_type, hostname, group_name, apply_group=should_apply)
+            if not should_apply:
+                # Comment out if group not applied
+                group_resource = '\n'.join([f'# {line}' for line in group_resource.splitlines()])
+            resources.append(group_resource)
+
         for elem in root:
             tag = normalize_tag(elem.tag)
             parsed_data[tag] = parse_element(elem, explicit_empty_tags, type_lookup)
 
-         # Normalize 'from' blocks globally
-        parsed_data = normalize_class_blocks(parsed_data)
-
-        # Generate the HCL output
-        hcl_block = generate_hcl_resources(parsed_data, device_type, hostname, group_name="base-config")
-        return hcl_block
+        return "\n".join(resources)
 
     except Exception as e:
         print(f"Error parsing XML: {e}")
         return None
-
-def normalize_class_blocks(data):
-    # Ensure 'system' exists and is a list
-    systems = data.get("system", [])
-    if not isinstance(systems, list):
-        return data
-
-    for system in systems:
-        logins = system.get("login", [])
-        if not isinstance(logins, list):
-            continue
-
-        for login in logins:
-            classes = login.get("class", [])
-            if not isinstance(classes, list):
-                continue
-
-            normalized = []
-
-            for cls in classes:
-                class_name = cls.get("name")
-                if not class_name:
-                    continue                                                                                                                            
-
-                base_fields = {}
-                list_fields = []
-
-                for key, value in cls.items():
-                    if key == "name":
-                        continue
-                    if isinstance(value, list):
-                        for item in value:
-                            list_fields.append({"name": class_name, key: item})
-                    else:
-                        base_fields[key] = value
-
-                # Add base_fields (if any)
-                if base_fields:
-                    base_fields["name"] = class_name
-                    normalized.append(base_fields)
-
-                # Add all list-derived entries
-                normalized.extend(list_fields)
-            
-             # Replace with normalized output
-            if normalized:
-                login["class"] = normalized
- 
-    return data
 
 def main():
     parser = argparse.ArgumentParser(exit_on_error=True)
@@ -258,7 +258,6 @@ def main():
     # --- Load JSON schema ---
     with open("trimmed_schema.json", 'r') as f:
         schema = json.load(f)
-
     config_node = None
     for child in schema["root"]["children"]:
         if child["name"] == "configuration":
@@ -267,8 +266,10 @@ def main():
     if not config_node:
         raise ValueError("No configuration node found in JSON schema")
 
+    # Using the trimmed json schema, build map of path to its type
     type_lookup = build_type_map(config_node)
     
+    # Traverse xml to create HCL resources
     hcl_output = parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup)
     if hcl_output:
         print("\nGenerated Terraform Configuration:\n")
