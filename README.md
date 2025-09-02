@@ -92,7 +92,7 @@ jtaf-xml2tf -x <device-xml-config> -t <device-type> -n <deivce-host-name>
 
 Example: 
 ```
-jtaf-xml2tf -x config.xml -t vqfx -n dc2-spine1
+jtaf-xml2tf -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx -n dc2-spine1
 ```
 
 Using the output from the terminal, which represents a template for the HCL .tf file, we can create our testing environment and fill in the template with the necessary device information.
@@ -145,6 +145,6 @@ You should know have a file structure which looks similar to:
 Once the `.terraform.rc` file is set up, and the `main.tf` test file contains access to the provider, information regarding the desired devices to push the configuration to, and the desired config in `HCL` format, we are now ready to use the provider.
 
 ```
-terrafrom plan
+terraform plan
 terraform apply -auto-approve
 ```
