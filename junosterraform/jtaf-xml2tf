@@ -246,13 +246,18 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
 
 def main():
     parser = argparse.ArgumentParser(exit_on_error=True)
-    parser.add_argument('-x', '--xml-config', required=True, action='append', nargs="+", help='specify one or more XML config files')
+    parser.add_argument('-j', '--trimmed_json', required=True, help='specify the trimmed json config file stored in the terraform provider folder')
+    parser.add_argument('-x', '--xml-config', required=True, nargs="+", help='specify one or more XML config files to create .tf files for')
     parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
-    parser.add_argument('-n', '--hostname', required=True, help='device hostname (i.e. dc2-spine1, dc2-spine2, etc)')
     parser.add_argument('-o', '--output', action='store_true', help='if provided, write out terraform config(s) to file')
     args = parser.parse_args()
 
-    xml_files = [file for group in args.xml_config for file in group]
+    ## Add optional options to take in username and password
+    # parser.add_argument('-u', '--username', required=False, help='device username')
+    # parser.add_argument('-p', '--password', required=False, help='device password')
+
+    trimmed_json_file = args.trimmed_json
+    xml_files = args.xml_config
     device_type = args.type
     hostname = args.hostname
 
@@ -284,6 +289,19 @@ def main():
             else:
                 print("\nGenerated Terraform Configuration:\n")
                 print(hcl_output)  
+    resources = []
+    hostnames = []
+    for file in xml_file:
+        hostname = file.split('/')[-1].strip('.xml')
+        hostnames.append(hostname)
+    print(createHeadBlock(device_type, hostnames))
+
+    for file in xml_file:
+        hostname = file.split('/')[-1].strip('.xml')
+        # Traverse xml to create HCL resources
+        hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup)
+        if hcl_output:
+            print(hcl_output)
 
 if __name__ == "__main__":
     main()
