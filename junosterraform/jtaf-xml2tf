@@ -117,37 +117,51 @@ def parse_element(element, explicit_empty_tags, type_lookup,parent_path=""):
 
     return [parsed]  # Always return a list of dict for elements with children
 
+def createHeadBlock(device_type, hostnames):
+    """
+    Generates a single Terraform-style resource block combining all top-level elements.
+    """
+    resource_block = ""
+    
+    provider_block = f"""terraform {{
+  required_providers {{
+    junos-{device_type} = {{
+      source = "hashicorp/junos-{device_type}"
+    }}
+  }}
+}}
+"""
+    for hostname in hostnames:
+        provider_block += f"""
+provider "junos-{device_type}" {{
+    host     = ""
+    port     = 22
+    username = ""
+    password = ""
+    sshkey   = ""
+    alias    = "{hostname.replace("-", "_")}"
+}}
+"""
+    
+    resource_block += provider_block
+
+    return resource_block
+
+
+
 # Generates a Terraform-style resource block for the given parsed data.
 def generate_hcl_resources(parsed_data, device_type, hostname, group_name, apply_group):
     """
     Generates a single Terraform-style resource block combining all top-level elements.
     """
     resource_block = ""
-    if group_name == "base-config":
-        provider_block = f"""terraform {{
-  required_providers {{
-    junos-{device_type} = {{
-      source = "junos-{device_type}"
-    }}
-  }}
-}}
-
-provider "junos-{device_type}" {{
-  host     = ""
-  port     = 22
-  username = ""
-  password = ""
-  sshkey   = ""
-  alias    = "{hostname.replace("-", "_")}"
-}}
-"""
-        resource_block += provider_block + "\n"
 
     if group_name == "base-config":
-        resource_block += f'resource "junos-{device_type}-base-config" "{group_name}" {{\n'
+        resource_block += f'resource "junos-{device_type}-base-config" "{hostname}" {{\n'
+        resource_block += f'  resource_name = "{hostname}"\n'
     else:
         resource_block += f'resource "junos_group" "{group_name}" {{\n'
-    resource_block += f'  resource_name = "{group_name}"\n'
+        resource_block += f'  resource_name = "{group_name}"\n'
     resource_block += f'  provider = junos-{device_type}.{hostname.replace("-", "_")}\n'
 
     for key, value in parsed_data.items():
@@ -215,6 +229,7 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
             tag = normalize_tag(elem.tag)
             base_data[tag] = parse_element(elem, explicit_empty_tags, type_lookup)
 
+        # resources.append(createHeadBlock(device_type))
         resources.append(generate_hcl_resources(base_data, device_type, hostname, group_name="base-config", apply_group=True))
 
         for group_name, group_node in groups:
@@ -246,17 +261,22 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
 
 def main():
     parser = argparse.ArgumentParser(exit_on_error=True)
-    parser.add_argument('-x', '--xml-config', required=True, help='specify the xml config file')
+    parser.add_argument('-j', '--trimmed_json', required=True, help='specify the trimmed json config file stored in the terraform provider folder')
+    parser.add_argument('-x', '--xml-config', required=True, nargs="+", help='specify one or more XML config files to create .tf files for')
     parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
-    parser.add_argument('-n', '--hostname', required=True, help='device hostname (i.e. dc2-spine1, dc2-spine2, etc)')
     args = parser.parse_args()
 
+    ## Add optional options to take in username and password
+    # parser.add_argument('-u', '--username', required=False, help='device username')
+    # parser.add_argument('-p', '--password', required=False, help='device password')
+
+    trimmed_json_file = args.trimmed_json
     xml_file = args.xml_config
+    print(f"xml_file: {xml_file}")
     device_type = args.type
-    hostname = args.hostname
 
     # --- Load JSON schema ---
-    with open("trimmed_schema.json", 'r') as f:
+    with open(trimmed_json_file, 'r') as f:
         schema = json.load(f)
     config_node = None
     for child in schema["root"]["children"]:
@@ -269,11 +289,27 @@ def main():
     # Using the trimmed json schema, build map of path to its type
     type_lookup = build_type_map(config_node)
     
-    # Traverse xml to create HCL resources
-    hcl_output = parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup)
-    if hcl_output:
-        print("\nGenerated Terraform Configuration:\n")
-        print(hcl_output)   
+    resources = []
+    hostnames = []
+    for file in xml_file:
+        hostname = file.split('/')[-1].strip('.xml')
+        hostnames.append(hostname)
+    print(createHeadBlock(device_type, hostnames))
+
+    for file in xml_file:
+        hostname = file.split('/')[-1].strip('.xml')
+        # Traverse xml to create HCL resources
+        hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup)
+        if hcl_output:
+            print(hcl_output)
 
 if __name__ == "__main__":
     main()
+
+
+# For Vinay: jtaf-xml2tf -j terraform-provider-junos-vsrx/trimmed_schema.json -x firewalls/*.xml -t vsrx
+
+# For Natalie: jtaf-xml2tf -j terraform-provider-junos-vsrx/trimmed_schema.json -x firewalls/*.xml -t vsrx -d testbed2
+
+# Future Goal: --> add -u and -p options to take in username and password
+# jtaf-xml2tf -j terraform-provider-junos-vsrx/trimmed_schema.json -x firewalls/*.xml -t vsrx -d testbed2 -u root -p password
