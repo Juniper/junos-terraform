@@ -133,7 +133,7 @@ def create_head_block(device_type, hostnames, include_provider_block=True):
     }}
     }}
     """
-    
+   
     for hostname in hostnames:
         provider_block += f"""
 provider "junos-{device_type}" {{
@@ -230,6 +230,7 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
             tag = normalize_tag(elem.tag)
             base_data[tag] = parse_element(elem, explicit_empty_tags, type_lookup)
 
+        # resources.append(createHeadBlock(device_type))
         resources.append(generate_hcl_resources(base_data, device_type, hostname, group_name="base-config", apply_group=True))
 
         for group_name, group_node in groups:
