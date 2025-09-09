@@ -202,14 +202,12 @@ def filter_json_using_xml(schema, xml):
         root = config_node
 
     # find and remove any version node
-    remove_tags_by_name(root, ["version", "versions", "model"])
+    remove_tags_by_name(root, ["version", "versions", "model", "groups", "apply-groups"])
 
     # find the unique paths
     paths = unique_xpaths(get_xpaths(root))
 
     new_schema = walk_schema(paths, schema)
-    with open("trimmed_schema.json", "w") as f:
-        json.dump(new_schema, f, indent=2)
     return new_schema
  
 def render_template_and_write(input_template: str, output_file: str, context: dict, description: str):
@@ -253,7 +251,6 @@ def main():
     resources = filter_json_using_xml(args.json_schema, xml_config)
 
     # Step 2: Render the template into Go code
-
     with as_file(files('junosterraform').joinpath('__init__.py')) as init_py:
         package_dir = os.path.dirname(init_py)
     templates_dir = f"{package_dir}/templates"
@@ -292,7 +289,12 @@ def main():
         with open(output_path, "w") as f:
             f.write(rendered)
         print(f"Updated {output_name} with type junos-{args.type}")
-    
+
+    # Step 7: Add trimmed_schema.json to new directory
+    trimmed_schema_path = os.path.join(new_dir, "trimmed_schema.json")
+    with open(trimmed_schema_path, "w") as f:
+        json.dump(resources, f, indent=2)
+
 # run main()
 if __name__ == "__main__":
     main()

@@ -80,26 +80,58 @@ cd terraform-provider-junos-vqfx
 go install
 ```
 
+
+## <u>Autogenerate Terraform Testing Files</u>
 ---
 
-### <u>Autogenerate Terraform Testing Files</u>
+### <u>Overview</u>
 
-Run this command to generate a `.tf` test file to deploy the Terraform provider.
-Output will be returned in the terminal.
+Run a command to generate a `.tf` test file to deploy the Terraform provider.
+
+**NOTE:** Output will be returned to the terminal **OR** created in a directory depending on your passed flags.
+
+**<u>Flag Options:</u>**
+ * -j 
+	* **Required:** trimmed_json output file from jtaf-provider (stored in terraform provider folder /terraform-provider-junos-"device-type")
+ * -x
+	* **Required:** File(s) of xml config to create terraform files for
+ * -t
+	* **Required:** Junos device type
+ * -d
+	* **Optional:** Flag to create multiple Terraform files under specified directory name, one for each xml config
+ * -u
+	* **Optional:** Device username
+ * -p
+	* **Optional:** Device password
+
+---
+
+### <u>Creating a single Terraform Testing File</u>
+
+To create a single Terraform (.tf) file from a config file(s) use the following command (output returned to terminal):
 ```
-jtaf-xml2tf -x <device-xml-config> -t <device-type> -n <deivce-host-name>
+jtaf-xml2tf -j <path-to-trimmed-schema> -x <path-to-config-files(s)> -t <device-type>
 ```
 
 Example: 
+
+* **trimmed_schema** - stored in terraform provider folder created from running the jtaf-provider module command (usually in terraform-provider-junos-'device-type')
+* **xml_files** - directory containing xml file(s) (ensure xml file(s) are for the same device type)
+
 ```
-jtaf-xml2tf -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx -n dc2-spine1
+jtaf-xml2tf -j terraform-provider-junos-vsrx/trimmed_schema.json -x firewalls/*.xml -t vsrx
+```
+* If the user wants to provide the device **username** and **password**, those additional flags can be added as well
+```
+jtaf-xml2tf -j terraform-provider-junos-vsrx/trimmed_schema.json -x firewalls/*.xml -t vsrx -u root -p password
 ```
 
-Using the output from the terminal, which represents a template for the HCL .tf file, we can create our testing environment and fill in the template with the necessary device information.
+Using the output from the terminal, which represents a template for the HCL .tf file, we can create our testing folder, copy the output into a terraform file, and fill in the template with the necessary device information.
 
-### <u>Setting up Testing environment</u>
+#### <u>Create testing folder</u>
 
 Create a testing folder which can be used to write .tf files and apply terraform configuration.   
+
 Example
 	```
 	mkdir testbed
@@ -109,7 +141,44 @@ In the `/testbed` folder created:
 * Create a `main.tf` file with the content of terminal output from the `jtaf-xml2tf` command.  
 	* Fill in any missing information
 
-Next, create a `.terraformrc` file in your home directory  with `vi` and add the following contents, replacing any `<elements>` tags with your own information. This is to ensure that the terraform plugin you created and installed to `/go/bin` will be read.
+Jump to [Setting up the Test Environment](./README.md#setting-up-testing-environment)
+
+---
+
+### <u>Creating multiple Terraform Testing Files</u>
+
+To create multiple Terraform (.tf) files from multiple config files, where each .tf file will represent one xml file, use the following command (output returned to specified directory name):
+
+```
+jtaf-xml2tf -j <path-to-trimmed-schema> -x <path-to-config-files(s)> -t <device-type> -d <testing-folder-name>
+```
+
+Example: 
+
+* **trimmed_schema** - stored in terraform provider folder created from running the jtaf-provider module command (usually in terraform-provider-junos-'device-type')
+* **xml_files** - directory containing xml file(s) (ensure xml file(s) are for the same device type)
+
+```
+jtaf-xml2tf -j terraform-provider-junos-vsrx/trimmed_schema.json -x firewalls/*.xml -t vsrx -d testbed
+```
+* If the user wants to provide the device(s) **username** and **password**, those additional flags can be added as well
+```
+jtaf-xml2tf -j terraform-provider-junos-vsrx/trimmed_schema.json -x firewalls/*.xml -t vsrx -d testbed -u root -p password
+```
+
+Using the output which is outputted to the specifed directory from the command, which represents a template for the HCL .tf file for each input XML file, we can now create our testing environment and fill in the template with any remaining necessary device or config information.
+
+---
+
+### <u>Setting up Testing environment</u>
+
+Now that we ran the `jtaf-xml2tf` command and have our testing folder setup:
+* Note: if you created a single terraform file, you should have copied that output to a `.tf` file in a test folder in the `/junos-terrafom` directory:
+	* ex: `junos-terraform/testbed/main.tf` <-- stores output from command
+
+#### Creating the Enviornment
+
+Next, create a `.terraformrc` file in your home directory, `(cd ~)`, with `vi` and add the following contents, replacing any `<elements>` tags with your own information. This is to ensure that the terraform plugin you created and installed to `/go/bin` will be read.
 
 **.terraformrc example**
 ```
@@ -129,11 +198,25 @@ provider_installation {
 }
 ```
 
-You should know have a file structure which looks similar to:
+You should know have a file structure which looks similar to: 
+* (if you created one terraform test file)
 
 ```
 /junos-terraform/<testing-folder-name>/
-/junos-terraform/<testing-folder-name>/main.tf         <-- contents of jtaf-xml2tf command
+/junos-terraform/<testing-folder-name>/main.tf     <-- contents of jtaf-xml2tf command
+
+/Users/<username>/.terraformrc     <-- link to provider created in /usr/go/bin/ [see details above]
+```
+
+OR:
+* (if you used the -d flag during the `jtaf-xml2tf` command and created a directory of multiple terraform test files)
+
+```
+/junos-terraform/<testing-folder-name>/	 <-- contents of jtaf-xml2tf command
+/junos-terraform/<testing-folder-name>/dc1-firewall1.tf         
+/junos-terraform/<testing-folder-name>/dc1-firewall2.tf        
+/junos-terraform/<testing-folder-name>/dc2-firewall1.tf        
+/junos-terraform/<testing-folder-name>/dc2-firewall2.tf         
 
 /Users/<username>/.terraformrc     <-- link to provider created in /usr/go/bin/ [see details above]
 ```
@@ -142,7 +225,7 @@ You should know have a file structure which looks similar to:
 
 ### <u>Edit Test Files, Plan, and Apply</u>
 
-Once the `.terraform.rc` file is set up, and the `main.tf` test file contains access to the provider, information regarding the desired devices to push the configuration to, and the desired config in `HCL` format, we are now ready to use the provider.
+Once the `.terraform.rc` file is set up, and the `main.tf` OR group of test file(s) contains access to the provider, information regarding the desired devices to push the configuration to, and the desired config in `HCL` format, we are now ready to use the provider.
 
 ```
 terraform plan
