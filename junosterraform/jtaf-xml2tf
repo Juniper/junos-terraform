@@ -156,8 +156,8 @@ def generate_hcl_resources(parsed_data, device_type, hostname, group_name, apply
     """
     resource_block = ""
 
-    if group_name == "config":
-        resource_block += f'resource "junos-{device_type}-config" "{hostname}" {{\n'
+    if group_name == "base-config":
+        resource_block += f'resource "junos-{device_type}-base-config" "{hostname}" {{\n'
         resource_block += f'  resource_name = "{hostname}"\n'
     else:
         resource_block += f'resource "junos-{device_type}-config" "{group_name}" {{\n'
@@ -231,7 +231,7 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
             tag = normalize_tag(elem.tag)
             base_data[tag] = parse_element(elem, explicit_empty_tags, type_lookup)
 
-        resources.append(generate_hcl_resources(base_data, device_type, hostname, group_name="config", apply_group=True))
+        resources.append(generate_hcl_resources(base_data, device_type, hostname, group_name="base-config", apply_group=True))
 
         for group_name, group_node in groups:
             group_data = {}
@@ -242,7 +242,7 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
                 group_data[tag] = value
 
             # Determine if group should be applied
-            should_apply = group_name in apply_groups and group_name != "config"
+            should_apply = group_name in apply_groups and group_name != "base-config"
 
             group_resource = generate_hcl_resources(group_data, device_type, hostname, group_name, apply_group=should_apply)
             if not should_apply:
