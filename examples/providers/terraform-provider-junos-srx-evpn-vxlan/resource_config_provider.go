@@ -2267,7 +2267,7 @@ func (r *resource_Apply_Groups) Configure(_ context.Context, req resource.Config
 }
 // Metadata implements resource.Resource.
 func (r *resource_Apply_Groups) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_Apply_Groups"
+	resp.TypeName = req.ProviderTypeName + "-base-config"
 }
 // Schema implements resource.Resource.
 func (r *resource_Apply_Groups) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
