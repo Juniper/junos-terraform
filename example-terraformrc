@@ -1,0 +1,5 @@
+provider_installation {
+        dev_overrides {
+                "registry.terraform.io/hashicorp/junos-qfx-evpn-vxlan" = "/home/jcluser/go/bin"
+                 "registry.terraform.io/hashicorp/junos-srx-evpn-vxlan" = "/home/jcluser/go/bin"        }
+}
