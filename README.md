@@ -119,11 +119,11 @@ Example:
 * **xml_files** - directory containing xml file(s) (ensure xml file(s) are for the same device type)
 
 ```
-jtaf-xml2tf -j terraform-provider-junos-vsrx/trimmed_schema.json -x firewalls/*.xml -t vsrx
+jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx
 ```
 * If the user wants to provide the device **username** and **password**, those additional flags can be added as well
 ```
-jtaf-xml2tf -j terraform-provider-junos-vsrx/trimmed_schema.json -x firewalls/*.xml -t vsrx -u root -p password
+jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx -u root -p password
 ```
 
 Using the output from the terminal, which represents a template for the HCL .tf file, we can create our testing folder, copy the output into a terraform file, and fill in the template with the necessary device information.
@@ -159,11 +159,11 @@ Example:
 * **xml_files** - directory containing xml file(s) (ensure xml file(s) are for the same device type)
 
 ```
-jtaf-xml2tf -j terraform-provider-junos-vsrx/trimmed_schema.json -x firewalls/*.xml -t vsrx -d testbed
+jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx -d testbed
 ```
 * If the user wants to provide the device(s) **username** and **password**, those additional flags can be added as well
 ```
-jtaf-xml2tf -j terraform-provider-junos-vsrx/trimmed_schema.json -x firewalls/*.xml -t vsrx -d testbed -u root -p password
+jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc2/dc2-spine1.xml -t vqfx -d testbed -u root -p password
 ```
 
 Using the output which is outputted to the specifed directory from the command, which represents a template for the HCL .tf file for each input XML file, we can now create our testing environment and fill in the template with any remaining necessary device or config information.
