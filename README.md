@@ -213,10 +213,7 @@ OR:
 
 ```
 /junos-terraform/<testing-folder-name>/	 <-- contents of jtaf-xml2tf command
-/junos-terraform/<testing-folder-name>/dc1-firewall1.tf         
-/junos-terraform/<testing-folder-name>/dc1-firewall2.tf        
-/junos-terraform/<testing-folder-name>/dc2-firewall1.tf        
-/junos-terraform/<testing-folder-name>/dc2-firewall2.tf         
+/junos-terraform/<testing-folder-name>/dc2-spine1.xml     
 
 /Users/<username>/.terraformrc     <-- link to provider created in /usr/go/bin/ [see details above]
 ```
