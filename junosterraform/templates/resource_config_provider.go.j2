@@ -300,21 +300,10 @@ func (o {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model) At
 {################ STRUCT FROM TF # ENDS ###############}
 
 {################ SCHEMA DEFINITION # STARTS ###########}
-type resourceMode int
-
-const (
-	modeBase resourceMode = iota
-	modeConfig
-)
-
 // Collects the data for the crud work
 type resource_Apply_Groups struct {
 	client ProviderConfig
-	mode   resourceMode
 }
-
-func BaseConfigResource() resource.Resource { return &resource_Apply_Groups{mode: modeBase} }
-func ConfigResource() resource.Resource     { return &resource_Apply_Groups{mode: modeConfig} }
 
 func (r *resource_Apply_Groups) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
@@ -324,11 +313,7 @@ func (r *resource_Apply_Groups) Configure(_ context.Context, req resource.Config
 }
 // Metadata implements resource.Resource.
 func (r *resource_Apply_Groups) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	if r.mode == modeBase {
-		resp.TypeName = req.ProviderTypeName + "-base-config"
-	} else {
-		resp.TypeName = req.ProviderTypeName + "-config"
-	}
+	resp.TypeName = req.ProviderTypeName + "-config"
 }
 // Schema implements resource.Resource.
 func (r *resource_Apply_Groups) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
