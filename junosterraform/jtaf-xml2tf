@@ -157,10 +157,10 @@ def generate_hcl_resources(parsed_data, device_type, hostname, group_name, apply
     resource_block = ""
 
     if group_name == "base-config":
-        resource_block += f'resource "junos-{device_type}-base-config" "{hostname}" {{\n'
-        resource_block += f'  resource_name = "{hostname}"\n'
+        resource_block += f'resource "junos-{device_type}-config" "{hostname}_base_config" {{\n'
+        resource_block += f'  resource_name = "{hostname}-base-config"\n'
     else:
-        resource_block += f'resource "junos_group" "{group_name}" {{\n'
+        resource_block += f'resource "junos-{device_type}-config" "{group_name}" {{\n'
         resource_block += f'  resource_name = "{group_name}"\n'
     resource_block += f'  provider = junos-{device_type}.{hostname.replace("-", "_")}\n'
 
@@ -213,6 +213,8 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
             if group_name_elem is not None:
                 group_name = group_name_elem.text.strip()
                 groups.append((group_name, group))
+                # Remove the <name> element inside of groups
+                group.remove(group_name_elem)
             root.remove(group)
 
         # Remove any <version> tag directly under root
@@ -232,12 +234,12 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
         resources.append(generate_hcl_resources(base_data, device_type, hostname, group_name="base-config", apply_group=True))
 
         for group_name, group_node in groups:
-            group_data = {"groups": {}}
+            group_data = {}
 
             for elem in group_node:
                 tag = normalize_tag(elem.tag)
                 value = parse_element(elem, explicit_empty_tags, type_lookup)
-                group_data["groups"][tag] = value
+                group_data[tag] = value
 
             # Determine if group should be applied
             should_apply = group_name in apply_groups and group_name != "base-config"
