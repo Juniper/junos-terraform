@@ -157,10 +157,10 @@ def generate_hcl_resources(parsed_data, device_type, hostname, group_name, apply
     resource_block = ""
 
     if group_name == "base-config":
-        resource_block += f'resource "junos-{device_type}-config" "{hostname}_base_config" {{\n'
-        resource_block += f'  resource_name = "{hostname}-base-config"\n'
+        resource_block += f'resource "terraform-provider-junos-{device_type}" "{hostname}_base_config" {{\n'
+        resource_block += f'  resource_name = "base-config"\n'
     else:
-        resource_block += f'resource "junos-{device_type}-config" "{group_name}" {{\n'
+        resource_block += f'resource "terraform-provider-junos-{device_type}" "{hostname}_{group_name}" {{\n'
         resource_block += f'  resource_name = "{group_name}"\n'
     resource_block += f'  provider = junos-{device_type}.{hostname.replace("-", "_")}\n'
 
