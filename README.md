@@ -51,13 +51,13 @@ jtaf-provider -j <json-file> -x <xml-configuration(s)> -t <device-type>
 
 Example:
 ```bash
-jtaf-provider -j junos.json -x examples/evpn-vxlan-dc/spine/*.xml -t vqfx
+jtaf-provider -j junos.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx
 ```
 NOTE: If using multiple xml configurations (like the example above), ensure that the configurations are for the same device type
 
 All in one example (`-j` accepts `-` for `stdin` for `jtaf-provider`):
 ```bash
-pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang | jtaf-provider -j - -x examples/evpn-vxlan-dc/spine/*.xml -t vqfx
+pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang | jtaf-provider -j - -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml  -t vqfx
 ```
 
 ---
@@ -73,7 +73,7 @@ jtaf-yang2go -p <path-to-common> <path-to-yang-files> -x <xml-configuration(s)> 
 Example:
 
 ```bash
-jtaf-yang2go -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/spine/*.xml -t vqfx
+jtaf-yang2go -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx
 ```
 NOTE: If using multiple xml configurations (like the example above), ensure that the configurations are for the same device type
 
@@ -129,11 +129,11 @@ Example:
 * **xml_files** - directory containing xml file(s) (ensure xml file(s) are for the same device type)
 
 ```
-jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/spine/*.xml -t vqfx
+jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx
 ```
 * If the user wants to provide the device **username** and **password**, those additional flags can be added as well
 ```
-jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/spine/*.xml -t vqfx -u root -p password
+jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx -u root -p password
 ```
 
 Using the output from the terminal, which represents a template for the HCL .tf file, we can create our testing folder, copy the output into a terraform file, and fill in the template with the necessary device information.
@@ -169,11 +169,11 @@ Example:
 * **xml_files** - directory containing xml file(s) (ensure xml file(s) are for the same device type)
 
 ```
-jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/spine/*.xml -t vqfx -d testbed
+jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx -d testbed
 ```
 * If the user wants to provide the device(s) **username** and **password**, those additional flags can be added as well
 ```
-jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/spine/*.xml -t vqfx -d testbed -u root -p password
+jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx -d testbed -u root -p password
 ```
 
 Using the output which is outputted to the specifed directory from the command, which represents a template for the HCL .tf file for each input XML file, we can now create our testing environment and fill in the template with any remaining necessary device or config information.
@@ -223,10 +223,15 @@ OR:
 
 ```
 /junos-terraform/<testing-folder-name>/	 <-- contents of jtaf-xml2tf command
+/junos-terraform/<testing-folder-name>/dc1-borderleaf1.tf
+/junos-terraform/<testing-folder-name>/dc1-borderleaf2.tf
+/junos-terraform/<testing-folder-name>/dc1-leaf1.tf
+/junos-terraform/<testing-folder-name>/dc1-leaf2.tf  
+/junos-terraform/<testing-folder-name>/dc1-leaf3.tf 
 /junos-terraform/<testing-folder-name>/dc1-spine1.tf
-/junos-terraform/<testing-folder-name>/dc1-spine2.tf
+/junos-terraform/<testing-folder-name>/dc1-spine2.tf 
 /junos-terraform/<testing-folder-name>/dc2-spine1.tf
-/junos-terraform/<testing-folder-name>/dc2-spine2.tf  
+/junos-terraform/<testing-folder-name>/dc2-spine2.tf 
 
 /Users/<username>/.terraformrc     <-- link to provider created in /usr/go/bin/ [see details above]
 ```
