@@ -1,10 +1,3 @@
-terraform {
-  required_providers {
-    junos-qfx-evpn-vxlan = {
-      source = "hashicorp/junos-qfx-evpn-vxlan"
-    }
-  }
-}
     
 provider "junos-qfx-evpn-vxlan" {
     host     = "dc1-spine1"
