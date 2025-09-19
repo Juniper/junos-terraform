@@ -28,8 +28,19 @@ def get_xpaths(root):
 def unique_xpaths(paths):
     path_dict = {}
     result = []
+
     for path in paths:
-        path_dict["/".join(path)] = path
+        if path == "groups/name":
+            # Skip the groups/name path entirely
+            continue
+        elif path.startswith("groups"):
+            # Remove the "groups/" prefix from other paths
+            path = path[len("groups/"):]
+        
+        # Only add non-empty paths
+        if path:
+            path_dict[path] = path
+    
     for key in path_dict.keys():
         result.append(path_dict[key])
     return result
@@ -202,7 +213,7 @@ def filter_json_using_xml(schema, xml):
         root = config_node
 
     # find and remove any version node
-    remove_tags_by_name(root, ["version", "versions", "model", "groups", "apply-groups"])
+    remove_tags_by_name(root, ["version", "versions", "model", "apply-groups"])
 
     # find the unique paths
     paths = unique_xpaths(get_xpaths(root))
