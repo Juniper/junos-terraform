@@ -1,10 +1,3 @@
-terraform {
-  required_providers {
-    junos-srx-evpn-vxlan = {
-      source = "hashicorp/junos-srx-evpn-vxlan"
-    }
-  }
-}
     
 provider "junos-srx-evpn-vxlan" {
     host     = "dc1-firewall1"
