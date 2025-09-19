@@ -39,6 +39,12 @@ Example:
 ```
 pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
 ```
+
+NOTE: For Junos version >23.2 (i.e. starting from 23.4 onwards), the file path in the `yang` directory is slightly different as shown in the example below.
+```
+pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/23.4/23.4R1/native/conf-and-rpcs/common/models ../yang/23.4/23.4R1/native/conf-and-rpcs/junos/conf/models/*.yang > junos.json
+```
+ 
 ---
 
 ### <u>Generate Resource Provider</u>
@@ -76,6 +82,8 @@ Example:
 jtaf-yang2go -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx
 ```
 NOTE: If using multiple xml configurations (like the example above), ensure that the configurations are for the same device type
+
+NOTE: For Junos version >23.2, the file path for the folder containing the yang files for each device is slightly different. Refer to section [Yang File(s) to JSON Conversion](./README.md#yang-files-to-json-conversion) for more information and examples.
 
 ---
 
