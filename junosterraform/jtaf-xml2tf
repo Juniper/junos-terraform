@@ -168,7 +168,6 @@ def edit_provider_block(device_type, provider_block):
 """
 
     return block
-    return block
 
 def create_head_block(device_type, hostname, username, password):
     """
