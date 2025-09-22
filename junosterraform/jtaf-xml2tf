@@ -306,7 +306,7 @@ def main():
     parser.add_argument('-j', '--trimmed_json', required=True, help='specify the trimmed json config file stored in the terraform provider folder')
     parser.add_argument('-x', '--xml-config', required=True, nargs="+", help='specify one or more XML config files to create .tf files for')
     parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
-    parser.add_argument('-d', '--directory', help='if provided, write out terraform config(s) to file(s) in specified directory')
+    parser.add_argument('-d', '--directory', required=True, help='specify the directory to write out .tf files to')
 
     ## Add optional options to take in username and password
     parser.add_argument('-u', '--username', help='device username')
@@ -339,48 +339,34 @@ def main():
     type_lookup = build_type_map(config_node)
     
     # Traverse xml to create HCL resources
-    if args.directory:
-        # Create provider source block in providers.tf 
-        directory = args.directory
-        if os.path.exists(f"{directory}/providers.tf"):  # Check if providers.tf exists
-            # If it does, edit the provider block to include the new device type and source
-            # make sure if a device type is already present, we don't add it again
-            with open(f"{directory}/providers.tf", "r") as f:
-                provider_block = f.read()
-                provider_block = edit_provider_block(device_type, provider_block)
-                with open(f"{directory}/providers.tf", "w") as f:
-                    f.write(provider_block)
-        else:
-            # If it doesn't, create a new provider block
-            provider_block = create_provider_block(device_type)
-            os.makedirs(directory, exist_ok=True)
+    # Create provider source block in providers.tf 
+    directory = args.directory
+    if os.path.exists(f"{directory}/providers.tf"):  # Check if providers.tf exists
+        # If it does, edit the provider block to include the new device type and source
+        # make sure if a device type is already present, we don't add it again
+        with open(f"{directory}/providers.tf", "r") as f:
+            provider_block = f.read()
+            provider_block = edit_provider_block(device_type, provider_block)
             with open(f"{directory}/providers.tf", "w") as f:
                 f.write(provider_block)
-        # Write a separate tf file for each xml file
-        for file in xml_files:
-            hostname = file.split("/")[-1].split(".")[0]
-            head_block = create_head_block(device_type, hostname, username, password)
-            hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup)
-            if hcl_output:
-                filename = f"{directory}/{hostname}.tf"
-                os.makedirs(os.path.dirname(filename), exist_ok=True)
-                with open(filename, "w") as f:
-                    f.write(head_block)
-                    f.write(hcl_output)
-                print(f"Wrote output to {filename}")
     else:
-        # Print a single tf file for all xml files 
-        hostnames = []
-        for file in xml_files:
-            hostname = file.split('/')[-1].strip('.xml')
-            hostnames.append(hostname)
-        print(create_head_block(device_type, hostnames, username, password))
-
-        for file in xml_files:
-            hostname = file.split('/')[-1].strip('.xml')
-            hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup)
-            if hcl_output:
-                print(hcl_output)
+        # If it doesn't, create a new provider block
+        provider_block = create_provider_block(device_type)
+        os.makedirs(directory, exist_ok=True)
+        with open(f"{directory}/providers.tf", "w") as f:
+            f.write(provider_block)
+    # Write a separate tf file for each xml file
+    for file in xml_files:
+        hostname = file.split("/")[-1].split(".")[0]
+        head_block = create_head_block(device_type, hostname, username, password)
+        hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup)
+        if hcl_output:
+            filename = f"{directory}/{hostname}.tf"
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            with open(filename, "w") as f:
+                f.write(head_block)
+                f.write(hcl_output)
+            print(f"Wrote output to {filename}")
 
 if __name__ == "__main__":
     main()
