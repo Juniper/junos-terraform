@@ -27,7 +27,9 @@ If you do not already have Terraform installed (in general), for macOS, run the 
 brew tap hashicorp/tap
 brew install hashicorp/tap/terraform
 ```
+
 For more information, refer to the Terraform website: https://developer.hashicorp.com/terraform/install.
+
 ---
 ### <u>Yang File(s) to JSON Conversion</u>
 
@@ -242,6 +244,39 @@ OR:
 /junos-terraform/<testing-folder-name>/dc2-spine2.tf 
 
 /Users/<username>/.terraformrc     <-- link to provider created in /usr/go/bin/ [see details above]
+```
+
+#### Setting Up Host Names
+
+In the test file(s), devices being configured are specified using the `host` field as shown below:
+```
+provider "junos-vqfx" {
+    host     = "dc1-leaf1"
+    port     = 22
+    username = ""
+    password = ""
+    alias    = "dc1_leaf1"
+}
+```
+
+You can either specify the exact IP address in the host field OR use a hostname (like in the example above) and provide the IP address for every hostname in the system file `/etc/hosts`.
+
+Example:
+```
+127.0.0.1       localhost
+<IP address>    dc1-leaf1
+<IP address> 	dc1-leaf2
+<IP address> 	dc1-leaf3
+<IP address> 	dc2-spine1
+<IP address> 	dc2-spine2
+<IP address> 	dc1-spine1
+<IP address> 	dc1-borderleaf2
+<IP address> 	dc1-borderleaf1
+<IP address> 	dc1-firewall1
+<IP address> 	dc1-firewall2
+<IP address> 	dc2-firewall1
+<IP address> 	dc1-spine2
+<IP address>	dc2-firewall2
 ```
 
 ---
