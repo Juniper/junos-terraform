@@ -431,31 +431,58 @@ func (r *resource_Apply_Groups) Create(ctx context.Context, req resource.CreateR
 {############ READ METHOD # STARTS ################}
 
 {%- macro read_method_macro(ele) %}
+        // Build {{ele.name}} list
         {{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_List := make([]{{get_full_parent_name(ele, "_", 'True')}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model, len(v_{{get_full_parent_name(ele, "_")}}.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}))
-        {# Below condition is added to skip for loop for nodes which have empty children #}
-		{%- if ele['children'] | length > 0%}
+
+        {# Skip loop for nodes with no children #}
+		{%- if ele['children'] | length > 0 %}
 		for i_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}, v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}} := range v_{{get_full_parent_name(ele, "_")}}.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} {
             var {{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model {{get_full_parent_name(ele, "_", "True")}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
+
             {%- for child in ele['children'] %}
-            {%- if (child['type'] == 'leaf') %}
-            {{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = types.StringPointerValue(v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}})
+            {%- if child['type'] == 'leaf' %}
+            // leaf -> keep pointer semantics
+            {{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} =
+                types.StringPointerValue(v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}})
             {%- endif %}
-            {%- if (child['type'] == 'leaf-list') %}
-			var var_{{get_full_parent_name(ele, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} []*string
-			if v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} != nil {
-				var_{{get_full_parent_name(ele, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} = make([]*string, len(v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}))
-				copy(var_{{get_full_parent_name(ele, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}, v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}})
-			}
-			{{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}, _ = types.ListValueFrom(ctx, types.StringType, var_{{get_full_parent_name(ele, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
-			{%- endif %}
-			{{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_List[i_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}] = {{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model
-			{%- if child['type'] == 'list' or child['type'] == 'container'%}
-                {{read_method_macro(child)}}
+
+            {%- if child['type'] == 'leaf-list' %}
+            // leaf-list -> write Null when nil OR empty (avoid [] when absent)
+            if v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} == nil ||
+               len(v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}) == 0 {
+                {{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} =
+                    types.ListNull(types.StringType)
+            } else {
+                src_{{get_full_parent_name(ele, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} :=
+                    v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}
+                vals_{{get_full_parent_name(ele, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} := make([]*string, len(src_{{get_full_parent_name(ele, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}))
+                copy(vals_{{get_full_parent_name(ele, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}, src_{{get_full_parent_name(ele, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
+                {{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_{{get_full_parent_name(ele, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
+            }
+            {%- endif %}
+
+            {{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_List[i_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}] =
+                {{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model
+
+            {%- if child['type'] == 'list' or child['type'] == 'container' %}
+                {{ read_method_macro(child) }}
             {%- endif %}
             {%- endfor %}
         }
 		{%- endif %}
-        {{get_full_parent_name(ele, "_")}}_model.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: {{get_full_parent_name(ele, "_", 'True')}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}.AttrTypes()}, {{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_List)
+
+        // Write {{ele.name}} field as Null when empty, else concrete list
+        if len({{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_List) == 0 {
+            {{get_full_parent_name(ele, "_")}}_model.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} =
+                types.ListNull(types.ObjectType{AttrTypes: {{get_full_parent_name(ele, "_", 'True')}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}.AttrTypes()})
+        } else {
+            {{get_full_parent_name(ele, "_")}}_model.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: {{get_full_parent_name(ele, "_", 'True')}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}.AttrTypes()},
+                    {{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_List,
+                )
+        }
         {{get_full_parent_name(ele, "_")}}_List[i_{{get_full_parent_name(ele, "_")}}] = {{get_full_parent_name(ele, "_")}}_model
 {%- endmacro %}
 
@@ -473,20 +500,43 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         resp.Diagnostics.AddError("Failed to read group", err.Error())
         return
     }
+
     {%- for parent in parent_list %}
-    state.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    {{parent.name|replace("-", "_")}}_List := make([]{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model, len(config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}))
+    // Initialize {{parent.name}} as Null; only materialize when we have elements
+    state.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} =
+        types.ListNull(types.ObjectType{AttrTypes: {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}.AttrTypes()})
+
+    // Build list from device
+    {{parent.name|replace("-", "_")}}_List := make([]{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model,
+        len(config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}))
+
     for i_{{parent.name|replace("-", "_")}}, v_{{parent.name|replace("-", "_")}} := range config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} {
         var {{parent.name|replace("-", "_")}}_model {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
+
         {%- for child in parent['children'] %}
-        {%- if child['type'] == 'list' or child['type'] == 'container'%}
-            {{- read_method_macro(child)}}
+        {%- if child['type'] == 'list' or child['type'] == 'container' %}
+            {{ read_method_macro(child) }}
         {%- endif %}
         {%- endfor %}
+
+        {{parent.name|replace("-", "_")}}_List[i_{{parent.name|replace("-", "_")}}] = {{parent.name|replace("-", "_")}}_model
     }
-    state.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}.AttrTypes()}, {{parent.name|replace("-", "_")}}_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-    {%- endfor %} 
+
+    // Write parent list as Null when empty
+    if len({{parent.name|replace("-", "_")}}_List) == 0 {
+        state.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} =
+            types.ListNull(types.ObjectType{AttrTypes: {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}.AttrTypes()})
+    } else {
+        state.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}.AttrTypes()},
+                {{parent.name|replace("-", "_")}}_List,
+            )
+    }
+    {%- endfor %}
+
+    // Persist final state once after all parents processed
+    resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 {############ READ METHOD # ENDS ################}
