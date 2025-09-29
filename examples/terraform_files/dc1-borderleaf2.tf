@@ -1,14 +1,6 @@
-
-provider "junos-qfx-evpn-vxlan" {
-    host     = "dc1-borderleaf2"
-    port     = 22
-    username = "jcluser"
-    password = "Juniper!1"
-    alias    = "dc1_borderleaf2"
-}
-resource "terraform-provider-junos-qfx-evpn-vxlan" "dc1-borderleaf2-base-config" {
+resource "terraform-provider-junos-vqfx" "dc1-borderleaf2-base-config" {
   resource_name = "base-config"
-  provider = junos-qfx-evpn-vxlan.dc1_borderleaf2
+  provider = junos-vqfx.dc1_borderleaf2
   system = [
     {
       host_name = "dc1-borderleaf2"
