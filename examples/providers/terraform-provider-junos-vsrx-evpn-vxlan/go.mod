@@ -1,4 +1,4 @@
-module terraform-provider-junos-vsrx
+module terraform-provider-junos-vsrx-evpn-vxlan
 
 go 1.25.0
 
