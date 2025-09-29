@@ -6,9 +6,8 @@ provider "junos-srx-evpn-vxlan" {
     password = "Juniper!1"
     alias    = "dc2_firewall1"
 }
-
-resource "junos-srx-evpn-vxlan-base-config" "dc2-firewall1" {
-  resource_name = "dc2-firewall1"
+resource "terraform-provider-junos-srx-evpn-vxlan" "dc2-firewall1-base-config" {
+  resource_name = "base-config"
   provider = junos-srx-evpn-vxlan.dc2_firewall1
   system = [
     {

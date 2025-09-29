@@ -6,9 +6,8 @@ provider "junos-qfx-evpn-vxlan" {
     password = "Juniper!1"
     alias    = "dc1_leaf1"
 }
-
-resource "junos-qfx-evpn-vxlan-base-config" "dc1-leaf1" {
-  resource_name = "dc1-leaf1"
+resource "terraform-provider-junos-qfx-evpn-vxlan" "dc1-leaf1-base-config" {
+  resource_name = "base-config"
   provider = junos-qfx-evpn-vxlan.dc1_leaf1
   system = [
     {

@@ -75,8 +75,7 @@ func (g *GoNCClient) updateRawConfig(applyGroup string, netconfCall string, comm
 	deleteString := fmt.Sprintf(deleteStr, applyGroup, applyGroup)
 
 	if _, err := g.Driver.SendRaw(deleteString); err != nil {
-		errInternal := g.Driver.Close()
-		return "", fmt.Errorf("driver error: %+v, driver close error: %s", err, errInternal)
+		fmt.Printf("driver error: %+v", err)
 	}
 
 	// Extract the string between <name> tags

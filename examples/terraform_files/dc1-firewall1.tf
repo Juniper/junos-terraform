@@ -1,4 +1,4 @@
-    
+
 provider "junos-srx-evpn-vxlan" {
     host     = "dc1-firewall1"
     port     = 22
@@ -6,9 +6,8 @@ provider "junos-srx-evpn-vxlan" {
     password = "Juniper!1"
     alias    = "dc1_firewall1"
 }
-
-resource "junos-srx-evpn-vxlan-base-config" "dc1-firewall1" {
-  resource_name = "dc1-firewall1"
+resource "terraform-provider-junos-srx-evpn-vxlan" "dc1-firewall1-base-config" {
+  resource_name = "base-config"
   provider = junos-srx-evpn-vxlan.dc1_firewall1
   system = [
     {
