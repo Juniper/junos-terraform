@@ -1,14 +1,6 @@
-
-provider "junos-srx-evpn-vxlan" {
-    host     = "dc2-firewall2"
-    port     = 22
-    username = "jcluser"
-    password = "Juniper!1"
-    alias    = "dc2_firewall2"
-}
-resource "terraform-provider-junos-srx-evpn-vxlan" "dc2-firewall2-base-config" {
+resource "terraform-provider-junos-vsrx" "dc2-firewall2-base-config" {
   resource_name = "base-config"
-  provider = junos-srx-evpn-vxlan.dc2_firewall2
+  provider = junos-vsrx.dc2_firewall2
   system = [
     {
       login = [

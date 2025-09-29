@@ -17,7 +17,7 @@
 package main
 
 import (
-	"terraform-provider-junos-srx-evpn-vxlan/netconf"
+	"terraform-provider-junos-vqfx/netconf"
 )
 
 // Config is the configuration structure used to instantiate the Netconf provider.
