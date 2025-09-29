@@ -145,13 +145,16 @@ def edit_provider_block(device_type, provider_block):
         return block
     
     # Extract the existing required_providers content
-    providers_match = re.search(r'required_providers\s*{\s*(.*?)\s*}\s*}', block, re.DOTALL)
+    providers_match = re.search(r'required_providers\s*{\s*(.*?)\s*}\s*}(.*)?', block, re.DOTALL)
     
     if providers_match:
         existing_providers = providers_match.group(1).strip()
+
+        # Capture any content after first closing brace of providers.tf
+        after_block = providers_match.group(2).strip()[1:] if providers_match.group(2) else ""
         
         # Add new provider entry
-        new_provider = "}\n\t\t" + f'junos-{device_type} = {{\n      source = "hashicorp/junos-{device_type}"\n    }}'
+        new_provider = "}\n\t" + f'junos-{device_type} = {{\n      source = "hashicorp/junos-{device_type}"\n    }}'
         
         # Combine existing and new providers
         if existing_providers:
@@ -165,6 +168,7 @@ def edit_provider_block(device_type, provider_block):
     {updated_providers}
   }}
 }}
+{after_block}
 """
 
     return block

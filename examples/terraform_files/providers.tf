@@ -3,11 +3,12 @@ terraform {
     junos-vqfx = {
       source = "hashicorp/junos-vqfx"
     }
-		junos-vsrx = {
+	junos-vsrx = {
       source = "hashicorp/junos-vsrx"
     }
   }
 }
+
 
 provider "junos-vqfx" {
     host     = "dc1-spine1"
