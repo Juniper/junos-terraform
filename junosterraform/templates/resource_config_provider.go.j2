@@ -441,13 +441,18 @@ func (r *resource_Apply_Groups) Create(ctx context.Context, req resource.CreateR
 
             {%- for child in ele['children'] %}
             {%- if child['type'] == 'leaf' %}
-            // leaf -> keep pointer semantics
-            {{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} =
+            // leaf
+            if v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} == nil {
+                {{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} =
+                    types.StringNull()
+            } else {
+				{{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} =
                 types.StringPointerValue(v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}})
+			}
             {%- endif %}
 
             {%- if child['type'] == 'leaf-list' %}
-            // leaf-list -> write Null when nil OR empty (avoid [] when absent)
+            // leaf-list
             if v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} == nil ||
                len(v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}) == 0 {
                 {{get_full_parent_name(ele,"_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} =

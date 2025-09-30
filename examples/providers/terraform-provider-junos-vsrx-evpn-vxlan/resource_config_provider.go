@@ -3234,9 +3234,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_chassis_aggregated_devices_ethernet, v_chassis_aggregated_devices_ethernet := range v_chassis_aggregated_devices.Ethernet {
             var chassis_aggregated_devices_ethernet_model Chassis_Aggregated_devices_Ethernet_Model
-            // leaf -> keep pointer semantics
-            chassis_aggregated_devices_ethernet_model.Device_count =
+            // leaf
+            if v_chassis_aggregated_devices_ethernet.Device_count == nil {
+                chassis_aggregated_devices_ethernet_model.Device_count =
+                    types.StringNull()
+            } else {
+				chassis_aggregated_devices_ethernet_model.Device_count =
                 types.StringPointerValue(v_chassis_aggregated_devices_ethernet.Device_count)
+			}
 
             chassis_aggregated_devices_ethernet_List[i_chassis_aggregated_devices_ethernet] =
                 chassis_aggregated_devices_ethernet_model
@@ -3300,15 +3305,25 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_interfaces_interface, v_interfaces_interface := range v_interfaces.Interface {
             var interfaces_interface_model Interfaces_Interface_Model
-            // leaf -> keep pointer semantics
-            interfaces_interface_model.Name =
+            // leaf
+            if v_interfaces_interface.Name == nil {
+                interfaces_interface_model.Name =
+                    types.StringNull()
+            } else {
+				interfaces_interface_model.Name =
                 types.StringPointerValue(v_interfaces_interface.Name)
+			}
 
             interfaces_interface_List[i_interfaces_interface] =
                 interfaces_interface_model
-            // leaf -> keep pointer semantics
-            interfaces_interface_model.Vlan_tagging =
+            // leaf
+            if v_interfaces_interface.Vlan_tagging == nil {
+                interfaces_interface_model.Vlan_tagging =
+                    types.StringNull()
+            } else {
+				interfaces_interface_model.Vlan_tagging =
                 types.StringPointerValue(v_interfaces_interface.Vlan_tagging)
+			}
 
             interfaces_interface_List[i_interfaces_interface] =
                 interfaces_interface_model
@@ -3322,21 +3337,36 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_interfaces_interface_unit, v_interfaces_interface_unit := range v_interfaces_interface.Unit {
             var interfaces_interface_unit_model Interfaces_Interface_Unit_Model
-            // leaf -> keep pointer semantics
-            interfaces_interface_unit_model.Name =
+            // leaf
+            if v_interfaces_interface_unit.Name == nil {
+                interfaces_interface_unit_model.Name =
+                    types.StringNull()
+            } else {
+				interfaces_interface_unit_model.Name =
                 types.StringPointerValue(v_interfaces_interface_unit.Name)
+			}
 
             interfaces_interface_unit_List[i_interfaces_interface_unit] =
                 interfaces_interface_unit_model
-            // leaf -> keep pointer semantics
-            interfaces_interface_unit_model.Description =
+            // leaf
+            if v_interfaces_interface_unit.Description == nil {
+                interfaces_interface_unit_model.Description =
+                    types.StringNull()
+            } else {
+				interfaces_interface_unit_model.Description =
                 types.StringPointerValue(v_interfaces_interface_unit.Description)
+			}
 
             interfaces_interface_unit_List[i_interfaces_interface_unit] =
                 interfaces_interface_unit_model
-            // leaf -> keep pointer semantics
-            interfaces_interface_unit_model.Vlan_id =
+            // leaf
+            if v_interfaces_interface_unit.Vlan_id == nil {
+                interfaces_interface_unit_model.Vlan_id =
+                    types.StringNull()
+            } else {
+				interfaces_interface_unit_model.Vlan_id =
                 types.StringPointerValue(v_interfaces_interface_unit.Vlan_id)
+			}
 
             interfaces_interface_unit_List[i_interfaces_interface_unit] =
                 interfaces_interface_unit_model
@@ -3370,9 +3400,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_interfaces_interface_unit_family_inet_address, v_interfaces_interface_unit_family_inet_address := range v_interfaces_interface_unit_family_inet.Address {
             var interfaces_interface_unit_family_inet_address_model Interfaces_Interface_Unit_Family_Inet_Address_Model
-            // leaf -> keep pointer semantics
-            interfaces_interface_unit_family_inet_address_model.Name =
+            // leaf
+            if v_interfaces_interface_unit_family_inet_address.Name == nil {
+                interfaces_interface_unit_family_inet_address_model.Name =
+                    types.StringNull()
+            } else {
+				interfaces_interface_unit_family_inet_address_model.Name =
                 types.StringPointerValue(v_interfaces_interface_unit_family_inet_address.Name)
+			}
 
             interfaces_interface_unit_family_inet_address_List[i_interfaces_interface_unit_family_inet_address] =
                 interfaces_interface_unit_family_inet_address_model
@@ -3478,9 +3513,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_policy_options_policy_statement, v_policy_options_policy_statement := range v_policy_options.Policy_statement {
             var policy_options_policy_statement_model Policy_options_Policy_statement_Model
-            // leaf -> keep pointer semantics
-            policy_options_policy_statement_model.Name =
+            // leaf
+            if v_policy_options_policy_statement.Name == nil {
+                policy_options_policy_statement_model.Name =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_model.Name =
                 types.StringPointerValue(v_policy_options_policy_statement.Name)
+			}
 
             policy_options_policy_statement_List[i_policy_options_policy_statement] =
                 policy_options_policy_statement_model
@@ -3494,9 +3534,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_policy_options_policy_statement_term, v_policy_options_policy_statement_term := range v_policy_options_policy_statement.Term {
             var policy_options_policy_statement_term_model Policy_options_Policy_statement_Term_Model
-            // leaf -> keep pointer semantics
-            policy_options_policy_statement_term_model.Name =
+            // leaf
+            if v_policy_options_policy_statement_term.Name == nil {
+                policy_options_policy_statement_term_model.Name =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_model.Name =
                 types.StringPointerValue(v_policy_options_policy_statement_term.Name)
+			}
 
             policy_options_policy_statement_term_List[i_policy_options_policy_statement_term] =
                 policy_options_policy_statement_term_model
@@ -3520,21 +3565,36 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_policy_options_policy_statement_term_from_route_filter, v_policy_options_policy_statement_term_from_route_filter := range v_policy_options_policy_statement_term_from.Route_filter {
             var policy_options_policy_statement_term_from_route_filter_model Policy_options_Policy_statement_Term_From_Route_filter_Model
-            // leaf -> keep pointer semantics
-            policy_options_policy_statement_term_from_route_filter_model.Address =
+            // leaf
+            if v_policy_options_policy_statement_term_from_route_filter.Address == nil {
+                policy_options_policy_statement_term_from_route_filter_model.Address =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_from_route_filter_model.Address =
                 types.StringPointerValue(v_policy_options_policy_statement_term_from_route_filter.Address)
+			}
 
             policy_options_policy_statement_term_from_route_filter_List[i_policy_options_policy_statement_term_from_route_filter] =
                 policy_options_policy_statement_term_from_route_filter_model
-            // leaf -> keep pointer semantics
-            policy_options_policy_statement_term_from_route_filter_model.Exact =
+            // leaf
+            if v_policy_options_policy_statement_term_from_route_filter.Exact == nil {
+                policy_options_policy_statement_term_from_route_filter_model.Exact =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_from_route_filter_model.Exact =
                 types.StringPointerValue(v_policy_options_policy_statement_term_from_route_filter.Exact)
+			}
 
             policy_options_policy_statement_term_from_route_filter_List[i_policy_options_policy_statement_term_from_route_filter] =
                 policy_options_policy_statement_term_from_route_filter_model
-            // leaf -> keep pointer semantics
-            policy_options_policy_statement_term_from_route_filter_model.Accept =
+            // leaf
+            if v_policy_options_policy_statement_term_from_route_filter.Accept == nil {
+                policy_options_policy_statement_term_from_route_filter_model.Accept =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_from_route_filter_model.Accept =
                 types.StringPointerValue(v_policy_options_policy_statement_term_from_route_filter.Accept)
+			}
 
             policy_options_policy_statement_term_from_route_filter_List[i_policy_options_policy_statement_term_from_route_filter] =
                 policy_options_policy_statement_term_from_route_filter_model
@@ -3636,9 +3696,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_protocols_lldp_interface, v_protocols_lldp_interface := range v_protocols_lldp.Interface {
             var protocols_lldp_interface_model Protocols_Lldp_Interface_Model
-            // leaf -> keep pointer semantics
-            protocols_lldp_interface_model.Name =
+            // leaf
+            if v_protocols_lldp_interface.Name == nil {
+                protocols_lldp_interface_model.Name =
+                    types.StringNull()
+            } else {
+				protocols_lldp_interface_model.Name =
                 types.StringPointerValue(v_protocols_lldp_interface.Name)
+			}
 
             protocols_lldp_interface_List[i_protocols_lldp_interface] =
                 protocols_lldp_interface_model
@@ -3702,15 +3767,25 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_routing_instances_instance, v_routing_instances_instance := range v_routing_instances.Instance {
             var routing_instances_instance_model Routing_instances_Instance_Model
-            // leaf -> keep pointer semantics
-            routing_instances_instance_model.Name =
+            // leaf
+            if v_routing_instances_instance.Name == nil {
+                routing_instances_instance_model.Name =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_model.Name =
                 types.StringPointerValue(v_routing_instances_instance.Name)
+			}
 
             routing_instances_instance_List[i_routing_instances_instance] =
                 routing_instances_instance_model
-            // leaf -> keep pointer semantics
-            routing_instances_instance_model.Instance_type =
+            // leaf
+            if v_routing_instances_instance.Instance_type == nil {
+                routing_instances_instance_model.Instance_type =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_model.Instance_type =
                 types.StringPointerValue(v_routing_instances_instance.Instance_type)
+			}
 
             routing_instances_instance_List[i_routing_instances_instance] =
                 routing_instances_instance_model
@@ -3724,9 +3799,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_routing_instances_instance_interface, v_routing_instances_instance_interface := range v_routing_instances_instance.Interface {
             var routing_instances_instance_interface_model Routing_instances_Instance_Interface_Model
-            // leaf -> keep pointer semantics
-            routing_instances_instance_interface_model.Name =
+            // leaf
+            if v_routing_instances_instance_interface.Name == nil {
+                routing_instances_instance_interface_model.Name =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_interface_model.Name =
                 types.StringPointerValue(v_routing_instances_instance_interface.Name)
+			}
 
             routing_instances_instance_interface_List[i_routing_instances_instance_interface] =
                 routing_instances_instance_interface_model
@@ -3774,15 +3854,25 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_routing_instances_instance_routing_options_static_route, v_routing_instances_instance_routing_options_static_route := range v_routing_instances_instance_routing_options_static.Route {
             var routing_instances_instance_routing_options_static_route_model Routing_instances_Instance_Routing_options_Static_Route_Model
-            // leaf -> keep pointer semantics
-            routing_instances_instance_routing_options_static_route_model.Name =
+            // leaf
+            if v_routing_instances_instance_routing_options_static_route.Name == nil {
+                routing_instances_instance_routing_options_static_route_model.Name =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_routing_options_static_route_model.Name =
                 types.StringPointerValue(v_routing_instances_instance_routing_options_static_route.Name)
+			}
 
             routing_instances_instance_routing_options_static_route_List[i_routing_instances_instance_routing_options_static_route] =
                 routing_instances_instance_routing_options_static_route_model
-            // leaf -> keep pointer semantics
-            routing_instances_instance_routing_options_static_route_model.Discard =
+            // leaf
+            if v_routing_instances_instance_routing_options_static_route.Discard == nil {
+                routing_instances_instance_routing_options_static_route_model.Discard =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_routing_options_static_route_model.Discard =
                 types.StringPointerValue(v_routing_instances_instance_routing_options_static_route.Discard)
+			}
 
             routing_instances_instance_routing_options_static_route_List[i_routing_instances_instance_routing_options_static_route] =
                 routing_instances_instance_routing_options_static_route_model
@@ -3848,7 +3938,7 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_routing_instances_instance_protocols_ospf, v_routing_instances_instance_protocols_ospf := range v_routing_instances_instance_protocols.Ospf {
             var routing_instances_instance_protocols_ospf_model Routing_instances_Instance_Protocols_Ospf_Model
-            // leaf-list -> write Null when nil OR empty (avoid [] when absent)
+            // leaf-list
             if v_routing_instances_instance_protocols_ospf.Export == nil ||
                len(v_routing_instances_instance_protocols_ospf.Export) == 0 {
                 routing_instances_instance_protocols_ospf_model.Export =
@@ -3874,9 +3964,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_routing_instances_instance_protocols_ospf_area, v_routing_instances_instance_protocols_ospf_area := range v_routing_instances_instance_protocols_ospf.Area {
             var routing_instances_instance_protocols_ospf_area_model Routing_instances_Instance_Protocols_Ospf_Area_Model
-            // leaf -> keep pointer semantics
-            routing_instances_instance_protocols_ospf_area_model.Name =
+            // leaf
+            if v_routing_instances_instance_protocols_ospf_area.Name == nil {
+                routing_instances_instance_protocols_ospf_area_model.Name =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_protocols_ospf_area_model.Name =
                 types.StringPointerValue(v_routing_instances_instance_protocols_ospf_area.Name)
+			}
 
             routing_instances_instance_protocols_ospf_area_List[i_routing_instances_instance_protocols_ospf_area] =
                 routing_instances_instance_protocols_ospf_area_model
@@ -3890,9 +3985,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_routing_instances_instance_protocols_ospf_area_interface, v_routing_instances_instance_protocols_ospf_area_interface := range v_routing_instances_instance_protocols_ospf_area.Interface {
             var routing_instances_instance_protocols_ospf_area_interface_model Routing_instances_Instance_Protocols_Ospf_Area_Interface_Model
-            // leaf -> keep pointer semantics
-            routing_instances_instance_protocols_ospf_area_interface_model.Name =
+            // leaf
+            if v_routing_instances_instance_protocols_ospf_area_interface.Name == nil {
+                routing_instances_instance_protocols_ospf_area_interface_model.Name =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_protocols_ospf_area_interface_model.Name =
                 types.StringPointerValue(v_routing_instances_instance_protocols_ospf_area_interface.Name)
+			}
 
             routing_instances_instance_protocols_ospf_area_interface_List[i_routing_instances_instance_protocols_ospf_area_interface] =
                 routing_instances_instance_protocols_ospf_area_interface_model
@@ -4008,13 +4108,18 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_routing_options_static_route, v_routing_options_static_route := range v_routing_options_static.Route {
             var routing_options_static_route_model Routing_options_Static_Route_Model
-            // leaf -> keep pointer semantics
-            routing_options_static_route_model.Name =
+            // leaf
+            if v_routing_options_static_route.Name == nil {
+                routing_options_static_route_model.Name =
+                    types.StringNull()
+            } else {
+				routing_options_static_route_model.Name =
                 types.StringPointerValue(v_routing_options_static_route.Name)
+			}
 
             routing_options_static_route_List[i_routing_options_static_route] =
                 routing_options_static_route_model
-            // leaf-list -> write Null when nil OR empty (avoid [] when absent)
+            // leaf-list
             if v_routing_options_static_route.Next_hop == nil ||
                len(v_routing_options_static_route.Next_hop) == 0 {
                 routing_options_static_route_model.Next_hop =
@@ -4090,9 +4195,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_log, v_security_log := range v_security.Log {
             var security_log_model Security_Log_Model
-            // leaf -> keep pointer semantics
-            security_log_model.Mode =
+            // leaf
+            if v_security_log.Mode == nil {
+                security_log_model.Mode =
+                    types.StringNull()
+            } else {
+				security_log_model.Mode =
                 types.StringPointerValue(v_security_log.Mode)
+			}
 
             security_log_List[i_security_log] =
                 security_log_model
@@ -4148,9 +4258,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_screen_ids_option, v_security_screen_ids_option := range v_security_screen.Ids_option {
             var security_screen_ids_option_model Security_Screen_Ids_option_Model
-            // leaf -> keep pointer semantics
-            security_screen_ids_option_model.Name =
+            // leaf
+            if v_security_screen_ids_option.Name == nil {
+                security_screen_ids_option_model.Name =
+                    types.StringNull()
+            } else {
+				security_screen_ids_option_model.Name =
                 types.StringPointerValue(v_security_screen_ids_option.Name)
+			}
 
             security_screen_ids_option_List[i_security_screen_ids_option] =
                 security_screen_ids_option_model
@@ -4164,9 +4279,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_screen_ids_option_icmp, v_security_screen_ids_option_icmp := range v_security_screen_ids_option.Icmp {
             var security_screen_ids_option_icmp_model Security_Screen_Ids_option_Icmp_Model
-            // leaf -> keep pointer semantics
-            security_screen_ids_option_icmp_model.Ping_death =
+            // leaf
+            if v_security_screen_ids_option_icmp.Ping_death == nil {
+                security_screen_ids_option_icmp_model.Ping_death =
+                    types.StringNull()
+            } else {
+				security_screen_ids_option_icmp_model.Ping_death =
                 types.StringPointerValue(v_security_screen_ids_option_icmp.Ping_death)
+			}
 
             security_screen_ids_option_icmp_List[i_security_screen_ids_option_icmp] =
                 security_screen_ids_option_icmp_model
@@ -4194,15 +4314,25 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_screen_ids_option_ip, v_security_screen_ids_option_ip := range v_security_screen_ids_option.Ip {
             var security_screen_ids_option_ip_model Security_Screen_Ids_option_Ip_Model
-            // leaf -> keep pointer semantics
-            security_screen_ids_option_ip_model.Source_route_option =
+            // leaf
+            if v_security_screen_ids_option_ip.Source_route_option == nil {
+                security_screen_ids_option_ip_model.Source_route_option =
+                    types.StringNull()
+            } else {
+				security_screen_ids_option_ip_model.Source_route_option =
                 types.StringPointerValue(v_security_screen_ids_option_ip.Source_route_option)
+			}
 
             security_screen_ids_option_ip_List[i_security_screen_ids_option_ip] =
                 security_screen_ids_option_ip_model
-            // leaf -> keep pointer semantics
-            security_screen_ids_option_ip_model.Tear_drop =
+            // leaf
+            if v_security_screen_ids_option_ip.Tear_drop == nil {
+                security_screen_ids_option_ip_model.Tear_drop =
+                    types.StringNull()
+            } else {
+				security_screen_ids_option_ip_model.Tear_drop =
                 types.StringPointerValue(v_security_screen_ids_option_ip.Tear_drop)
+			}
 
             security_screen_ids_option_ip_List[i_security_screen_ids_option_ip] =
                 security_screen_ids_option_ip_model
@@ -4240,33 +4370,58 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_screen_ids_option_tcp_syn_flood, v_security_screen_ids_option_tcp_syn_flood := range v_security_screen_ids_option_tcp.Syn_flood {
             var security_screen_ids_option_tcp_syn_flood_model Security_Screen_Ids_option_Tcp_Syn_flood_Model
-            // leaf -> keep pointer semantics
-            security_screen_ids_option_tcp_syn_flood_model.Alarm_threshold =
+            // leaf
+            if v_security_screen_ids_option_tcp_syn_flood.Alarm_threshold == nil {
+                security_screen_ids_option_tcp_syn_flood_model.Alarm_threshold =
+                    types.StringNull()
+            } else {
+				security_screen_ids_option_tcp_syn_flood_model.Alarm_threshold =
                 types.StringPointerValue(v_security_screen_ids_option_tcp_syn_flood.Alarm_threshold)
+			}
 
             security_screen_ids_option_tcp_syn_flood_List[i_security_screen_ids_option_tcp_syn_flood] =
                 security_screen_ids_option_tcp_syn_flood_model
-            // leaf -> keep pointer semantics
-            security_screen_ids_option_tcp_syn_flood_model.Attack_threshold =
+            // leaf
+            if v_security_screen_ids_option_tcp_syn_flood.Attack_threshold == nil {
+                security_screen_ids_option_tcp_syn_flood_model.Attack_threshold =
+                    types.StringNull()
+            } else {
+				security_screen_ids_option_tcp_syn_flood_model.Attack_threshold =
                 types.StringPointerValue(v_security_screen_ids_option_tcp_syn_flood.Attack_threshold)
+			}
 
             security_screen_ids_option_tcp_syn_flood_List[i_security_screen_ids_option_tcp_syn_flood] =
                 security_screen_ids_option_tcp_syn_flood_model
-            // leaf -> keep pointer semantics
-            security_screen_ids_option_tcp_syn_flood_model.Source_threshold =
+            // leaf
+            if v_security_screen_ids_option_tcp_syn_flood.Source_threshold == nil {
+                security_screen_ids_option_tcp_syn_flood_model.Source_threshold =
+                    types.StringNull()
+            } else {
+				security_screen_ids_option_tcp_syn_flood_model.Source_threshold =
                 types.StringPointerValue(v_security_screen_ids_option_tcp_syn_flood.Source_threshold)
+			}
 
             security_screen_ids_option_tcp_syn_flood_List[i_security_screen_ids_option_tcp_syn_flood] =
                 security_screen_ids_option_tcp_syn_flood_model
-            // leaf -> keep pointer semantics
-            security_screen_ids_option_tcp_syn_flood_model.Destination_threshold =
+            // leaf
+            if v_security_screen_ids_option_tcp_syn_flood.Destination_threshold == nil {
+                security_screen_ids_option_tcp_syn_flood_model.Destination_threshold =
+                    types.StringNull()
+            } else {
+				security_screen_ids_option_tcp_syn_flood_model.Destination_threshold =
                 types.StringPointerValue(v_security_screen_ids_option_tcp_syn_flood.Destination_threshold)
+			}
 
             security_screen_ids_option_tcp_syn_flood_List[i_security_screen_ids_option_tcp_syn_flood] =
                 security_screen_ids_option_tcp_syn_flood_model
-            // leaf -> keep pointer semantics
-            security_screen_ids_option_tcp_syn_flood_model.Timeout =
+            // leaf
+            if v_security_screen_ids_option_tcp_syn_flood.Timeout == nil {
+                security_screen_ids_option_tcp_syn_flood_model.Timeout =
+                    types.StringNull()
+            } else {
+				security_screen_ids_option_tcp_syn_flood_model.Timeout =
                 types.StringPointerValue(v_security_screen_ids_option_tcp_syn_flood.Timeout)
+			}
 
             security_screen_ids_option_tcp_syn_flood_List[i_security_screen_ids_option_tcp_syn_flood] =
                 security_screen_ids_option_tcp_syn_flood_model
@@ -4284,9 +4439,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
                 )
         }
         security_screen_ids_option_tcp_List[i_security_screen_ids_option_tcp] = security_screen_ids_option_tcp_model
-            // leaf -> keep pointer semantics
-            security_screen_ids_option_tcp_model.Land =
+            // leaf
+            if v_security_screen_ids_option_tcp.Land == nil {
+                security_screen_ids_option_tcp_model.Land =
+                    types.StringNull()
+            } else {
+				security_screen_ids_option_tcp_model.Land =
                 types.StringPointerValue(v_security_screen_ids_option_tcp.Land)
+			}
 
             security_screen_ids_option_tcp_List[i_security_screen_ids_option_tcp] =
                 security_screen_ids_option_tcp_model
@@ -4349,15 +4509,25 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_policies_policy, v_security_policies_policy := range v_security_policies.Policy {
             var security_policies_policy_model Security_Policies_Policy_Model
-            // leaf -> keep pointer semantics
-            security_policies_policy_model.From_zone_name =
+            // leaf
+            if v_security_policies_policy.From_zone_name == nil {
+                security_policies_policy_model.From_zone_name =
+                    types.StringNull()
+            } else {
+				security_policies_policy_model.From_zone_name =
                 types.StringPointerValue(v_security_policies_policy.From_zone_name)
+			}
 
             security_policies_policy_List[i_security_policies_policy] =
                 security_policies_policy_model
-            // leaf -> keep pointer semantics
-            security_policies_policy_model.To_zone_name =
+            // leaf
+            if v_security_policies_policy.To_zone_name == nil {
+                security_policies_policy_model.To_zone_name =
+                    types.StringNull()
+            } else {
+				security_policies_policy_model.To_zone_name =
                 types.StringPointerValue(v_security_policies_policy.To_zone_name)
+			}
 
             security_policies_policy_List[i_security_policies_policy] =
                 security_policies_policy_model
@@ -4371,9 +4541,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_policies_policy_policy, v_security_policies_policy_policy := range v_security_policies_policy.Policy {
             var security_policies_policy_policy_model Security_Policies_Policy_Policy_Model
-            // leaf -> keep pointer semantics
-            security_policies_policy_policy_model.Name =
+            // leaf
+            if v_security_policies_policy_policy.Name == nil {
+                security_policies_policy_policy_model.Name =
+                    types.StringNull()
+            } else {
+				security_policies_policy_policy_model.Name =
                 types.StringPointerValue(v_security_policies_policy_policy.Name)
+			}
 
             security_policies_policy_policy_List[i_security_policies_policy_policy] =
                 security_policies_policy_policy_model
@@ -4387,7 +4562,7 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_policies_policy_policy_match, v_security_policies_policy_policy_match := range v_security_policies_policy_policy.Match {
             var security_policies_policy_policy_match_model Security_Policies_Policy_Policy_Match_Model
-            // leaf-list -> write Null when nil OR empty (avoid [] when absent)
+            // leaf-list
             if v_security_policies_policy_policy_match.Source_address == nil ||
                len(v_security_policies_policy_policy_match.Source_address) == 0 {
                 security_policies_policy_policy_match_model.Source_address =
@@ -4403,7 +4578,7 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
 
             security_policies_policy_policy_match_List[i_security_policies_policy_policy_match] =
                 security_policies_policy_policy_match_model
-            // leaf-list -> write Null when nil OR empty (avoid [] when absent)
+            // leaf-list
             if v_security_policies_policy_policy_match.Destination_address == nil ||
                len(v_security_policies_policy_policy_match.Destination_address) == 0 {
                 security_policies_policy_policy_match_model.Destination_address =
@@ -4419,7 +4594,7 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
 
             security_policies_policy_policy_match_List[i_security_policies_policy_policy_match] =
                 security_policies_policy_policy_match_model
-            // leaf-list -> write Null when nil OR empty (avoid [] when absent)
+            // leaf-list
             if v_security_policies_policy_policy_match.Application == nil ||
                len(v_security_policies_policy_policy_match.Application) == 0 {
                 security_policies_policy_policy_match_model.Application =
@@ -4553,21 +4728,36 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_zones_security_zone, v_security_zones_security_zone := range v_security_zones.Security_zone {
             var security_zones_security_zone_model Security_Zones_Security_zone_Model
-            // leaf -> keep pointer semantics
-            security_zones_security_zone_model.Name =
+            // leaf
+            if v_security_zones_security_zone.Name == nil {
+                security_zones_security_zone_model.Name =
+                    types.StringNull()
+            } else {
+				security_zones_security_zone_model.Name =
                 types.StringPointerValue(v_security_zones_security_zone.Name)
+			}
 
             security_zones_security_zone_List[i_security_zones_security_zone] =
                 security_zones_security_zone_model
-            // leaf -> keep pointer semantics
-            security_zones_security_zone_model.Tcp_rst =
+            // leaf
+            if v_security_zones_security_zone.Tcp_rst == nil {
+                security_zones_security_zone_model.Tcp_rst =
+                    types.StringNull()
+            } else {
+				security_zones_security_zone_model.Tcp_rst =
                 types.StringPointerValue(v_security_zones_security_zone.Tcp_rst)
+			}
 
             security_zones_security_zone_List[i_security_zones_security_zone] =
                 security_zones_security_zone_model
-            // leaf -> keep pointer semantics
-            security_zones_security_zone_model.Screen =
+            // leaf
+            if v_security_zones_security_zone.Screen == nil {
+                security_zones_security_zone_model.Screen =
+                    types.StringNull()
+            } else {
+				security_zones_security_zone_model.Screen =
                 types.StringPointerValue(v_security_zones_security_zone.Screen)
+			}
 
             security_zones_security_zone_List[i_security_zones_security_zone] =
                 security_zones_security_zone_model
@@ -4591,9 +4781,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_zones_security_zone_host_inbound_traffic_system_services, v_security_zones_security_zone_host_inbound_traffic_system_services := range v_security_zones_security_zone_host_inbound_traffic.System_services {
             var security_zones_security_zone_host_inbound_traffic_system_services_model Security_Zones_Security_zone_Host_inbound_traffic_System_services_Model
-            // leaf -> keep pointer semantics
-            security_zones_security_zone_host_inbound_traffic_system_services_model.Name =
+            // leaf
+            if v_security_zones_security_zone_host_inbound_traffic_system_services.Name == nil {
+                security_zones_security_zone_host_inbound_traffic_system_services_model.Name =
+                    types.StringNull()
+            } else {
+				security_zones_security_zone_host_inbound_traffic_system_services_model.Name =
                 types.StringPointerValue(v_security_zones_security_zone_host_inbound_traffic_system_services.Name)
+			}
 
             security_zones_security_zone_host_inbound_traffic_system_services_List[i_security_zones_security_zone_host_inbound_traffic_system_services] =
                 security_zones_security_zone_host_inbound_traffic_system_services_model
@@ -4621,9 +4816,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_zones_security_zone_host_inbound_traffic_protocols, v_security_zones_security_zone_host_inbound_traffic_protocols := range v_security_zones_security_zone_host_inbound_traffic.Protocols {
             var security_zones_security_zone_host_inbound_traffic_protocols_model Security_Zones_Security_zone_Host_inbound_traffic_Protocols_Model
-            // leaf -> keep pointer semantics
-            security_zones_security_zone_host_inbound_traffic_protocols_model.Name =
+            // leaf
+            if v_security_zones_security_zone_host_inbound_traffic_protocols.Name == nil {
+                security_zones_security_zone_host_inbound_traffic_protocols_model.Name =
+                    types.StringNull()
+            } else {
+				security_zones_security_zone_host_inbound_traffic_protocols_model.Name =
                 types.StringPointerValue(v_security_zones_security_zone_host_inbound_traffic_protocols.Name)
+			}
 
             security_zones_security_zone_host_inbound_traffic_protocols_List[i_security_zones_security_zone_host_inbound_traffic_protocols] =
                 security_zones_security_zone_host_inbound_traffic_protocols_model
@@ -4665,9 +4865,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_security_zones_security_zone_interfaces, v_security_zones_security_zone_interfaces := range v_security_zones_security_zone.Interfaces {
             var security_zones_security_zone_interfaces_model Security_Zones_Security_zone_Interfaces_Model
-            // leaf -> keep pointer semantics
-            security_zones_security_zone_interfaces_model.Name =
+            // leaf
+            if v_security_zones_security_zone_interfaces.Name == nil {
+                security_zones_security_zone_interfaces_model.Name =
+                    types.StringNull()
+            } else {
+				security_zones_security_zone_interfaces_model.Name =
                 types.StringPointerValue(v_security_zones_security_zone_interfaces.Name)
+			}
 
             security_zones_security_zone_interfaces_List[i_security_zones_security_zone_interfaces] =
                 security_zones_security_zone_interfaces_model
@@ -4745,15 +4950,25 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_snmp_community, v_snmp_community := range v_snmp.Community {
             var snmp_community_model Snmp_Community_Model
-            // leaf -> keep pointer semantics
-            snmp_community_model.Name =
+            // leaf
+            if v_snmp_community.Name == nil {
+                snmp_community_model.Name =
+                    types.StringNull()
+            } else {
+				snmp_community_model.Name =
                 types.StringPointerValue(v_snmp_community.Name)
+			}
 
             snmp_community_List[i_snmp_community] =
                 snmp_community_model
-            // leaf -> keep pointer semantics
-            snmp_community_model.Authorization =
+            // leaf
+            if v_snmp_community.Authorization == nil {
+                snmp_community_model.Authorization =
+                    types.StringNull()
+            } else {
+				snmp_community_model.Authorization =
                 types.StringPointerValue(v_snmp_community.Authorization)
+			}
 
             snmp_community_List[i_snmp_community] =
                 snmp_community_model
@@ -4813,21 +5028,36 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_login_user, v_system_login_user := range v_system_login.User {
             var system_login_user_model System_Login_User_Model
-            // leaf -> keep pointer semantics
-            system_login_user_model.Name =
+            // leaf
+            if v_system_login_user.Name == nil {
+                system_login_user_model.Name =
+                    types.StringNull()
+            } else {
+				system_login_user_model.Name =
                 types.StringPointerValue(v_system_login_user.Name)
+			}
 
             system_login_user_List[i_system_login_user] =
                 system_login_user_model
-            // leaf -> keep pointer semantics
-            system_login_user_model.Uid =
+            // leaf
+            if v_system_login_user.Uid == nil {
+                system_login_user_model.Uid =
+                    types.StringNull()
+            } else {
+				system_login_user_model.Uid =
                 types.StringPointerValue(v_system_login_user.Uid)
+			}
 
             system_login_user_List[i_system_login_user] =
                 system_login_user_model
-            // leaf -> keep pointer semantics
-            system_login_user_model.Class =
+            // leaf
+            if v_system_login_user.Class == nil {
+                system_login_user_model.Class =
+                    types.StringNull()
+            } else {
+				system_login_user_model.Class =
                 types.StringPointerValue(v_system_login_user.Class)
+			}
 
             system_login_user_List[i_system_login_user] =
                 system_login_user_model
@@ -4841,9 +5071,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_login_user_authentication, v_system_login_user_authentication := range v_system_login_user.Authentication {
             var system_login_user_authentication_model System_Login_User_Authentication_Model
-            // leaf -> keep pointer semantics
-            system_login_user_authentication_model.Encrypted_password =
+            // leaf
+            if v_system_login_user_authentication.Encrypted_password == nil {
+                system_login_user_authentication_model.Encrypted_password =
+                    types.StringNull()
+            } else {
+				system_login_user_authentication_model.Encrypted_password =
                 types.StringPointerValue(v_system_login_user_authentication.Encrypted_password)
+			}
 
             system_login_user_authentication_List[i_system_login_user_authentication] =
                 system_login_user_authentication_model
@@ -4875,9 +5110,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
                 )
         }
         system_login_List[i_system_login] = system_login_model
-            // leaf -> keep pointer semantics
-            system_login_model.Message =
+            // leaf
+            if v_system_login.Message == nil {
+                system_login_model.Message =
+                    types.StringNull()
+            } else {
+				system_login_model.Message =
                 types.StringPointerValue(v_system_login.Message)
+			}
 
             system_login_List[i_system_login] =
                 system_login_model
@@ -4902,9 +5142,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_root_authentication, v_system_root_authentication := range v_system.Root_authentication {
             var system_root_authentication_model System_Root_authentication_Model
-            // leaf -> keep pointer semantics
-            system_root_authentication_model.Encrypted_password =
+            // leaf
+            if v_system_root_authentication.Encrypted_password == nil {
+                system_root_authentication_model.Encrypted_password =
+                    types.StringNull()
+            } else {
+				system_root_authentication_model.Encrypted_password =
                 types.StringPointerValue(v_system_root_authentication.Encrypted_password)
+			}
 
             system_root_authentication_List[i_system_root_authentication] =
                 system_root_authentication_model
@@ -4939,9 +5184,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_services_ssh, v_system_services_ssh := range v_system_services.Ssh {
             var system_services_ssh_model System_Services_Ssh_Model
-            // leaf -> keep pointer semantics
-            system_services_ssh_model.Root_login =
+            // leaf
+            if v_system_services_ssh.Root_login == nil {
+                system_services_ssh_model.Root_login =
+                    types.StringNull()
+            } else {
+				system_services_ssh_model.Root_login =
                 types.StringPointerValue(v_system_services_ssh.Root_login)
+			}
 
             system_services_ssh_List[i_system_services_ssh] =
                 system_services_ssh_model
@@ -4989,9 +5239,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_services_extension_service_request_response_grpc, v_system_services_extension_service_request_response_grpc := range v_system_services_extension_service_request_response.Grpc {
             var system_services_extension_service_request_response_grpc_model System_Services_Extension_service_Request_response_Grpc_Model
-            // leaf -> keep pointer semantics
-            system_services_extension_service_request_response_grpc_model.Max_connections =
+            // leaf
+            if v_system_services_extension_service_request_response_grpc.Max_connections == nil {
+                system_services_extension_service_request_response_grpc_model.Max_connections =
+                    types.StringNull()
+            } else {
+				system_services_extension_service_request_response_grpc_model.Max_connections =
                 types.StringPointerValue(v_system_services_extension_service_request_response_grpc.Max_connections)
+			}
 
             system_services_extension_service_request_response_grpc_List[i_system_services_extension_service_request_response_grpc] =
                 system_services_extension_service_request_response_grpc_model
@@ -5043,7 +5298,7 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_services_extension_service_notification_allow_clients, v_system_services_extension_service_notification_allow_clients := range v_system_services_extension_service_notification.Allow_clients {
             var system_services_extension_service_notification_allow_clients_model System_Services_Extension_service_Notification_Allow_clients_Model
-            // leaf-list -> write Null when nil OR empty (avoid [] when absent)
+            // leaf-list
             if v_system_services_extension_service_notification_allow_clients.Address == nil ||
                len(v_system_services_extension_service_notification_allow_clients.Address) == 0 {
                 system_services_extension_service_notification_allow_clients_model.Address =
@@ -5166,9 +5421,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_services_rest_http, v_system_services_rest_http := range v_system_services_rest.Http {
             var system_services_rest_http_model System_Services_Rest_Http_Model
-            // leaf -> keep pointer semantics
-            system_services_rest_http_model.Port =
+            // leaf
+            if v_system_services_rest_http.Port == nil {
+                system_services_rest_http_model.Port =
+                    types.StringNull()
+            } else {
+				system_services_rest_http_model.Port =
                 types.StringPointerValue(v_system_services_rest_http.Port)
+			}
 
             system_services_rest_http_List[i_system_services_rest_http] =
                 system_services_rest_http_model
@@ -5186,9 +5446,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
                 )
         }
         system_services_rest_List[i_system_services_rest] = system_services_rest_model
-            // leaf -> keep pointer semantics
-            system_services_rest_model.Enable_explorer =
+            // leaf
+            if v_system_services_rest.Enable_explorer == nil {
+                system_services_rest_model.Enable_explorer =
+                    types.StringNull()
+            } else {
+				system_services_rest_model.Enable_explorer =
                 types.StringPointerValue(v_system_services_rest.Enable_explorer)
+			}
 
             system_services_rest_List[i_system_services_rest] =
                 system_services_rest_model
@@ -5237,9 +5502,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_syslog_user, v_system_syslog_user := range v_system_syslog.User {
             var system_syslog_user_model System_Syslog_User_Model
-            // leaf -> keep pointer semantics
-            system_syslog_user_model.Name =
+            // leaf
+            if v_system_syslog_user.Name == nil {
+                system_syslog_user_model.Name =
+                    types.StringNull()
+            } else {
+				system_syslog_user_model.Name =
                 types.StringPointerValue(v_system_syslog_user.Name)
+			}
 
             system_syslog_user_List[i_system_syslog_user] =
                 system_syslog_user_model
@@ -5253,15 +5523,25 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_syslog_user_contents, v_system_syslog_user_contents := range v_system_syslog_user.Contents {
             var system_syslog_user_contents_model System_Syslog_User_Contents_Model
-            // leaf -> keep pointer semantics
-            system_syslog_user_contents_model.Name =
+            // leaf
+            if v_system_syslog_user_contents.Name == nil {
+                system_syslog_user_contents_model.Name =
+                    types.StringNull()
+            } else {
+				system_syslog_user_contents_model.Name =
                 types.StringPointerValue(v_system_syslog_user_contents.Name)
+			}
 
             system_syslog_user_contents_List[i_system_syslog_user_contents] =
                 system_syslog_user_contents_model
-            // leaf -> keep pointer semantics
-            system_syslog_user_contents_model.Emergency =
+            // leaf
+            if v_system_syslog_user_contents.Emergency == nil {
+                system_syslog_user_contents_model.Emergency =
+                    types.StringNull()
+            } else {
+				system_syslog_user_contents_model.Emergency =
                 types.StringPointerValue(v_system_syslog_user_contents.Emergency)
+			}
 
             system_syslog_user_contents_List[i_system_syslog_user_contents] =
                 system_syslog_user_contents_model
@@ -5303,9 +5583,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_syslog_file, v_system_syslog_file := range v_system_syslog.File {
             var system_syslog_file_model System_Syslog_File_Model
-            // leaf -> keep pointer semantics
-            system_syslog_file_model.Name =
+            // leaf
+            if v_system_syslog_file.Name == nil {
+                system_syslog_file_model.Name =
+                    types.StringNull()
+            } else {
+				system_syslog_file_model.Name =
                 types.StringPointerValue(v_system_syslog_file.Name)
+			}
 
             system_syslog_file_List[i_system_syslog_file] =
                 system_syslog_file_model
@@ -5319,21 +5604,36 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_syslog_file_contents, v_system_syslog_file_contents := range v_system_syslog_file.Contents {
             var system_syslog_file_contents_model System_Syslog_File_Contents_Model
-            // leaf -> keep pointer semantics
-            system_syslog_file_contents_model.Name =
+            // leaf
+            if v_system_syslog_file_contents.Name == nil {
+                system_syslog_file_contents_model.Name =
+                    types.StringNull()
+            } else {
+				system_syslog_file_contents_model.Name =
                 types.StringPointerValue(v_system_syslog_file_contents.Name)
+			}
 
             system_syslog_file_contents_List[i_system_syslog_file_contents] =
                 system_syslog_file_contents_model
-            // leaf -> keep pointer semantics
-            system_syslog_file_contents_model.Any =
+            // leaf
+            if v_system_syslog_file_contents.Any == nil {
+                system_syslog_file_contents_model.Any =
+                    types.StringNull()
+            } else {
+				system_syslog_file_contents_model.Any =
                 types.StringPointerValue(v_system_syslog_file_contents.Any)
+			}
 
             system_syslog_file_contents_List[i_system_syslog_file_contents] =
                 system_syslog_file_contents_model
-            // leaf -> keep pointer semantics
-            system_syslog_file_contents_model.Info =
+            // leaf
+            if v_system_syslog_file_contents.Info == nil {
+                system_syslog_file_contents_model.Info =
+                    types.StringNull()
+            } else {
+				system_syslog_file_contents_model.Info =
                 types.StringPointerValue(v_system_syslog_file_contents.Info)
+			}
 
             system_syslog_file_contents_List[i_system_syslog_file_contents] =
                 system_syslog_file_contents_model
@@ -5406,9 +5706,14 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         
 		for i_system_license_autoupdate_url, v_system_license_autoupdate_url := range v_system_license_autoupdate.Url {
             var system_license_autoupdate_url_model System_License_Autoupdate_Url_Model
-            // leaf -> keep pointer semantics
-            system_license_autoupdate_url_model.Name =
+            // leaf
+            if v_system_license_autoupdate_url.Name == nil {
+                system_license_autoupdate_url_model.Name =
+                    types.StringNull()
+            } else {
+				system_license_autoupdate_url_model.Name =
                 types.StringPointerValue(v_system_license_autoupdate_url.Name)
+			}
 
             system_license_autoupdate_url_List[i_system_license_autoupdate_url] =
                 system_license_autoupdate_url_model
