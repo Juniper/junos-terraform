@@ -145,13 +145,16 @@ def edit_provider_block(device_type, provider_block):
         return block
     
     # Extract the existing required_providers content
-    providers_match = re.search(r'required_providers\s*{\s*(.*?)\s*}\s*}', block, re.DOTALL)
+    providers_match = re.search(r'required_providers\s*{\s*(.*?)\s*}\s*}(.*)?', block, re.DOTALL)
     
     if providers_match:
         existing_providers = providers_match.group(1).strip()
+
+        # Capture any content after first closing brace of providers.tf
+        after_block = providers_match.group(2).strip()[1:] if providers_match.group(2) else ""
         
         # Add new provider entry
-        new_provider = "}\n\t\t" + f'junos-{device_type} = {{\n      source = "hashicorp/junos-{device_type}"\n    }}'
+        new_provider = "}\n\t" + f'junos-{device_type} = {{\n      source = "hashicorp/junos-{device_type}"\n    }}'
         
         # Combine existing and new providers
         if existing_providers:
@@ -165,6 +168,7 @@ def edit_provider_block(device_type, provider_block):
     {updated_providers}
   }}
 }}
+{after_block}
 """
 
     return block
@@ -359,12 +363,17 @@ def main():
     for file in xml_files:
         hostname = file.split("/")[-1].split(".")[0]
         head_block = create_head_block(device_type, hostname, username, password)
+        if head_block:
+            with open(f"{directory}/providers.tf", "r") as f:
+                provider_block = f.read()
+                provider_block = provider_block + head_block
+            with open(f"{directory}/providers.tf", "w") as f:
+                f.write(provider_block)
         hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup)
         if hcl_output:
             filename = f"{directory}/{hostname}.tf"
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             with open(filename, "w") as f:
-                f.write(head_block)
                 f.write(hcl_output)
             print(f"Wrote output to {filename}")
 

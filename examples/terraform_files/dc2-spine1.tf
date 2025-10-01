@@ -1,14 +1,6 @@
-
-provider "junos-qfx-evpn-vxlan" {
-    host     = "dc2-spine1"
-    port     = 22
-    username = "jcluser"
-    password = "Juniper!1"
-    alias    = "dc2_spine1"
-}
-resource "terraform-provider-junos-qfx-evpn-vxlan" "dc2-spine1-base-config" {
+resource "terraform-provider-junos-vqfx-evpn-vxlan" "dc2-spine1-base-config" {
   resource_name = "base-config"
-  provider = junos-qfx-evpn-vxlan.dc2_spine1
+  provider = junos-vqfx-evpn-vxlan.dc2_spine1
   system = [
     {
       host_name = "dc2-spine1"

@@ -4322,1109 +4322,3607 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         resp.Diagnostics.AddError("Failed to read group", err.Error())
         return
     }
-    state.Chassis = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    chassis_List := make([]Chassis_Model, len(config.Groups.Chassis))
+    // Initialize chassis as Null; only materialize when we have elements
+    state.Chassis =
+        types.ListNull(types.ObjectType{AttrTypes: Chassis_Model{}.AttrTypes()})
+
+    // Build list from device
+    chassis_List := make([]Chassis_Model,
+        len(config.Groups.Chassis))
+
     for i_chassis, v_chassis := range config.Groups.Chassis {
         var chassis_model Chassis_Model
+            
+        // Build aggregated-devices list
         chassis_aggregated_devices_List := make([]Chassis_Aggregated_devices_Model, len(v_chassis.Aggregated_devices))
+
         
 		for i_chassis_aggregated_devices, v_chassis_aggregated_devices := range v_chassis.Aggregated_devices {
             var chassis_aggregated_devices_model Chassis_Aggregated_devices_Model
-			chassis_aggregated_devices_List[i_chassis_aggregated_devices] = chassis_aggregated_devices_model
+
+            chassis_aggregated_devices_List[i_chassis_aggregated_devices] =
+                chassis_aggregated_devices_model
                 
+        // Build ethernet list
         chassis_aggregated_devices_ethernet_List := make([]Chassis_Aggregated_devices_Ethernet_Model, len(v_chassis_aggregated_devices.Ethernet))
+
         
 		for i_chassis_aggregated_devices_ethernet, v_chassis_aggregated_devices_ethernet := range v_chassis_aggregated_devices.Ethernet {
             var chassis_aggregated_devices_ethernet_model Chassis_Aggregated_devices_Ethernet_Model
-            chassis_aggregated_devices_ethernet_model.Device_count = types.StringPointerValue(v_chassis_aggregated_devices_ethernet.Device_count)
-			chassis_aggregated_devices_ethernet_List[i_chassis_aggregated_devices_ethernet] = chassis_aggregated_devices_ethernet_model
+            // leaf
+            if v_chassis_aggregated_devices_ethernet.Device_count == nil {
+                chassis_aggregated_devices_ethernet_model.Device_count =
+                    types.StringNull()
+            } else {
+				chassis_aggregated_devices_ethernet_model.Device_count =
+                types.StringPointerValue(v_chassis_aggregated_devices_ethernet.Device_count)
+			}
+
+            chassis_aggregated_devices_ethernet_List[i_chassis_aggregated_devices_ethernet] =
+                chassis_aggregated_devices_ethernet_model
         }
-        chassis_aggregated_devices_model.Ethernet, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Chassis_Aggregated_devices_Ethernet_Model{}.AttrTypes()}, chassis_aggregated_devices_ethernet_List)
+
+        // Write ethernet field as Null when empty, else concrete list
+        if len(chassis_aggregated_devices_ethernet_List) == 0 {
+            chassis_aggregated_devices_model.Ethernet =
+                types.ListNull(types.ObjectType{AttrTypes: Chassis_Aggregated_devices_Ethernet_Model{}.AttrTypes()})
+        } else {
+            chassis_aggregated_devices_model.Ethernet, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Chassis_Aggregated_devices_Ethernet_Model{}.AttrTypes()},
+                    chassis_aggregated_devices_ethernet_List,
+                )
+        }
         chassis_aggregated_devices_List[i_chassis_aggregated_devices] = chassis_aggregated_devices_model
         }
-        chassis_model.Aggregated_devices, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Chassis_Aggregated_devices_Model{}.AttrTypes()}, chassis_aggregated_devices_List)
+
+        // Write aggregated-devices field as Null when empty, else concrete list
+        if len(chassis_aggregated_devices_List) == 0 {
+            chassis_model.Aggregated_devices =
+                types.ListNull(types.ObjectType{AttrTypes: Chassis_Aggregated_devices_Model{}.AttrTypes()})
+        } else {
+            chassis_model.Aggregated_devices, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Chassis_Aggregated_devices_Model{}.AttrTypes()},
+                    chassis_aggregated_devices_List,
+                )
+        }
+        chassis_List[i_chassis] = chassis_model
+
         chassis_List[i_chassis] = chassis_model
     }
-    state.Chassis, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Chassis_Model{}.AttrTypes()}, chassis_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-    state.Forwarding_options = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    forwarding_options_List := make([]Forwarding_options_Model, len(config.Groups.Forwarding_options))
+
+    // Write parent list as Null when empty
+    if len(chassis_List) == 0 {
+        state.Chassis =
+            types.ListNull(types.ObjectType{AttrTypes: Chassis_Model{}.AttrTypes()})
+    } else {
+        state.Chassis, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: Chassis_Model{}.AttrTypes()},
+                chassis_List,
+            )
+    }
+    // Initialize forwarding-options as Null; only materialize when we have elements
+    state.Forwarding_options =
+        types.ListNull(types.ObjectType{AttrTypes: Forwarding_options_Model{}.AttrTypes()})
+
+    // Build list from device
+    forwarding_options_List := make([]Forwarding_options_Model,
+        len(config.Groups.Forwarding_options))
+
     for i_forwarding_options, v_forwarding_options := range config.Groups.Forwarding_options {
         var forwarding_options_model Forwarding_options_Model
+            
+        // Build storm-control-profiles list
         forwarding_options_storm_control_profiles_List := make([]Forwarding_options_Storm_control_profiles_Model, len(v_forwarding_options.Storm_control_profiles))
+
         
 		for i_forwarding_options_storm_control_profiles, v_forwarding_options_storm_control_profiles := range v_forwarding_options.Storm_control_profiles {
             var forwarding_options_storm_control_profiles_model Forwarding_options_Storm_control_profiles_Model
-            forwarding_options_storm_control_profiles_model.Name = types.StringPointerValue(v_forwarding_options_storm_control_profiles.Name)
-			forwarding_options_storm_control_profiles_List[i_forwarding_options_storm_control_profiles] = forwarding_options_storm_control_profiles_model
-			forwarding_options_storm_control_profiles_List[i_forwarding_options_storm_control_profiles] = forwarding_options_storm_control_profiles_model
+            // leaf
+            if v_forwarding_options_storm_control_profiles.Name == nil {
+                forwarding_options_storm_control_profiles_model.Name =
+                    types.StringNull()
+            } else {
+				forwarding_options_storm_control_profiles_model.Name =
+                types.StringPointerValue(v_forwarding_options_storm_control_profiles.Name)
+			}
+
+            forwarding_options_storm_control_profiles_List[i_forwarding_options_storm_control_profiles] =
+                forwarding_options_storm_control_profiles_model
+
+            forwarding_options_storm_control_profiles_List[i_forwarding_options_storm_control_profiles] =
+                forwarding_options_storm_control_profiles_model
                 
+        // Build all list
         forwarding_options_storm_control_profiles_all_List := make([]Forwarding_options_Storm_control_profiles_All_Model, len(v_forwarding_options_storm_control_profiles.All))
+
         
-        forwarding_options_storm_control_profiles_model.All, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Forwarding_options_Storm_control_profiles_All_Model{}.AttrTypes()}, forwarding_options_storm_control_profiles_all_List)
+
+        // Write all field as Null when empty, else concrete list
+        if len(forwarding_options_storm_control_profiles_all_List) == 0 {
+            forwarding_options_storm_control_profiles_model.All =
+                types.ListNull(types.ObjectType{AttrTypes: Forwarding_options_Storm_control_profiles_All_Model{}.AttrTypes()})
+        } else {
+            forwarding_options_storm_control_profiles_model.All, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Forwarding_options_Storm_control_profiles_All_Model{}.AttrTypes()},
+                    forwarding_options_storm_control_profiles_all_List,
+                )
+        }
         forwarding_options_storm_control_profiles_List[i_forwarding_options_storm_control_profiles] = forwarding_options_storm_control_profiles_model
         }
-        forwarding_options_model.Storm_control_profiles, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Forwarding_options_Storm_control_profiles_Model{}.AttrTypes()}, forwarding_options_storm_control_profiles_List)
+
+        // Write storm-control-profiles field as Null when empty, else concrete list
+        if len(forwarding_options_storm_control_profiles_List) == 0 {
+            forwarding_options_model.Storm_control_profiles =
+                types.ListNull(types.ObjectType{AttrTypes: Forwarding_options_Storm_control_profiles_Model{}.AttrTypes()})
+        } else {
+            forwarding_options_model.Storm_control_profiles, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Forwarding_options_Storm_control_profiles_Model{}.AttrTypes()},
+                    forwarding_options_storm_control_profiles_List,
+                )
+        }
+        forwarding_options_List[i_forwarding_options] = forwarding_options_model
+
         forwarding_options_List[i_forwarding_options] = forwarding_options_model
     }
-    state.Forwarding_options, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Forwarding_options_Model{}.AttrTypes()}, forwarding_options_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-    state.Interfaces = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    interfaces_List := make([]Interfaces_Model, len(config.Groups.Interfaces))
+
+    // Write parent list as Null when empty
+    if len(forwarding_options_List) == 0 {
+        state.Forwarding_options =
+            types.ListNull(types.ObjectType{AttrTypes: Forwarding_options_Model{}.AttrTypes()})
+    } else {
+        state.Forwarding_options, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: Forwarding_options_Model{}.AttrTypes()},
+                forwarding_options_List,
+            )
+    }
+    // Initialize interfaces as Null; only materialize when we have elements
+    state.Interfaces =
+        types.ListNull(types.ObjectType{AttrTypes: Interfaces_Model{}.AttrTypes()})
+
+    // Build list from device
+    interfaces_List := make([]Interfaces_Model,
+        len(config.Groups.Interfaces))
+
     for i_interfaces, v_interfaces := range config.Groups.Interfaces {
         var interfaces_model Interfaces_Model
+            
+        // Build interface list
         interfaces_interface_List := make([]Interfaces_Interface_Model, len(v_interfaces.Interface))
+
         
 		for i_interfaces_interface, v_interfaces_interface := range v_interfaces.Interface {
             var interfaces_interface_model Interfaces_Interface_Model
-            interfaces_interface_model.Name = types.StringPointerValue(v_interfaces_interface.Name)
-			interfaces_interface_List[i_interfaces_interface] = interfaces_interface_model
-            interfaces_interface_model.Description = types.StringPointerValue(v_interfaces_interface.Description)
-			interfaces_interface_List[i_interfaces_interface] = interfaces_interface_model
-            interfaces_interface_model.Vlan_tagging = types.StringPointerValue(v_interfaces_interface.Vlan_tagging)
-			interfaces_interface_List[i_interfaces_interface] = interfaces_interface_model
-			interfaces_interface_List[i_interfaces_interface] = interfaces_interface_model
+            // leaf
+            if v_interfaces_interface.Name == nil {
+                interfaces_interface_model.Name =
+                    types.StringNull()
+            } else {
+				interfaces_interface_model.Name =
+                types.StringPointerValue(v_interfaces_interface.Name)
+			}
+
+            interfaces_interface_List[i_interfaces_interface] =
+                interfaces_interface_model
+            // leaf
+            if v_interfaces_interface.Description == nil {
+                interfaces_interface_model.Description =
+                    types.StringNull()
+            } else {
+				interfaces_interface_model.Description =
+                types.StringPointerValue(v_interfaces_interface.Description)
+			}
+
+            interfaces_interface_List[i_interfaces_interface] =
+                interfaces_interface_model
+            // leaf
+            if v_interfaces_interface.Vlan_tagging == nil {
+                interfaces_interface_model.Vlan_tagging =
+                    types.StringNull()
+            } else {
+				interfaces_interface_model.Vlan_tagging =
+                types.StringPointerValue(v_interfaces_interface.Vlan_tagging)
+			}
+
+            interfaces_interface_List[i_interfaces_interface] =
+                interfaces_interface_model
+
+            interfaces_interface_List[i_interfaces_interface] =
+                interfaces_interface_model
                 
+        // Build esi list
         interfaces_interface_esi_List := make([]Interfaces_Interface_Esi_Model, len(v_interfaces_interface.Esi))
+
         
 		for i_interfaces_interface_esi, v_interfaces_interface_esi := range v_interfaces_interface.Esi {
             var interfaces_interface_esi_model Interfaces_Interface_Esi_Model
-            interfaces_interface_esi_model.Identifier = types.StringPointerValue(v_interfaces_interface_esi.Identifier)
-			interfaces_interface_esi_List[i_interfaces_interface_esi] = interfaces_interface_esi_model
-            interfaces_interface_esi_model.All_active = types.StringPointerValue(v_interfaces_interface_esi.All_active)
-			interfaces_interface_esi_List[i_interfaces_interface_esi] = interfaces_interface_esi_model
+            // leaf
+            if v_interfaces_interface_esi.Identifier == nil {
+                interfaces_interface_esi_model.Identifier =
+                    types.StringNull()
+            } else {
+				interfaces_interface_esi_model.Identifier =
+                types.StringPointerValue(v_interfaces_interface_esi.Identifier)
+			}
+
+            interfaces_interface_esi_List[i_interfaces_interface_esi] =
+                interfaces_interface_esi_model
+            // leaf
+            if v_interfaces_interface_esi.All_active == nil {
+                interfaces_interface_esi_model.All_active =
+                    types.StringNull()
+            } else {
+				interfaces_interface_esi_model.All_active =
+                types.StringPointerValue(v_interfaces_interface_esi.All_active)
+			}
+
+            interfaces_interface_esi_List[i_interfaces_interface_esi] =
+                interfaces_interface_esi_model
         }
-        interfaces_interface_model.Esi, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Esi_Model{}.AttrTypes()}, interfaces_interface_esi_List)
+
+        // Write esi field as Null when empty, else concrete list
+        if len(interfaces_interface_esi_List) == 0 {
+            interfaces_interface_model.Esi =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Esi_Model{}.AttrTypes()})
+        } else {
+            interfaces_interface_model.Esi, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Esi_Model{}.AttrTypes()},
+                    interfaces_interface_esi_List,
+                )
+        }
         interfaces_interface_List[i_interfaces_interface] = interfaces_interface_model
-			interfaces_interface_List[i_interfaces_interface] = interfaces_interface_model
+
+            interfaces_interface_List[i_interfaces_interface] =
+                interfaces_interface_model
                 
+        // Build ether-options list
         interfaces_interface_ether_options_List := make([]Interfaces_Interface_Ether_options_Model, len(v_interfaces_interface.Ether_options))
+
         
 		for i_interfaces_interface_ether_options, v_interfaces_interface_ether_options := range v_interfaces_interface.Ether_options {
             var interfaces_interface_ether_options_model Interfaces_Interface_Ether_options_Model
-			interfaces_interface_ether_options_List[i_interfaces_interface_ether_options] = interfaces_interface_ether_options_model
+
+            interfaces_interface_ether_options_List[i_interfaces_interface_ether_options] =
+                interfaces_interface_ether_options_model
                 
+        // Build ieee-802.3ad list
         interfaces_interface_ether_options_ieee_802_3ad_List := make([]Interfaces_Interface_Ether_options_Ieee_802_3ad_Model, len(v_interfaces_interface_ether_options.Ieee_802_3ad))
+
         
 		for i_interfaces_interface_ether_options_ieee_802_3ad, v_interfaces_interface_ether_options_ieee_802_3ad := range v_interfaces_interface_ether_options.Ieee_802_3ad {
             var interfaces_interface_ether_options_ieee_802_3ad_model Interfaces_Interface_Ether_options_Ieee_802_3ad_Model
-            interfaces_interface_ether_options_ieee_802_3ad_model.Bundle = types.StringPointerValue(v_interfaces_interface_ether_options_ieee_802_3ad.Bundle)
-			interfaces_interface_ether_options_ieee_802_3ad_List[i_interfaces_interface_ether_options_ieee_802_3ad] = interfaces_interface_ether_options_ieee_802_3ad_model
+            // leaf
+            if v_interfaces_interface_ether_options_ieee_802_3ad.Bundle == nil {
+                interfaces_interface_ether_options_ieee_802_3ad_model.Bundle =
+                    types.StringNull()
+            } else {
+				interfaces_interface_ether_options_ieee_802_3ad_model.Bundle =
+                types.StringPointerValue(v_interfaces_interface_ether_options_ieee_802_3ad.Bundle)
+			}
+
+            interfaces_interface_ether_options_ieee_802_3ad_List[i_interfaces_interface_ether_options_ieee_802_3ad] =
+                interfaces_interface_ether_options_ieee_802_3ad_model
         }
-        interfaces_interface_ether_options_model.Ieee_802_3ad, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Ether_options_Ieee_802_3ad_Model{}.AttrTypes()}, interfaces_interface_ether_options_ieee_802_3ad_List)
+
+        // Write ieee-802.3ad field as Null when empty, else concrete list
+        if len(interfaces_interface_ether_options_ieee_802_3ad_List) == 0 {
+            interfaces_interface_ether_options_model.Ieee_802_3ad =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Ether_options_Ieee_802_3ad_Model{}.AttrTypes()})
+        } else {
+            interfaces_interface_ether_options_model.Ieee_802_3ad, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Ether_options_Ieee_802_3ad_Model{}.AttrTypes()},
+                    interfaces_interface_ether_options_ieee_802_3ad_List,
+                )
+        }
         interfaces_interface_ether_options_List[i_interfaces_interface_ether_options] = interfaces_interface_ether_options_model
         }
-        interfaces_interface_model.Ether_options, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Ether_options_Model{}.AttrTypes()}, interfaces_interface_ether_options_List)
+
+        // Write ether-options field as Null when empty, else concrete list
+        if len(interfaces_interface_ether_options_List) == 0 {
+            interfaces_interface_model.Ether_options =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Ether_options_Model{}.AttrTypes()})
+        } else {
+            interfaces_interface_model.Ether_options, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Ether_options_Model{}.AttrTypes()},
+                    interfaces_interface_ether_options_List,
+                )
+        }
         interfaces_interface_List[i_interfaces_interface] = interfaces_interface_model
-			interfaces_interface_List[i_interfaces_interface] = interfaces_interface_model
+
+            interfaces_interface_List[i_interfaces_interface] =
+                interfaces_interface_model
                 
+        // Build aggregated-ether-options list
         interfaces_interface_aggregated_ether_options_List := make([]Interfaces_Interface_Aggregated_ether_options_Model, len(v_interfaces_interface.Aggregated_ether_options))
+
         
 		for i_interfaces_interface_aggregated_ether_options, v_interfaces_interface_aggregated_ether_options := range v_interfaces_interface.Aggregated_ether_options {
             var interfaces_interface_aggregated_ether_options_model Interfaces_Interface_Aggregated_ether_options_Model
-			interfaces_interface_aggregated_ether_options_List[i_interfaces_interface_aggregated_ether_options] = interfaces_interface_aggregated_ether_options_model
+
+            interfaces_interface_aggregated_ether_options_List[i_interfaces_interface_aggregated_ether_options] =
+                interfaces_interface_aggregated_ether_options_model
                 
+        // Build lacp list
         interfaces_interface_aggregated_ether_options_lacp_List := make([]Interfaces_Interface_Aggregated_ether_options_Lacp_Model, len(v_interfaces_interface_aggregated_ether_options.Lacp))
+
         
 		for i_interfaces_interface_aggregated_ether_options_lacp, v_interfaces_interface_aggregated_ether_options_lacp := range v_interfaces_interface_aggregated_ether_options.Lacp {
             var interfaces_interface_aggregated_ether_options_lacp_model Interfaces_Interface_Aggregated_ether_options_Lacp_Model
-            interfaces_interface_aggregated_ether_options_lacp_model.Active = types.StringPointerValue(v_interfaces_interface_aggregated_ether_options_lacp.Active)
-			interfaces_interface_aggregated_ether_options_lacp_List[i_interfaces_interface_aggregated_ether_options_lacp] = interfaces_interface_aggregated_ether_options_lacp_model
-            interfaces_interface_aggregated_ether_options_lacp_model.Periodic = types.StringPointerValue(v_interfaces_interface_aggregated_ether_options_lacp.Periodic)
-			interfaces_interface_aggregated_ether_options_lacp_List[i_interfaces_interface_aggregated_ether_options_lacp] = interfaces_interface_aggregated_ether_options_lacp_model
-            interfaces_interface_aggregated_ether_options_lacp_model.System_id = types.StringPointerValue(v_interfaces_interface_aggregated_ether_options_lacp.System_id)
-			interfaces_interface_aggregated_ether_options_lacp_List[i_interfaces_interface_aggregated_ether_options_lacp] = interfaces_interface_aggregated_ether_options_lacp_model
+            // leaf
+            if v_interfaces_interface_aggregated_ether_options_lacp.Active == nil {
+                interfaces_interface_aggregated_ether_options_lacp_model.Active =
+                    types.StringNull()
+            } else {
+				interfaces_interface_aggregated_ether_options_lacp_model.Active =
+                types.StringPointerValue(v_interfaces_interface_aggregated_ether_options_lacp.Active)
+			}
+
+            interfaces_interface_aggregated_ether_options_lacp_List[i_interfaces_interface_aggregated_ether_options_lacp] =
+                interfaces_interface_aggregated_ether_options_lacp_model
+            // leaf
+            if v_interfaces_interface_aggregated_ether_options_lacp.Periodic == nil {
+                interfaces_interface_aggregated_ether_options_lacp_model.Periodic =
+                    types.StringNull()
+            } else {
+				interfaces_interface_aggregated_ether_options_lacp_model.Periodic =
+                types.StringPointerValue(v_interfaces_interface_aggregated_ether_options_lacp.Periodic)
+			}
+
+            interfaces_interface_aggregated_ether_options_lacp_List[i_interfaces_interface_aggregated_ether_options_lacp] =
+                interfaces_interface_aggregated_ether_options_lacp_model
+            // leaf
+            if v_interfaces_interface_aggregated_ether_options_lacp.System_id == nil {
+                interfaces_interface_aggregated_ether_options_lacp_model.System_id =
+                    types.StringNull()
+            } else {
+				interfaces_interface_aggregated_ether_options_lacp_model.System_id =
+                types.StringPointerValue(v_interfaces_interface_aggregated_ether_options_lacp.System_id)
+			}
+
+            interfaces_interface_aggregated_ether_options_lacp_List[i_interfaces_interface_aggregated_ether_options_lacp] =
+                interfaces_interface_aggregated_ether_options_lacp_model
         }
-        interfaces_interface_aggregated_ether_options_model.Lacp, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Aggregated_ether_options_Lacp_Model{}.AttrTypes()}, interfaces_interface_aggregated_ether_options_lacp_List)
+
+        // Write lacp field as Null when empty, else concrete list
+        if len(interfaces_interface_aggregated_ether_options_lacp_List) == 0 {
+            interfaces_interface_aggregated_ether_options_model.Lacp =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Aggregated_ether_options_Lacp_Model{}.AttrTypes()})
+        } else {
+            interfaces_interface_aggregated_ether_options_model.Lacp, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Aggregated_ether_options_Lacp_Model{}.AttrTypes()},
+                    interfaces_interface_aggregated_ether_options_lacp_List,
+                )
+        }
         interfaces_interface_aggregated_ether_options_List[i_interfaces_interface_aggregated_ether_options] = interfaces_interface_aggregated_ether_options_model
         }
-        interfaces_interface_model.Aggregated_ether_options, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Aggregated_ether_options_Model{}.AttrTypes()}, interfaces_interface_aggregated_ether_options_List)
+
+        // Write aggregated-ether-options field as Null when empty, else concrete list
+        if len(interfaces_interface_aggregated_ether_options_List) == 0 {
+            interfaces_interface_model.Aggregated_ether_options =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Aggregated_ether_options_Model{}.AttrTypes()})
+        } else {
+            interfaces_interface_model.Aggregated_ether_options, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Aggregated_ether_options_Model{}.AttrTypes()},
+                    interfaces_interface_aggregated_ether_options_List,
+                )
+        }
         interfaces_interface_List[i_interfaces_interface] = interfaces_interface_model
-			interfaces_interface_List[i_interfaces_interface] = interfaces_interface_model
+
+            interfaces_interface_List[i_interfaces_interface] =
+                interfaces_interface_model
                 
+        // Build unit list
         interfaces_interface_unit_List := make([]Interfaces_Interface_Unit_Model, len(v_interfaces_interface.Unit))
+
         
 		for i_interfaces_interface_unit, v_interfaces_interface_unit := range v_interfaces_interface.Unit {
             var interfaces_interface_unit_model Interfaces_Interface_Unit_Model
-            interfaces_interface_unit_model.Name = types.StringPointerValue(v_interfaces_interface_unit.Name)
-			interfaces_interface_unit_List[i_interfaces_interface_unit] = interfaces_interface_unit_model
-            interfaces_interface_unit_model.Description = types.StringPointerValue(v_interfaces_interface_unit.Description)
-			interfaces_interface_unit_List[i_interfaces_interface_unit] = interfaces_interface_unit_model
-            interfaces_interface_unit_model.Vlan_id = types.StringPointerValue(v_interfaces_interface_unit.Vlan_id)
-			interfaces_interface_unit_List[i_interfaces_interface_unit] = interfaces_interface_unit_model
-			interfaces_interface_unit_List[i_interfaces_interface_unit] = interfaces_interface_unit_model
+            // leaf
+            if v_interfaces_interface_unit.Name == nil {
+                interfaces_interface_unit_model.Name =
+                    types.StringNull()
+            } else {
+				interfaces_interface_unit_model.Name =
+                types.StringPointerValue(v_interfaces_interface_unit.Name)
+			}
+
+            interfaces_interface_unit_List[i_interfaces_interface_unit] =
+                interfaces_interface_unit_model
+            // leaf
+            if v_interfaces_interface_unit.Description == nil {
+                interfaces_interface_unit_model.Description =
+                    types.StringNull()
+            } else {
+				interfaces_interface_unit_model.Description =
+                types.StringPointerValue(v_interfaces_interface_unit.Description)
+			}
+
+            interfaces_interface_unit_List[i_interfaces_interface_unit] =
+                interfaces_interface_unit_model
+            // leaf
+            if v_interfaces_interface_unit.Vlan_id == nil {
+                interfaces_interface_unit_model.Vlan_id =
+                    types.StringNull()
+            } else {
+				interfaces_interface_unit_model.Vlan_id =
+                types.StringPointerValue(v_interfaces_interface_unit.Vlan_id)
+			}
+
+            interfaces_interface_unit_List[i_interfaces_interface_unit] =
+                interfaces_interface_unit_model
+
+            interfaces_interface_unit_List[i_interfaces_interface_unit] =
+                interfaces_interface_unit_model
                 
+        // Build family list
         interfaces_interface_unit_family_List := make([]Interfaces_Interface_Unit_Family_Model, len(v_interfaces_interface_unit.Family))
+
         
 		for i_interfaces_interface_unit_family, v_interfaces_interface_unit_family := range v_interfaces_interface_unit.Family {
             var interfaces_interface_unit_family_model Interfaces_Interface_Unit_Family_Model
-			interfaces_interface_unit_family_List[i_interfaces_interface_unit_family] = interfaces_interface_unit_family_model
+
+            interfaces_interface_unit_family_List[i_interfaces_interface_unit_family] =
+                interfaces_interface_unit_family_model
                 
+        // Build inet list
         interfaces_interface_unit_family_inet_List := make([]Interfaces_Interface_Unit_Family_Inet_Model, len(v_interfaces_interface_unit_family.Inet))
+
         
 		for i_interfaces_interface_unit_family_inet, v_interfaces_interface_unit_family_inet := range v_interfaces_interface_unit_family.Inet {
             var interfaces_interface_unit_family_inet_model Interfaces_Interface_Unit_Family_Inet_Model
-			interfaces_interface_unit_family_inet_List[i_interfaces_interface_unit_family_inet] = interfaces_interface_unit_family_inet_model
+
+            interfaces_interface_unit_family_inet_List[i_interfaces_interface_unit_family_inet] =
+                interfaces_interface_unit_family_inet_model
                 
+        // Build address list
         interfaces_interface_unit_family_inet_address_List := make([]Interfaces_Interface_Unit_Family_Inet_Address_Model, len(v_interfaces_interface_unit_family_inet.Address))
+
         
 		for i_interfaces_interface_unit_family_inet_address, v_interfaces_interface_unit_family_inet_address := range v_interfaces_interface_unit_family_inet.Address {
             var interfaces_interface_unit_family_inet_address_model Interfaces_Interface_Unit_Family_Inet_Address_Model
-            interfaces_interface_unit_family_inet_address_model.Name = types.StringPointerValue(v_interfaces_interface_unit_family_inet_address.Name)
-			interfaces_interface_unit_family_inet_address_List[i_interfaces_interface_unit_family_inet_address] = interfaces_interface_unit_family_inet_address_model
+            // leaf
+            if v_interfaces_interface_unit_family_inet_address.Name == nil {
+                interfaces_interface_unit_family_inet_address_model.Name =
+                    types.StringNull()
+            } else {
+				interfaces_interface_unit_family_inet_address_model.Name =
+                types.StringPointerValue(v_interfaces_interface_unit_family_inet_address.Name)
+			}
+
+            interfaces_interface_unit_family_inet_address_List[i_interfaces_interface_unit_family_inet_address] =
+                interfaces_interface_unit_family_inet_address_model
         }
-        interfaces_interface_unit_family_inet_model.Address, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Inet_Address_Model{}.AttrTypes()}, interfaces_interface_unit_family_inet_address_List)
+
+        // Write address field as Null when empty, else concrete list
+        if len(interfaces_interface_unit_family_inet_address_List) == 0 {
+            interfaces_interface_unit_family_inet_model.Address =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Inet_Address_Model{}.AttrTypes()})
+        } else {
+            interfaces_interface_unit_family_inet_model.Address, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Inet_Address_Model{}.AttrTypes()},
+                    interfaces_interface_unit_family_inet_address_List,
+                )
+        }
         interfaces_interface_unit_family_inet_List[i_interfaces_interface_unit_family_inet] = interfaces_interface_unit_family_inet_model
         }
-        interfaces_interface_unit_family_model.Inet, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Inet_Model{}.AttrTypes()}, interfaces_interface_unit_family_inet_List)
+
+        // Write inet field as Null when empty, else concrete list
+        if len(interfaces_interface_unit_family_inet_List) == 0 {
+            interfaces_interface_unit_family_model.Inet =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Inet_Model{}.AttrTypes()})
+        } else {
+            interfaces_interface_unit_family_model.Inet, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Inet_Model{}.AttrTypes()},
+                    interfaces_interface_unit_family_inet_List,
+                )
+        }
         interfaces_interface_unit_family_List[i_interfaces_interface_unit_family] = interfaces_interface_unit_family_model
-			interfaces_interface_unit_family_List[i_interfaces_interface_unit_family] = interfaces_interface_unit_family_model
+
+            interfaces_interface_unit_family_List[i_interfaces_interface_unit_family] =
+                interfaces_interface_unit_family_model
                 
+        // Build ethernet-switching list
         interfaces_interface_unit_family_ethernet_switching_List := make([]Interfaces_Interface_Unit_Family_Ethernet_switching_Model, len(v_interfaces_interface_unit_family.Ethernet_switching))
+
         
 		for i_interfaces_interface_unit_family_ethernet_switching, v_interfaces_interface_unit_family_ethernet_switching := range v_interfaces_interface_unit_family.Ethernet_switching {
             var interfaces_interface_unit_family_ethernet_switching_model Interfaces_Interface_Unit_Family_Ethernet_switching_Model
-			interfaces_interface_unit_family_ethernet_switching_List[i_interfaces_interface_unit_family_ethernet_switching] = interfaces_interface_unit_family_ethernet_switching_model
+
+            interfaces_interface_unit_family_ethernet_switching_List[i_interfaces_interface_unit_family_ethernet_switching] =
+                interfaces_interface_unit_family_ethernet_switching_model
                 
+        // Build vlan list
         interfaces_interface_unit_family_ethernet_switching_vlan_List := make([]Interfaces_Interface_Unit_Family_Ethernet_switching_Vlan_Model, len(v_interfaces_interface_unit_family_ethernet_switching.Vlan))
+
         
 		for i_interfaces_interface_unit_family_ethernet_switching_vlan, v_interfaces_interface_unit_family_ethernet_switching_vlan := range v_interfaces_interface_unit_family_ethernet_switching.Vlan {
             var interfaces_interface_unit_family_ethernet_switching_vlan_model Interfaces_Interface_Unit_Family_Ethernet_switching_Vlan_Model
-			var var_interfaces_interface_unit_family_ethernet_switching_members []*string
-			if v_interfaces_interface_unit_family_ethernet_switching_vlan.Members != nil {
-				var_interfaces_interface_unit_family_ethernet_switching_members = make([]*string, len(v_interfaces_interface_unit_family_ethernet_switching_vlan.Members))
-				copy(var_interfaces_interface_unit_family_ethernet_switching_members, v_interfaces_interface_unit_family_ethernet_switching_vlan.Members)
-			}
-			interfaces_interface_unit_family_ethernet_switching_vlan_model.Members, _ = types.ListValueFrom(ctx, types.StringType, var_interfaces_interface_unit_family_ethernet_switching_members)
-			interfaces_interface_unit_family_ethernet_switching_vlan_List[i_interfaces_interface_unit_family_ethernet_switching_vlan] = interfaces_interface_unit_family_ethernet_switching_vlan_model
+            // leaf-list
+            if v_interfaces_interface_unit_family_ethernet_switching_vlan.Members == nil ||
+               len(v_interfaces_interface_unit_family_ethernet_switching_vlan.Members) == 0 {
+                interfaces_interface_unit_family_ethernet_switching_vlan_model.Members =
+                    types.ListNull(types.StringType)
+            } else {
+                src_interfaces_interface_unit_family_ethernet_switching_members :=
+                    v_interfaces_interface_unit_family_ethernet_switching_vlan.Members
+                vals_interfaces_interface_unit_family_ethernet_switching_members := make([]*string, len(src_interfaces_interface_unit_family_ethernet_switching_members))
+                copy(vals_interfaces_interface_unit_family_ethernet_switching_members, src_interfaces_interface_unit_family_ethernet_switching_members)
+                interfaces_interface_unit_family_ethernet_switching_vlan_model.Members, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_interfaces_interface_unit_family_ethernet_switching_members)
+            }
+
+            interfaces_interface_unit_family_ethernet_switching_vlan_List[i_interfaces_interface_unit_family_ethernet_switching_vlan] =
+                interfaces_interface_unit_family_ethernet_switching_vlan_model
         }
-        interfaces_interface_unit_family_ethernet_switching_model.Vlan, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Ethernet_switching_Vlan_Model{}.AttrTypes()}, interfaces_interface_unit_family_ethernet_switching_vlan_List)
+
+        // Write vlan field as Null when empty, else concrete list
+        if len(interfaces_interface_unit_family_ethernet_switching_vlan_List) == 0 {
+            interfaces_interface_unit_family_ethernet_switching_model.Vlan =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Ethernet_switching_Vlan_Model{}.AttrTypes()})
+        } else {
+            interfaces_interface_unit_family_ethernet_switching_model.Vlan, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Ethernet_switching_Vlan_Model{}.AttrTypes()},
+                    interfaces_interface_unit_family_ethernet_switching_vlan_List,
+                )
+        }
         interfaces_interface_unit_family_ethernet_switching_List[i_interfaces_interface_unit_family_ethernet_switching] = interfaces_interface_unit_family_ethernet_switching_model
         }
-        interfaces_interface_unit_family_model.Ethernet_switching, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Ethernet_switching_Model{}.AttrTypes()}, interfaces_interface_unit_family_ethernet_switching_List)
+
+        // Write ethernet-switching field as Null when empty, else concrete list
+        if len(interfaces_interface_unit_family_ethernet_switching_List) == 0 {
+            interfaces_interface_unit_family_model.Ethernet_switching =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Ethernet_switching_Model{}.AttrTypes()})
+        } else {
+            interfaces_interface_unit_family_model.Ethernet_switching, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Ethernet_switching_Model{}.AttrTypes()},
+                    interfaces_interface_unit_family_ethernet_switching_List,
+                )
+        }
         interfaces_interface_unit_family_List[i_interfaces_interface_unit_family] = interfaces_interface_unit_family_model
         }
-        interfaces_interface_unit_model.Family, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Model{}.AttrTypes()}, interfaces_interface_unit_family_List)
-        interfaces_interface_unit_List[i_interfaces_interface_unit] = interfaces_interface_unit_model
-            interfaces_interface_unit_model.Mac = types.StringPointerValue(v_interfaces_interface_unit.Mac)
-			interfaces_interface_unit_List[i_interfaces_interface_unit] = interfaces_interface_unit_model
+
+        // Write family field as Null when empty, else concrete list
+        if len(interfaces_interface_unit_family_List) == 0 {
+            interfaces_interface_unit_model.Family =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Model{}.AttrTypes()})
+        } else {
+            interfaces_interface_unit_model.Family, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Family_Model{}.AttrTypes()},
+                    interfaces_interface_unit_family_List,
+                )
         }
-        interfaces_interface_model.Unit, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Model{}.AttrTypes()}, interfaces_interface_unit_List)
+        interfaces_interface_unit_List[i_interfaces_interface_unit] = interfaces_interface_unit_model
+            // leaf
+            if v_interfaces_interface_unit.Mac == nil {
+                interfaces_interface_unit_model.Mac =
+                    types.StringNull()
+            } else {
+				interfaces_interface_unit_model.Mac =
+                types.StringPointerValue(v_interfaces_interface_unit.Mac)
+			}
+
+            interfaces_interface_unit_List[i_interfaces_interface_unit] =
+                interfaces_interface_unit_model
+        }
+
+        // Write unit field as Null when empty, else concrete list
+        if len(interfaces_interface_unit_List) == 0 {
+            interfaces_interface_model.Unit =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Model{}.AttrTypes()})
+        } else {
+            interfaces_interface_model.Unit, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Unit_Model{}.AttrTypes()},
+                    interfaces_interface_unit_List,
+                )
+        }
         interfaces_interface_List[i_interfaces_interface] = interfaces_interface_model
         }
-        interfaces_model.Interface, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Interface_Model{}.AttrTypes()}, interfaces_interface_List)
+
+        // Write interface field as Null when empty, else concrete list
+        if len(interfaces_interface_List) == 0 {
+            interfaces_model.Interface =
+                types.ListNull(types.ObjectType{AttrTypes: Interfaces_Interface_Model{}.AttrTypes()})
+        } else {
+            interfaces_model.Interface, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Interfaces_Interface_Model{}.AttrTypes()},
+                    interfaces_interface_List,
+                )
+        }
+        interfaces_List[i_interfaces] = interfaces_model
+
         interfaces_List[i_interfaces] = interfaces_model
     }
-    state.Interfaces, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Interfaces_Model{}.AttrTypes()}, interfaces_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-    state.Policy_options = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    policy_options_List := make([]Policy_options_Model, len(config.Groups.Policy_options))
+
+    // Write parent list as Null when empty
+    if len(interfaces_List) == 0 {
+        state.Interfaces =
+            types.ListNull(types.ObjectType{AttrTypes: Interfaces_Model{}.AttrTypes()})
+    } else {
+        state.Interfaces, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: Interfaces_Model{}.AttrTypes()},
+                interfaces_List,
+            )
+    }
+    // Initialize policy-options as Null; only materialize when we have elements
+    state.Policy_options =
+        types.ListNull(types.ObjectType{AttrTypes: Policy_options_Model{}.AttrTypes()})
+
+    // Build list from device
+    policy_options_List := make([]Policy_options_Model,
+        len(config.Groups.Policy_options))
+
     for i_policy_options, v_policy_options := range config.Groups.Policy_options {
         var policy_options_model Policy_options_Model
+            
+        // Build policy-statement list
         policy_options_policy_statement_List := make([]Policy_options_Policy_statement_Model, len(v_policy_options.Policy_statement))
+
         
 		for i_policy_options_policy_statement, v_policy_options_policy_statement := range v_policy_options.Policy_statement {
             var policy_options_policy_statement_model Policy_options_Policy_statement_Model
-            policy_options_policy_statement_model.Name = types.StringPointerValue(v_policy_options_policy_statement.Name)
-			policy_options_policy_statement_List[i_policy_options_policy_statement] = policy_options_policy_statement_model
-			policy_options_policy_statement_List[i_policy_options_policy_statement] = policy_options_policy_statement_model
+            // leaf
+            if v_policy_options_policy_statement.Name == nil {
+                policy_options_policy_statement_model.Name =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_model.Name =
+                types.StringPointerValue(v_policy_options_policy_statement.Name)
+			}
+
+            policy_options_policy_statement_List[i_policy_options_policy_statement] =
+                policy_options_policy_statement_model
+
+            policy_options_policy_statement_List[i_policy_options_policy_statement] =
+                policy_options_policy_statement_model
                 
+        // Build term list
         policy_options_policy_statement_term_List := make([]Policy_options_Policy_statement_Term_Model, len(v_policy_options_policy_statement.Term))
+
         
 		for i_policy_options_policy_statement_term, v_policy_options_policy_statement_term := range v_policy_options_policy_statement.Term {
             var policy_options_policy_statement_term_model Policy_options_Policy_statement_Term_Model
-            policy_options_policy_statement_term_model.Name = types.StringPointerValue(v_policy_options_policy_statement_term.Name)
-			policy_options_policy_statement_term_List[i_policy_options_policy_statement_term] = policy_options_policy_statement_term_model
-			policy_options_policy_statement_term_List[i_policy_options_policy_statement_term] = policy_options_policy_statement_term_model
+            // leaf
+            if v_policy_options_policy_statement_term.Name == nil {
+                policy_options_policy_statement_term_model.Name =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_model.Name =
+                types.StringPointerValue(v_policy_options_policy_statement_term.Name)
+			}
+
+            policy_options_policy_statement_term_List[i_policy_options_policy_statement_term] =
+                policy_options_policy_statement_term_model
+
+            policy_options_policy_statement_term_List[i_policy_options_policy_statement_term] =
+                policy_options_policy_statement_term_model
                 
+        // Build from list
         policy_options_policy_statement_term_from_List := make([]Policy_options_Policy_statement_Term_From_Model, len(v_policy_options_policy_statement_term.From))
+
         
 		for i_policy_options_policy_statement_term_from, v_policy_options_policy_statement_term_from := range v_policy_options_policy_statement_term.From {
             var policy_options_policy_statement_term_from_model Policy_options_Policy_statement_Term_From_Model
-			var var_policy_options_policy_statement_term_protocol []*string
-			if v_policy_options_policy_statement_term_from.Protocol != nil {
-				var_policy_options_policy_statement_term_protocol = make([]*string, len(v_policy_options_policy_statement_term_from.Protocol))
-				copy(var_policy_options_policy_statement_term_protocol, v_policy_options_policy_statement_term_from.Protocol)
-			}
-			policy_options_policy_statement_term_from_model.Protocol, _ = types.ListValueFrom(ctx, types.StringType, var_policy_options_policy_statement_term_protocol)
-			policy_options_policy_statement_term_from_List[i_policy_options_policy_statement_term_from] = policy_options_policy_statement_term_from_model
-			policy_options_policy_statement_term_from_List[i_policy_options_policy_statement_term_from] = policy_options_policy_statement_term_from_model
+            // leaf-list
+            if v_policy_options_policy_statement_term_from.Protocol == nil ||
+               len(v_policy_options_policy_statement_term_from.Protocol) == 0 {
+                policy_options_policy_statement_term_from_model.Protocol =
+                    types.ListNull(types.StringType)
+            } else {
+                src_policy_options_policy_statement_term_protocol :=
+                    v_policy_options_policy_statement_term_from.Protocol
+                vals_policy_options_policy_statement_term_protocol := make([]*string, len(src_policy_options_policy_statement_term_protocol))
+                copy(vals_policy_options_policy_statement_term_protocol, src_policy_options_policy_statement_term_protocol)
+                policy_options_policy_statement_term_from_model.Protocol, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_policy_options_policy_statement_term_protocol)
+            }
+
+            policy_options_policy_statement_term_from_List[i_policy_options_policy_statement_term_from] =
+                policy_options_policy_statement_term_from_model
+
+            policy_options_policy_statement_term_from_List[i_policy_options_policy_statement_term_from] =
+                policy_options_policy_statement_term_from_model
                 
+        // Build route-filter list
         policy_options_policy_statement_term_from_route_filter_List := make([]Policy_options_Policy_statement_Term_From_Route_filter_Model, len(v_policy_options_policy_statement_term_from.Route_filter))
+
         
 		for i_policy_options_policy_statement_term_from_route_filter, v_policy_options_policy_statement_term_from_route_filter := range v_policy_options_policy_statement_term_from.Route_filter {
             var policy_options_policy_statement_term_from_route_filter_model Policy_options_Policy_statement_Term_From_Route_filter_Model
-            policy_options_policy_statement_term_from_route_filter_model.Address = types.StringPointerValue(v_policy_options_policy_statement_term_from_route_filter.Address)
-			policy_options_policy_statement_term_from_route_filter_List[i_policy_options_policy_statement_term_from_route_filter] = policy_options_policy_statement_term_from_route_filter_model
-            policy_options_policy_statement_term_from_route_filter_model.Exact = types.StringPointerValue(v_policy_options_policy_statement_term_from_route_filter.Exact)
-			policy_options_policy_statement_term_from_route_filter_List[i_policy_options_policy_statement_term_from_route_filter] = policy_options_policy_statement_term_from_route_filter_model
-            policy_options_policy_statement_term_from_route_filter_model.Orlonger = types.StringPointerValue(v_policy_options_policy_statement_term_from_route_filter.Orlonger)
-			policy_options_policy_statement_term_from_route_filter_List[i_policy_options_policy_statement_term_from_route_filter] = policy_options_policy_statement_term_from_route_filter_model
-            policy_options_policy_statement_term_from_route_filter_model.Prefix_length_range = types.StringPointerValue(v_policy_options_policy_statement_term_from_route_filter.Prefix_length_range)
-			policy_options_policy_statement_term_from_route_filter_List[i_policy_options_policy_statement_term_from_route_filter] = policy_options_policy_statement_term_from_route_filter_model
+            // leaf
+            if v_policy_options_policy_statement_term_from_route_filter.Address == nil {
+                policy_options_policy_statement_term_from_route_filter_model.Address =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_from_route_filter_model.Address =
+                types.StringPointerValue(v_policy_options_policy_statement_term_from_route_filter.Address)
+			}
+
+            policy_options_policy_statement_term_from_route_filter_List[i_policy_options_policy_statement_term_from_route_filter] =
+                policy_options_policy_statement_term_from_route_filter_model
+            // leaf
+            if v_policy_options_policy_statement_term_from_route_filter.Exact == nil {
+                policy_options_policy_statement_term_from_route_filter_model.Exact =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_from_route_filter_model.Exact =
+                types.StringPointerValue(v_policy_options_policy_statement_term_from_route_filter.Exact)
+			}
+
+            policy_options_policy_statement_term_from_route_filter_List[i_policy_options_policy_statement_term_from_route_filter] =
+                policy_options_policy_statement_term_from_route_filter_model
+            // leaf
+            if v_policy_options_policy_statement_term_from_route_filter.Orlonger == nil {
+                policy_options_policy_statement_term_from_route_filter_model.Orlonger =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_from_route_filter_model.Orlonger =
+                types.StringPointerValue(v_policy_options_policy_statement_term_from_route_filter.Orlonger)
+			}
+
+            policy_options_policy_statement_term_from_route_filter_List[i_policy_options_policy_statement_term_from_route_filter] =
+                policy_options_policy_statement_term_from_route_filter_model
+            // leaf
+            if v_policy_options_policy_statement_term_from_route_filter.Prefix_length_range == nil {
+                policy_options_policy_statement_term_from_route_filter_model.Prefix_length_range =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_from_route_filter_model.Prefix_length_range =
+                types.StringPointerValue(v_policy_options_policy_statement_term_from_route_filter.Prefix_length_range)
+			}
+
+            policy_options_policy_statement_term_from_route_filter_List[i_policy_options_policy_statement_term_from_route_filter] =
+                policy_options_policy_statement_term_from_route_filter_model
         }
-        policy_options_policy_statement_term_from_model.Route_filter, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_From_Route_filter_Model{}.AttrTypes()}, policy_options_policy_statement_term_from_route_filter_List)
+
+        // Write route-filter field as Null when empty, else concrete list
+        if len(policy_options_policy_statement_term_from_route_filter_List) == 0 {
+            policy_options_policy_statement_term_from_model.Route_filter =
+                types.ListNull(types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_From_Route_filter_Model{}.AttrTypes()})
+        } else {
+            policy_options_policy_statement_term_from_model.Route_filter, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_From_Route_filter_Model{}.AttrTypes()},
+                    policy_options_policy_statement_term_from_route_filter_List,
+                )
+        }
         policy_options_policy_statement_term_from_List[i_policy_options_policy_statement_term_from] = policy_options_policy_statement_term_from_model
         }
-        policy_options_policy_statement_term_model.From, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_From_Model{}.AttrTypes()}, policy_options_policy_statement_term_from_List)
+
+        // Write from field as Null when empty, else concrete list
+        if len(policy_options_policy_statement_term_from_List) == 0 {
+            policy_options_policy_statement_term_model.From =
+                types.ListNull(types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_From_Model{}.AttrTypes()})
+        } else {
+            policy_options_policy_statement_term_model.From, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_From_Model{}.AttrTypes()},
+                    policy_options_policy_statement_term_from_List,
+                )
+        }
         policy_options_policy_statement_term_List[i_policy_options_policy_statement_term] = policy_options_policy_statement_term_model
-			policy_options_policy_statement_term_List[i_policy_options_policy_statement_term] = policy_options_policy_statement_term_model
+
+            policy_options_policy_statement_term_List[i_policy_options_policy_statement_term] =
+                policy_options_policy_statement_term_model
                 
+        // Build then list
         policy_options_policy_statement_term_then_List := make([]Policy_options_Policy_statement_Term_Then_Model, len(v_policy_options_policy_statement_term.Then))
+
         
 		for i_policy_options_policy_statement_term_then, v_policy_options_policy_statement_term_then := range v_policy_options_policy_statement_term.Then {
             var policy_options_policy_statement_term_then_model Policy_options_Policy_statement_Term_Then_Model
-			policy_options_policy_statement_term_then_List[i_policy_options_policy_statement_term_then] = policy_options_policy_statement_term_then_model
+
+            policy_options_policy_statement_term_then_List[i_policy_options_policy_statement_term_then] =
+                policy_options_policy_statement_term_then_model
                 
+        // Build community list
         policy_options_policy_statement_term_then_community_List := make([]Policy_options_Policy_statement_Term_Then_Community_Model, len(v_policy_options_policy_statement_term_then.Community))
+
         
 		for i_policy_options_policy_statement_term_then_community, v_policy_options_policy_statement_term_then_community := range v_policy_options_policy_statement_term_then.Community {
             var policy_options_policy_statement_term_then_community_model Policy_options_Policy_statement_Term_Then_Community_Model
-            policy_options_policy_statement_term_then_community_model.Add = types.StringPointerValue(v_policy_options_policy_statement_term_then_community.Add)
-			policy_options_policy_statement_term_then_community_List[i_policy_options_policy_statement_term_then_community] = policy_options_policy_statement_term_then_community_model
-            policy_options_policy_statement_term_then_community_model.Community_name = types.StringPointerValue(v_policy_options_policy_statement_term_then_community.Community_name)
-			policy_options_policy_statement_term_then_community_List[i_policy_options_policy_statement_term_then_community] = policy_options_policy_statement_term_then_community_model
+            // leaf
+            if v_policy_options_policy_statement_term_then_community.Add == nil {
+                policy_options_policy_statement_term_then_community_model.Add =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_then_community_model.Add =
+                types.StringPointerValue(v_policy_options_policy_statement_term_then_community.Add)
+			}
+
+            policy_options_policy_statement_term_then_community_List[i_policy_options_policy_statement_term_then_community] =
+                policy_options_policy_statement_term_then_community_model
+            // leaf
+            if v_policy_options_policy_statement_term_then_community.Community_name == nil {
+                policy_options_policy_statement_term_then_community_model.Community_name =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_then_community_model.Community_name =
+                types.StringPointerValue(v_policy_options_policy_statement_term_then_community.Community_name)
+			}
+
+            policy_options_policy_statement_term_then_community_List[i_policy_options_policy_statement_term_then_community] =
+                policy_options_policy_statement_term_then_community_model
         }
-        policy_options_policy_statement_term_then_model.Community, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_Then_Community_Model{}.AttrTypes()}, policy_options_policy_statement_term_then_community_List)
+
+        // Write community field as Null when empty, else concrete list
+        if len(policy_options_policy_statement_term_then_community_List) == 0 {
+            policy_options_policy_statement_term_then_model.Community =
+                types.ListNull(types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_Then_Community_Model{}.AttrTypes()})
+        } else {
+            policy_options_policy_statement_term_then_model.Community, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_Then_Community_Model{}.AttrTypes()},
+                    policy_options_policy_statement_term_then_community_List,
+                )
+        }
         policy_options_policy_statement_term_then_List[i_policy_options_policy_statement_term_then] = policy_options_policy_statement_term_then_model
-            policy_options_policy_statement_term_then_model.Accept = types.StringPointerValue(v_policy_options_policy_statement_term_then.Accept)
-			policy_options_policy_statement_term_then_List[i_policy_options_policy_statement_term_then] = policy_options_policy_statement_term_then_model
-            policy_options_policy_statement_term_then_model.Reject = types.StringPointerValue(v_policy_options_policy_statement_term_then.Reject)
-			policy_options_policy_statement_term_then_List[i_policy_options_policy_statement_term_then] = policy_options_policy_statement_term_then_model
+            // leaf
+            if v_policy_options_policy_statement_term_then.Accept == nil {
+                policy_options_policy_statement_term_then_model.Accept =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_then_model.Accept =
+                types.StringPointerValue(v_policy_options_policy_statement_term_then.Accept)
+			}
+
+            policy_options_policy_statement_term_then_List[i_policy_options_policy_statement_term_then] =
+                policy_options_policy_statement_term_then_model
+            // leaf
+            if v_policy_options_policy_statement_term_then.Reject == nil {
+                policy_options_policy_statement_term_then_model.Reject =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_term_then_model.Reject =
+                types.StringPointerValue(v_policy_options_policy_statement_term_then.Reject)
+			}
+
+            policy_options_policy_statement_term_then_List[i_policy_options_policy_statement_term_then] =
+                policy_options_policy_statement_term_then_model
         }
-        policy_options_policy_statement_term_model.Then, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_Then_Model{}.AttrTypes()}, policy_options_policy_statement_term_then_List)
+
+        // Write then field as Null when empty, else concrete list
+        if len(policy_options_policy_statement_term_then_List) == 0 {
+            policy_options_policy_statement_term_model.Then =
+                types.ListNull(types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_Then_Model{}.AttrTypes()})
+        } else {
+            policy_options_policy_statement_term_model.Then, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_Then_Model{}.AttrTypes()},
+                    policy_options_policy_statement_term_then_List,
+                )
+        }
         policy_options_policy_statement_term_List[i_policy_options_policy_statement_term] = policy_options_policy_statement_term_model
         }
-        policy_options_policy_statement_model.Term, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_Model{}.AttrTypes()}, policy_options_policy_statement_term_List)
+
+        // Write term field as Null when empty, else concrete list
+        if len(policy_options_policy_statement_term_List) == 0 {
+            policy_options_policy_statement_model.Term =
+                types.ListNull(types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_Model{}.AttrTypes()})
+        } else {
+            policy_options_policy_statement_model.Term, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Policy_options_Policy_statement_Term_Model{}.AttrTypes()},
+                    policy_options_policy_statement_term_List,
+                )
+        }
         policy_options_policy_statement_List[i_policy_options_policy_statement] = policy_options_policy_statement_model
-			policy_options_policy_statement_List[i_policy_options_policy_statement] = policy_options_policy_statement_model
+
+            policy_options_policy_statement_List[i_policy_options_policy_statement] =
+                policy_options_policy_statement_model
                 
+        // Build then list
         policy_options_policy_statement_then_List := make([]Policy_options_Policy_statement_Then_Model, len(v_policy_options_policy_statement.Then))
+
         
 		for i_policy_options_policy_statement_then, v_policy_options_policy_statement_then := range v_policy_options_policy_statement.Then {
             var policy_options_policy_statement_then_model Policy_options_Policy_statement_Then_Model
-			policy_options_policy_statement_then_List[i_policy_options_policy_statement_then] = policy_options_policy_statement_then_model
+
+            policy_options_policy_statement_then_List[i_policy_options_policy_statement_then] =
+                policy_options_policy_statement_then_model
                 
+        // Build load-balance list
         policy_options_policy_statement_then_load_balance_List := make([]Policy_options_Policy_statement_Then_Load_balance_Model, len(v_policy_options_policy_statement_then.Load_balance))
+
         
 		for i_policy_options_policy_statement_then_load_balance, v_policy_options_policy_statement_then_load_balance := range v_policy_options_policy_statement_then.Load_balance {
             var policy_options_policy_statement_then_load_balance_model Policy_options_Policy_statement_Then_Load_balance_Model
-            policy_options_policy_statement_then_load_balance_model.Per_packet = types.StringPointerValue(v_policy_options_policy_statement_then_load_balance.Per_packet)
-			policy_options_policy_statement_then_load_balance_List[i_policy_options_policy_statement_then_load_balance] = policy_options_policy_statement_then_load_balance_model
+            // leaf
+            if v_policy_options_policy_statement_then_load_balance.Per_packet == nil {
+                policy_options_policy_statement_then_load_balance_model.Per_packet =
+                    types.StringNull()
+            } else {
+				policy_options_policy_statement_then_load_balance_model.Per_packet =
+                types.StringPointerValue(v_policy_options_policy_statement_then_load_balance.Per_packet)
+			}
+
+            policy_options_policy_statement_then_load_balance_List[i_policy_options_policy_statement_then_load_balance] =
+                policy_options_policy_statement_then_load_balance_model
         }
-        policy_options_policy_statement_then_model.Load_balance, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Policy_options_Policy_statement_Then_Load_balance_Model{}.AttrTypes()}, policy_options_policy_statement_then_load_balance_List)
+
+        // Write load-balance field as Null when empty, else concrete list
+        if len(policy_options_policy_statement_then_load_balance_List) == 0 {
+            policy_options_policy_statement_then_model.Load_balance =
+                types.ListNull(types.ObjectType{AttrTypes: Policy_options_Policy_statement_Then_Load_balance_Model{}.AttrTypes()})
+        } else {
+            policy_options_policy_statement_then_model.Load_balance, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Policy_options_Policy_statement_Then_Load_balance_Model{}.AttrTypes()},
+                    policy_options_policy_statement_then_load_balance_List,
+                )
+        }
         policy_options_policy_statement_then_List[i_policy_options_policy_statement_then] = policy_options_policy_statement_then_model
         }
-        policy_options_policy_statement_model.Then, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Policy_options_Policy_statement_Then_Model{}.AttrTypes()}, policy_options_policy_statement_then_List)
+
+        // Write then field as Null when empty, else concrete list
+        if len(policy_options_policy_statement_then_List) == 0 {
+            policy_options_policy_statement_model.Then =
+                types.ListNull(types.ObjectType{AttrTypes: Policy_options_Policy_statement_Then_Model{}.AttrTypes()})
+        } else {
+            policy_options_policy_statement_model.Then, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Policy_options_Policy_statement_Then_Model{}.AttrTypes()},
+                    policy_options_policy_statement_then_List,
+                )
+        }
         policy_options_policy_statement_List[i_policy_options_policy_statement] = policy_options_policy_statement_model
         }
-        policy_options_model.Policy_statement, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Policy_options_Policy_statement_Model{}.AttrTypes()}, policy_options_policy_statement_List)
+
+        // Write policy-statement field as Null when empty, else concrete list
+        if len(policy_options_policy_statement_List) == 0 {
+            policy_options_model.Policy_statement =
+                types.ListNull(types.ObjectType{AttrTypes: Policy_options_Policy_statement_Model{}.AttrTypes()})
+        } else {
+            policy_options_model.Policy_statement, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Policy_options_Policy_statement_Model{}.AttrTypes()},
+                    policy_options_policy_statement_List,
+                )
+        }
         policy_options_List[i_policy_options] = policy_options_model
+            
+        // Build community list
         policy_options_community_List := make([]Policy_options_Community_Model, len(v_policy_options.Community))
+
         
 		for i_policy_options_community, v_policy_options_community := range v_policy_options.Community {
             var policy_options_community_model Policy_options_Community_Model
-            policy_options_community_model.Name = types.StringPointerValue(v_policy_options_community.Name)
-			policy_options_community_List[i_policy_options_community] = policy_options_community_model
-			var var_policy_options_members []*string
-			if v_policy_options_community.Members != nil {
-				var_policy_options_members = make([]*string, len(v_policy_options_community.Members))
-				copy(var_policy_options_members, v_policy_options_community.Members)
+            // leaf
+            if v_policy_options_community.Name == nil {
+                policy_options_community_model.Name =
+                    types.StringNull()
+            } else {
+				policy_options_community_model.Name =
+                types.StringPointerValue(v_policy_options_community.Name)
 			}
-			policy_options_community_model.Members, _ = types.ListValueFrom(ctx, types.StringType, var_policy_options_members)
-			policy_options_community_List[i_policy_options_community] = policy_options_community_model
+
+            policy_options_community_List[i_policy_options_community] =
+                policy_options_community_model
+            // leaf-list
+            if v_policy_options_community.Members == nil ||
+               len(v_policy_options_community.Members) == 0 {
+                policy_options_community_model.Members =
+                    types.ListNull(types.StringType)
+            } else {
+                src_policy_options_members :=
+                    v_policy_options_community.Members
+                vals_policy_options_members := make([]*string, len(src_policy_options_members))
+                copy(vals_policy_options_members, src_policy_options_members)
+                policy_options_community_model.Members, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_policy_options_members)
+            }
+
+            policy_options_community_List[i_policy_options_community] =
+                policy_options_community_model
         }
-        policy_options_model.Community, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Policy_options_Community_Model{}.AttrTypes()}, policy_options_community_List)
+
+        // Write community field as Null when empty, else concrete list
+        if len(policy_options_community_List) == 0 {
+            policy_options_model.Community =
+                types.ListNull(types.ObjectType{AttrTypes: Policy_options_Community_Model{}.AttrTypes()})
+        } else {
+            policy_options_model.Community, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Policy_options_Community_Model{}.AttrTypes()},
+                    policy_options_community_List,
+                )
+        }
+        policy_options_List[i_policy_options] = policy_options_model
+
         policy_options_List[i_policy_options] = policy_options_model
     }
-    state.Policy_options, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Policy_options_Model{}.AttrTypes()}, policy_options_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-    state.Protocols = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    protocols_List := make([]Protocols_Model, len(config.Groups.Protocols))
+
+    // Write parent list as Null when empty
+    if len(policy_options_List) == 0 {
+        state.Policy_options =
+            types.ListNull(types.ObjectType{AttrTypes: Policy_options_Model{}.AttrTypes()})
+    } else {
+        state.Policy_options, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: Policy_options_Model{}.AttrTypes()},
+                policy_options_List,
+            )
+    }
+    // Initialize protocols as Null; only materialize when we have elements
+    state.Protocols =
+        types.ListNull(types.ObjectType{AttrTypes: Protocols_Model{}.AttrTypes()})
+
+    // Build list from device
+    protocols_List := make([]Protocols_Model,
+        len(config.Groups.Protocols))
+
     for i_protocols, v_protocols := range config.Groups.Protocols {
         var protocols_model Protocols_Model
+            
+        // Build bgp list
         protocols_bgp_List := make([]Protocols_Bgp_Model, len(v_protocols.Bgp))
+
         
 		for i_protocols_bgp, v_protocols_bgp := range v_protocols.Bgp {
             var protocols_bgp_model Protocols_Bgp_Model
-			protocols_bgp_List[i_protocols_bgp] = protocols_bgp_model
+
+            protocols_bgp_List[i_protocols_bgp] =
+                protocols_bgp_model
                 
+        // Build group list
         protocols_bgp_group_List := make([]Protocols_Bgp_Group_Model, len(v_protocols_bgp.Group))
+
         
 		for i_protocols_bgp_group, v_protocols_bgp_group := range v_protocols_bgp.Group {
             var protocols_bgp_group_model Protocols_Bgp_Group_Model
-            protocols_bgp_group_model.Name = types.StringPointerValue(v_protocols_bgp_group.Name)
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-            protocols_bgp_group_model.Type = types.StringPointerValue(v_protocols_bgp_group.Type)
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
+            // leaf
+            if v_protocols_bgp_group.Name == nil {
+                protocols_bgp_group_model.Name =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_model.Name =
+                types.StringPointerValue(v_protocols_bgp_group.Name)
+			}
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
+            // leaf
+            if v_protocols_bgp_group.Type == nil {
+                protocols_bgp_group_model.Type =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_model.Type =
+                types.StringPointerValue(v_protocols_bgp_group.Type)
+			}
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
                 
+        // Build multihop list
         protocols_bgp_group_multihop_List := make([]Protocols_Bgp_Group_Multihop_Model, len(v_protocols_bgp_group.Multihop))
+
         
 		for i_protocols_bgp_group_multihop, v_protocols_bgp_group_multihop := range v_protocols_bgp_group.Multihop {
             var protocols_bgp_group_multihop_model Protocols_Bgp_Group_Multihop_Model
-            protocols_bgp_group_multihop_model.No_nexthop_change = types.StringPointerValue(v_protocols_bgp_group_multihop.No_nexthop_change)
-			protocols_bgp_group_multihop_List[i_protocols_bgp_group_multihop] = protocols_bgp_group_multihop_model
-        }
-        protocols_bgp_group_model.Multihop, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Group_Multihop_Model{}.AttrTypes()}, protocols_bgp_group_multihop_List)
-        protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-            protocols_bgp_group_model.Local_address = types.StringPointerValue(v_protocols_bgp_group.Local_address)
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-            protocols_bgp_group_model.Mtu_discovery = types.StringPointerValue(v_protocols_bgp_group.Mtu_discovery)
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-			var var_protocols_bgp_import []*string
-			if v_protocols_bgp_group.Import != nil {
-				var_protocols_bgp_import = make([]*string, len(v_protocols_bgp_group.Import))
-				copy(var_protocols_bgp_import, v_protocols_bgp_group.Import)
+            // leaf
+            if v_protocols_bgp_group_multihop.No_nexthop_change == nil {
+                protocols_bgp_group_multihop_model.No_nexthop_change =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_multihop_model.No_nexthop_change =
+                types.StringPointerValue(v_protocols_bgp_group_multihop.No_nexthop_change)
 			}
-			protocols_bgp_group_model.Import, _ = types.ListValueFrom(ctx, types.StringType, var_protocols_bgp_import)
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
+
+            protocols_bgp_group_multihop_List[i_protocols_bgp_group_multihop] =
+                protocols_bgp_group_multihop_model
+        }
+
+        // Write multihop field as Null when empty, else concrete list
+        if len(protocols_bgp_group_multihop_List) == 0 {
+            protocols_bgp_group_model.Multihop =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Group_Multihop_Model{}.AttrTypes()})
+        } else {
+            protocols_bgp_group_model.Multihop, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Group_Multihop_Model{}.AttrTypes()},
+                    protocols_bgp_group_multihop_List,
+                )
+        }
+        protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
+            // leaf
+            if v_protocols_bgp_group.Local_address == nil {
+                protocols_bgp_group_model.Local_address =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_model.Local_address =
+                types.StringPointerValue(v_protocols_bgp_group.Local_address)
+			}
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
+            // leaf
+            if v_protocols_bgp_group.Mtu_discovery == nil {
+                protocols_bgp_group_model.Mtu_discovery =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_model.Mtu_discovery =
+                types.StringPointerValue(v_protocols_bgp_group.Mtu_discovery)
+			}
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
+            // leaf-list
+            if v_protocols_bgp_group.Import == nil ||
+               len(v_protocols_bgp_group.Import) == 0 {
+                protocols_bgp_group_model.Import =
+                    types.ListNull(types.StringType)
+            } else {
+                src_protocols_bgp_import :=
+                    v_protocols_bgp_group.Import
+                vals_protocols_bgp_import := make([]*string, len(src_protocols_bgp_import))
+                copy(vals_protocols_bgp_import, src_protocols_bgp_import)
+                protocols_bgp_group_model.Import, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_protocols_bgp_import)
+            }
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
                 
+        // Build family list
         protocols_bgp_group_family_List := make([]Protocols_Bgp_Group_Family_Model, len(v_protocols_bgp_group.Family))
+
         
 		for i_protocols_bgp_group_family, v_protocols_bgp_group_family := range v_protocols_bgp_group.Family {
             var protocols_bgp_group_family_model Protocols_Bgp_Group_Family_Model
-			protocols_bgp_group_family_List[i_protocols_bgp_group_family] = protocols_bgp_group_family_model
+
+            protocols_bgp_group_family_List[i_protocols_bgp_group_family] =
+                protocols_bgp_group_family_model
                 
+        // Build evpn list
         protocols_bgp_group_family_evpn_List := make([]Protocols_Bgp_Group_Family_Evpn_Model, len(v_protocols_bgp_group_family.Evpn))
+
         
 		for i_protocols_bgp_group_family_evpn, v_protocols_bgp_group_family_evpn := range v_protocols_bgp_group_family.Evpn {
             var protocols_bgp_group_family_evpn_model Protocols_Bgp_Group_Family_Evpn_Model
-			protocols_bgp_group_family_evpn_List[i_protocols_bgp_group_family_evpn] = protocols_bgp_group_family_evpn_model
+
+            protocols_bgp_group_family_evpn_List[i_protocols_bgp_group_family_evpn] =
+                protocols_bgp_group_family_evpn_model
                 
+        // Build signaling list
         protocols_bgp_group_family_evpn_signaling_List := make([]Protocols_Bgp_Group_Family_Evpn_Signaling_Model, len(v_protocols_bgp_group_family_evpn.Signaling))
+
         
 		for i_protocols_bgp_group_family_evpn_signaling, v_protocols_bgp_group_family_evpn_signaling := range v_protocols_bgp_group_family_evpn.Signaling {
             var protocols_bgp_group_family_evpn_signaling_model Protocols_Bgp_Group_Family_Evpn_Signaling_Model
-			protocols_bgp_group_family_evpn_signaling_List[i_protocols_bgp_group_family_evpn_signaling] = protocols_bgp_group_family_evpn_signaling_model
+
+            protocols_bgp_group_family_evpn_signaling_List[i_protocols_bgp_group_family_evpn_signaling] =
+                protocols_bgp_group_family_evpn_signaling_model
                 
+        // Build delay-route-advertisements list
         protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_List := make([]Protocols_Bgp_Group_Family_Evpn_Signaling_Delay_route_advertisements_Model, len(v_protocols_bgp_group_family_evpn_signaling.Delay_route_advertisements))
+
         
 		for i_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements, v_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements := range v_protocols_bgp_group_family_evpn_signaling.Delay_route_advertisements {
             var protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_model Protocols_Bgp_Group_Family_Evpn_Signaling_Delay_route_advertisements_Model
-			protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_List[i_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements] = protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_model
+
+            protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_List[i_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements] =
+                protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_model
                 
+        // Build minimum-delay list
         protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_List := make([]Protocols_Bgp_Group_Family_Evpn_Signaling_Delay_route_advertisements_Minimum_delay_Model, len(v_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements.Minimum_delay))
+
         
 		for i_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay, v_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay := range v_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements.Minimum_delay {
             var protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_model Protocols_Bgp_Group_Family_Evpn_Signaling_Delay_route_advertisements_Minimum_delay_Model
-            protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_model.Routing_uptime = types.StringPointerValue(v_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay.Routing_uptime)
-			protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_List[i_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay] = protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_model
+            // leaf
+            if v_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay.Routing_uptime == nil {
+                protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_model.Routing_uptime =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_model.Routing_uptime =
+                types.StringPointerValue(v_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay.Routing_uptime)
+			}
+
+            protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_List[i_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay] =
+                protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_model
         }
-        protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_model.Minimum_delay, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Signaling_Delay_route_advertisements_Minimum_delay_Model{}.AttrTypes()}, protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_List)
+
+        // Write minimum-delay field as Null when empty, else concrete list
+        if len(protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_List) == 0 {
+            protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_model.Minimum_delay =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Signaling_Delay_route_advertisements_Minimum_delay_Model{}.AttrTypes()})
+        } else {
+            protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_model.Minimum_delay, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Signaling_Delay_route_advertisements_Minimum_delay_Model{}.AttrTypes()},
+                    protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_minimum_delay_List,
+                )
+        }
         protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_List[i_protocols_bgp_group_family_evpn_signaling_delay_route_advertisements] = protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_model
         }
-        protocols_bgp_group_family_evpn_signaling_model.Delay_route_advertisements, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Signaling_Delay_route_advertisements_Model{}.AttrTypes()}, protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_List)
+
+        // Write delay-route-advertisements field as Null when empty, else concrete list
+        if len(protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_List) == 0 {
+            protocols_bgp_group_family_evpn_signaling_model.Delay_route_advertisements =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Signaling_Delay_route_advertisements_Model{}.AttrTypes()})
+        } else {
+            protocols_bgp_group_family_evpn_signaling_model.Delay_route_advertisements, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Signaling_Delay_route_advertisements_Model{}.AttrTypes()},
+                    protocols_bgp_group_family_evpn_signaling_delay_route_advertisements_List,
+                )
+        }
         protocols_bgp_group_family_evpn_signaling_List[i_protocols_bgp_group_family_evpn_signaling] = protocols_bgp_group_family_evpn_signaling_model
         }
-        protocols_bgp_group_family_evpn_model.Signaling, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Signaling_Model{}.AttrTypes()}, protocols_bgp_group_family_evpn_signaling_List)
+
+        // Write signaling field as Null when empty, else concrete list
+        if len(protocols_bgp_group_family_evpn_signaling_List) == 0 {
+            protocols_bgp_group_family_evpn_model.Signaling =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Signaling_Model{}.AttrTypes()})
+        } else {
+            protocols_bgp_group_family_evpn_model.Signaling, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Signaling_Model{}.AttrTypes()},
+                    protocols_bgp_group_family_evpn_signaling_List,
+                )
+        }
         protocols_bgp_group_family_evpn_List[i_protocols_bgp_group_family_evpn] = protocols_bgp_group_family_evpn_model
         }
-        protocols_bgp_group_family_model.Evpn, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Model{}.AttrTypes()}, protocols_bgp_group_family_evpn_List)
+
+        // Write evpn field as Null when empty, else concrete list
+        if len(protocols_bgp_group_family_evpn_List) == 0 {
+            protocols_bgp_group_family_model.Evpn =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Model{}.AttrTypes()})
+        } else {
+            protocols_bgp_group_family_model.Evpn, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Evpn_Model{}.AttrTypes()},
+                    protocols_bgp_group_family_evpn_List,
+                )
+        }
         protocols_bgp_group_family_List[i_protocols_bgp_group_family] = protocols_bgp_group_family_model
         }
-        protocols_bgp_group_model.Family, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Model{}.AttrTypes()}, protocols_bgp_group_family_List)
+
+        // Write family field as Null when empty, else concrete list
+        if len(protocols_bgp_group_family_List) == 0 {
+            protocols_bgp_group_model.Family =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Model{}.AttrTypes()})
+        } else {
+            protocols_bgp_group_model.Family, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Group_Family_Model{}.AttrTypes()},
+                    protocols_bgp_group_family_List,
+                )
+        }
         protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-			var var_protocols_bgp_export []*string
-			if v_protocols_bgp_group.Export != nil {
-				var_protocols_bgp_export = make([]*string, len(v_protocols_bgp_group.Export))
-				copy(var_protocols_bgp_export, v_protocols_bgp_group.Export)
+            // leaf-list
+            if v_protocols_bgp_group.Export == nil ||
+               len(v_protocols_bgp_group.Export) == 0 {
+                protocols_bgp_group_model.Export =
+                    types.ListNull(types.StringType)
+            } else {
+                src_protocols_bgp_export :=
+                    v_protocols_bgp_group.Export
+                vals_protocols_bgp_export := make([]*string, len(src_protocols_bgp_export))
+                copy(vals_protocols_bgp_export, src_protocols_bgp_export)
+                protocols_bgp_group_model.Export, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_protocols_bgp_export)
+            }
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
+            // leaf
+            if v_protocols_bgp_group.Vpn_apply_export == nil {
+                protocols_bgp_group_model.Vpn_apply_export =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_model.Vpn_apply_export =
+                types.StringPointerValue(v_protocols_bgp_group.Vpn_apply_export)
 			}
-			protocols_bgp_group_model.Export, _ = types.ListValueFrom(ctx, types.StringType, var_protocols_bgp_export)
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-            protocols_bgp_group_model.Vpn_apply_export = types.StringPointerValue(v_protocols_bgp_group.Vpn_apply_export)
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-            protocols_bgp_group_model.Cluster = types.StringPointerValue(v_protocols_bgp_group.Cluster)
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
+            // leaf
+            if v_protocols_bgp_group.Cluster == nil {
+                protocols_bgp_group_model.Cluster =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_model.Cluster =
+                types.StringPointerValue(v_protocols_bgp_group.Cluster)
+			}
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
                 
+        // Build local-as list
         protocols_bgp_group_local_as_List := make([]Protocols_Bgp_Group_Local_as_Model, len(v_protocols_bgp_group.Local_as))
+
         
 		for i_protocols_bgp_group_local_as, v_protocols_bgp_group_local_as := range v_protocols_bgp_group.Local_as {
             var protocols_bgp_group_local_as_model Protocols_Bgp_Group_Local_as_Model
-            protocols_bgp_group_local_as_model.As_number = types.StringPointerValue(v_protocols_bgp_group_local_as.As_number)
-			protocols_bgp_group_local_as_List[i_protocols_bgp_group_local_as] = protocols_bgp_group_local_as_model
+            // leaf
+            if v_protocols_bgp_group_local_as.As_number == nil {
+                protocols_bgp_group_local_as_model.As_number =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_local_as_model.As_number =
+                types.StringPointerValue(v_protocols_bgp_group_local_as.As_number)
+			}
+
+            protocols_bgp_group_local_as_List[i_protocols_bgp_group_local_as] =
+                protocols_bgp_group_local_as_model
         }
-        protocols_bgp_group_model.Local_as, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Group_Local_as_Model{}.AttrTypes()}, protocols_bgp_group_local_as_List)
+
+        // Write local-as field as Null when empty, else concrete list
+        if len(protocols_bgp_group_local_as_List) == 0 {
+            protocols_bgp_group_model.Local_as =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Group_Local_as_Model{}.AttrTypes()})
+        } else {
+            protocols_bgp_group_model.Local_as, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Group_Local_as_Model{}.AttrTypes()},
+                    protocols_bgp_group_local_as_List,
+                )
+        }
         protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
                 
+        // Build multipath list
         protocols_bgp_group_multipath_List := make([]Protocols_Bgp_Group_Multipath_Model, len(v_protocols_bgp_group.Multipath))
+
         
 		for i_protocols_bgp_group_multipath, v_protocols_bgp_group_multipath := range v_protocols_bgp_group.Multipath {
             var protocols_bgp_group_multipath_model Protocols_Bgp_Group_Multipath_Model
-            protocols_bgp_group_multipath_model.Multiple_as = types.StringPointerValue(v_protocols_bgp_group_multipath.Multiple_as)
-			protocols_bgp_group_multipath_List[i_protocols_bgp_group_multipath] = protocols_bgp_group_multipath_model
+            // leaf
+            if v_protocols_bgp_group_multipath.Multiple_as == nil {
+                protocols_bgp_group_multipath_model.Multiple_as =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_multipath_model.Multiple_as =
+                types.StringPointerValue(v_protocols_bgp_group_multipath.Multiple_as)
+			}
+
+            protocols_bgp_group_multipath_List[i_protocols_bgp_group_multipath] =
+                protocols_bgp_group_multipath_model
         }
-        protocols_bgp_group_model.Multipath, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Group_Multipath_Model{}.AttrTypes()}, protocols_bgp_group_multipath_List)
+
+        // Write multipath field as Null when empty, else concrete list
+        if len(protocols_bgp_group_multipath_List) == 0 {
+            protocols_bgp_group_model.Multipath =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Group_Multipath_Model{}.AttrTypes()})
+        } else {
+            protocols_bgp_group_model.Multipath, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Group_Multipath_Model{}.AttrTypes()},
+                    protocols_bgp_group_multipath_List,
+                )
+        }
         protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
                 
+        // Build bfd-liveness-detection list
         protocols_bgp_group_bfd_liveness_detection_List := make([]Protocols_Bgp_Group_Bfd_liveness_detection_Model, len(v_protocols_bgp_group.Bfd_liveness_detection))
+
         
 		for i_protocols_bgp_group_bfd_liveness_detection, v_protocols_bgp_group_bfd_liveness_detection := range v_protocols_bgp_group.Bfd_liveness_detection {
             var protocols_bgp_group_bfd_liveness_detection_model Protocols_Bgp_Group_Bfd_liveness_detection_Model
-            protocols_bgp_group_bfd_liveness_detection_model.Minimum_interval = types.StringPointerValue(v_protocols_bgp_group_bfd_liveness_detection.Minimum_interval)
-			protocols_bgp_group_bfd_liveness_detection_List[i_protocols_bgp_group_bfd_liveness_detection] = protocols_bgp_group_bfd_liveness_detection_model
-            protocols_bgp_group_bfd_liveness_detection_model.Multiplier = types.StringPointerValue(v_protocols_bgp_group_bfd_liveness_detection.Multiplier)
-			protocols_bgp_group_bfd_liveness_detection_List[i_protocols_bgp_group_bfd_liveness_detection] = protocols_bgp_group_bfd_liveness_detection_model
-        }
-        protocols_bgp_group_model.Bfd_liveness_detection, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Group_Bfd_liveness_detection_Model{}.AttrTypes()}, protocols_bgp_group_bfd_liveness_detection_List)
-        protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-			var var_protocols_bgp_allow []*string
-			if v_protocols_bgp_group.Allow != nil {
-				var_protocols_bgp_allow = make([]*string, len(v_protocols_bgp_group.Allow))
-				copy(var_protocols_bgp_allow, v_protocols_bgp_group.Allow)
+            // leaf
+            if v_protocols_bgp_group_bfd_liveness_detection.Minimum_interval == nil {
+                protocols_bgp_group_bfd_liveness_detection_model.Minimum_interval =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_bfd_liveness_detection_model.Minimum_interval =
+                types.StringPointerValue(v_protocols_bgp_group_bfd_liveness_detection.Minimum_interval)
 			}
-			protocols_bgp_group_model.Allow, _ = types.ListValueFrom(ctx, types.StringType, var_protocols_bgp_allow)
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
-			protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
+
+            protocols_bgp_group_bfd_liveness_detection_List[i_protocols_bgp_group_bfd_liveness_detection] =
+                protocols_bgp_group_bfd_liveness_detection_model
+            // leaf
+            if v_protocols_bgp_group_bfd_liveness_detection.Multiplier == nil {
+                protocols_bgp_group_bfd_liveness_detection_model.Multiplier =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_bfd_liveness_detection_model.Multiplier =
+                types.StringPointerValue(v_protocols_bgp_group_bfd_liveness_detection.Multiplier)
+			}
+
+            protocols_bgp_group_bfd_liveness_detection_List[i_protocols_bgp_group_bfd_liveness_detection] =
+                protocols_bgp_group_bfd_liveness_detection_model
+        }
+
+        // Write bfd-liveness-detection field as Null when empty, else concrete list
+        if len(protocols_bgp_group_bfd_liveness_detection_List) == 0 {
+            protocols_bgp_group_model.Bfd_liveness_detection =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Group_Bfd_liveness_detection_Model{}.AttrTypes()})
+        } else {
+            protocols_bgp_group_model.Bfd_liveness_detection, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Group_Bfd_liveness_detection_Model{}.AttrTypes()},
+                    protocols_bgp_group_bfd_liveness_detection_List,
+                )
+        }
+        protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
+            // leaf-list
+            if v_protocols_bgp_group.Allow == nil ||
+               len(v_protocols_bgp_group.Allow) == 0 {
+                protocols_bgp_group_model.Allow =
+                    types.ListNull(types.StringType)
+            } else {
+                src_protocols_bgp_allow :=
+                    v_protocols_bgp_group.Allow
+                vals_protocols_bgp_allow := make([]*string, len(src_protocols_bgp_allow))
+                copy(vals_protocols_bgp_allow, src_protocols_bgp_allow)
+                protocols_bgp_group_model.Allow, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_protocols_bgp_allow)
+            }
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
+
+            protocols_bgp_group_List[i_protocols_bgp_group] =
+                protocols_bgp_group_model
                 
+        // Build neighbor list
         protocols_bgp_group_neighbor_List := make([]Protocols_Bgp_Group_Neighbor_Model, len(v_protocols_bgp_group.Neighbor))
+
         
 		for i_protocols_bgp_group_neighbor, v_protocols_bgp_group_neighbor := range v_protocols_bgp_group.Neighbor {
             var protocols_bgp_group_neighbor_model Protocols_Bgp_Group_Neighbor_Model
-            protocols_bgp_group_neighbor_model.Name = types.StringPointerValue(v_protocols_bgp_group_neighbor.Name)
-			protocols_bgp_group_neighbor_List[i_protocols_bgp_group_neighbor] = protocols_bgp_group_neighbor_model
-            protocols_bgp_group_neighbor_model.Description = types.StringPointerValue(v_protocols_bgp_group_neighbor.Description)
-			protocols_bgp_group_neighbor_List[i_protocols_bgp_group_neighbor] = protocols_bgp_group_neighbor_model
-            protocols_bgp_group_neighbor_model.Peer_as = types.StringPointerValue(v_protocols_bgp_group_neighbor.Peer_as)
-			protocols_bgp_group_neighbor_List[i_protocols_bgp_group_neighbor] = protocols_bgp_group_neighbor_model
+            // leaf
+            if v_protocols_bgp_group_neighbor.Name == nil {
+                protocols_bgp_group_neighbor_model.Name =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_neighbor_model.Name =
+                types.StringPointerValue(v_protocols_bgp_group_neighbor.Name)
+			}
+
+            protocols_bgp_group_neighbor_List[i_protocols_bgp_group_neighbor] =
+                protocols_bgp_group_neighbor_model
+            // leaf
+            if v_protocols_bgp_group_neighbor.Description == nil {
+                protocols_bgp_group_neighbor_model.Description =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_neighbor_model.Description =
+                types.StringPointerValue(v_protocols_bgp_group_neighbor.Description)
+			}
+
+            protocols_bgp_group_neighbor_List[i_protocols_bgp_group_neighbor] =
+                protocols_bgp_group_neighbor_model
+            // leaf
+            if v_protocols_bgp_group_neighbor.Peer_as == nil {
+                protocols_bgp_group_neighbor_model.Peer_as =
+                    types.StringNull()
+            } else {
+				protocols_bgp_group_neighbor_model.Peer_as =
+                types.StringPointerValue(v_protocols_bgp_group_neighbor.Peer_as)
+			}
+
+            protocols_bgp_group_neighbor_List[i_protocols_bgp_group_neighbor] =
+                protocols_bgp_group_neighbor_model
         }
-        protocols_bgp_group_model.Neighbor, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Group_Neighbor_Model{}.AttrTypes()}, protocols_bgp_group_neighbor_List)
+
+        // Write neighbor field as Null when empty, else concrete list
+        if len(protocols_bgp_group_neighbor_List) == 0 {
+            protocols_bgp_group_model.Neighbor =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Group_Neighbor_Model{}.AttrTypes()})
+        } else {
+            protocols_bgp_group_model.Neighbor, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Group_Neighbor_Model{}.AttrTypes()},
+                    protocols_bgp_group_neighbor_List,
+                )
+        }
         protocols_bgp_group_List[i_protocols_bgp_group] = protocols_bgp_group_model
         }
-        protocols_bgp_model.Group, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Group_Model{}.AttrTypes()}, protocols_bgp_group_List)
+
+        // Write group field as Null when empty, else concrete list
+        if len(protocols_bgp_group_List) == 0 {
+            protocols_bgp_model.Group =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Group_Model{}.AttrTypes()})
+        } else {
+            protocols_bgp_model.Group, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Group_Model{}.AttrTypes()},
+                    protocols_bgp_group_List,
+                )
+        }
         protocols_bgp_List[i_protocols_bgp] = protocols_bgp_model
         }
-        protocols_model.Bgp, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Bgp_Model{}.AttrTypes()}, protocols_bgp_List)
+
+        // Write bgp field as Null when empty, else concrete list
+        if len(protocols_bgp_List) == 0 {
+            protocols_model.Bgp =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Bgp_Model{}.AttrTypes()})
+        } else {
+            protocols_model.Bgp, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Bgp_Model{}.AttrTypes()},
+                    protocols_bgp_List,
+                )
+        }
         protocols_List[i_protocols] = protocols_model
+            
+        // Build evpn list
         protocols_evpn_List := make([]Protocols_Evpn_Model, len(v_protocols.Evpn))
+
         
 		for i_protocols_evpn, v_protocols_evpn := range v_protocols.Evpn {
             var protocols_evpn_model Protocols_Evpn_Model
-            protocols_evpn_model.Encapsulation = types.StringPointerValue(v_protocols_evpn.Encapsulation)
-			protocols_evpn_List[i_protocols_evpn] = protocols_evpn_model
-            protocols_evpn_model.Multicast_mode = types.StringPointerValue(v_protocols_evpn.Multicast_mode)
-			protocols_evpn_List[i_protocols_evpn] = protocols_evpn_model
-            protocols_evpn_model.Default_gateway = types.StringPointerValue(v_protocols_evpn.Default_gateway)
-			protocols_evpn_List[i_protocols_evpn] = protocols_evpn_model
-			var var_protocols_extended_vni_list []*string
-			if v_protocols_evpn.Extended_vni_list != nil {
-				var_protocols_extended_vni_list = make([]*string, len(v_protocols_evpn.Extended_vni_list))
-				copy(var_protocols_extended_vni_list, v_protocols_evpn.Extended_vni_list)
+            // leaf
+            if v_protocols_evpn.Encapsulation == nil {
+                protocols_evpn_model.Encapsulation =
+                    types.StringNull()
+            } else {
+				protocols_evpn_model.Encapsulation =
+                types.StringPointerValue(v_protocols_evpn.Encapsulation)
 			}
-			protocols_evpn_model.Extended_vni_list, _ = types.ListValueFrom(ctx, types.StringType, var_protocols_extended_vni_list)
-			protocols_evpn_List[i_protocols_evpn] = protocols_evpn_model
-            protocols_evpn_model.No_core_isolation = types.StringPointerValue(v_protocols_evpn.No_core_isolation)
-			protocols_evpn_List[i_protocols_evpn] = protocols_evpn_model
+
+            protocols_evpn_List[i_protocols_evpn] =
+                protocols_evpn_model
+            // leaf
+            if v_protocols_evpn.Multicast_mode == nil {
+                protocols_evpn_model.Multicast_mode =
+                    types.StringNull()
+            } else {
+				protocols_evpn_model.Multicast_mode =
+                types.StringPointerValue(v_protocols_evpn.Multicast_mode)
+			}
+
+            protocols_evpn_List[i_protocols_evpn] =
+                protocols_evpn_model
+            // leaf
+            if v_protocols_evpn.Default_gateway == nil {
+                protocols_evpn_model.Default_gateway =
+                    types.StringNull()
+            } else {
+				protocols_evpn_model.Default_gateway =
+                types.StringPointerValue(v_protocols_evpn.Default_gateway)
+			}
+
+            protocols_evpn_List[i_protocols_evpn] =
+                protocols_evpn_model
+            // leaf-list
+            if v_protocols_evpn.Extended_vni_list == nil ||
+               len(v_protocols_evpn.Extended_vni_list) == 0 {
+                protocols_evpn_model.Extended_vni_list =
+                    types.ListNull(types.StringType)
+            } else {
+                src_protocols_extended_vni_list :=
+                    v_protocols_evpn.Extended_vni_list
+                vals_protocols_extended_vni_list := make([]*string, len(src_protocols_extended_vni_list))
+                copy(vals_protocols_extended_vni_list, src_protocols_extended_vni_list)
+                protocols_evpn_model.Extended_vni_list, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_protocols_extended_vni_list)
+            }
+
+            protocols_evpn_List[i_protocols_evpn] =
+                protocols_evpn_model
+            // leaf
+            if v_protocols_evpn.No_core_isolation == nil {
+                protocols_evpn_model.No_core_isolation =
+                    types.StringNull()
+            } else {
+				protocols_evpn_model.No_core_isolation =
+                types.StringPointerValue(v_protocols_evpn.No_core_isolation)
+			}
+
+            protocols_evpn_List[i_protocols_evpn] =
+                protocols_evpn_model
         }
-        protocols_model.Evpn, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Evpn_Model{}.AttrTypes()}, protocols_evpn_List)
+
+        // Write evpn field as Null when empty, else concrete list
+        if len(protocols_evpn_List) == 0 {
+            protocols_model.Evpn =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Evpn_Model{}.AttrTypes()})
+        } else {
+            protocols_model.Evpn, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Evpn_Model{}.AttrTypes()},
+                    protocols_evpn_List,
+                )
+        }
         protocols_List[i_protocols] = protocols_model
+            
+        // Build lldp list
         protocols_lldp_List := make([]Protocols_Lldp_Model, len(v_protocols.Lldp))
+
         
 		for i_protocols_lldp, v_protocols_lldp := range v_protocols.Lldp {
             var protocols_lldp_model Protocols_Lldp_Model
-			protocols_lldp_List[i_protocols_lldp] = protocols_lldp_model
+
+            protocols_lldp_List[i_protocols_lldp] =
+                protocols_lldp_model
                 
+        // Build interface list
         protocols_lldp_interface_List := make([]Protocols_Lldp_Interface_Model, len(v_protocols_lldp.Interface))
+
         
 		for i_protocols_lldp_interface, v_protocols_lldp_interface := range v_protocols_lldp.Interface {
             var protocols_lldp_interface_model Protocols_Lldp_Interface_Model
-            protocols_lldp_interface_model.Name = types.StringPointerValue(v_protocols_lldp_interface.Name)
-			protocols_lldp_interface_List[i_protocols_lldp_interface] = protocols_lldp_interface_model
+            // leaf
+            if v_protocols_lldp_interface.Name == nil {
+                protocols_lldp_interface_model.Name =
+                    types.StringNull()
+            } else {
+				protocols_lldp_interface_model.Name =
+                types.StringPointerValue(v_protocols_lldp_interface.Name)
+			}
+
+            protocols_lldp_interface_List[i_protocols_lldp_interface] =
+                protocols_lldp_interface_model
         }
-        protocols_lldp_model.Interface, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Lldp_Interface_Model{}.AttrTypes()}, protocols_lldp_interface_List)
+
+        // Write interface field as Null when empty, else concrete list
+        if len(protocols_lldp_interface_List) == 0 {
+            protocols_lldp_model.Interface =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Lldp_Interface_Model{}.AttrTypes()})
+        } else {
+            protocols_lldp_model.Interface, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Lldp_Interface_Model{}.AttrTypes()},
+                    protocols_lldp_interface_List,
+                )
+        }
         protocols_lldp_List[i_protocols_lldp] = protocols_lldp_model
         }
-        protocols_model.Lldp, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Lldp_Model{}.AttrTypes()}, protocols_lldp_List)
+
+        // Write lldp field as Null when empty, else concrete list
+        if len(protocols_lldp_List) == 0 {
+            protocols_model.Lldp =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Lldp_Model{}.AttrTypes()})
+        } else {
+            protocols_model.Lldp, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Lldp_Model{}.AttrTypes()},
+                    protocols_lldp_List,
+                )
+        }
         protocols_List[i_protocols] = protocols_model
+            
+        // Build igmp-snooping list
         protocols_igmp_snooping_List := make([]Protocols_Igmp_snooping_Model, len(v_protocols.Igmp_snooping))
+
         
 		for i_protocols_igmp_snooping, v_protocols_igmp_snooping := range v_protocols.Igmp_snooping {
             var protocols_igmp_snooping_model Protocols_Igmp_snooping_Model
-			protocols_igmp_snooping_List[i_protocols_igmp_snooping] = protocols_igmp_snooping_model
+
+            protocols_igmp_snooping_List[i_protocols_igmp_snooping] =
+                protocols_igmp_snooping_model
                 
+        // Build vlan list
         protocols_igmp_snooping_vlan_List := make([]Protocols_Igmp_snooping_Vlan_Model, len(v_protocols_igmp_snooping.Vlan))
+
         
 		for i_protocols_igmp_snooping_vlan, v_protocols_igmp_snooping_vlan := range v_protocols_igmp_snooping.Vlan {
             var protocols_igmp_snooping_vlan_model Protocols_Igmp_snooping_Vlan_Model
-            protocols_igmp_snooping_vlan_model.Name = types.StringPointerValue(v_protocols_igmp_snooping_vlan.Name)
-			protocols_igmp_snooping_vlan_List[i_protocols_igmp_snooping_vlan] = protocols_igmp_snooping_vlan_model
+            // leaf
+            if v_protocols_igmp_snooping_vlan.Name == nil {
+                protocols_igmp_snooping_vlan_model.Name =
+                    types.StringNull()
+            } else {
+				protocols_igmp_snooping_vlan_model.Name =
+                types.StringPointerValue(v_protocols_igmp_snooping_vlan.Name)
+			}
+
+            protocols_igmp_snooping_vlan_List[i_protocols_igmp_snooping_vlan] =
+                protocols_igmp_snooping_vlan_model
         }
-        protocols_igmp_snooping_model.Vlan, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Igmp_snooping_Vlan_Model{}.AttrTypes()}, protocols_igmp_snooping_vlan_List)
+
+        // Write vlan field as Null when empty, else concrete list
+        if len(protocols_igmp_snooping_vlan_List) == 0 {
+            protocols_igmp_snooping_model.Vlan =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Igmp_snooping_Vlan_Model{}.AttrTypes()})
+        } else {
+            protocols_igmp_snooping_model.Vlan, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Igmp_snooping_Vlan_Model{}.AttrTypes()},
+                    protocols_igmp_snooping_vlan_List,
+                )
+        }
         protocols_igmp_snooping_List[i_protocols_igmp_snooping] = protocols_igmp_snooping_model
         }
-        protocols_model.Igmp_snooping, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Igmp_snooping_Model{}.AttrTypes()}, protocols_igmp_snooping_List)
+
+        // Write igmp-snooping field as Null when empty, else concrete list
+        if len(protocols_igmp_snooping_List) == 0 {
+            protocols_model.Igmp_snooping =
+                types.ListNull(types.ObjectType{AttrTypes: Protocols_Igmp_snooping_Model{}.AttrTypes()})
+        } else {
+            protocols_model.Igmp_snooping, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Protocols_Igmp_snooping_Model{}.AttrTypes()},
+                    protocols_igmp_snooping_List,
+                )
+        }
+        protocols_List[i_protocols] = protocols_model
+
         protocols_List[i_protocols] = protocols_model
     }
-    state.Protocols, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Protocols_Model{}.AttrTypes()}, protocols_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-    state.Routing_instances = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    routing_instances_List := make([]Routing_instances_Model, len(config.Groups.Routing_instances))
+
+    // Write parent list as Null when empty
+    if len(protocols_List) == 0 {
+        state.Protocols =
+            types.ListNull(types.ObjectType{AttrTypes: Protocols_Model{}.AttrTypes()})
+    } else {
+        state.Protocols, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: Protocols_Model{}.AttrTypes()},
+                protocols_List,
+            )
+    }
+    // Initialize routing-instances as Null; only materialize when we have elements
+    state.Routing_instances =
+        types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Model{}.AttrTypes()})
+
+    // Build list from device
+    routing_instances_List := make([]Routing_instances_Model,
+        len(config.Groups.Routing_instances))
+
     for i_routing_instances, v_routing_instances := range config.Groups.Routing_instances {
         var routing_instances_model Routing_instances_Model
+            
+        // Build instance list
         routing_instances_instance_List := make([]Routing_instances_Instance_Model, len(v_routing_instances.Instance))
+
         
 		for i_routing_instances_instance, v_routing_instances_instance := range v_routing_instances.Instance {
             var routing_instances_instance_model Routing_instances_Instance_Model
-            routing_instances_instance_model.Name = types.StringPointerValue(v_routing_instances_instance.Name)
-			routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
-            routing_instances_instance_model.Instance_type = types.StringPointerValue(v_routing_instances_instance.Instance_type)
-			routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
-			routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
+            // leaf
+            if v_routing_instances_instance.Name == nil {
+                routing_instances_instance_model.Name =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_model.Name =
+                types.StringPointerValue(v_routing_instances_instance.Name)
+			}
+
+            routing_instances_instance_List[i_routing_instances_instance] =
+                routing_instances_instance_model
+            // leaf
+            if v_routing_instances_instance.Instance_type == nil {
+                routing_instances_instance_model.Instance_type =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_model.Instance_type =
+                types.StringPointerValue(v_routing_instances_instance.Instance_type)
+			}
+
+            routing_instances_instance_List[i_routing_instances_instance] =
+                routing_instances_instance_model
+
+            routing_instances_instance_List[i_routing_instances_instance] =
+                routing_instances_instance_model
                 
+        // Build interface list
         routing_instances_instance_interface_List := make([]Routing_instances_Instance_Interface_Model, len(v_routing_instances_instance.Interface))
+
         
 		for i_routing_instances_instance_interface, v_routing_instances_instance_interface := range v_routing_instances_instance.Interface {
             var routing_instances_instance_interface_model Routing_instances_Instance_Interface_Model
-            routing_instances_instance_interface_model.Name = types.StringPointerValue(v_routing_instances_instance_interface.Name)
-			routing_instances_instance_interface_List[i_routing_instances_instance_interface] = routing_instances_instance_interface_model
+            // leaf
+            if v_routing_instances_instance_interface.Name == nil {
+                routing_instances_instance_interface_model.Name =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_interface_model.Name =
+                types.StringPointerValue(v_routing_instances_instance_interface.Name)
+			}
+
+            routing_instances_instance_interface_List[i_routing_instances_instance_interface] =
+                routing_instances_instance_interface_model
         }
-        routing_instances_instance_model.Interface, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Interface_Model{}.AttrTypes()}, routing_instances_instance_interface_List)
+
+        // Write interface field as Null when empty, else concrete list
+        if len(routing_instances_instance_interface_List) == 0 {
+            routing_instances_instance_model.Interface =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Interface_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_model.Interface, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Interface_Model{}.AttrTypes()},
+                    routing_instances_instance_interface_List,
+                )
+        }
         routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
-			routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
+
+            routing_instances_instance_List[i_routing_instances_instance] =
+                routing_instances_instance_model
                 
+        // Build route-distinguisher list
         routing_instances_instance_route_distinguisher_List := make([]Routing_instances_Instance_Route_distinguisher_Model, len(v_routing_instances_instance.Route_distinguisher))
+
         
 		for i_routing_instances_instance_route_distinguisher, v_routing_instances_instance_route_distinguisher := range v_routing_instances_instance.Route_distinguisher {
             var routing_instances_instance_route_distinguisher_model Routing_instances_Instance_Route_distinguisher_Model
-            routing_instances_instance_route_distinguisher_model.Rd_type = types.StringPointerValue(v_routing_instances_instance_route_distinguisher.Rd_type)
-			routing_instances_instance_route_distinguisher_List[i_routing_instances_instance_route_distinguisher] = routing_instances_instance_route_distinguisher_model
+            // leaf
+            if v_routing_instances_instance_route_distinguisher.Rd_type == nil {
+                routing_instances_instance_route_distinguisher_model.Rd_type =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_route_distinguisher_model.Rd_type =
+                types.StringPointerValue(v_routing_instances_instance_route_distinguisher.Rd_type)
+			}
+
+            routing_instances_instance_route_distinguisher_List[i_routing_instances_instance_route_distinguisher] =
+                routing_instances_instance_route_distinguisher_model
         }
-        routing_instances_instance_model.Route_distinguisher, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Route_distinguisher_Model{}.AttrTypes()}, routing_instances_instance_route_distinguisher_List)
+
+        // Write route-distinguisher field as Null when empty, else concrete list
+        if len(routing_instances_instance_route_distinguisher_List) == 0 {
+            routing_instances_instance_model.Route_distinguisher =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Route_distinguisher_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_model.Route_distinguisher, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Route_distinguisher_Model{}.AttrTypes()},
+                    routing_instances_instance_route_distinguisher_List,
+                )
+        }
         routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
-			routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
+
+            routing_instances_instance_List[i_routing_instances_instance] =
+                routing_instances_instance_model
                 
+        // Build vrf-target list
         routing_instances_instance_vrf_target_List := make([]Routing_instances_Instance_Vrf_target_Model, len(v_routing_instances_instance.Vrf_target))
+
         
 		for i_routing_instances_instance_vrf_target, v_routing_instances_instance_vrf_target := range v_routing_instances_instance.Vrf_target {
             var routing_instances_instance_vrf_target_model Routing_instances_Instance_Vrf_target_Model
-            routing_instances_instance_vrf_target_model.Community = types.StringPointerValue(v_routing_instances_instance_vrf_target.Community)
-			routing_instances_instance_vrf_target_List[i_routing_instances_instance_vrf_target] = routing_instances_instance_vrf_target_model
+            // leaf
+            if v_routing_instances_instance_vrf_target.Community == nil {
+                routing_instances_instance_vrf_target_model.Community =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_vrf_target_model.Community =
+                types.StringPointerValue(v_routing_instances_instance_vrf_target.Community)
+			}
+
+            routing_instances_instance_vrf_target_List[i_routing_instances_instance_vrf_target] =
+                routing_instances_instance_vrf_target_model
         }
-        routing_instances_instance_model.Vrf_target, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Vrf_target_Model{}.AttrTypes()}, routing_instances_instance_vrf_target_List)
+
+        // Write vrf-target field as Null when empty, else concrete list
+        if len(routing_instances_instance_vrf_target_List) == 0 {
+            routing_instances_instance_model.Vrf_target =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Vrf_target_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_model.Vrf_target, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Vrf_target_Model{}.AttrTypes()},
+                    routing_instances_instance_vrf_target_List,
+                )
+        }
         routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
-			routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
+
+            routing_instances_instance_List[i_routing_instances_instance] =
+                routing_instances_instance_model
                 
+        // Build vrf-table-label list
         routing_instances_instance_vrf_table_label_List := make([]Routing_instances_Instance_Vrf_table_label_Model, len(v_routing_instances_instance.Vrf_table_label))
+
         
-        routing_instances_instance_model.Vrf_table_label, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Vrf_table_label_Model{}.AttrTypes()}, routing_instances_instance_vrf_table_label_List)
+
+        // Write vrf-table-label field as Null when empty, else concrete list
+        if len(routing_instances_instance_vrf_table_label_List) == 0 {
+            routing_instances_instance_model.Vrf_table_label =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Vrf_table_label_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_model.Vrf_table_label, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Vrf_table_label_Model{}.AttrTypes()},
+                    routing_instances_instance_vrf_table_label_List,
+                )
+        }
         routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
-			routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
+
+            routing_instances_instance_List[i_routing_instances_instance] =
+                routing_instances_instance_model
                 
+        // Build routing-options list
         routing_instances_instance_routing_options_List := make([]Routing_instances_Instance_Routing_options_Model, len(v_routing_instances_instance.Routing_options))
+
         
 		for i_routing_instances_instance_routing_options, v_routing_instances_instance_routing_options := range v_routing_instances_instance.Routing_options {
             var routing_instances_instance_routing_options_model Routing_instances_Instance_Routing_options_Model
-			routing_instances_instance_routing_options_List[i_routing_instances_instance_routing_options] = routing_instances_instance_routing_options_model
+
+            routing_instances_instance_routing_options_List[i_routing_instances_instance_routing_options] =
+                routing_instances_instance_routing_options_model
                 
+        // Build auto-export list
         routing_instances_instance_routing_options_auto_export_List := make([]Routing_instances_Instance_Routing_options_Auto_export_Model, len(v_routing_instances_instance_routing_options.Auto_export))
+
         
-        routing_instances_instance_routing_options_model.Auto_export, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Routing_options_Auto_export_Model{}.AttrTypes()}, routing_instances_instance_routing_options_auto_export_List)
+
+        // Write auto-export field as Null when empty, else concrete list
+        if len(routing_instances_instance_routing_options_auto_export_List) == 0 {
+            routing_instances_instance_routing_options_model.Auto_export =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Routing_options_Auto_export_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_routing_options_model.Auto_export, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Routing_options_Auto_export_Model{}.AttrTypes()},
+                    routing_instances_instance_routing_options_auto_export_List,
+                )
+        }
         routing_instances_instance_routing_options_List[i_routing_instances_instance_routing_options] = routing_instances_instance_routing_options_model
         }
-        routing_instances_instance_model.Routing_options, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Routing_options_Model{}.AttrTypes()}, routing_instances_instance_routing_options_List)
+
+        // Write routing-options field as Null when empty, else concrete list
+        if len(routing_instances_instance_routing_options_List) == 0 {
+            routing_instances_instance_model.Routing_options =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Routing_options_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_model.Routing_options, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Routing_options_Model{}.AttrTypes()},
+                    routing_instances_instance_routing_options_List,
+                )
+        }
         routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
-			routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
+
+            routing_instances_instance_List[i_routing_instances_instance] =
+                routing_instances_instance_model
                 
+        // Build protocols list
         routing_instances_instance_protocols_List := make([]Routing_instances_Instance_Protocols_Model, len(v_routing_instances_instance.Protocols))
+
         
 		for i_routing_instances_instance_protocols, v_routing_instances_instance_protocols := range v_routing_instances_instance.Protocols {
             var routing_instances_instance_protocols_model Routing_instances_Instance_Protocols_Model
-			routing_instances_instance_protocols_List[i_routing_instances_instance_protocols] = routing_instances_instance_protocols_model
+
+            routing_instances_instance_protocols_List[i_routing_instances_instance_protocols] =
+                routing_instances_instance_protocols_model
                 
+        // Build ospf list
         routing_instances_instance_protocols_ospf_List := make([]Routing_instances_Instance_Protocols_Ospf_Model, len(v_routing_instances_instance_protocols.Ospf))
+
         
 		for i_routing_instances_instance_protocols_ospf, v_routing_instances_instance_protocols_ospf := range v_routing_instances_instance_protocols.Ospf {
             var routing_instances_instance_protocols_ospf_model Routing_instances_Instance_Protocols_Ospf_Model
-			var var_routing_instances_instance_protocols_export []*string
-			if v_routing_instances_instance_protocols_ospf.Export != nil {
-				var_routing_instances_instance_protocols_export = make([]*string, len(v_routing_instances_instance_protocols_ospf.Export))
-				copy(var_routing_instances_instance_protocols_export, v_routing_instances_instance_protocols_ospf.Export)
-			}
-			routing_instances_instance_protocols_ospf_model.Export, _ = types.ListValueFrom(ctx, types.StringType, var_routing_instances_instance_protocols_export)
-			routing_instances_instance_protocols_ospf_List[i_routing_instances_instance_protocols_ospf] = routing_instances_instance_protocols_ospf_model
-			routing_instances_instance_protocols_ospf_List[i_routing_instances_instance_protocols_ospf] = routing_instances_instance_protocols_ospf_model
+            // leaf-list
+            if v_routing_instances_instance_protocols_ospf.Export == nil ||
+               len(v_routing_instances_instance_protocols_ospf.Export) == 0 {
+                routing_instances_instance_protocols_ospf_model.Export =
+                    types.ListNull(types.StringType)
+            } else {
+                src_routing_instances_instance_protocols_export :=
+                    v_routing_instances_instance_protocols_ospf.Export
+                vals_routing_instances_instance_protocols_export := make([]*string, len(src_routing_instances_instance_protocols_export))
+                copy(vals_routing_instances_instance_protocols_export, src_routing_instances_instance_protocols_export)
+                routing_instances_instance_protocols_ospf_model.Export, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_routing_instances_instance_protocols_export)
+            }
+
+            routing_instances_instance_protocols_ospf_List[i_routing_instances_instance_protocols_ospf] =
+                routing_instances_instance_protocols_ospf_model
+
+            routing_instances_instance_protocols_ospf_List[i_routing_instances_instance_protocols_ospf] =
+                routing_instances_instance_protocols_ospf_model
                 
+        // Build area list
         routing_instances_instance_protocols_ospf_area_List := make([]Routing_instances_Instance_Protocols_Ospf_Area_Model, len(v_routing_instances_instance_protocols_ospf.Area))
+
         
 		for i_routing_instances_instance_protocols_ospf_area, v_routing_instances_instance_protocols_ospf_area := range v_routing_instances_instance_protocols_ospf.Area {
             var routing_instances_instance_protocols_ospf_area_model Routing_instances_Instance_Protocols_Ospf_Area_Model
-            routing_instances_instance_protocols_ospf_area_model.Name = types.StringPointerValue(v_routing_instances_instance_protocols_ospf_area.Name)
-			routing_instances_instance_protocols_ospf_area_List[i_routing_instances_instance_protocols_ospf_area] = routing_instances_instance_protocols_ospf_area_model
-			routing_instances_instance_protocols_ospf_area_List[i_routing_instances_instance_protocols_ospf_area] = routing_instances_instance_protocols_ospf_area_model
+            // leaf
+            if v_routing_instances_instance_protocols_ospf_area.Name == nil {
+                routing_instances_instance_protocols_ospf_area_model.Name =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_protocols_ospf_area_model.Name =
+                types.StringPointerValue(v_routing_instances_instance_protocols_ospf_area.Name)
+			}
+
+            routing_instances_instance_protocols_ospf_area_List[i_routing_instances_instance_protocols_ospf_area] =
+                routing_instances_instance_protocols_ospf_area_model
+
+            routing_instances_instance_protocols_ospf_area_List[i_routing_instances_instance_protocols_ospf_area] =
+                routing_instances_instance_protocols_ospf_area_model
                 
+        // Build interface list
         routing_instances_instance_protocols_ospf_area_interface_List := make([]Routing_instances_Instance_Protocols_Ospf_Area_Interface_Model, len(v_routing_instances_instance_protocols_ospf_area.Interface))
+
         
 		for i_routing_instances_instance_protocols_ospf_area_interface, v_routing_instances_instance_protocols_ospf_area_interface := range v_routing_instances_instance_protocols_ospf_area.Interface {
             var routing_instances_instance_protocols_ospf_area_interface_model Routing_instances_Instance_Protocols_Ospf_Area_Interface_Model
-            routing_instances_instance_protocols_ospf_area_interface_model.Name = types.StringPointerValue(v_routing_instances_instance_protocols_ospf_area_interface.Name)
-			routing_instances_instance_protocols_ospf_area_interface_List[i_routing_instances_instance_protocols_ospf_area_interface] = routing_instances_instance_protocols_ospf_area_interface_model
-            routing_instances_instance_protocols_ospf_area_interface_model.Metric = types.StringPointerValue(v_routing_instances_instance_protocols_ospf_area_interface.Metric)
-			routing_instances_instance_protocols_ospf_area_interface_List[i_routing_instances_instance_protocols_ospf_area_interface] = routing_instances_instance_protocols_ospf_area_interface_model
+            // leaf
+            if v_routing_instances_instance_protocols_ospf_area_interface.Name == nil {
+                routing_instances_instance_protocols_ospf_area_interface_model.Name =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_protocols_ospf_area_interface_model.Name =
+                types.StringPointerValue(v_routing_instances_instance_protocols_ospf_area_interface.Name)
+			}
+
+            routing_instances_instance_protocols_ospf_area_interface_List[i_routing_instances_instance_protocols_ospf_area_interface] =
+                routing_instances_instance_protocols_ospf_area_interface_model
+            // leaf
+            if v_routing_instances_instance_protocols_ospf_area_interface.Metric == nil {
+                routing_instances_instance_protocols_ospf_area_interface_model.Metric =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_protocols_ospf_area_interface_model.Metric =
+                types.StringPointerValue(v_routing_instances_instance_protocols_ospf_area_interface.Metric)
+			}
+
+            routing_instances_instance_protocols_ospf_area_interface_List[i_routing_instances_instance_protocols_ospf_area_interface] =
+                routing_instances_instance_protocols_ospf_area_interface_model
         }
-        routing_instances_instance_protocols_ospf_area_model.Interface, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Ospf_Area_Interface_Model{}.AttrTypes()}, routing_instances_instance_protocols_ospf_area_interface_List)
+
+        // Write interface field as Null when empty, else concrete list
+        if len(routing_instances_instance_protocols_ospf_area_interface_List) == 0 {
+            routing_instances_instance_protocols_ospf_area_model.Interface =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Ospf_Area_Interface_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_protocols_ospf_area_model.Interface, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Ospf_Area_Interface_Model{}.AttrTypes()},
+                    routing_instances_instance_protocols_ospf_area_interface_List,
+                )
+        }
         routing_instances_instance_protocols_ospf_area_List[i_routing_instances_instance_protocols_ospf_area] = routing_instances_instance_protocols_ospf_area_model
         }
-        routing_instances_instance_protocols_ospf_model.Area, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Ospf_Area_Model{}.AttrTypes()}, routing_instances_instance_protocols_ospf_area_List)
+
+        // Write area field as Null when empty, else concrete list
+        if len(routing_instances_instance_protocols_ospf_area_List) == 0 {
+            routing_instances_instance_protocols_ospf_model.Area =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Ospf_Area_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_protocols_ospf_model.Area, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Ospf_Area_Model{}.AttrTypes()},
+                    routing_instances_instance_protocols_ospf_area_List,
+                )
+        }
         routing_instances_instance_protocols_ospf_List[i_routing_instances_instance_protocols_ospf] = routing_instances_instance_protocols_ospf_model
         }
-        routing_instances_instance_protocols_model.Ospf, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Ospf_Model{}.AttrTypes()}, routing_instances_instance_protocols_ospf_List)
+
+        // Write ospf field as Null when empty, else concrete list
+        if len(routing_instances_instance_protocols_ospf_List) == 0 {
+            routing_instances_instance_protocols_model.Ospf =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Ospf_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_protocols_model.Ospf, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Ospf_Model{}.AttrTypes()},
+                    routing_instances_instance_protocols_ospf_List,
+                )
+        }
         routing_instances_instance_protocols_List[i_routing_instances_instance_protocols] = routing_instances_instance_protocols_model
-			routing_instances_instance_protocols_List[i_routing_instances_instance_protocols] = routing_instances_instance_protocols_model
+
+            routing_instances_instance_protocols_List[i_routing_instances_instance_protocols] =
+                routing_instances_instance_protocols_model
                 
+        // Build evpn list
         routing_instances_instance_protocols_evpn_List := make([]Routing_instances_Instance_Protocols_Evpn_Model, len(v_routing_instances_instance_protocols.Evpn))
+
         
 		for i_routing_instances_instance_protocols_evpn, v_routing_instances_instance_protocols_evpn := range v_routing_instances_instance_protocols.Evpn {
             var routing_instances_instance_protocols_evpn_model Routing_instances_Instance_Protocols_Evpn_Model
-			routing_instances_instance_protocols_evpn_List[i_routing_instances_instance_protocols_evpn] = routing_instances_instance_protocols_evpn_model
+
+            routing_instances_instance_protocols_evpn_List[i_routing_instances_instance_protocols_evpn] =
+                routing_instances_instance_protocols_evpn_model
                 
+        // Build ip-prefix-routes list
         routing_instances_instance_protocols_evpn_ip_prefix_routes_List := make([]Routing_instances_Instance_Protocols_Evpn_Ip_prefix_routes_Model, len(v_routing_instances_instance_protocols_evpn.Ip_prefix_routes))
+
         
 		for i_routing_instances_instance_protocols_evpn_ip_prefix_routes, v_routing_instances_instance_protocols_evpn_ip_prefix_routes := range v_routing_instances_instance_protocols_evpn.Ip_prefix_routes {
             var routing_instances_instance_protocols_evpn_ip_prefix_routes_model Routing_instances_Instance_Protocols_Evpn_Ip_prefix_routes_Model
-            routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Advertise = types.StringPointerValue(v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Advertise)
-			routing_instances_instance_protocols_evpn_ip_prefix_routes_List[i_routing_instances_instance_protocols_evpn_ip_prefix_routes] = routing_instances_instance_protocols_evpn_ip_prefix_routes_model
-            routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Encapsulation = types.StringPointerValue(v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Encapsulation)
-			routing_instances_instance_protocols_evpn_ip_prefix_routes_List[i_routing_instances_instance_protocols_evpn_ip_prefix_routes] = routing_instances_instance_protocols_evpn_ip_prefix_routes_model
-            routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Vni = types.StringPointerValue(v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Vni)
-			routing_instances_instance_protocols_evpn_ip_prefix_routes_List[i_routing_instances_instance_protocols_evpn_ip_prefix_routes] = routing_instances_instance_protocols_evpn_ip_prefix_routes_model
-			var var_routing_instances_instance_protocols_evpn_export []*string
-			if v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Export != nil {
-				var_routing_instances_instance_protocols_evpn_export = make([]*string, len(v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Export))
-				copy(var_routing_instances_instance_protocols_evpn_export, v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Export)
+            // leaf
+            if v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Advertise == nil {
+                routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Advertise =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Advertise =
+                types.StringPointerValue(v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Advertise)
 			}
-			routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Export, _ = types.ListValueFrom(ctx, types.StringType, var_routing_instances_instance_protocols_evpn_export)
-			routing_instances_instance_protocols_evpn_ip_prefix_routes_List[i_routing_instances_instance_protocols_evpn_ip_prefix_routes] = routing_instances_instance_protocols_evpn_ip_prefix_routes_model
+
+            routing_instances_instance_protocols_evpn_ip_prefix_routes_List[i_routing_instances_instance_protocols_evpn_ip_prefix_routes] =
+                routing_instances_instance_protocols_evpn_ip_prefix_routes_model
+            // leaf
+            if v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Encapsulation == nil {
+                routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Encapsulation =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Encapsulation =
+                types.StringPointerValue(v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Encapsulation)
+			}
+
+            routing_instances_instance_protocols_evpn_ip_prefix_routes_List[i_routing_instances_instance_protocols_evpn_ip_prefix_routes] =
+                routing_instances_instance_protocols_evpn_ip_prefix_routes_model
+            // leaf
+            if v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Vni == nil {
+                routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Vni =
+                    types.StringNull()
+            } else {
+				routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Vni =
+                types.StringPointerValue(v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Vni)
+			}
+
+            routing_instances_instance_protocols_evpn_ip_prefix_routes_List[i_routing_instances_instance_protocols_evpn_ip_prefix_routes] =
+                routing_instances_instance_protocols_evpn_ip_prefix_routes_model
+            // leaf-list
+            if v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Export == nil ||
+               len(v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Export) == 0 {
+                routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Export =
+                    types.ListNull(types.StringType)
+            } else {
+                src_routing_instances_instance_protocols_evpn_export :=
+                    v_routing_instances_instance_protocols_evpn_ip_prefix_routes.Export
+                vals_routing_instances_instance_protocols_evpn_export := make([]*string, len(src_routing_instances_instance_protocols_evpn_export))
+                copy(vals_routing_instances_instance_protocols_evpn_export, src_routing_instances_instance_protocols_evpn_export)
+                routing_instances_instance_protocols_evpn_ip_prefix_routes_model.Export, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_routing_instances_instance_protocols_evpn_export)
+            }
+
+            routing_instances_instance_protocols_evpn_ip_prefix_routes_List[i_routing_instances_instance_protocols_evpn_ip_prefix_routes] =
+                routing_instances_instance_protocols_evpn_ip_prefix_routes_model
         }
-        routing_instances_instance_protocols_evpn_model.Ip_prefix_routes, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Evpn_Ip_prefix_routes_Model{}.AttrTypes()}, routing_instances_instance_protocols_evpn_ip_prefix_routes_List)
+
+        // Write ip-prefix-routes field as Null when empty, else concrete list
+        if len(routing_instances_instance_protocols_evpn_ip_prefix_routes_List) == 0 {
+            routing_instances_instance_protocols_evpn_model.Ip_prefix_routes =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Evpn_Ip_prefix_routes_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_protocols_evpn_model.Ip_prefix_routes, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Evpn_Ip_prefix_routes_Model{}.AttrTypes()},
+                    routing_instances_instance_protocols_evpn_ip_prefix_routes_List,
+                )
+        }
         routing_instances_instance_protocols_evpn_List[i_routing_instances_instance_protocols_evpn] = routing_instances_instance_protocols_evpn_model
         }
-        routing_instances_instance_protocols_model.Evpn, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Evpn_Model{}.AttrTypes()}, routing_instances_instance_protocols_evpn_List)
+
+        // Write evpn field as Null when empty, else concrete list
+        if len(routing_instances_instance_protocols_evpn_List) == 0 {
+            routing_instances_instance_protocols_model.Evpn =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Evpn_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_protocols_model.Evpn, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Evpn_Model{}.AttrTypes()},
+                    routing_instances_instance_protocols_evpn_List,
+                )
+        }
         routing_instances_instance_protocols_List[i_routing_instances_instance_protocols] = routing_instances_instance_protocols_model
         }
-        routing_instances_instance_model.Protocols, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Model{}.AttrTypes()}, routing_instances_instance_protocols_List)
+
+        // Write protocols field as Null when empty, else concrete list
+        if len(routing_instances_instance_protocols_List) == 0 {
+            routing_instances_instance_model.Protocols =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Model{}.AttrTypes()})
+        } else {
+            routing_instances_instance_model.Protocols, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Protocols_Model{}.AttrTypes()},
+                    routing_instances_instance_protocols_List,
+                )
+        }
         routing_instances_instance_List[i_routing_instances_instance] = routing_instances_instance_model
         }
-        routing_instances_model.Instance, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Instance_Model{}.AttrTypes()}, routing_instances_instance_List)
+
+        // Write instance field as Null when empty, else concrete list
+        if len(routing_instances_instance_List) == 0 {
+            routing_instances_model.Instance =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Instance_Model{}.AttrTypes()})
+        } else {
+            routing_instances_model.Instance, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_instances_Instance_Model{}.AttrTypes()},
+                    routing_instances_instance_List,
+                )
+        }
+        routing_instances_List[i_routing_instances] = routing_instances_model
+
         routing_instances_List[i_routing_instances] = routing_instances_model
     }
-    state.Routing_instances, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_instances_Model{}.AttrTypes()}, routing_instances_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-    state.Routing_options = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    routing_options_List := make([]Routing_options_Model, len(config.Groups.Routing_options))
+
+    // Write parent list as Null when empty
+    if len(routing_instances_List) == 0 {
+        state.Routing_instances =
+            types.ListNull(types.ObjectType{AttrTypes: Routing_instances_Model{}.AttrTypes()})
+    } else {
+        state.Routing_instances, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: Routing_instances_Model{}.AttrTypes()},
+                routing_instances_List,
+            )
+    }
+    // Initialize routing-options as Null; only materialize when we have elements
+    state.Routing_options =
+        types.ListNull(types.ObjectType{AttrTypes: Routing_options_Model{}.AttrTypes()})
+
+    // Build list from device
+    routing_options_List := make([]Routing_options_Model,
+        len(config.Groups.Routing_options))
+
     for i_routing_options, v_routing_options := range config.Groups.Routing_options {
         var routing_options_model Routing_options_Model
+            
+        // Build static list
         routing_options_static_List := make([]Routing_options_Static_Model, len(v_routing_options.Static))
+
         
 		for i_routing_options_static, v_routing_options_static := range v_routing_options.Static {
             var routing_options_static_model Routing_options_Static_Model
-			routing_options_static_List[i_routing_options_static] = routing_options_static_model
+
+            routing_options_static_List[i_routing_options_static] =
+                routing_options_static_model
                 
+        // Build route list
         routing_options_static_route_List := make([]Routing_options_Static_Route_Model, len(v_routing_options_static.Route))
+
         
 		for i_routing_options_static_route, v_routing_options_static_route := range v_routing_options_static.Route {
             var routing_options_static_route_model Routing_options_Static_Route_Model
-            routing_options_static_route_model.Name = types.StringPointerValue(v_routing_options_static_route.Name)
-			routing_options_static_route_List[i_routing_options_static_route] = routing_options_static_route_model
-			var var_routing_options_static_next_hop []*string
-			if v_routing_options_static_route.Next_hop != nil {
-				var_routing_options_static_next_hop = make([]*string, len(v_routing_options_static_route.Next_hop))
-				copy(var_routing_options_static_next_hop, v_routing_options_static_route.Next_hop)
+            // leaf
+            if v_routing_options_static_route.Name == nil {
+                routing_options_static_route_model.Name =
+                    types.StringNull()
+            } else {
+				routing_options_static_route_model.Name =
+                types.StringPointerValue(v_routing_options_static_route.Name)
 			}
-			routing_options_static_route_model.Next_hop, _ = types.ListValueFrom(ctx, types.StringType, var_routing_options_static_next_hop)
-			routing_options_static_route_List[i_routing_options_static_route] = routing_options_static_route_model
+
+            routing_options_static_route_List[i_routing_options_static_route] =
+                routing_options_static_route_model
+            // leaf-list
+            if v_routing_options_static_route.Next_hop == nil ||
+               len(v_routing_options_static_route.Next_hop) == 0 {
+                routing_options_static_route_model.Next_hop =
+                    types.ListNull(types.StringType)
+            } else {
+                src_routing_options_static_next_hop :=
+                    v_routing_options_static_route.Next_hop
+                vals_routing_options_static_next_hop := make([]*string, len(src_routing_options_static_next_hop))
+                copy(vals_routing_options_static_next_hop, src_routing_options_static_next_hop)
+                routing_options_static_route_model.Next_hop, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_routing_options_static_next_hop)
+            }
+
+            routing_options_static_route_List[i_routing_options_static_route] =
+                routing_options_static_route_model
         }
-        routing_options_static_model.Route, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_options_Static_Route_Model{}.AttrTypes()}, routing_options_static_route_List)
+
+        // Write route field as Null when empty, else concrete list
+        if len(routing_options_static_route_List) == 0 {
+            routing_options_static_model.Route =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_options_Static_Route_Model{}.AttrTypes()})
+        } else {
+            routing_options_static_model.Route, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_options_Static_Route_Model{}.AttrTypes()},
+                    routing_options_static_route_List,
+                )
+        }
         routing_options_static_List[i_routing_options_static] = routing_options_static_model
         }
-        routing_options_model.Static, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_options_Static_Model{}.AttrTypes()}, routing_options_static_List)
+
+        // Write static field as Null when empty, else concrete list
+        if len(routing_options_static_List) == 0 {
+            routing_options_model.Static =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_options_Static_Model{}.AttrTypes()})
+        } else {
+            routing_options_model.Static, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_options_Static_Model{}.AttrTypes()},
+                    routing_options_static_List,
+                )
+        }
         routing_options_List[i_routing_options] = routing_options_model
+		if v_routing_options.Router_id == nil {
+			routing_options_model.Router_id = types.StringNull()
+		} else {
+			routing_options_model.Router_id =
+				types.StringPointerValue(v_routing_options.Router_id)
+		}
+            
+        // Build forwarding-table list
         routing_options_forwarding_table_List := make([]Routing_options_Forwarding_table_Model, len(v_routing_options.Forwarding_table))
+
         
 		for i_routing_options_forwarding_table, v_routing_options_forwarding_table := range v_routing_options.Forwarding_table {
             var routing_options_forwarding_table_model Routing_options_Forwarding_table_Model
-			var var_routing_options_export []*string
-			if v_routing_options_forwarding_table.Export != nil {
-				var_routing_options_export = make([]*string, len(v_routing_options_forwarding_table.Export))
-				copy(var_routing_options_export, v_routing_options_forwarding_table.Export)
+            // leaf-list
+            if v_routing_options_forwarding_table.Export == nil ||
+               len(v_routing_options_forwarding_table.Export) == 0 {
+                routing_options_forwarding_table_model.Export =
+                    types.ListNull(types.StringType)
+            } else {
+                src_routing_options_export :=
+                    v_routing_options_forwarding_table.Export
+                vals_routing_options_export := make([]*string, len(src_routing_options_export))
+                copy(vals_routing_options_export, src_routing_options_export)
+                routing_options_forwarding_table_model.Export, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_routing_options_export)
+            }
+
+            routing_options_forwarding_table_List[i_routing_options_forwarding_table] =
+                routing_options_forwarding_table_model
+            // leaf
+            if v_routing_options_forwarding_table.Ecmp_fast_reroute == nil {
+                routing_options_forwarding_table_model.Ecmp_fast_reroute =
+                    types.StringNull()
+            } else {
+				routing_options_forwarding_table_model.Ecmp_fast_reroute =
+                types.StringPointerValue(v_routing_options_forwarding_table.Ecmp_fast_reroute)
 			}
-			routing_options_forwarding_table_model.Export, _ = types.ListValueFrom(ctx, types.StringType, var_routing_options_export)
-			routing_options_forwarding_table_List[i_routing_options_forwarding_table] = routing_options_forwarding_table_model
-            routing_options_forwarding_table_model.Ecmp_fast_reroute = types.StringPointerValue(v_routing_options_forwarding_table.Ecmp_fast_reroute)
-			routing_options_forwarding_table_List[i_routing_options_forwarding_table] = routing_options_forwarding_table_model
-			routing_options_forwarding_table_List[i_routing_options_forwarding_table] = routing_options_forwarding_table_model
+
+            routing_options_forwarding_table_List[i_routing_options_forwarding_table] =
+                routing_options_forwarding_table_model
+
+            routing_options_forwarding_table_List[i_routing_options_forwarding_table] =
+                routing_options_forwarding_table_model
                 
+        // Build chained-composite-next-hop list
         routing_options_forwarding_table_chained_composite_next_hop_List := make([]Routing_options_Forwarding_table_Chained_composite_next_hop_Model, len(v_routing_options_forwarding_table.Chained_composite_next_hop))
+
         
 		for i_routing_options_forwarding_table_chained_composite_next_hop, v_routing_options_forwarding_table_chained_composite_next_hop := range v_routing_options_forwarding_table.Chained_composite_next_hop {
             var routing_options_forwarding_table_chained_composite_next_hop_model Routing_options_Forwarding_table_Chained_composite_next_hop_Model
-			routing_options_forwarding_table_chained_composite_next_hop_List[i_routing_options_forwarding_table_chained_composite_next_hop] = routing_options_forwarding_table_chained_composite_next_hop_model
+
+            routing_options_forwarding_table_chained_composite_next_hop_List[i_routing_options_forwarding_table_chained_composite_next_hop] =
+                routing_options_forwarding_table_chained_composite_next_hop_model
                 
+        // Build ingress list
         routing_options_forwarding_table_chained_composite_next_hop_ingress_List := make([]Routing_options_Forwarding_table_Chained_composite_next_hop_Ingress_Model, len(v_routing_options_forwarding_table_chained_composite_next_hop.Ingress))
+
         
 		for i_routing_options_forwarding_table_chained_composite_next_hop_ingress, v_routing_options_forwarding_table_chained_composite_next_hop_ingress := range v_routing_options_forwarding_table_chained_composite_next_hop.Ingress {
             var routing_options_forwarding_table_chained_composite_next_hop_ingress_model Routing_options_Forwarding_table_Chained_composite_next_hop_Ingress_Model
-            routing_options_forwarding_table_chained_composite_next_hop_ingress_model.Evpn = types.StringPointerValue(v_routing_options_forwarding_table_chained_composite_next_hop_ingress.Evpn)
-			routing_options_forwarding_table_chained_composite_next_hop_ingress_List[i_routing_options_forwarding_table_chained_composite_next_hop_ingress] = routing_options_forwarding_table_chained_composite_next_hop_ingress_model
+            // leaf
+            if v_routing_options_forwarding_table_chained_composite_next_hop_ingress.Evpn == nil {
+                routing_options_forwarding_table_chained_composite_next_hop_ingress_model.Evpn =
+                    types.StringNull()
+            } else {
+				routing_options_forwarding_table_chained_composite_next_hop_ingress_model.Evpn =
+                types.StringPointerValue(v_routing_options_forwarding_table_chained_composite_next_hop_ingress.Evpn)
+			}
+
+            routing_options_forwarding_table_chained_composite_next_hop_ingress_List[i_routing_options_forwarding_table_chained_composite_next_hop_ingress] =
+                routing_options_forwarding_table_chained_composite_next_hop_ingress_model
         }
-        routing_options_forwarding_table_chained_composite_next_hop_model.Ingress, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_options_Forwarding_table_Chained_composite_next_hop_Ingress_Model{}.AttrTypes()}, routing_options_forwarding_table_chained_composite_next_hop_ingress_List)
+
+        // Write ingress field as Null when empty, else concrete list
+        if len(routing_options_forwarding_table_chained_composite_next_hop_ingress_List) == 0 {
+            routing_options_forwarding_table_chained_composite_next_hop_model.Ingress =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_options_Forwarding_table_Chained_composite_next_hop_Ingress_Model{}.AttrTypes()})
+        } else {
+            routing_options_forwarding_table_chained_composite_next_hop_model.Ingress, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_options_Forwarding_table_Chained_composite_next_hop_Ingress_Model{}.AttrTypes()},
+                    routing_options_forwarding_table_chained_composite_next_hop_ingress_List,
+                )
+        }
         routing_options_forwarding_table_chained_composite_next_hop_List[i_routing_options_forwarding_table_chained_composite_next_hop] = routing_options_forwarding_table_chained_composite_next_hop_model
         }
-        routing_options_forwarding_table_model.Chained_composite_next_hop, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_options_Forwarding_table_Chained_composite_next_hop_Model{}.AttrTypes()}, routing_options_forwarding_table_chained_composite_next_hop_List)
+
+        // Write chained-composite-next-hop field as Null when empty, else concrete list
+        if len(routing_options_forwarding_table_chained_composite_next_hop_List) == 0 {
+            routing_options_forwarding_table_model.Chained_composite_next_hop =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_options_Forwarding_table_Chained_composite_next_hop_Model{}.AttrTypes()})
+        } else {
+            routing_options_forwarding_table_model.Chained_composite_next_hop, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_options_Forwarding_table_Chained_composite_next_hop_Model{}.AttrTypes()},
+                    routing_options_forwarding_table_chained_composite_next_hop_List,
+                )
+        }
         routing_options_forwarding_table_List[i_routing_options_forwarding_table] = routing_options_forwarding_table_model
         }
-        routing_options_model.Forwarding_table, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_options_Forwarding_table_Model{}.AttrTypes()}, routing_options_forwarding_table_List)
+
+        // Write forwarding-table field as Null when empty, else concrete list
+        if len(routing_options_forwarding_table_List) == 0 {
+            routing_options_model.Forwarding_table =
+                types.ListNull(types.ObjectType{AttrTypes: Routing_options_Forwarding_table_Model{}.AttrTypes()})
+        } else {
+            routing_options_model.Forwarding_table, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Routing_options_Forwarding_table_Model{}.AttrTypes()},
+                    routing_options_forwarding_table_List,
+                )
+        }
+        routing_options_List[i_routing_options] = routing_options_model
+
         routing_options_List[i_routing_options] = routing_options_model
     }
-    state.Routing_options, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Routing_options_Model{}.AttrTypes()}, routing_options_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-    state.Snmp = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    snmp_List := make([]Snmp_Model, len(config.Groups.Snmp))
+
+    // Write parent list as Null when empty
+    if len(routing_options_List) == 0 {
+        state.Routing_options =
+            types.ListNull(types.ObjectType{AttrTypes: Routing_options_Model{}.AttrTypes()})
+    } else {
+        state.Routing_options, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: Routing_options_Model{}.AttrTypes()},
+                routing_options_List,
+            )
+    }
+    // Initialize snmp as Null; only materialize when we have elements
+    state.Snmp =
+        types.ListNull(types.ObjectType{AttrTypes: Snmp_Model{}.AttrTypes()})
+
+    // Build list from device
+    snmp_List := make([]Snmp_Model,
+        len(config.Groups.Snmp))
+
     for i_snmp, v_snmp := range config.Groups.Snmp {
         var snmp_model Snmp_Model
+		if v_snmp.Location == nil {
+			snmp_model.Location = types.StringNull()
+		} else {
+			snmp_model.Location =
+				types.StringPointerValue(v_snmp.Location)
+		}
+		if v_snmp.Contact == nil {
+			snmp_model.Contact = types.StringNull()
+		} else {
+			snmp_model.Contact =
+				types.StringPointerValue(v_snmp.Contact)
+		}
+            
+        // Build community list
         snmp_community_List := make([]Snmp_Community_Model, len(v_snmp.Community))
+
         
 		for i_snmp_community, v_snmp_community := range v_snmp.Community {
             var snmp_community_model Snmp_Community_Model
-            snmp_community_model.Name = types.StringPointerValue(v_snmp_community.Name)
-			snmp_community_List[i_snmp_community] = snmp_community_model
-            snmp_community_model.Authorization = types.StringPointerValue(v_snmp_community.Authorization)
-			snmp_community_List[i_snmp_community] = snmp_community_model
+            // leaf
+            if v_snmp_community.Name == nil {
+                snmp_community_model.Name =
+                    types.StringNull()
+            } else {
+				snmp_community_model.Name =
+                types.StringPointerValue(v_snmp_community.Name)
+			}
+
+            snmp_community_List[i_snmp_community] =
+                snmp_community_model
+            // leaf
+            if v_snmp_community.Authorization == nil {
+                snmp_community_model.Authorization =
+                    types.StringNull()
+            } else {
+				snmp_community_model.Authorization =
+                types.StringPointerValue(v_snmp_community.Authorization)
+			}
+
+            snmp_community_List[i_snmp_community] =
+                snmp_community_model
         }
-        snmp_model.Community, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Snmp_Community_Model{}.AttrTypes()}, snmp_community_List)
+
+        // Write community field as Null when empty, else concrete list
+        if len(snmp_community_List) == 0 {
+            snmp_model.Community =
+                types.ListNull(types.ObjectType{AttrTypes: Snmp_Community_Model{}.AttrTypes()})
+        } else {
+            snmp_model.Community, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Snmp_Community_Model{}.AttrTypes()},
+                    snmp_community_List,
+                )
+        }
+        snmp_List[i_snmp] = snmp_model
+
         snmp_List[i_snmp] = snmp_model
     }
-    state.Snmp, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Snmp_Model{}.AttrTypes()}, snmp_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-    state.Switch_options = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    switch_options_List := make([]Switch_options_Model, len(config.Groups.Switch_options))
+
+    // Write parent list as Null when empty
+    if len(snmp_List) == 0 {
+        state.Snmp =
+            types.ListNull(types.ObjectType{AttrTypes: Snmp_Model{}.AttrTypes()})
+    } else {
+        state.Snmp, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: Snmp_Model{}.AttrTypes()},
+                snmp_List,
+            )
+    }
+    // Initialize switch-options as Null; only materialize when we have elements
+    state.Switch_options =
+        types.ListNull(types.ObjectType{AttrTypes: Switch_options_Model{}.AttrTypes()})
+
+    // Build list from device
+    switch_options_List := make([]Switch_options_Model,
+        len(config.Groups.Switch_options))
+
     for i_switch_options, v_switch_options := range config.Groups.Switch_options {
         var switch_options_model Switch_options_Model
+            
+        // Build vtep-source-interface list
         switch_options_vtep_source_interface_List := make([]Switch_options_Vtep_source_interface_Model, len(v_switch_options.Vtep_source_interface))
+
         
 		for i_switch_options_vtep_source_interface, v_switch_options_vtep_source_interface := range v_switch_options.Vtep_source_interface {
             var switch_options_vtep_source_interface_model Switch_options_Vtep_source_interface_Model
-            switch_options_vtep_source_interface_model.Interface_name = types.StringPointerValue(v_switch_options_vtep_source_interface.Interface_name)
-			switch_options_vtep_source_interface_List[i_switch_options_vtep_source_interface] = switch_options_vtep_source_interface_model
+            // leaf
+            if v_switch_options_vtep_source_interface.Interface_name == nil {
+                switch_options_vtep_source_interface_model.Interface_name =
+                    types.StringNull()
+            } else {
+				switch_options_vtep_source_interface_model.Interface_name =
+                types.StringPointerValue(v_switch_options_vtep_source_interface.Interface_name)
+			}
+
+            switch_options_vtep_source_interface_List[i_switch_options_vtep_source_interface] =
+                switch_options_vtep_source_interface_model
         }
-        switch_options_model.Vtep_source_interface, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Switch_options_Vtep_source_interface_Model{}.AttrTypes()}, switch_options_vtep_source_interface_List)
+
+        // Write vtep-source-interface field as Null when empty, else concrete list
+        if len(switch_options_vtep_source_interface_List) == 0 {
+            switch_options_model.Vtep_source_interface =
+                types.ListNull(types.ObjectType{AttrTypes: Switch_options_Vtep_source_interface_Model{}.AttrTypes()})
+        } else {
+            switch_options_model.Vtep_source_interface, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Switch_options_Vtep_source_interface_Model{}.AttrTypes()},
+                    switch_options_vtep_source_interface_List,
+                )
+        }
         switch_options_List[i_switch_options] = switch_options_model
+            
+        // Build route-distinguisher list
         switch_options_route_distinguisher_List := make([]Switch_options_Route_distinguisher_Model, len(v_switch_options.Route_distinguisher))
+
         
 		for i_switch_options_route_distinguisher, v_switch_options_route_distinguisher := range v_switch_options.Route_distinguisher {
             var switch_options_route_distinguisher_model Switch_options_Route_distinguisher_Model
-            switch_options_route_distinguisher_model.Rd_type = types.StringPointerValue(v_switch_options_route_distinguisher.Rd_type)
-			switch_options_route_distinguisher_List[i_switch_options_route_distinguisher] = switch_options_route_distinguisher_model
+            // leaf
+            if v_switch_options_route_distinguisher.Rd_type == nil {
+                switch_options_route_distinguisher_model.Rd_type =
+                    types.StringNull()
+            } else {
+				switch_options_route_distinguisher_model.Rd_type =
+                types.StringPointerValue(v_switch_options_route_distinguisher.Rd_type)
+			}
+
+            switch_options_route_distinguisher_List[i_switch_options_route_distinguisher] =
+                switch_options_route_distinguisher_model
         }
-        switch_options_model.Route_distinguisher, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Switch_options_Route_distinguisher_Model{}.AttrTypes()}, switch_options_route_distinguisher_List)
+
+        // Write route-distinguisher field as Null when empty, else concrete list
+        if len(switch_options_route_distinguisher_List) == 0 {
+            switch_options_model.Route_distinguisher =
+                types.ListNull(types.ObjectType{AttrTypes: Switch_options_Route_distinguisher_Model{}.AttrTypes()})
+        } else {
+            switch_options_model.Route_distinguisher, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Switch_options_Route_distinguisher_Model{}.AttrTypes()},
+                    switch_options_route_distinguisher_List,
+                )
+        }
         switch_options_List[i_switch_options] = switch_options_model
+            
+        // Build vrf-target list
         switch_options_vrf_target_List := make([]Switch_options_Vrf_target_Model, len(v_switch_options.Vrf_target))
+
         
 		for i_switch_options_vrf_target, v_switch_options_vrf_target := range v_switch_options.Vrf_target {
             var switch_options_vrf_target_model Switch_options_Vrf_target_Model
-            switch_options_vrf_target_model.Community = types.StringPointerValue(v_switch_options_vrf_target.Community)
-			switch_options_vrf_target_List[i_switch_options_vrf_target] = switch_options_vrf_target_model
-			switch_options_vrf_target_List[i_switch_options_vrf_target] = switch_options_vrf_target_model
+            // leaf
+            if v_switch_options_vrf_target.Community == nil {
+                switch_options_vrf_target_model.Community =
+                    types.StringNull()
+            } else {
+				switch_options_vrf_target_model.Community =
+                types.StringPointerValue(v_switch_options_vrf_target.Community)
+			}
+
+            switch_options_vrf_target_List[i_switch_options_vrf_target] =
+                switch_options_vrf_target_model
+
+            switch_options_vrf_target_List[i_switch_options_vrf_target] =
+                switch_options_vrf_target_model
                 
+        // Build auto list
         switch_options_vrf_target_auto_List := make([]Switch_options_Vrf_target_Auto_Model, len(v_switch_options_vrf_target.Auto))
+
         
-        switch_options_vrf_target_model.Auto, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Switch_options_Vrf_target_Auto_Model{}.AttrTypes()}, switch_options_vrf_target_auto_List)
+
+        // Write auto field as Null when empty, else concrete list
+        if len(switch_options_vrf_target_auto_List) == 0 {
+            switch_options_vrf_target_model.Auto =
+                types.ListNull(types.ObjectType{AttrTypes: Switch_options_Vrf_target_Auto_Model{}.AttrTypes()})
+        } else {
+            switch_options_vrf_target_model.Auto, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Switch_options_Vrf_target_Auto_Model{}.AttrTypes()},
+                    switch_options_vrf_target_auto_List,
+                )
+        }
         switch_options_vrf_target_List[i_switch_options_vrf_target] = switch_options_vrf_target_model
         }
-        switch_options_model.Vrf_target, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Switch_options_Vrf_target_Model{}.AttrTypes()}, switch_options_vrf_target_List)
+
+        // Write vrf-target field as Null when empty, else concrete list
+        if len(switch_options_vrf_target_List) == 0 {
+            switch_options_model.Vrf_target =
+                types.ListNull(types.ObjectType{AttrTypes: Switch_options_Vrf_target_Model{}.AttrTypes()})
+        } else {
+            switch_options_model.Vrf_target, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Switch_options_Vrf_target_Model{}.AttrTypes()},
+                    switch_options_vrf_target_List,
+                )
+        }
+        switch_options_List[i_switch_options] = switch_options_model
+
         switch_options_List[i_switch_options] = switch_options_model
     }
-    state.Switch_options, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Switch_options_Model{}.AttrTypes()}, switch_options_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-    state.System = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    system_List := make([]System_Model, len(config.Groups.System))
+
+    // Write parent list as Null when empty
+    if len(switch_options_List) == 0 {
+        state.Switch_options =
+            types.ListNull(types.ObjectType{AttrTypes: Switch_options_Model{}.AttrTypes()})
+    } else {
+        state.Switch_options, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: Switch_options_Model{}.AttrTypes()},
+                switch_options_List,
+            )
+    }
+    // Initialize system as Null; only materialize when we have elements
+    state.System =
+        types.ListNull(types.ObjectType{AttrTypes: System_Model{}.AttrTypes()})
+
+    // Build list from device
+    system_List := make([]System_Model,
+        len(config.Groups.System))
+
     for i_system, v_system := range config.Groups.System {
         var system_model System_Model
+            
+        // Build login list
         system_login_List := make([]System_Login_Model, len(v_system.Login))
+
         
 		for i_system_login, v_system_login := range v_system.Login {
             var system_login_model System_Login_Model
-			system_login_List[i_system_login] = system_login_model
+
+            system_login_List[i_system_login] =
+                system_login_model
                 
+        // Build user list
         system_login_user_List := make([]System_Login_User_Model, len(v_system_login.User))
+
         
 		for i_system_login_user, v_system_login_user := range v_system_login.User {
             var system_login_user_model System_Login_User_Model
-            system_login_user_model.Name = types.StringPointerValue(v_system_login_user.Name)
-			system_login_user_List[i_system_login_user] = system_login_user_model
-            system_login_user_model.Uid = types.StringPointerValue(v_system_login_user.Uid)
-			system_login_user_List[i_system_login_user] = system_login_user_model
-            system_login_user_model.Class = types.StringPointerValue(v_system_login_user.Class)
-			system_login_user_List[i_system_login_user] = system_login_user_model
-			system_login_user_List[i_system_login_user] = system_login_user_model
+            // leaf
+            if v_system_login_user.Name == nil {
+                system_login_user_model.Name =
+                    types.StringNull()
+            } else {
+				system_login_user_model.Name =
+                types.StringPointerValue(v_system_login_user.Name)
+			}
+
+            system_login_user_List[i_system_login_user] =
+                system_login_user_model
+            // leaf
+            if v_system_login_user.Uid == nil {
+                system_login_user_model.Uid =
+                    types.StringNull()
+            } else {
+				system_login_user_model.Uid =
+                types.StringPointerValue(v_system_login_user.Uid)
+			}
+
+            system_login_user_List[i_system_login_user] =
+                system_login_user_model
+            // leaf
+            if v_system_login_user.Class == nil {
+                system_login_user_model.Class =
+                    types.StringNull()
+            } else {
+				system_login_user_model.Class =
+                types.StringPointerValue(v_system_login_user.Class)
+			}
+
+            system_login_user_List[i_system_login_user] =
+                system_login_user_model
+
+            system_login_user_List[i_system_login_user] =
+                system_login_user_model
                 
+        // Build authentication list
         system_login_user_authentication_List := make([]System_Login_User_Authentication_Model, len(v_system_login_user.Authentication))
+
         
 		for i_system_login_user_authentication, v_system_login_user_authentication := range v_system_login_user.Authentication {
             var system_login_user_authentication_model System_Login_User_Authentication_Model
-            system_login_user_authentication_model.Encrypted_password = types.StringPointerValue(v_system_login_user_authentication.Encrypted_password)
-			system_login_user_authentication_List[i_system_login_user_authentication] = system_login_user_authentication_model
+            // leaf
+            if v_system_login_user_authentication.Encrypted_password == nil {
+                system_login_user_authentication_model.Encrypted_password =
+                    types.StringNull()
+            } else {
+				system_login_user_authentication_model.Encrypted_password =
+                types.StringPointerValue(v_system_login_user_authentication.Encrypted_password)
+			}
+
+            system_login_user_authentication_List[i_system_login_user_authentication] =
+                system_login_user_authentication_model
         }
-        system_login_user_model.Authentication, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Login_User_Authentication_Model{}.AttrTypes()}, system_login_user_authentication_List)
+
+        // Write authentication field as Null when empty, else concrete list
+        if len(system_login_user_authentication_List) == 0 {
+            system_login_user_model.Authentication =
+                types.ListNull(types.ObjectType{AttrTypes: System_Login_User_Authentication_Model{}.AttrTypes()})
+        } else {
+            system_login_user_model.Authentication, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Login_User_Authentication_Model{}.AttrTypes()},
+                    system_login_user_authentication_List,
+                )
+        }
         system_login_user_List[i_system_login_user] = system_login_user_model
         }
-        system_login_model.User, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Login_User_Model{}.AttrTypes()}, system_login_user_List)
-        system_login_List[i_system_login] = system_login_model
-            system_login_model.Message = types.StringPointerValue(v_system_login.Message)
-			system_login_List[i_system_login] = system_login_model
+
+        // Write user field as Null when empty, else concrete list
+        if len(system_login_user_List) == 0 {
+            system_login_model.User =
+                types.ListNull(types.ObjectType{AttrTypes: System_Login_User_Model{}.AttrTypes()})
+        } else {
+            system_login_model.User, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Login_User_Model{}.AttrTypes()},
+                    system_login_user_List,
+                )
         }
-        system_model.Login, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Login_Model{}.AttrTypes()}, system_login_List)
+        system_login_List[i_system_login] = system_login_model
+            // leaf
+            if v_system_login.Message == nil {
+                system_login_model.Message =
+                    types.StringNull()
+            } else {
+				system_login_model.Message =
+                types.StringPointerValue(v_system_login.Message)
+			}
+
+            system_login_List[i_system_login] =
+                system_login_model
+        }
+
+        // Write login field as Null when empty, else concrete list
+        if len(system_login_List) == 0 {
+            system_model.Login =
+                types.ListNull(types.ObjectType{AttrTypes: System_Login_Model{}.AttrTypes()})
+        } else {
+            system_model.Login, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Login_Model{}.AttrTypes()},
+                    system_login_List,
+                )
+        }
         system_List[i_system] = system_model
+            
+        // Build root-authentication list
         system_root_authentication_List := make([]System_Root_authentication_Model, len(v_system.Root_authentication))
+
         
 		for i_system_root_authentication, v_system_root_authentication := range v_system.Root_authentication {
             var system_root_authentication_model System_Root_authentication_Model
-            system_root_authentication_model.Encrypted_password = types.StringPointerValue(v_system_root_authentication.Encrypted_password)
-			system_root_authentication_List[i_system_root_authentication] = system_root_authentication_model
+            // leaf
+            if v_system_root_authentication.Encrypted_password == nil {
+                system_root_authentication_model.Encrypted_password =
+                    types.StringNull()
+            } else {
+				system_root_authentication_model.Encrypted_password =
+                types.StringPointerValue(v_system_root_authentication.Encrypted_password)
+			}
+
+            system_root_authentication_List[i_system_root_authentication] =
+                system_root_authentication_model
         }
-        system_model.Root_authentication, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Root_authentication_Model{}.AttrTypes()}, system_root_authentication_List)
+
+        // Write root-authentication field as Null when empty, else concrete list
+        if len(system_root_authentication_List) == 0 {
+            system_model.Root_authentication =
+                types.ListNull(types.ObjectType{AttrTypes: System_Root_authentication_Model{}.AttrTypes()})
+        } else {
+            system_model.Root_authentication, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Root_authentication_Model{}.AttrTypes()},
+                    system_root_authentication_List,
+                )
+        }
         system_List[i_system] = system_model
+		if v_system.Host_name == nil {
+			system_model.Host_name = types.StringNull()
+		} else {
+			system_model.Host_name =
+				types.StringPointerValue(v_system.Host_name)
+		}
+            
+        // Build services list
         system_services_List := make([]System_Services_Model, len(v_system.Services))
+
         
 		for i_system_services, v_system_services := range v_system.Services {
             var system_services_model System_Services_Model
-			system_services_List[i_system_services] = system_services_model
+
+            system_services_List[i_system_services] =
+                system_services_model
                 
+        // Build ssh list
         system_services_ssh_List := make([]System_Services_Ssh_Model, len(v_system_services.Ssh))
+
         
 		for i_system_services_ssh, v_system_services_ssh := range v_system_services.Ssh {
             var system_services_ssh_model System_Services_Ssh_Model
-            system_services_ssh_model.Root_login = types.StringPointerValue(v_system_services_ssh.Root_login)
-			system_services_ssh_List[i_system_services_ssh] = system_services_ssh_model
+            // leaf
+            if v_system_services_ssh.Root_login == nil {
+                system_services_ssh_model.Root_login =
+                    types.StringNull()
+            } else {
+				system_services_ssh_model.Root_login =
+                types.StringPointerValue(v_system_services_ssh.Root_login)
+			}
+
+            system_services_ssh_List[i_system_services_ssh] =
+                system_services_ssh_model
         }
-        system_services_model.Ssh, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Services_Ssh_Model{}.AttrTypes()}, system_services_ssh_List)
+
+        // Write ssh field as Null when empty, else concrete list
+        if len(system_services_ssh_List) == 0 {
+            system_services_model.Ssh =
+                types.ListNull(types.ObjectType{AttrTypes: System_Services_Ssh_Model{}.AttrTypes()})
+        } else {
+            system_services_model.Ssh, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Services_Ssh_Model{}.AttrTypes()},
+                    system_services_ssh_List,
+                )
+        }
         system_services_List[i_system_services] = system_services_model
-			system_services_List[i_system_services] = system_services_model
+
+            system_services_List[i_system_services] =
+                system_services_model
                 
+        // Build extension-service list
         system_services_extension_service_List := make([]System_Services_Extension_service_Model, len(v_system_services.Extension_service))
+
         
 		for i_system_services_extension_service, v_system_services_extension_service := range v_system_services.Extension_service {
             var system_services_extension_service_model System_Services_Extension_service_Model
-			system_services_extension_service_List[i_system_services_extension_service] = system_services_extension_service_model
+
+            system_services_extension_service_List[i_system_services_extension_service] =
+                system_services_extension_service_model
                 
+        // Build request-response list
         system_services_extension_service_request_response_List := make([]System_Services_Extension_service_Request_response_Model, len(v_system_services_extension_service.Request_response))
+
         
 		for i_system_services_extension_service_request_response, v_system_services_extension_service_request_response := range v_system_services_extension_service.Request_response {
             var system_services_extension_service_request_response_model System_Services_Extension_service_Request_response_Model
-			system_services_extension_service_request_response_List[i_system_services_extension_service_request_response] = system_services_extension_service_request_response_model
+
+            system_services_extension_service_request_response_List[i_system_services_extension_service_request_response] =
+                system_services_extension_service_request_response_model
                 
+        // Build grpc list
         system_services_extension_service_request_response_grpc_List := make([]System_Services_Extension_service_Request_response_Grpc_Model, len(v_system_services_extension_service_request_response.Grpc))
+
         
 		for i_system_services_extension_service_request_response_grpc, v_system_services_extension_service_request_response_grpc := range v_system_services_extension_service_request_response.Grpc {
             var system_services_extension_service_request_response_grpc_model System_Services_Extension_service_Request_response_Grpc_Model
-            system_services_extension_service_request_response_grpc_model.Max_connections = types.StringPointerValue(v_system_services_extension_service_request_response_grpc.Max_connections)
-			system_services_extension_service_request_response_grpc_List[i_system_services_extension_service_request_response_grpc] = system_services_extension_service_request_response_grpc_model
+            // leaf
+            if v_system_services_extension_service_request_response_grpc.Max_connections == nil {
+                system_services_extension_service_request_response_grpc_model.Max_connections =
+                    types.StringNull()
+            } else {
+				system_services_extension_service_request_response_grpc_model.Max_connections =
+                types.StringPointerValue(v_system_services_extension_service_request_response_grpc.Max_connections)
+			}
+
+            system_services_extension_service_request_response_grpc_List[i_system_services_extension_service_request_response_grpc] =
+                system_services_extension_service_request_response_grpc_model
         }
-        system_services_extension_service_request_response_model.Grpc, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Services_Extension_service_Request_response_Grpc_Model{}.AttrTypes()}, system_services_extension_service_request_response_grpc_List)
+
+        // Write grpc field as Null when empty, else concrete list
+        if len(system_services_extension_service_request_response_grpc_List) == 0 {
+            system_services_extension_service_request_response_model.Grpc =
+                types.ListNull(types.ObjectType{AttrTypes: System_Services_Extension_service_Request_response_Grpc_Model{}.AttrTypes()})
+        } else {
+            system_services_extension_service_request_response_model.Grpc, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Services_Extension_service_Request_response_Grpc_Model{}.AttrTypes()},
+                    system_services_extension_service_request_response_grpc_List,
+                )
+        }
         system_services_extension_service_request_response_List[i_system_services_extension_service_request_response] = system_services_extension_service_request_response_model
         }
-        system_services_extension_service_model.Request_response, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Services_Extension_service_Request_response_Model{}.AttrTypes()}, system_services_extension_service_request_response_List)
+
+        // Write request-response field as Null when empty, else concrete list
+        if len(system_services_extension_service_request_response_List) == 0 {
+            system_services_extension_service_model.Request_response =
+                types.ListNull(types.ObjectType{AttrTypes: System_Services_Extension_service_Request_response_Model{}.AttrTypes()})
+        } else {
+            system_services_extension_service_model.Request_response, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Services_Extension_service_Request_response_Model{}.AttrTypes()},
+                    system_services_extension_service_request_response_List,
+                )
+        }
         system_services_extension_service_List[i_system_services_extension_service] = system_services_extension_service_model
-			system_services_extension_service_List[i_system_services_extension_service] = system_services_extension_service_model
+
+            system_services_extension_service_List[i_system_services_extension_service] =
+                system_services_extension_service_model
                 
+        // Build notification list
         system_services_extension_service_notification_List := make([]System_Services_Extension_service_Notification_Model, len(v_system_services_extension_service.Notification))
+
         
 		for i_system_services_extension_service_notification, v_system_services_extension_service_notification := range v_system_services_extension_service.Notification {
             var system_services_extension_service_notification_model System_Services_Extension_service_Notification_Model
-			system_services_extension_service_notification_List[i_system_services_extension_service_notification] = system_services_extension_service_notification_model
+
+            system_services_extension_service_notification_List[i_system_services_extension_service_notification] =
+                system_services_extension_service_notification_model
                 
+        // Build allow-clients list
         system_services_extension_service_notification_allow_clients_List := make([]System_Services_Extension_service_Notification_Allow_clients_Model, len(v_system_services_extension_service_notification.Allow_clients))
+
         
 		for i_system_services_extension_service_notification_allow_clients, v_system_services_extension_service_notification_allow_clients := range v_system_services_extension_service_notification.Allow_clients {
             var system_services_extension_service_notification_allow_clients_model System_Services_Extension_service_Notification_Allow_clients_Model
-			var var_system_services_extension_service_notification_address []*string
-			if v_system_services_extension_service_notification_allow_clients.Address != nil {
-				var_system_services_extension_service_notification_address = make([]*string, len(v_system_services_extension_service_notification_allow_clients.Address))
-				copy(var_system_services_extension_service_notification_address, v_system_services_extension_service_notification_allow_clients.Address)
-			}
-			system_services_extension_service_notification_allow_clients_model.Address, _ = types.ListValueFrom(ctx, types.StringType, var_system_services_extension_service_notification_address)
-			system_services_extension_service_notification_allow_clients_List[i_system_services_extension_service_notification_allow_clients] = system_services_extension_service_notification_allow_clients_model
+            // leaf-list
+            if v_system_services_extension_service_notification_allow_clients.Address == nil ||
+               len(v_system_services_extension_service_notification_allow_clients.Address) == 0 {
+                system_services_extension_service_notification_allow_clients_model.Address =
+                    types.ListNull(types.StringType)
+            } else {
+                src_system_services_extension_service_notification_address :=
+                    v_system_services_extension_service_notification_allow_clients.Address
+                vals_system_services_extension_service_notification_address := make([]*string, len(src_system_services_extension_service_notification_address))
+                copy(vals_system_services_extension_service_notification_address, src_system_services_extension_service_notification_address)
+                system_services_extension_service_notification_allow_clients_model.Address, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_system_services_extension_service_notification_address)
+            }
+
+            system_services_extension_service_notification_allow_clients_List[i_system_services_extension_service_notification_allow_clients] =
+                system_services_extension_service_notification_allow_clients_model
         }
-        system_services_extension_service_notification_model.Allow_clients, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Services_Extension_service_Notification_Allow_clients_Model{}.AttrTypes()}, system_services_extension_service_notification_allow_clients_List)
+
+        // Write allow-clients field as Null when empty, else concrete list
+        if len(system_services_extension_service_notification_allow_clients_List) == 0 {
+            system_services_extension_service_notification_model.Allow_clients =
+                types.ListNull(types.ObjectType{AttrTypes: System_Services_Extension_service_Notification_Allow_clients_Model{}.AttrTypes()})
+        } else {
+            system_services_extension_service_notification_model.Allow_clients, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Services_Extension_service_Notification_Allow_clients_Model{}.AttrTypes()},
+                    system_services_extension_service_notification_allow_clients_List,
+                )
+        }
         system_services_extension_service_notification_List[i_system_services_extension_service_notification] = system_services_extension_service_notification_model
         }
-        system_services_extension_service_model.Notification, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Services_Extension_service_Notification_Model{}.AttrTypes()}, system_services_extension_service_notification_List)
+
+        // Write notification field as Null when empty, else concrete list
+        if len(system_services_extension_service_notification_List) == 0 {
+            system_services_extension_service_model.Notification =
+                types.ListNull(types.ObjectType{AttrTypes: System_Services_Extension_service_Notification_Model{}.AttrTypes()})
+        } else {
+            system_services_extension_service_model.Notification, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Services_Extension_service_Notification_Model{}.AttrTypes()},
+                    system_services_extension_service_notification_List,
+                )
+        }
         system_services_extension_service_List[i_system_services_extension_service] = system_services_extension_service_model
         }
-        system_services_model.Extension_service, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Services_Extension_service_Model{}.AttrTypes()}, system_services_extension_service_List)
+
+        // Write extension-service field as Null when empty, else concrete list
+        if len(system_services_extension_service_List) == 0 {
+            system_services_model.Extension_service =
+                types.ListNull(types.ObjectType{AttrTypes: System_Services_Extension_service_Model{}.AttrTypes()})
+        } else {
+            system_services_model.Extension_service, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Services_Extension_service_Model{}.AttrTypes()},
+                    system_services_extension_service_List,
+                )
+        }
         system_services_List[i_system_services] = system_services_model
-			system_services_List[i_system_services] = system_services_model
+
+            system_services_List[i_system_services] =
+                system_services_model
                 
+        // Build netconf list
         system_services_netconf_List := make([]System_Services_Netconf_Model, len(v_system_services.Netconf))
+
         
 		for i_system_services_netconf, v_system_services_netconf := range v_system_services.Netconf {
             var system_services_netconf_model System_Services_Netconf_Model
-			system_services_netconf_List[i_system_services_netconf] = system_services_netconf_model
+
+            system_services_netconf_List[i_system_services_netconf] =
+                system_services_netconf_model
                 
+        // Build ssh list
         system_services_netconf_ssh_List := make([]System_Services_Netconf_Ssh_Model, len(v_system_services_netconf.Ssh))
+
         
-        system_services_netconf_model.Ssh, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Services_Netconf_Ssh_Model{}.AttrTypes()}, system_services_netconf_ssh_List)
+
+        // Write ssh field as Null when empty, else concrete list
+        if len(system_services_netconf_ssh_List) == 0 {
+            system_services_netconf_model.Ssh =
+                types.ListNull(types.ObjectType{AttrTypes: System_Services_Netconf_Ssh_Model{}.AttrTypes()})
+        } else {
+            system_services_netconf_model.Ssh, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Services_Netconf_Ssh_Model{}.AttrTypes()},
+                    system_services_netconf_ssh_List,
+                )
+        }
         system_services_netconf_List[i_system_services_netconf] = system_services_netconf_model
         }
-        system_services_model.Netconf, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Services_Netconf_Model{}.AttrTypes()}, system_services_netconf_List)
+
+        // Write netconf field as Null when empty, else concrete list
+        if len(system_services_netconf_List) == 0 {
+            system_services_model.Netconf =
+                types.ListNull(types.ObjectType{AttrTypes: System_Services_Netconf_Model{}.AttrTypes()})
+        } else {
+            system_services_model.Netconf, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Services_Netconf_Model{}.AttrTypes()},
+                    system_services_netconf_List,
+                )
+        }
         system_services_List[i_system_services] = system_services_model
-			system_services_List[i_system_services] = system_services_model
+
+            system_services_List[i_system_services] =
+                system_services_model
                 
+        // Build rest list
         system_services_rest_List := make([]System_Services_Rest_Model, len(v_system_services.Rest))
+
         
 		for i_system_services_rest, v_system_services_rest := range v_system_services.Rest {
             var system_services_rest_model System_Services_Rest_Model
-			system_services_rest_List[i_system_services_rest] = system_services_rest_model
+
+            system_services_rest_List[i_system_services_rest] =
+                system_services_rest_model
                 
+        // Build http list
         system_services_rest_http_List := make([]System_Services_Rest_Http_Model, len(v_system_services_rest.Http))
+
         
 		for i_system_services_rest_http, v_system_services_rest_http := range v_system_services_rest.Http {
             var system_services_rest_http_model System_Services_Rest_Http_Model
-            system_services_rest_http_model.Port = types.StringPointerValue(v_system_services_rest_http.Port)
-			system_services_rest_http_List[i_system_services_rest_http] = system_services_rest_http_model
+            // leaf
+            if v_system_services_rest_http.Port == nil {
+                system_services_rest_http_model.Port =
+                    types.StringNull()
+            } else {
+				system_services_rest_http_model.Port =
+                types.StringPointerValue(v_system_services_rest_http.Port)
+			}
+
+            system_services_rest_http_List[i_system_services_rest_http] =
+                system_services_rest_http_model
         }
-        system_services_rest_model.Http, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Services_Rest_Http_Model{}.AttrTypes()}, system_services_rest_http_List)
+
+        // Write http field as Null when empty, else concrete list
+        if len(system_services_rest_http_List) == 0 {
+            system_services_rest_model.Http =
+                types.ListNull(types.ObjectType{AttrTypes: System_Services_Rest_Http_Model{}.AttrTypes()})
+        } else {
+            system_services_rest_model.Http, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Services_Rest_Http_Model{}.AttrTypes()},
+                    system_services_rest_http_List,
+                )
+        }
         system_services_rest_List[i_system_services_rest] = system_services_rest_model
-            system_services_rest_model.Enable_explorer = types.StringPointerValue(v_system_services_rest.Enable_explorer)
-			system_services_rest_List[i_system_services_rest] = system_services_rest_model
+            // leaf
+            if v_system_services_rest.Enable_explorer == nil {
+                system_services_rest_model.Enable_explorer =
+                    types.StringNull()
+            } else {
+				system_services_rest_model.Enable_explorer =
+                types.StringPointerValue(v_system_services_rest.Enable_explorer)
+			}
+
+            system_services_rest_List[i_system_services_rest] =
+                system_services_rest_model
         }
-        system_services_model.Rest, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Services_Rest_Model{}.AttrTypes()}, system_services_rest_List)
+
+        // Write rest field as Null when empty, else concrete list
+        if len(system_services_rest_List) == 0 {
+            system_services_model.Rest =
+                types.ListNull(types.ObjectType{AttrTypes: System_Services_Rest_Model{}.AttrTypes()})
+        } else {
+            system_services_model.Rest, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Services_Rest_Model{}.AttrTypes()},
+                    system_services_rest_List,
+                )
+        }
         system_services_List[i_system_services] = system_services_model
         }
-        system_model.Services, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Services_Model{}.AttrTypes()}, system_services_List)
+
+        // Write services field as Null when empty, else concrete list
+        if len(system_services_List) == 0 {
+            system_model.Services =
+                types.ListNull(types.ObjectType{AttrTypes: System_Services_Model{}.AttrTypes()})
+        } else {
+            system_model.Services, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Services_Model{}.AttrTypes()},
+                    system_services_List,
+                )
+        }
         system_List[i_system] = system_model
+            
+        // Build syslog list
         system_syslog_List := make([]System_Syslog_Model, len(v_system.Syslog))
+
         
 		for i_system_syslog, v_system_syslog := range v_system.Syslog {
             var system_syslog_model System_Syslog_Model
-			system_syslog_List[i_system_syslog] = system_syslog_model
+
+            system_syslog_List[i_system_syslog] =
+                system_syslog_model
                 
+        // Build user list
         system_syslog_user_List := make([]System_Syslog_User_Model, len(v_system_syslog.User))
+
         
 		for i_system_syslog_user, v_system_syslog_user := range v_system_syslog.User {
             var system_syslog_user_model System_Syslog_User_Model
-            system_syslog_user_model.Name = types.StringPointerValue(v_system_syslog_user.Name)
-			system_syslog_user_List[i_system_syslog_user] = system_syslog_user_model
-			system_syslog_user_List[i_system_syslog_user] = system_syslog_user_model
+            // leaf
+            if v_system_syslog_user.Name == nil {
+                system_syslog_user_model.Name =
+                    types.StringNull()
+            } else {
+				system_syslog_user_model.Name =
+                types.StringPointerValue(v_system_syslog_user.Name)
+			}
+
+            system_syslog_user_List[i_system_syslog_user] =
+                system_syslog_user_model
+
+            system_syslog_user_List[i_system_syslog_user] =
+                system_syslog_user_model
                 
+        // Build contents list
         system_syslog_user_contents_List := make([]System_Syslog_User_Contents_Model, len(v_system_syslog_user.Contents))
+
         
 		for i_system_syslog_user_contents, v_system_syslog_user_contents := range v_system_syslog_user.Contents {
             var system_syslog_user_contents_model System_Syslog_User_Contents_Model
-            system_syslog_user_contents_model.Name = types.StringPointerValue(v_system_syslog_user_contents.Name)
-			system_syslog_user_contents_List[i_system_syslog_user_contents] = system_syslog_user_contents_model
-            system_syslog_user_contents_model.Emergency = types.StringPointerValue(v_system_syslog_user_contents.Emergency)
-			system_syslog_user_contents_List[i_system_syslog_user_contents] = system_syslog_user_contents_model
+            // leaf
+            if v_system_syslog_user_contents.Name == nil {
+                system_syslog_user_contents_model.Name =
+                    types.StringNull()
+            } else {
+				system_syslog_user_contents_model.Name =
+                types.StringPointerValue(v_system_syslog_user_contents.Name)
+			}
+
+            system_syslog_user_contents_List[i_system_syslog_user_contents] =
+                system_syslog_user_contents_model
+            // leaf
+            if v_system_syslog_user_contents.Emergency == nil {
+                system_syslog_user_contents_model.Emergency =
+                    types.StringNull()
+            } else {
+				system_syslog_user_contents_model.Emergency =
+                types.StringPointerValue(v_system_syslog_user_contents.Emergency)
+			}
+
+            system_syslog_user_contents_List[i_system_syslog_user_contents] =
+                system_syslog_user_contents_model
         }
-        system_syslog_user_model.Contents, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Syslog_User_Contents_Model{}.AttrTypes()}, system_syslog_user_contents_List)
+
+        // Write contents field as Null when empty, else concrete list
+        if len(system_syslog_user_contents_List) == 0 {
+            system_syslog_user_model.Contents =
+                types.ListNull(types.ObjectType{AttrTypes: System_Syslog_User_Contents_Model{}.AttrTypes()})
+        } else {
+            system_syslog_user_model.Contents, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Syslog_User_Contents_Model{}.AttrTypes()},
+                    system_syslog_user_contents_List,
+                )
+        }
         system_syslog_user_List[i_system_syslog_user] = system_syslog_user_model
         }
-        system_syslog_model.User, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Syslog_User_Model{}.AttrTypes()}, system_syslog_user_List)
+
+        // Write user field as Null when empty, else concrete list
+        if len(system_syslog_user_List) == 0 {
+            system_syslog_model.User =
+                types.ListNull(types.ObjectType{AttrTypes: System_Syslog_User_Model{}.AttrTypes()})
+        } else {
+            system_syslog_model.User, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Syslog_User_Model{}.AttrTypes()},
+                    system_syslog_user_List,
+                )
+        }
         system_syslog_List[i_system_syslog] = system_syslog_model
-			system_syslog_List[i_system_syslog] = system_syslog_model
+
+            system_syslog_List[i_system_syslog] =
+                system_syslog_model
                 
+        // Build file list
         system_syslog_file_List := make([]System_Syslog_File_Model, len(v_system_syslog.File))
+
         
 		for i_system_syslog_file, v_system_syslog_file := range v_system_syslog.File {
             var system_syslog_file_model System_Syslog_File_Model
-            system_syslog_file_model.Name = types.StringPointerValue(v_system_syslog_file.Name)
-			system_syslog_file_List[i_system_syslog_file] = system_syslog_file_model
-			system_syslog_file_List[i_system_syslog_file] = system_syslog_file_model
+            // leaf
+            if v_system_syslog_file.Name == nil {
+                system_syslog_file_model.Name =
+                    types.StringNull()
+            } else {
+				system_syslog_file_model.Name =
+                types.StringPointerValue(v_system_syslog_file.Name)
+			}
+
+            system_syslog_file_List[i_system_syslog_file] =
+                system_syslog_file_model
+
+            system_syslog_file_List[i_system_syslog_file] =
+                system_syslog_file_model
                 
+        // Build contents list
         system_syslog_file_contents_List := make([]System_Syslog_File_Contents_Model, len(v_system_syslog_file.Contents))
+
         
 		for i_system_syslog_file_contents, v_system_syslog_file_contents := range v_system_syslog_file.Contents {
             var system_syslog_file_contents_model System_Syslog_File_Contents_Model
-            system_syslog_file_contents_model.Name = types.StringPointerValue(v_system_syslog_file_contents.Name)
-			system_syslog_file_contents_List[i_system_syslog_file_contents] = system_syslog_file_contents_model
-            system_syslog_file_contents_model.Any = types.StringPointerValue(v_system_syslog_file_contents.Any)
-			system_syslog_file_contents_List[i_system_syslog_file_contents] = system_syslog_file_contents_model
-            system_syslog_file_contents_model.Notice = types.StringPointerValue(v_system_syslog_file_contents.Notice)
-			system_syslog_file_contents_List[i_system_syslog_file_contents] = system_syslog_file_contents_model
-            system_syslog_file_contents_model.Info = types.StringPointerValue(v_system_syslog_file_contents.Info)
-			system_syslog_file_contents_List[i_system_syslog_file_contents] = system_syslog_file_contents_model
+            // leaf
+            if v_system_syslog_file_contents.Name == nil {
+                system_syslog_file_contents_model.Name =
+                    types.StringNull()
+            } else {
+				system_syslog_file_contents_model.Name =
+                types.StringPointerValue(v_system_syslog_file_contents.Name)
+			}
+
+            system_syslog_file_contents_List[i_system_syslog_file_contents] =
+                system_syslog_file_contents_model
+            // leaf
+            if v_system_syslog_file_contents.Any == nil {
+                system_syslog_file_contents_model.Any =
+                    types.StringNull()
+            } else {
+				system_syslog_file_contents_model.Any =
+                types.StringPointerValue(v_system_syslog_file_contents.Any)
+			}
+
+            system_syslog_file_contents_List[i_system_syslog_file_contents] =
+                system_syslog_file_contents_model
+            // leaf
+            if v_system_syslog_file_contents.Notice == nil {
+                system_syslog_file_contents_model.Notice =
+                    types.StringNull()
+            } else {
+				system_syslog_file_contents_model.Notice =
+                types.StringPointerValue(v_system_syslog_file_contents.Notice)
+			}
+
+            system_syslog_file_contents_List[i_system_syslog_file_contents] =
+                system_syslog_file_contents_model
+            // leaf
+            if v_system_syslog_file_contents.Info == nil {
+                system_syslog_file_contents_model.Info =
+                    types.StringNull()
+            } else {
+				system_syslog_file_contents_model.Info =
+                types.StringPointerValue(v_system_syslog_file_contents.Info)
+			}
+
+            system_syslog_file_contents_List[i_system_syslog_file_contents] =
+                system_syslog_file_contents_model
         }
-        system_syslog_file_model.Contents, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Syslog_File_Contents_Model{}.AttrTypes()}, system_syslog_file_contents_List)
+
+        // Write contents field as Null when empty, else concrete list
+        if len(system_syslog_file_contents_List) == 0 {
+            system_syslog_file_model.Contents =
+                types.ListNull(types.ObjectType{AttrTypes: System_Syslog_File_Contents_Model{}.AttrTypes()})
+        } else {
+            system_syslog_file_model.Contents, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Syslog_File_Contents_Model{}.AttrTypes()},
+                    system_syslog_file_contents_List,
+                )
+        }
         system_syslog_file_List[i_system_syslog_file] = system_syslog_file_model
         }
-        system_syslog_model.File, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Syslog_File_Model{}.AttrTypes()}, system_syslog_file_List)
+
+        // Write file field as Null when empty, else concrete list
+        if len(system_syslog_file_List) == 0 {
+            system_syslog_model.File =
+                types.ListNull(types.ObjectType{AttrTypes: System_Syslog_File_Model{}.AttrTypes()})
+        } else {
+            system_syslog_model.File, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Syslog_File_Model{}.AttrTypes()},
+                    system_syslog_file_List,
+                )
+        }
         system_syslog_List[i_system_syslog] = system_syslog_model
         }
-        system_model.Syslog, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Syslog_Model{}.AttrTypes()}, system_syslog_List)
+
+        // Write syslog field as Null when empty, else concrete list
+        if len(system_syslog_List) == 0 {
+            system_model.Syslog =
+                types.ListNull(types.ObjectType{AttrTypes: System_Syslog_Model{}.AttrTypes()})
+        } else {
+            system_model.Syslog, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Syslog_Model{}.AttrTypes()},
+                    system_syslog_List,
+                )
+        }
         system_List[i_system] = system_model
+            
+        // Build extensions list
         system_extensions_List := make([]System_Extensions_Model, len(v_system.Extensions))
+
         
 		for i_system_extensions, v_system_extensions := range v_system.Extensions {
             var system_extensions_model System_Extensions_Model
-			system_extensions_List[i_system_extensions] = system_extensions_model
+
+            system_extensions_List[i_system_extensions] =
+                system_extensions_model
                 
+        // Build providers list
         system_extensions_providers_List := make([]System_Extensions_Providers_Model, len(v_system_extensions.Providers))
+
         
 		for i_system_extensions_providers, v_system_extensions_providers := range v_system_extensions.Providers {
             var system_extensions_providers_model System_Extensions_Providers_Model
-            system_extensions_providers_model.Name = types.StringPointerValue(v_system_extensions_providers.Name)
-			system_extensions_providers_List[i_system_extensions_providers] = system_extensions_providers_model
-			system_extensions_providers_List[i_system_extensions_providers] = system_extensions_providers_model
+            // leaf
+            if v_system_extensions_providers.Name == nil {
+                system_extensions_providers_model.Name =
+                    types.StringNull()
+            } else {
+				system_extensions_providers_model.Name =
+                types.StringPointerValue(v_system_extensions_providers.Name)
+			}
+
+            system_extensions_providers_List[i_system_extensions_providers] =
+                system_extensions_providers_model
+
+            system_extensions_providers_List[i_system_extensions_providers] =
+                system_extensions_providers_model
                 
+        // Build license-type list
         system_extensions_providers_license_type_List := make([]System_Extensions_Providers_License_type_Model, len(v_system_extensions_providers.License_type))
+
         
 		for i_system_extensions_providers_license_type, v_system_extensions_providers_license_type := range v_system_extensions_providers.License_type {
             var system_extensions_providers_license_type_model System_Extensions_Providers_License_type_Model
-            system_extensions_providers_license_type_model.Name = types.StringPointerValue(v_system_extensions_providers_license_type.Name)
-			system_extensions_providers_license_type_List[i_system_extensions_providers_license_type] = system_extensions_providers_license_type_model
-			var var_system_extensions_providers_deployment_scope []*string
-			if v_system_extensions_providers_license_type.Deployment_scope != nil {
-				var_system_extensions_providers_deployment_scope = make([]*string, len(v_system_extensions_providers_license_type.Deployment_scope))
-				copy(var_system_extensions_providers_deployment_scope, v_system_extensions_providers_license_type.Deployment_scope)
+            // leaf
+            if v_system_extensions_providers_license_type.Name == nil {
+                system_extensions_providers_license_type_model.Name =
+                    types.StringNull()
+            } else {
+				system_extensions_providers_license_type_model.Name =
+                types.StringPointerValue(v_system_extensions_providers_license_type.Name)
 			}
-			system_extensions_providers_license_type_model.Deployment_scope, _ = types.ListValueFrom(ctx, types.StringType, var_system_extensions_providers_deployment_scope)
-			system_extensions_providers_license_type_List[i_system_extensions_providers_license_type] = system_extensions_providers_license_type_model
+
+            system_extensions_providers_license_type_List[i_system_extensions_providers_license_type] =
+                system_extensions_providers_license_type_model
+            // leaf-list
+            if v_system_extensions_providers_license_type.Deployment_scope == nil ||
+               len(v_system_extensions_providers_license_type.Deployment_scope) == 0 {
+                system_extensions_providers_license_type_model.Deployment_scope =
+                    types.ListNull(types.StringType)
+            } else {
+                src_system_extensions_providers_deployment_scope :=
+                    v_system_extensions_providers_license_type.Deployment_scope
+                vals_system_extensions_providers_deployment_scope := make([]*string, len(src_system_extensions_providers_deployment_scope))
+                copy(vals_system_extensions_providers_deployment_scope, src_system_extensions_providers_deployment_scope)
+                system_extensions_providers_license_type_model.Deployment_scope, _ =
+                    types.ListValueFrom(ctx, types.StringType, vals_system_extensions_providers_deployment_scope)
+            }
+
+            system_extensions_providers_license_type_List[i_system_extensions_providers_license_type] =
+                system_extensions_providers_license_type_model
         }
-        system_extensions_providers_model.License_type, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Extensions_Providers_License_type_Model{}.AttrTypes()}, system_extensions_providers_license_type_List)
+
+        // Write license-type field as Null when empty, else concrete list
+        if len(system_extensions_providers_license_type_List) == 0 {
+            system_extensions_providers_model.License_type =
+                types.ListNull(types.ObjectType{AttrTypes: System_Extensions_Providers_License_type_Model{}.AttrTypes()})
+        } else {
+            system_extensions_providers_model.License_type, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Extensions_Providers_License_type_Model{}.AttrTypes()},
+                    system_extensions_providers_license_type_List,
+                )
+        }
         system_extensions_providers_List[i_system_extensions_providers] = system_extensions_providers_model
         }
-        system_extensions_model.Providers, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Extensions_Providers_Model{}.AttrTypes()}, system_extensions_providers_List)
+
+        // Write providers field as Null when empty, else concrete list
+        if len(system_extensions_providers_List) == 0 {
+            system_extensions_model.Providers =
+                types.ListNull(types.ObjectType{AttrTypes: System_Extensions_Providers_Model{}.AttrTypes()})
+        } else {
+            system_extensions_model.Providers, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Extensions_Providers_Model{}.AttrTypes()},
+                    system_extensions_providers_List,
+                )
+        }
         system_extensions_List[i_system_extensions] = system_extensions_model
         }
-        system_model.Extensions, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Extensions_Model{}.AttrTypes()}, system_extensions_List)
+
+        // Write extensions field as Null when empty, else concrete list
+        if len(system_extensions_List) == 0 {
+            system_model.Extensions =
+                types.ListNull(types.ObjectType{AttrTypes: System_Extensions_Model{}.AttrTypes()})
+        } else {
+            system_model.Extensions, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: System_Extensions_Model{}.AttrTypes()},
+                    system_extensions_List,
+                )
+        }
+        system_List[i_system] = system_model
+
         system_List[i_system] = system_model
     }
-    state.System, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: System_Model{}.AttrTypes()}, system_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-    state.Vlans = types.ListNull(types.ObjectType{AttrTypes: Groups_Model{}.AttrTypes()})
-    vlans_List := make([]Vlans_Model, len(config.Groups.Vlans))
+
+    // Write parent list as Null when empty
+    if len(system_List) == 0 {
+        state.System =
+            types.ListNull(types.ObjectType{AttrTypes: System_Model{}.AttrTypes()})
+    } else {
+        state.System, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: System_Model{}.AttrTypes()},
+                system_List,
+            )
+    }
+    // Initialize vlans as Null; only materialize when we have elements
+    state.Vlans =
+        types.ListNull(types.ObjectType{AttrTypes: Vlans_Model{}.AttrTypes()})
+
+    // Build list from device
+    vlans_List := make([]Vlans_Model,
+        len(config.Groups.Vlans))
+
     for i_vlans, v_vlans := range config.Groups.Vlans {
         var vlans_model Vlans_Model
+            
+        // Build vlan list
         vlans_vlan_List := make([]Vlans_Vlan_Model, len(v_vlans.Vlan))
+
         
 		for i_vlans_vlan, v_vlans_vlan := range v_vlans.Vlan {
             var vlans_vlan_model Vlans_Vlan_Model
-            vlans_vlan_model.Name = types.StringPointerValue(v_vlans_vlan.Name)
-			vlans_vlan_List[i_vlans_vlan] = vlans_vlan_model
-            vlans_vlan_model.Vlan_id = types.StringPointerValue(v_vlans_vlan.Vlan_id)
-			vlans_vlan_List[i_vlans_vlan] = vlans_vlan_model
-            vlans_vlan_model.L3_interface = types.StringPointerValue(v_vlans_vlan.L3_interface)
-			vlans_vlan_List[i_vlans_vlan] = vlans_vlan_model
-			vlans_vlan_List[i_vlans_vlan] = vlans_vlan_model
+            // leaf
+            if v_vlans_vlan.Name == nil {
+                vlans_vlan_model.Name =
+                    types.StringNull()
+            } else {
+				vlans_vlan_model.Name =
+                types.StringPointerValue(v_vlans_vlan.Name)
+			}
+
+            vlans_vlan_List[i_vlans_vlan] =
+                vlans_vlan_model
+            // leaf
+            if v_vlans_vlan.Vlan_id == nil {
+                vlans_vlan_model.Vlan_id =
+                    types.StringNull()
+            } else {
+				vlans_vlan_model.Vlan_id =
+                types.StringPointerValue(v_vlans_vlan.Vlan_id)
+			}
+
+            vlans_vlan_List[i_vlans_vlan] =
+                vlans_vlan_model
+            // leaf
+            if v_vlans_vlan.L3_interface == nil {
+                vlans_vlan_model.L3_interface =
+                    types.StringNull()
+            } else {
+				vlans_vlan_model.L3_interface =
+                types.StringPointerValue(v_vlans_vlan.L3_interface)
+			}
+
+            vlans_vlan_List[i_vlans_vlan] =
+                vlans_vlan_model
+
+            vlans_vlan_List[i_vlans_vlan] =
+                vlans_vlan_model
                 
+        // Build vxlan list
         vlans_vlan_vxlan_List := make([]Vlans_Vlan_Vxlan_Model, len(v_vlans_vlan.Vxlan))
+
         
 		for i_vlans_vlan_vxlan, v_vlans_vlan_vxlan := range v_vlans_vlan.Vxlan {
             var vlans_vlan_vxlan_model Vlans_Vlan_Vxlan_Model
-            vlans_vlan_vxlan_model.Vni = types.StringPointerValue(v_vlans_vlan_vxlan.Vni)
-			vlans_vlan_vxlan_List[i_vlans_vlan_vxlan] = vlans_vlan_vxlan_model
+            // leaf
+            if v_vlans_vlan_vxlan.Vni == nil {
+                vlans_vlan_vxlan_model.Vni =
+                    types.StringNull()
+            } else {
+				vlans_vlan_vxlan_model.Vni =
+                types.StringPointerValue(v_vlans_vlan_vxlan.Vni)
+			}
+
+            vlans_vlan_vxlan_List[i_vlans_vlan_vxlan] =
+                vlans_vlan_vxlan_model
         }
-        vlans_vlan_model.Vxlan, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Vlans_Vlan_Vxlan_Model{}.AttrTypes()}, vlans_vlan_vxlan_List)
+
+        // Write vxlan field as Null when empty, else concrete list
+        if len(vlans_vlan_vxlan_List) == 0 {
+            vlans_vlan_model.Vxlan =
+                types.ListNull(types.ObjectType{AttrTypes: Vlans_Vlan_Vxlan_Model{}.AttrTypes()})
+        } else {
+            vlans_vlan_model.Vxlan, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Vlans_Vlan_Vxlan_Model{}.AttrTypes()},
+                    vlans_vlan_vxlan_List,
+                )
+        }
         vlans_vlan_List[i_vlans_vlan] = vlans_vlan_model
         }
-        vlans_model.Vlan, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Vlans_Vlan_Model{}.AttrTypes()}, vlans_vlan_List)
+
+        // Write vlan field as Null when empty, else concrete list
+        if len(vlans_vlan_List) == 0 {
+            vlans_model.Vlan =
+                types.ListNull(types.ObjectType{AttrTypes: Vlans_Vlan_Model{}.AttrTypes()})
+        } else {
+            vlans_model.Vlan, _ =
+                types.ListValueFrom(ctx,
+                    types.ObjectType{AttrTypes: Vlans_Vlan_Model{}.AttrTypes()},
+                    vlans_vlan_List,
+                )
+        }
+        vlans_List[i_vlans] = vlans_model
+
         vlans_List[i_vlans] = vlans_model
     }
-    state.Vlans, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: Vlans_Model{}.AttrTypes()}, vlans_List)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...) 
+
+    // Write parent list as Null when empty
+    if len(vlans_List) == 0 {
+        state.Vlans =
+            types.ListNull(types.ObjectType{AttrTypes: Vlans_Model{}.AttrTypes()})
+    } else {
+        state.Vlans, _ =
+            types.ListValueFrom(ctx,
+                types.ObjectType{AttrTypes: Vlans_Model{}.AttrTypes()},
+                vlans_List,
+            )
+    }
+
+    // Persist final state once after all parents processed
+    resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 
