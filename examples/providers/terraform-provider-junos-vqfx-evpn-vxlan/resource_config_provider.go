@@ -6639,6 +6639,12 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
                 )
         }
         routing_options_List[i_routing_options] = routing_options_model
+		if v_routing_options.Router_id == nil {
+			routing_options_model.Router_id = types.StringNull()
+		} else {
+			routing_options_model.Router_id =
+				types.StringPointerValue(v_routing_options.Router_id)
+		}
             
         // Build forwarding-table list
         routing_options_forwarding_table_List := make([]Routing_options_Forwarding_table_Model, len(v_routing_options.Forwarding_table))
@@ -6771,6 +6777,18 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
 
     for i_snmp, v_snmp := range config.Groups.Snmp {
         var snmp_model Snmp_Model
+		if v_snmp.Location == nil {
+			snmp_model.Location = types.StringNull()
+		} else {
+			snmp_model.Location =
+				types.StringPointerValue(v_snmp.Location)
+		}
+		if v_snmp.Contact == nil {
+			snmp_model.Contact = types.StringNull()
+		} else {
+			snmp_model.Contact =
+				types.StringPointerValue(v_snmp.Contact)
+		}
             
         // Build community list
         snmp_community_List := make([]Snmp_Community_Model, len(v_snmp.Community))
@@ -7137,6 +7155,12 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
                 )
         }
         system_List[i_system] = system_model
+		if v_system.Host_name == nil {
+			system_model.Host_name = types.StringNull()
+		} else {
+			system_model.Host_name =
+				types.StringPointerValue(v_system.Host_name)
+		}
             
         // Build services list
         system_services_List := make([]System_Services_Model, len(v_system.Services))

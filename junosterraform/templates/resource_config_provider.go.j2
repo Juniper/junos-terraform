@@ -519,6 +519,31 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         var {{parent.name|replace("-", "_")}}_model {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
 
         {%- for child in parent['children'] %}
+		{#-- NEW: top-level leaf --#}
+		{%- if child['type'] == 'leaf' %}
+		if v_{{parent.name|replace("-", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} == nil {
+			{{parent.name|replace("-", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = types.StringNull()
+		} else {
+			{{parent.name|replace("-", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} =
+				types.StringPointerValue(v_{{parent.name|replace("-", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}})
+		}
+		{%- endif %}
+
+		{#-- NEW: top-level leaf-list --#}
+		{%- if child['type'] == 'leaf-list' %}
+		if v_{{parent.name|replace("-", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} == nil ||
+		len(v_{{parent.name|replace("-", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}) == 0 {
+			{{parent.name|replace("-", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} =
+				types.ListNull(types.StringType)
+		} else {
+			src_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} :=
+				v_{{parent.name|replace("-", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}
+			vals_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} := make([]*string, len(src_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}))
+			copy(vals_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}, src_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
+			{{parent.name|replace("-", "_")}}_model.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}, _ =
+				types.ListValueFrom(ctx, types.StringType, vals_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
+		}
+		{%- endif %}
         {%- if child['type'] == 'list' or child['type'] == 'container' %}
             {{ read_method_macro(child) }}
         {%- endif %}
