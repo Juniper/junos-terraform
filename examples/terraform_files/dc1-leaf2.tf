@@ -1,6 +1,6 @@
-resource "terraform-provider-junos-vqfx" "dc1-leaf2-base-config" {
+resource "terraform-provider-junos-vqfx-evpn-vxlan" "dc1-leaf2-base-config" {
   resource_name = "base-config"
-  provider = junos-vqfx.dc1_leaf2
+  provider = junos-vqfx-evpn-vxlan.dc1_leaf2
   system = [
     {
       host_name = "dc1-leaf2"

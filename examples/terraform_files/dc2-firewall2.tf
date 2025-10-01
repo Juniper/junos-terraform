@@ -1,6 +1,6 @@
-resource "terraform-provider-junos-vsrx" "dc2-firewall2-base-config" {
+resource "terraform-provider-junos-vsrx-evpn-vxlan" "dc2-firewall2-base-config" {
   resource_name = "base-config"
-  provider = junos-vsrx.dc2_firewall2
+  provider = junos-vsrx-evpn-vxlan.dc2_firewall2
   system = [
     {
       login = [
