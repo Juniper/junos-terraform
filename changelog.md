@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - yyyy-mm-dd
+## [1.1.0] - 2025-10-03
  
 ### Added
 - jtaf-yang2go command to combine yang files to JSON conversion and provider creation ([#6](https://github.com/Juniper/junos-terraform/issues/6))
