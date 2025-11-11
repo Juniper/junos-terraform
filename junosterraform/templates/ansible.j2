@@ -1,0 +1,152 @@
+{############# COMMON VARIABLES # STARTS ################}
+{%- set parent_list = data['root']['children'][0]['children']%}
+
+{############### COMMON VARIABLES # ENDS ####################}
+
+{############# COMMON MACROS #STARTS ################}
+{%- macro get_full_parent_name(ele, sep, cap='False') %}
+{%- set result_list = [] %}
+{%- if ele['path'] is defined %}
+{%- for item in ele['path'].split("/")%}
+{%- if cap == 'True'%}
+{{- result_list.append(item|capitalize|replace("-", "_")|replace(".", "_")|replace(".", "_")) or ""}}
+{%- else %}
+{{- result_list.append(item|replace("-", "_")|replace(".", "_")) or ""}}
+{%- endif %}
+{%- endfor %}
+{%- endif %}
+{{-result_list|join(sep)-}}
+{%- endmacro %}
+
+{%- macro get_parent_list_with_iterator(ele) -%}
+{%- set result_list = [] %}
+{%- set temp_list = []%}
+{%- if ele['path'] is defined %}
+{%- for item in ele['path'].split("/")%}
+{{- temp_list.append(item|replace("-", "_")|replace(".", "_")) or ""}}
+{%- set cap_item = item|capitalize|replace("-", "_")|replace(".", "_") %}
+{{- result_list.append(cap_item+"[i_"+temp_list|join("_")+"]") or ""}}
+{%- endfor %}
+{%- endif %}
+{{-result_list|join(".")-}}
+{%- endmacro -%}
+
+{%- macro slice_string_macro(ele) -%}
+		{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}         []*string  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+{%- endmacro -%}
+
+{%- macro string_macro(ele) -%}
+		{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}         *string  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+{%- endmacro -%}
+
+{%- macro bool_macro(ele) -%}
+		{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}         *bool  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+{%- endmacro -%}
+
+{%- macro int32_macro(ele) -%}
+		{{ele.name|capitalize}}         *int32  `xml:"{{ele.name|replace("_","-")}},omitempty"`
+{%- endmacro -%}
+
+{%- macro list_macro(ele) -%}
+		{%- if ele['path'] is defined %}
+		{%- set parent_name = ele['path'].split("/")[-1] -%}
+		{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} []xml_{{get_full_parent_name(ele, "_", 'True')}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} `xml:"{{ele.name}},omitempty"`	
+		{%- endif %}
+{%- endmacro -%}
+
+{############### XML2Ansible Macros  ####################}
+{%- macro path2variable(path) -%}
+{{- path|replace("-","_")|replace("/",".") -}} 
+{% endmacro %}
+
+{#####}
+{%- macro printleaf(path,name,level)%}
+{{'\n'+' '*4*level}}{{'{%'}} if {{path2variable(path)+'.'+name }} {{'%}'}}
+{{'\n'+' '*4*level}}<{{name}}> 
+{{' '*4*(level+1)}}{{ path2variable(path)+'.'+name }}
+{{' '*4*level}}</{{name}}>
+{{'\n'+' '*4*level}}{{'{%'}} endif {{'%}'}}
+{% endmacro %}
+
+{#####}
+{%- macro expand_xml_recursive(ele,level,child_key) -%}
+    {% if ele.type == 'leaf' %}
+	  {{- printleaf(ele.path,ele.name,level) }}
+	{%else%}
+{{'\n'+' '*4*level}}<{{ele.name}}> 
+		{%- for child in ele['children'] %}
+		{%- if (child['type'] == 'list') or child['type'] == 'container' %}	
+		{% if (child['type'] == 'list') %}
+		{% set child_key=child['key'] %}
+		{% else %}
+		{% set child_key=None %}
+		{% endif %}
+{{' '*4*level}}{{'{%-'}} for i_{{level}} in {{path2variable(child['path'])}} {{'%}'}}
+{{' '*4*level}}<{{child['name']}}>
+		{%- for i in child['children'] %}
+		{{- expand_xml_recursive(i,level+1,child_key) }}
+		{%- endfor %}
+{{' '*4*level}}</{{child['name']}}>
+{{' '*4*level}}{{'{%-'}} endfor {{'%}'}}
+   	{%- endif %}
+	{%- if (child['type'] == 'leaf') %}
+       {{- printleaf(child['path'],child['name'],level) -}}
+	{%- endif %}
+	{%- endfor %}
+{{' '*4*level}}</{{ele.name}}>
+    {%endif%}
+{%- endmacro -%}
+
+{################ COMMON MACROS #ENDS ################}
+{################ STRUCT FROM XML # STARTS #############}
+{%- set ele_xml_struct = [] %}
+{%- macro xml_struct_definition(parent, arg1) -%}
+{%- if parent[0] is defined  %}
+{%- set arg1 = []%}
+{%- for ele in parent %}
+type xml_{{get_full_parent_name(ele, "_", 'True')}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} struct {
+	XMLName xml.Name `xml:"{{ele.name}}"`
+	{%- if ele.children %}
+	{%- for child in ele['children'] %}
+	{%- if (child['type'] == 'leaf-list') %}
+	{{slice_string_macro(child)}}
+	{%- endif %}
+	{%- if (child['type'] == 'leaf') %}
+	{{string_macro(child)}}
+	{%- endif %}
+	{%- if (child['type'] == 'container') or (child['type'] == 'list') %}
+	{{list_macro(child)}}
+	{%- if arg1.append(child) %}{%- endif %}
+	{%- endif %}
+	{%- endfor %}
+	{%- endif %}
+}
+{%- endfor %}
+{%- if arg1|length > 0 %}
+{{xml_struct_definition(arg1, arg0)}}
+{%- endif %}
+{%- endif %}
+{%- endmacro -%}
+
+
+// Junos XML Hierarchy
+
+<configuration>
+  <groups>
+    {%- for parent in parent_list %}
+		{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} []xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} `xml:"{{parent.name}},omitempty"`
+	{%- endfor %}
+  </groups>   
+</configuration>  
+
+START_OF_J2_CONFIG
+<configuration>
+
+{%- for parent in parent_list %}
+  {{ expand_xml_recursive(parent,1,None) }}
+{% endfor %}
+
+
+</configuration>
+END_OF_J2_CONFIG
+{################ STRUCT FROM XML # ENDS #############}
