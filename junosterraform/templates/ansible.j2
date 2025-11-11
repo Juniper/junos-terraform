@@ -60,73 +60,50 @@
 {% endmacro %}
 
 {#####}
-{%- macro printleaf(path,name,level)%}
-{{'\n'+' '*4*level}}{{'{%'}} if {{path2variable(path)+'.'+name }} {{'%}'}}
+{%- macro printleaf(path,name,level,indexvar)%}
+{% if indexvar %}
+{% set var1 = indexvar %}
+{% else %}
+{% set var1= path2variable(path) %}
+{% endif %}
+{{'\n'+' '*4*level}}{{'{%'}} if {{var1+'.'+name }} {{'%}'}}
 {{'\n'+' '*4*level}}<{{name}}> 
-{{' '*4*(level+1)}}{{ path2variable(path)+'.'+name }}
+{{' '*4*(level+1)}}{{ var1+'.'+name }}
 {{' '*4*level}}</{{name}}>
 {{'\n'+' '*4*level}}{{'{%'}} endif {{'%}'}}
 {% endmacro %}
 
 {#####}
-{%- macro expand_xml_recursive(ele,level,child_key) -%}
+{%- macro expand_xml_recursive(ele,level,indexvar) -%}
     {% if ele.type == 'leaf' %}
-	  {{- printleaf(ele.path,ele.name,level) }}
+	  {{- printleaf(ele.path,ele.name,level,indexvar) }}
 	{%else%}
-{{'\n'+' '*4*level}}<{{ele.name}}> 
-		{%- for child in ele['children'] %}
-		{%- if (child['type'] == 'list') or child['type'] == 'container' %}	
-		{% if (child['type'] == 'list') %}
-		{% set child_key=child['key'] %}
-		{% else %}
-		{% set child_key=None %}
-		{% endif %}
-{{' '*4*level}}{{'{%-'}} for i_{{level}} in {{path2variable(child['path'])}} {{'%}'}}
-{{' '*4*level}}<{{child['name']}}>
-		{%- for i in child['children'] %}
-		{{- expand_xml_recursive(i,level+1,child_key) }}
-		{%- endfor %}
-{{' '*4*level}}</{{child['name']}}>
+{{'\n'+' '*4*level}}<{{ele.name}}>
+        {%- if ele.type == 'list' %}
+		{% if indexvar %}
+			{% set pathvar=indexvar %}
+ 		{% else %}
+			{% set pathvar=path2variable(ele.path) %}
+		{% endif %}	      
+{{'\n'+' '*4*level}}{{'{%'}} for i_{{level}} in {{pathvar+"."+ele.name}} {{'%}'}}
+		{% set indexvar = 'i_{0:d}'.format(level) %}    
+		{%- endif %} 
+    	{% if indexvar and ele.type == 'container' %}
+			{% set old_indexvar = indexvar %}
+			{% set indexvar = indexvar + '.' + ele.name %}
+        {% endif %}
+    	{%- for child in ele['children'] %}
+            {{- expand_xml_recursive(child,level+1,indexvar) -}}
+	    {%- endfor %}
+		{% set indexvar=old_indexvar %}
+		{%- if ele.type == 'list' %}
 {{' '*4*level}}{{'{%-'}} endfor {{'%}'}}
-   	{%- endif %}
-	{%- if (child['type'] == 'leaf') %}
-       {{- printleaf(child['path'],child['name'],level) -}}
-	{%- endif %}
-	{%- endfor %}
+		{%- endif %}
 {{' '*4*level}}</{{ele.name}}>
     {%endif%}
 {%- endmacro -%}
 
 {################ COMMON MACROS #ENDS ################}
-{################ STRUCT FROM XML # STARTS #############}
-{%- set ele_xml_struct = [] %}
-{%- macro xml_struct_definition(parent, arg1) -%}
-{%- if parent[0] is defined  %}
-{%- set arg1 = []%}
-{%- for ele in parent %}
-type xml_{{get_full_parent_name(ele, "_", 'True')}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} struct {
-	XMLName xml.Name `xml:"{{ele.name}}"`
-	{%- if ele.children %}
-	{%- for child in ele['children'] %}
-	{%- if (child['type'] == 'leaf-list') %}
-	{{slice_string_macro(child)}}
-	{%- endif %}
-	{%- if (child['type'] == 'leaf') %}
-	{{string_macro(child)}}
-	{%- endif %}
-	{%- if (child['type'] == 'container') or (child['type'] == 'list') %}
-	{{list_macro(child)}}
-	{%- if arg1.append(child) %}{%- endif %}
-	{%- endif %}
-	{%- endfor %}
-	{%- endif %}
-}
-{%- endfor %}
-{%- if arg1|length > 0 %}
-{{xml_struct_definition(arg1, arg0)}}
-{%- endif %}
-{%- endif %}
-{%- endmacro -%}
 
 
 // Junos XML Hierarchy
