@@ -10,6 +10,7 @@ import shutil
 import distutils.dir_util
 import os
 from importlib.resources import files, as_file
+import yaml
 
 def get_xpaths(root):
     # defined a recursive function to walk the xml and populate result[]
@@ -245,6 +246,120 @@ def load_and_merge_xmls(xml_file_list):
 
     return merged_config
 
+# def elem_to_dict(element):
+#     result = {}
+#     for child in element:
+#         try:
+#             if len(child) == 0:
+#                 try:
+#                     result[child.tag] = child.text
+#                 except AttributeError:
+#                     result[child.tag] = child    
+#             else:
+#                 result[child.tag] = elem_to_dict(child)
+#         except TypeError:
+#             try:
+#                 result[child.tag] = child.text       
+#             except AttributeError:
+#                 result[child.tag] = child    
+#     return result
+
+CURRENT_LEVEL=0
+def prepare_tag(tag):
+    return tag.replace("-", "_").replace(".", "_")
+
+def element_node(element,path,resources):
+ #   print(f"RESOURCES_PATH={resources.get("path")} TYPE={resources.get("type")} NAME={resources.get("name")} ELEMENT={element} TAG={element.tag} TEXT=|{element.get('text')}| PATH={path} ")
+    if resources['name'] == element.tag and (resources.get("path") is None or (resources["path"]+'/'+element.tag)==path):
+ #       print(f"FOUND MATCH FOR ELEMENT={element} TYPE={resources['type']} PATH={path}")
+        return {k: v for k, v in resources.items() if k != "children"}
+    try:
+        for elem in resources["children"]:
+    #        if elem['name'] == element['name'] and path==elem['path']:
+    #            return elem['type']
+    #        if elem['type'] != 'leaf':
+                etype=element_node(element,path,elem)
+                if etype:
+                    return etype                  
+    except KeyError:
+        return None            
+    return None
+def elem_to_dict(element,path,resources):
+    result = {}
+    global CURRENT_LEVEL
+    CURRENT_LEVEL+=1
+ #   cnt=0
+ #   print(f"CURRENT_LEVEL={CURRENT_LEVEL} ELEMENT={element} ")
+    for child in element:
+        prepared_tag=prepare_tag(child.tag)
+        prepared_path=child.tag            
+        if len(path)>0:
+            prepared_path=path+'/'+child.tag
+        elem_node=element_node(child,prepared_path,resources)    
+        elem_type=elem_node['type'] if elem_node else None
+ #       print(f"ELEM_NODE={elem_node} ELEM_TYPE={elem_type} FOR CHILD={child.tag} PATH={prepared_path} ")
+  #      if child.tag=='interface':
+  #              print(f"Processing interface element: {ElementTree.tostring(child)}")
+  #              print(f"CURRENT_LEVEL={CURRENT_LEVEL} result[prepared_tag]={result.get(prepared_tag)} elem_type={elem_type}")
+        if elem_type == 'list':
+            # If the element is of type list, always create a list
+            
+            if not result.get(prepared_tag):
+                result[prepared_tag] = []
+            if len(child) > 0:
+                result[prepared_tag].append(elem_to_dict(child,prepared_path,resources))
+            else:
+                result[prepared_tag].append(child.text)
+        elif elem_type == 'leaf-list':
+            # If the element is of type leaf-list, always create a list
+            if not result.get(prepared_tag):
+                result[prepared_tag] = []
+            result[prepared_tag].append(child.text)        
+        elif elem_type == 'container':
+            # If the element is of type container, always create a dict
+            if len(child) > 0:
+                result[prepared_tag] = elem_to_dict(child,prepared_path,resources)
+            else:
+                # if child.text is not None:
+                #     result[prepared_tag] = child.text
+                # else:
+                #     result[prepared_tag] = {}
+                result[prepared_tag] = {}
+        else:
+            # For other types, decide based on children
+            if len(child) > 0:
+                result[prepared_tag] = elem_to_dict(child,prepared_path,resources)
+            else:
+                if elem_type=='leaf':
+                    if elem_node['leaf-type']=='empty':
+                        result[prepared_tag] = True
+                    else:    
+                        result[prepared_tag] = child.text
+                else:
+                    result[prepared_tag] = child.text     
+#       cnt+=1      
+#    if not cnt:
+#        result[element.tag] = element.text    
+    CURRENT_LEVEL-=1    
+    return result
+
+def xml2yaml(xml_file, resources,output_dir):
+    with open(xml_file) as f:
+        raw = f.read()
+    root = ElementTree.fromstring(f"<root>{raw}</root>")
+    config = root.find(".//configuration")
+    if config is None:
+        raise ValueError(f"No <configuration> found in {xml_file}")
+    xml_dict = elem_to_dict(config,"",resources['root'])
+    yaml_output = yaml.dump(xml_dict, sort_keys=False)
+    base_name = os.path.basename(xml_file)
+    yaml_file_name = os.path.splitext(base_name)[0] + ".yaml"
+    output_path = os.path.join(output_dir, yaml_file_name)
+    os.makedirs(output_dir, exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write(yaml_output)
+#    print(f"Converted {xml_file} to {output_path}")
+    
 # Main Method
 def main():
     # other arguments
@@ -275,6 +390,9 @@ def main():
         go_dir = os.path.dirname(init_py)
     new_dir = f"ansible-provider-junos-{args.type}"
 
+    for xml_file in xml_files:
+        xml2yaml(xml_file,resources, new_dir)
+        
     # Step 4: copy the template go files into place
     distutils.dir_util.copy_tree(go_dir, new_dir)
     shutil.copytree(go_dir, new_dir, dirs_exist_ok=True)
@@ -288,6 +406,7 @@ def main():
 
     # Step 7: Add trimmed_schema.json to new directory
     trimmed_schema_path = os.path.join(new_dir, "trimmed_schema.json")
+    print(f"Resources type is {type(resources)}")
     with open(trimmed_schema_path, "w") as f:
         json.dump(resources, f, indent=2)
 

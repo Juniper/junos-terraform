@@ -57,73 +57,66 @@
 {############### XML2Ansible Macros  ####################}
 {%- macro path2variable(path) -%}
 {{- path|replace("-","_")|replace("/",".") -}} 
-{% endmacro %}
+{%- endmacro -%}
+
+{%- macro preparename(name) -%}
+{{- name|replace(".","_") -}} 
+{%- endmacro -%}
 
 {#####}
-{%- macro printleaf(path,name,level,indexvar)%}
-{% if indexvar %}
-{% set var1 = indexvar %}
-{% else %}
-{% set var1= path2variable(path) %}
-{% endif %}
-{{'\n'+' '*4*level}}{{'{%'}} if {{var1+'.'+name }} {{'%}'}}
-{{'\n'+' '*4*level}}<{{name}}> 
-{{' '*4*(level+1)}}{{ var1+'.'+name }}
-{{' '*4*level}}</{{name}}>
-{{'\n'+' '*4*level}}{{'{%'}} endif {{'%}'}}
-{% endmacro %}
+{%- macro printleaf(path,name,level,indexvar) -%}
+{% if indexvar -%}
+{%- set var1 = indexvar -%}
+{%- else -%}
+{%- set var1= path -%}
+{%- endif -%}
+{%- set name_prepared = preparename(name) -%}
+{{- '\n'+' '*4*level}}{{'{%-'}} if {{path2variable(var1+'.'+name_prepared) }} {{'%}'}}
+{{' '*4*level}}<{{name}}>{{'{{'}}{{ path2variable(var1+'.'+name_prepared) }}{{'}}'}}</{{name}}>
+{# {{' '*4*(level+1)}} {{'{{'}} {{ path2variable(var1+'.'+name_prepared) }} {{'}}'}} #}
+{# {{' '*4*level}}</{{name}}> #}
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
+{%- endmacro -%}
 
 {#####}
 {%- macro expand_xml_recursive(ele,level,indexvar) -%}
-    {% if ele.type == 'leaf' %}
-	  {{- printleaf(ele.path,ele.name,level,indexvar) }}
-	{%else%}
+    {%- if ele.type == 'leaf' -%}
+	  {{- printleaf(ele.path,ele.name,level,indexvar) -}}
+    {%- else -%}
+        {%- if ele.type == 'list' -%}
+			{%- if indexvar -%}
+				{%- set pathvar=indexvar -%}
+			{%- else -%}
+				{%- set pathvar=path2variable(ele.path) -%}
+			{%- endif -%}	      
+{{'\n'+' '*4*level}}{{'{%-'}} for i_{{level}} in {{pathvar+"."+path2variable(preparename(ele.name))}} {{'%}'}}
+			{%- set indexvar = 'i_{0:d}'.format(level) -%}    
 {{'\n'+' '*4*level}}<{{ele.name}}>
-        {%- if ele.type == 'list' %}
-		{% if indexvar %}
-			{% set pathvar=indexvar %}
- 		{% else %}
-			{% set pathvar=path2variable(ele.path) %}
-		{% endif %}	      
-{{'\n'+' '*4*level}}{{'{%'}} for i_{{level}} in {{pathvar+"."+ele.name}} {{'%}'}}
-		{% set indexvar = 'i_{0:d}'.format(level) %}    
+		{%- else -%}	
+{{'\n'+' '*4*level}}<{{ele.name}}>
 		{%- endif %} 
-    	{% if indexvar and ele.type == 'container' %}
-			{% set old_indexvar = indexvar %}
-			{% set indexvar = indexvar + '.' + ele.name %}
-        {% endif %}
-    	{%- for child in ele['children'] %}
-            {{- expand_xml_recursive(child,level+1,indexvar) -}}
-	    {%- endfor %}
-		{% set indexvar=old_indexvar %}
+    	{%- if indexvar and ele.type == 'container' -%}
+			{%- set old_indexvar = indexvar -%}
+			{%- set indexvar = indexvar + '.' + path2variable(preparename(ele.name)) -%}
+        {%- endif -%}
+    	{%- for child in ele['children'] -%}
+            {{ expand_xml_recursive(child,level+1,indexvar) }}
+	    {%- endfor -%}
+		{%- set indexvar=old_indexvar -%}
 		{%- if ele.type == 'list' %}
-{{' '*4*level}}{{'{%-'}} endfor {{'%}'}}
-		{%- endif %}
-{{' '*4*level}}</{{ele.name}}>
-    {%endif%}
+{{- '\n'+' '*4*level}}</{{ele.name}}>
+{{ ' '*4*level}}{{'{%-'}} endfor {{'%}'}}
+		{%- endif -%}
+		{%- if ele.type != 'list' -%}
+{{'\n'+' '*4*level}}</{{ele.name}}>
+        {%- endif -%}
+    {%- endif -%}
 {%- endmacro -%}
 
 {################ COMMON MACROS #ENDS ################}
-
-
-// Junos XML Hierarchy
-
 <configuration>
-  <groups>
-    {%- for parent in parent_list %}
-		{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} []xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} `xml:"{{parent.name}},omitempty"`
-	{%- endfor %}
-  </groups>   
-</configuration>  
-
-START_OF_J2_CONFIG
-<configuration>
-
-{%- for parent in parent_list %}
+{%- for parent in parent_list -%}
   {{ expand_xml_recursive(parent,1,None) }}
-{% endfor %}
-
-
+{%- endfor %}
 </configuration>
-END_OF_J2_CONFIG
 {################ STRUCT FROM XML # ENDS #############}
