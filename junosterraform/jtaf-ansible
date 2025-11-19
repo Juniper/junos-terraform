@@ -246,29 +246,23 @@ def load_and_merge_xmls(xml_file_list):
 
     return merged_config
 
-# def elem_to_dict(element):
-#     result = {}
-#     for child in element:
-#         try:
-#             if len(child) == 0:
-#                 try:
-#                     result[child.tag] = child.text
-#                 except AttributeError:
-#                     result[child.tag] = child    
-#             else:
-#                 result[child.tag] = elem_to_dict(child)
-#         except TypeError:
-#             try:
-#                 result[child.tag] = child.text       
-#             except AttributeError:
-#                 result[child.tag] = child    
-#     return result
 
-CURRENT_LEVEL=0
+#CURRENT_LEVEL=0
+
 def prepare_tag(tag):
+    """Prepare XML tag to be used as YAML key by replacing '-' and '.' with '_'."""
     return tag.replace("-", "_").replace(".", "_")
 
 def element_node(element,path,resources):
+    """Return the resource node matching the given XML element and path.
+    Args:
+        element: XML element to match
+        path: path to match in the schema
+        resources: schema resource node to search
+    Returns:
+        The matching resource node or None if not found
+    """
+    
  #   print(f"RESOURCES_PATH={resources.get("path")} TYPE={resources.get("type")} NAME={resources.get("name")} ELEMENT={element} TAG={element.tag} TEXT=|{element.get('text')}| PATH={path} ")
     if resources['name'] == element.tag and (resources.get("path") is None or (resources["path"]+'/'+element.tag)==path):
  #       print(f"FOUND MATCH FOR ELEMENT={element} TYPE={resources['type']} PATH={path}")
@@ -284,10 +278,20 @@ def element_node(element,path,resources):
     except KeyError:
         return None            
     return None
+
 def elem_to_dict(element,path,resources):
+    """Convert an XML element and its children to a dictionary.
+    Args:
+        element: XML element to convert
+        path: current path of the element. Needed to uniquely identify the element in the schema
+        resources: schema resource node to use for type information
+    Returns:
+        A dictionary representation of the XML element
+    """
+    
     result = {}
-    global CURRENT_LEVEL
-    CURRENT_LEVEL+=1
+ #   global CURRENT_LEVEL
+ #   CURRENT_LEVEL+=1
  #   cnt=0
  #   print(f"CURRENT_LEVEL={CURRENT_LEVEL} ELEMENT={element} ")
     for child in element:
@@ -320,10 +324,6 @@ def elem_to_dict(element,path,resources):
             if len(child) > 0:
                 result[prepared_tag] = elem_to_dict(child,prepared_path,resources)
             else:
-                # if child.text is not None:
-                #     result[prepared_tag] = child.text
-                # else:
-                #     result[prepared_tag] = {}
                 result[prepared_tag] = {}
         else:
             # For other types, decide based on children
@@ -340,10 +340,17 @@ def elem_to_dict(element,path,resources):
 #       cnt+=1      
 #    if not cnt:
 #        result[element.tag] = element.text    
-    CURRENT_LEVEL-=1    
+#    CURRENT_LEVEL-=1    
     return result
 
 def xml2yaml(xml_file, resources,output_dir):
+    """Convert an XML configuration file to YAML format using the provided schema resources.
+    Output file name is derived from the XML file name by changing the extension to .yaml.
+    Args:
+        xml_file: Path to the XML configuration file
+        resources: Schema resource node to use for conversion
+        output_dir: Directory to save the converted YAML file"""
+        
     with open(xml_file) as f:
         raw = f.read()
     root = ElementTree.fromstring(f"<root>{raw}</root>")

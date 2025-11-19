@@ -3,57 +3,6 @@
 
 {############### COMMON VARIABLES # ENDS ####################}
 
-{############# COMMON MACROS #STARTS ################}
-{%- macro get_full_parent_name(ele, sep, cap='False') %}
-{%- set result_list = [] %}
-{%- if ele['path'] is defined %}
-{%- for item in ele['path'].split("/")%}
-{%- if cap == 'True'%}
-{{- result_list.append(item|capitalize|replace("-", "_")|replace(".", "_")|replace(".", "_")) or ""}}
-{%- else %}
-{{- result_list.append(item|replace("-", "_")|replace(".", "_")) or ""}}
-{%- endif %}
-{%- endfor %}
-{%- endif %}
-{{-result_list|join(sep)-}}
-{%- endmacro %}
-
-{%- macro get_parent_list_with_iterator(ele) -%}
-{%- set result_list = [] %}
-{%- set temp_list = []%}
-{%- if ele['path'] is defined %}
-{%- for item in ele['path'].split("/")%}
-{{- temp_list.append(item|replace("-", "_")|replace(".", "_")) or ""}}
-{%- set cap_item = item|capitalize|replace("-", "_")|replace(".", "_") %}
-{{- result_list.append(cap_item+"[i_"+temp_list|join("_")+"]") or ""}}
-{%- endfor %}
-{%- endif %}
-{{-result_list|join(".")-}}
-{%- endmacro -%}
-
-{%- macro slice_string_macro(ele) -%}
-		{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}         []*string  `xml:"{{ele.name|replace("_","-")}},omitempty"`
-{%- endmacro -%}
-
-{%- macro string_macro(ele) -%}
-		{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}         *string  `xml:"{{ele.name|replace("_","-")}},omitempty"`
-{%- endmacro -%}
-
-{%- macro bool_macro(ele) -%}
-		{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}         *bool  `xml:"{{ele.name|replace("_","-")}},omitempty"`
-{%- endmacro -%}
-
-{%- macro int32_macro(ele) -%}
-		{{ele.name|capitalize}}         *int32  `xml:"{{ele.name|replace("_","-")}},omitempty"`
-{%- endmacro -%}
-
-{%- macro list_macro(ele) -%}
-		{%- if ele['path'] is defined %}
-		{%- set parent_name = ele['path'].split("/")[-1] -%}
-		{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} []xml_{{get_full_parent_name(ele, "_", 'True')}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} `xml:"{{ele.name}},omitempty"`	
-		{%- endif %}
-{%- endmacro -%}
-
 {############### XML2Ansible Macros  ####################}
 {%- macro path2variable(path) -%}
 {{- path|replace("-","_")|replace("/",".") -}} 
