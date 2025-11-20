@@ -432,7 +432,7 @@ def main():
   connection: local
   gather_facts: no
   vars:
-    tmp_dir: "{{ playbook_dir }}"
+    tmp_dir: "{{{{ playbook_dir }}}}"
   roles:
     - {role_name}
 """
