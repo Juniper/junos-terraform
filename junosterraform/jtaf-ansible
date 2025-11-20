@@ -405,8 +405,8 @@ def main():
     os.makedirs(templates_path, exist_ok=True)
 
     # write a minimal tasks/main.yml
-    tasks_main = """- name: Applying template for <role_name>
-  template: src=template.j2 dest={{ tmp_dir }}/{{ hostname }}.xml
+    tasks_main = f"""- name: Applying template for {role_name}
+  template: src=template.j2 dest={{{{ tmp_dir }}}}/{{{{ inventory_hostname }}}}.xml
 """
     with open(os.path.join(tasks_path, "main.yml"), "w") as f:
         f.write(tasks_main)
@@ -426,19 +426,18 @@ def main():
         for hostname in hostnames:
             f.write(f"{hostname}\n")
    
-   # # Step 5: Save rendered Jinja2 file into new directory
-   # resource_config_provider_j2_fullpath = os.path.join(new_dir, "main.j2")
-   # with open(resource_config_provider_j2_fullpath, "w") as f:
-   #     f.write(resource_config_provider_j2)
-   # print(f"Plugin created in {os.path.relpath(resource_config_provider_j2_fullpath)}\n")
-
-
-#    # Step 6: Add trimmed_schema.json to new directory
-#    trimmed_schema_path = os.path.join(new_dir, "trimmed_schema.json")
-#    print(f"Resources type is {type(resources)}")
-#    with open(trimmed_schema_path, "w") as f:
-#        json.dump(resources, f, indent=2)
-
+   # Step 5: Create a minimal ansible playbook
+    playbook_content = f"""- name: Apply Junos configuration
+  hosts: all
+  connection: local
+  gather_facts: no
+  vars:
+    tmp_dir: "{{ playbook_dir }}"
+  roles:
+    - {role_name}
+"""
+    with open(os.path.join(new_dir, "jtaf-playbook.yml"), "w") as f:
+        f.write(playbook_content)
 # run main()
 if __name__ == "__main__":
     main()

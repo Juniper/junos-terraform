@@ -20,7 +20,7 @@
 {%- set var1= path -%}
 {%- endif -%}
 {%- set name_prepared = preparename(name) -%}
-{{- '\n'+' '*4*level}}{{'{%-'}} if {{path2variable(var1+'.'+name_prepared) }} {{'%}'}}
+{{- '\n'+' '*4*level}}{{'{%-'}} if {{path2variable(var1+'.'+'get("'+name_prepared+'")') }} {{'%}'}}
 {{' '*4*level}}<{{name}}>{{'{{'}}{{ path2variable(var1+'.'+name_prepared) }}{{'}}'}}</{{name}}>
 {# {{' '*4*(level+1)}} {{'{{'}} {{ path2variable(var1+'.'+name_prepared) }} {{'}}'}} #}
 {# {{' '*4*level}}</{{name}}> #}
@@ -37,8 +37,9 @@
 				{%- set pathvar=indexvar -%}
 			{%- else -%}
 				{%- set pathvar=path2variable(ele.path) -%}
-			{%- endif -%}	      
-{{'\n'+' '*4*level}}{{'{%-'}} for i_{{level}} in {{pathvar+"."+path2variable(preparename(ele.name))}} {{'%}'}}
+			{%- endif -%}	    
+{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}			  
+{{'\n'+' '*4*level}}{{'{%-'}} for i_{{level}} in {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
 			{%- set indexvar = 'i_{0:d}'.format(level) -%}    
 {{'\n'+' '*4*level}}<{{ele.name}}>
 		{%- else -%}	
@@ -55,6 +56,7 @@
 		{%- if ele.type == 'list' %}
 {{- '\n'+' '*4*level}}</{{ele.name}}>
 {{ ' '*4*level}}{{'{%-'}} endfor {{'%}'}}
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
 		{%- endif -%}
 		{%- if ele.type != 'list' -%}
 {{'\n'+' '*4*level}}</{{ele.name}}>
