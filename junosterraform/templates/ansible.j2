@@ -21,7 +21,12 @@
 {%- endif -%}
 {%- set name_prepared = preparename(name) -%}
 {{- '\n'+' '*4*level}}{{'{%-'}} if {{path2variable(var1+'.'+'get("'+name_prepared+'")') }} {{'%}'}}
+{{- '\n'+' '*4*level}}{{'{%-'}} if {{path2variable(var1+'.'+'get("'+name_prepared+'")')}} is boolean {{'%}'}}
+{{' '*4*level}}<{{name}}/>
+{{' '*4*level}}       {{'{%-'}} else {{'%}'}}
 {{' '*4*level}}<{{name}}>{{'{{'}}{{ path2variable(var1+'.'+name_prepared) }}{{'}}'}}</{{name}}>
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
+
 {# {{' '*4*(level+1)}} {{'{{'}} {{ path2variable(var1+'.'+name_prepared) }} {{'}}'}} #}
 {# {{' '*4*level}}</{{name}}> #}
 {{' '*4*level}}{{'{%-'}} endif {{'%}'}}
