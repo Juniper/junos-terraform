@@ -355,7 +355,7 @@ def xml2yaml(xml_file, resources,output_dir, subdir=None):
         output_dir = os.path.join(output_dir, subdir)
     xml_dict = elem_to_dict(config,"",resources['root'])
     yaml_output = yaml.dump(xml_dict, sort_keys=False)
-    base_name = os.path.basename(xml_file)
+ #   base_name = os.path.basename(xml_file)
 #    yaml_file_name = os.path.splitext(base_name)[0] + ".yaml"
     yaml_file_name = hostname + ".yaml"
     output_path = os.path.join(output_dir, yaml_file_name)
@@ -398,11 +398,13 @@ def main():
 # create roles/<rolename>/{tasks,templates} structure
     role_name = f"{args.type}_role"
     roles_path = os.path.join(new_dir, "roles", role_name)
-    
     tasks_path = os.path.join(roles_path, "tasks")
     templates_path = os.path.join(roles_path, "templates")
     os.makedirs(tasks_path, exist_ok=True)
     os.makedirs(templates_path, exist_ok=True)
+    os.makedirs(os.path.join(new_dir, "host_vars"), exist_ok=True)
+    os.makedirs(os.path.join(new_dir, "configs"), exist_ok=True)
+    
 
     # write a minimal tasks/main.yml
     tasks_main = f"""- name: Applying template for {role_name}
@@ -432,9 +434,10 @@ def main():
   connection: local
   gather_facts: no
   vars:
-    tmp_dir: "{{{{ playbook_dir }}}}"
+    tmp_dir: "configs"
   roles:
-    - {role_name}
+    - role: {role_name}
+      delegate_to: localhost
 """
     with open(os.path.join(new_dir, "jtaf-playbook.yml"), "w") as f:
         f.write(playbook_content)

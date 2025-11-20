@@ -38,7 +38,7 @@
 			{%- else -%}
 				{%- set pathvar=path2variable(ele.path) -%}
 			{%- endif -%}	    
-{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}			  
+{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}			  
 {{'\n'+' '*4*level}}{{'{%-'}} for i_{{level}} in {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
 			{%- set indexvar = 'i_{0:d}'.format(level) -%}    
 {{'\n'+' '*4*level}}<{{ele.name}}>
@@ -65,9 +65,14 @@
 {%- endmacro -%}
 
 {################ COMMON MACROS #ENDS ################}
+#jinja2: trim_blocks: False, lstrip_blocks: False
 <configuration>
+    <groups>
+        <name> JTAF_ANSIBLE </name>
 {%- for parent in parent_list -%}
   {{ expand_xml_recursive(parent,1,None) }}
 {%- endfor %}
+    </groups>
+	<apply-groups> JTAF_ANSIBLE </apply-groups>
 </configuration>
 {################ STRUCT FROM XML # ENDS #############}
