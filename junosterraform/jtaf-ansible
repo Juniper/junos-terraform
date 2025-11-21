@@ -321,10 +321,14 @@ def elem_to_dict(element,path,resources):
                 result[prepared_tag] = elem_to_dict(child,prepared_path,resources)
             else:
                 if elem_type=='leaf':
-                    if elem_node['leaf-type']=='empty':
+#                    if elem_node['leaf-type']=='empty':
+#                        result[prepared_tag] = True
+#                    else:    
+#                        result[prepared_tag] = child.text
+                    if not child.text:
                         result[prepared_tag] = True
-                    else:    
-                        result[prepared_tag] = child.text
+                    else:
+                        result[prepared_tag] = child.text    
                 else:
                     result[prepared_tag] = child.text     
 #       cnt+=1      
@@ -441,6 +445,11 @@ def main():
 """
     with open(os.path.join(new_dir, "jtaf-playbook.yml"), "w") as f:
         f.write(playbook_content)
+        
+    # Step 6: Add trimmed_schema.json to new directory
+    trimmed_schema_path = os.path.join(new_dir, "trimmed_schema.json")
+    with open(trimmed_schema_path, "w") as f:
+        json.dump(resources, f, indent=2)
 # run main()
 if __name__ == "__main__":
     main()

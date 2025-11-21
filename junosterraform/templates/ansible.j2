@@ -34,38 +34,107 @@
 
 {#####}
 {%- macro expand_xml_recursive(ele,level,indexvar) -%}
+    {# CHECKLEAF IF #}
     {%- if ele.type == 'leaf' -%}
 	  {{- printleaf(ele.path,ele.name,level,indexvar) -}}
+	
+	{# CHECKLEAF ELSE #}
     {%- else -%}
+
+        {# INDEXVAR IF #}
+		{%- if indexvar -%}
+			{%- set pathvar=indexvar -%}
+		{# INDEXVAR ELSE #}
+		{%- else -%}
+			{%- set pathvar=path2variable(ele.path) -%}
+		{# INDEXVAR ENDIF #}
+		{%- endif -%}
+
+        {# LIST IF #}
         {%- if ele.type == 'list' -%}
-			{%- if indexvar -%}
-				{%- set pathvar=indexvar -%}
-			{%- else -%}
-				{%- set pathvar=path2variable(ele.path) -%}
-			{%- endif -%}	    
+
 {{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}			  
 {{'\n'+' '*4*level}}{{'{%-'}} for i_{{level}} in {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
 			{%- set indexvar = 'i_{0:d}'.format(level) -%}    
+
+{%- if level>1 -%}
+{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
+{%- endif -%}
+{#{% if ele.type != "leaf-list" %}#}
 {{'\n'+' '*4*level}}<{{ele.name}}>
+{#{% endif %}#}
+
+        {# LIST ELSE #}
 		{%- else -%}	
+
+{%- if level>1 -%}
+{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
+{%- endif -%}
+{% if ele.type != "leaf-list" %}
 {{'\n'+' '*4*level}}<{{ele.name}}>
+{% endif %}
+        {# LIST ENDIF #}
 		{%- endif %} 
+
+        {# CONTAINER IF#}
     	{%- if indexvar and ele.type == 'container' -%}
 			{%- set old_indexvar = indexvar -%}
 			{%- set indexvar = indexvar + '.' + path2variable(preparename(ele.name)) -%}
+		{# CONTAINER ENDIF#}
         {%- endif -%}
+
+        {# LEAF-LIST IF #}
+		
+		{% if ele.type=="leaf-list" %}
+              {{'{%'}} for ii_{{level}} in {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
+{{'\n'+' '*4*(level+1)}}<{{ele.name}}>{{'{{'}}ii_{{level}}{{'}}'}}</{{ele.name}}>
+			  {{'{%'}} endfor {{'%}'}}
+        {# LEAF-LIST ELSE #}
+		{% else %}
+   
     	{%- for child in ele['children'] -%}
             {{ expand_xml_recursive(child,level+1,indexvar) }}
 	    {%- endfor -%}
+
+        {# LEAF-LIST ENDIF #}
+		{% endif %}
+
 		{%- set indexvar=old_indexvar -%}
+
+		{# LIST IF #}
 		{%- if ele.type == 'list' %}
+
+{#{%- if level>1 -%}#}
+{#{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}#}
+{#{%- endif %}#}
+
 {{- '\n'+' '*4*level}}</{{ele.name}}>
+
+{%- if level>1 -%}
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
+{%- endif %}
+
 {{ ' '*4*level}}{{'{%-'}} endfor {{'%}'}}
 {{' '*4*level}}{{'{%-'}} endif {{'%}'}}
-		{%- endif -%}
-		{%- if ele.type != 'list' -%}
+
+
+		{# LIST ELSE#}
+		{%- else -%}
+
+{#{%- if level>1 -%}#}
+{#{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}#}
+{#{%- endif %}#}
+{%- if ele.type != "leaf-list" -%}
 {{'\n'+' '*4*level}}</{{ele.name}}>
+{% endif %}
+{%- if level>1 -%}
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
+{%- endif %}
+
+        {# LIST ENDIF#}
         {%- endif -%}
+
+	{# CHECKLEAF ENDIF #}	
     {%- endif -%}
 {%- endmacro -%}
 
