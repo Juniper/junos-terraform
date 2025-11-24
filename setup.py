@@ -25,7 +25,10 @@ setup(
             "go-netconf/session/*",
             "go-netconf/transport/*"
         ],
-        "junosterraform": [ "templates/*" ]
+        "junosterraform": [ 
+            "templates/*",
+            "jtaf_common.py"
+            ]
     },
     install_requires=[
         'pytest',
