@@ -392,7 +392,7 @@ def main():
     with open(f"{templates_dir}/ansible.j2") as f:
         jinja2_source = f.read()
     tmpl = Template(jinja2_source)
-    resource_config_provider_j2 = tmpl.render(data=resources).lstrip()
+    resource_config_provider_j2 = '\n'.join(list(filter(lambda x: x.strip() != '',tmpl.render(data=resources).splitlines())))
 
     # Step 3: Prepare new output directory based on type
     with as_file(files('terraform_provider').joinpath('__init__.py')) as init_py:
