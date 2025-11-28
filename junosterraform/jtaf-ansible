@@ -1,147 +1,11 @@
 #!/usr/bin/env python3
-import xml.etree.ElementTree as ElementTree
 import json
 import argparse
-import sys
 from jinja2 import Template
 import os
-import os
 from importlib.resources import files, as_file
-import yaml
 from junosterraform.jtaf_common import filter_json_using_xml, load_and_merge_xmls
 
-
-#CURRENT_LEVEL=0
-
-def prepare_tag(tag):
-    """Prepare XML tag to be used as YAML key by replacing '-' and '.' with '_'."""
-    return tag.replace("-", "_").replace(".", "_")
-
-def element_node(element,path,resources):
-    """Return the resource node matching the given XML element and path.
-    Args:
-        element: XML element to match
-        path: path to match in the schema
-        resources: schema resource node to search
-    Returns:
-        The matching resource node or None if not found
-    """
-    
- #   print(f"RESOURCES_PATH={resources.get("path")} TYPE={resources.get("type")} NAME={resources.get("name")} ELEMENT={element} TAG={element.tag} TEXT=|{element.get('text')}| PATH={path} ")
-    if resources['name'] == element.tag and (resources.get("path") is None or (resources["path"]+'/'+element.tag)==path):
- #       print(f"FOUND MATCH FOR ELEMENT={element} TYPE={resources['type']} PATH={path}")
-        return {k: v for k, v in resources.items() if k != "children"}
-    try:
-        for elem in resources["children"]:
-    #        if elem['name'] == element['name'] and path==elem['path']:
-    #            return elem['type']
-    #        if elem['type'] != 'leaf':
-                etype=element_node(element,path,elem)
-                if etype:
-                    return etype                  
-    except KeyError:
-        return None            
-    return None
-
-def elem_to_dict(element,path,resources):
-    """Convert an XML element and its children to a dictionary.
-    Args:
-        element: XML element to convert
-        path: current path of the element. Needed to uniquely identify the element in the schema
-        resources: schema resource node to use for type information
-    Returns:
-        A dictionary representation of the XML element
-    """
-    
-    result = {}
- #   global CURRENT_LEVEL
- #   CURRENT_LEVEL+=1
- #   cnt=0
- #   print(f"CURRENT_LEVEL={CURRENT_LEVEL} ELEMENT={element} ")
-    for child in element:
-        prepared_tag=prepare_tag(child.tag)
-        prepared_path=child.tag            
-        if len(path)>0:
-            prepared_path=path+'/'+child.tag
-        elem_node=element_node(child,prepared_path,resources)    
-        elem_type=elem_node['type'] if elem_node else None
- #       print(f"ELEM_NODE={elem_node} ELEM_TYPE={elem_type} FOR CHILD={child.tag} PATH={prepared_path} ")
-  #      if child.tag=='interface':
-  #              print(f"Processing interface element: {ElementTree.tostring(child)}")
-  #              print(f"CURRENT_LEVEL={CURRENT_LEVEL} result[prepared_tag]={result.get(prepared_tag)} elem_type={elem_type}")
-        if elem_type == 'list':
-            # If the element is of type list, always create a list
-            
-            if not result.get(prepared_tag):
-                result[prepared_tag] = []
-            if len(child) > 0:
-                result[prepared_tag].append(elem_to_dict(child,prepared_path,resources))
-            else:
-                result[prepared_tag].append(child.text)
-        elif elem_type == 'leaf-list':
-            # If the element is of type leaf-list, always create a list
-            if not result.get(prepared_tag):
-                result[prepared_tag] = []
-            result[prepared_tag].append(child.text)        
-        elif elem_type == 'container':
-            # If the element is of type container, always create a dict
-            if len(child) > 0:
-                result[prepared_tag] = elem_to_dict(child,prepared_path,resources)
-            else:
-                result[prepared_tag] = {}
-        else:
-            # For other types, decide based on children
-            if len(child) > 0:
-                result[prepared_tag] = elem_to_dict(child,prepared_path,resources)
-            else:
-                if elem_type=='leaf':
-#                    if elem_node['leaf-type']=='empty':
-#                        result[prepared_tag] = True
-#                    else:    
-#                        result[prepared_tag] = child.text
-                    if not child.text:
-                        result[prepared_tag] = True
-                    else:
-                        result[prepared_tag] = child.text    
-                else:
-                    result[prepared_tag] = child.text     
-#       cnt+=1      
-#    if not cnt:
-#        result[element.tag] = element.text    
-#    CURRENT_LEVEL-=1    
-    return result
-
-def xml2yaml(xml_file, resources,output_dir, subdir=None):
-    """Convert an XML configuration file to YAML format using the provided schema resources.
-    Output file name is derived from the XML file name by changing the extension to .yaml.
-    Args:
-        xml_file: Path to the XML configuration file
-        resources: Schema resource node to use for conversion
-        output_dir: Directory to save the converted YAML file"""
-        
-    with open(xml_file) as f:
-        raw = f.read()
-    root = ElementTree.fromstring(f"<root>{raw}</root>")
-    hostname = xml_file.split('.')[0]
-    hostname_elem = root.find(".//system/host-name")
-    if hostname_elem is not None and hostname_elem.text:
-        hostname = hostname_elem.text  
-    config = root.find(".//configuration")
-    if config is None:
-        raise ValueError(f"No <configuration> found in {xml_file}")
-    if subdir:
-        output_dir = os.path.join(output_dir, subdir)
-    xml_dict = elem_to_dict(config,"",resources['root'])
-    yaml_output = yaml.dump(xml_dict, sort_keys=False)
- #   base_name = os.path.basename(xml_file)
-#    yaml_file_name = os.path.splitext(base_name)[0] + ".yaml"
-    yaml_file_name = hostname + ".yaml"
-    output_path = os.path.join(output_dir, yaml_file_name)
-    os.makedirs(output_dir, exist_ok=True)
-    with open(output_path, "w") as f:
-        f.write(yaml_output)
-    return hostname    
-#    print(f"Converted {xml_file} to {output_path}")
     
 # Main Method
 def main():
@@ -169,8 +33,6 @@ def main():
     resource_config_provider_j2 = '\n'.join(list(filter(lambda x: x.strip() != '',tmpl.render(data=resources).splitlines())))
 
     # Step 3: Prepare new output directory based on type
-    with as_file(files('terraform_provider').joinpath('__init__.py')) as init_py:
-       j2_dir = os.path.dirname(init_py)
     new_dir = f"ansible-provider-junos-{args.type}"
 
 # create roles/<rolename>/{tasks,templates} structure
@@ -195,18 +57,8 @@ def main():
     with open(os.path.join(templates_path, "template.j2"), "w") as f:
         f.write(resource_config_provider_j2)
 
-
-    # Step 4: Generate YAML files from XML configs and hosts file
-    hostnames=[]
-    for xml_file in xml_files:
-        hostnames.append(xml2yaml(xml_file,resources, new_dir,"host_vars"))
-    
-    with open(os.path.join(new_dir, "hosts"), "w") as f:
-        f.write("[all]\n")
-        for hostname in hostnames:
-            f.write(f"{hostname}\n")
    
-   # Step 5: Create a minimal ansible playbook
+   # Step 4: Create a minimal ansible playbook
     playbook_content = f"""- name: Apply Junos configuration
   hosts: all
   connection: local
@@ -220,7 +72,7 @@ def main():
     with open(os.path.join(new_dir, "jtaf-playbook.yml"), "w") as f:
         f.write(playbook_content)
         
-    # Step 6: Add trimmed_schema.json to new directory
+    # Step 5: Add trimmed_schema.json to new directory
     trimmed_schema_path = os.path.join(new_dir, "trimmed_schema.json")
     with open(trimmed_schema_path, "w") as f:
         json.dump(resources, f, indent=2)

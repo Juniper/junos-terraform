@@ -8,7 +8,7 @@ setup(
     author="Juniper Networks",
     description="Junos Terraform Framework",
     packages=["junosterraform", "jtaf_pyang_plugin", "terraform_provider"],
-    scripts=["junosterraform/jtaf-provider","junosterraform/jtaf-ansible", "jtaf_pyang_plugin/jtaf-pyang-plugindir", "junosterraform/jtaf-xml2tf", "junosterraform/jtaf-yang2go",
+    scripts=["junosterraform/jtaf-provider","junosterraform/jtaf-ansible","junosterraform/jtaf-xml2yaml", "jtaf_pyang_plugin/jtaf-pyang-plugindir", "junosterraform/jtaf-xml2tf", "junosterraform/jtaf-yang2go",
              "junosterraform/jtaf-yang2ansible"],
     package_data = {
         "terraform_provider": [
@@ -35,6 +35,7 @@ setup(
         'pyang',
         'lxml',
         'jinja2',
-        'setuptools'
+        'setuptools',
+        'pyyaml'
     ]
 )
