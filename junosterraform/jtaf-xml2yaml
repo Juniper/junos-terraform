@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import sys
+import re
+import os
+import yaml
+from xml.etree import ElementTree
+from typing import Any
+
+
+def prepare_tag(tag:str) -> str:
+    """Prepare XML tag to be used as YAML key by replacing '-' and '.' with '_'."""
+    return tag.replace("-", "_").replace(".", "_")
+
+def element_node(element:ElementTree.Element,path:str,resources:dict[str,Any]) -> dict[str,Any]|None:
+    """Return the resource node matching the given XML element and path.
+    Args:
+        element: XML element to match
+        path: path to match in the schema
+        resources: schema resource node to search
+    Returns:
+        The matching resource node or None if not found
+    """
+    
+    if resources['name'] == element.tag and (resources.get("path") is None or (resources["path"]+'/'+element.tag)==path):
+        return {k: v for k, v in resources.items() if k != "children"}
+    try:
+        for elem in resources["children"]:
+                etype=element_node(element,path,elem)
+                if etype:
+                    return etype                  
+    except KeyError:
+        return None            
+    return None
+
+
+def elem_to_dict(element:ElementTree.Element,path:str,resources:Any)-> dict[str, Any]:
+    """Convert an XML element and its children to a dictionary.
+    Args:
+        element: XML element to convert
+        path: current path of the element. Needed to uniquely identify the element in the schema
+        resources: schema resource node to use for type information
+    Returns:
+        A dictionary representation of the XML element
+    """
+    
+    result = {}
+    for child in element:
+        prepared_tag=prepare_tag(child.tag)
+        prepared_path=child.tag            
+        if len(path)>0:
+            prepared_path=path+'/'+child.tag
+        elem_node=element_node(child,prepared_path,resources)    
+        elem_type=elem_node['type'] if elem_node else None
+
+        if elem_type == 'list':
+            # If the element is of type list, always create a list
+            
+            if not result.get(prepared_tag):
+                result[prepared_tag] = []
+            if len(child) > 0:
+                result[prepared_tag].append(elem_to_dict(child,prepared_path,resources))
+            else:
+                result[prepared_tag].append(child.text)
+        elif elem_type == 'leaf-list':
+            # If the element is of type leaf-list, always create a list
+            if not result.get(prepared_tag):
+                result[prepared_tag] = []
+            result[prepared_tag].append(child.text)        
+        elif elem_type == 'container':
+            # If the element is of type container, always create a dict
+            if len(child) > 0:
+                result[prepared_tag] = elem_to_dict(child,prepared_path,resources)
+            else:
+                result[prepared_tag] = {}
+        else:
+            # For other types, decide based on children
+            if len(child) > 0:
+                result[prepared_tag] = elem_to_dict(child,prepared_path,resources)
+            else:
+                if elem_type=='leaf':
+                    if not child.text:
+                        result[prepared_tag] = True
+                    else:
+                        result[prepared_tag] = child.text    
+                else:
+                    result[prepared_tag] = child.text     
+    return result
+
+def xml2yaml(xml_file:str, resources:dict[str,Any],output_dir:str, subdir:str|None=None)-> str:
+    """Convert an XML configuration file to YAML format using the provided schema resources.
+    Output file name is derived from the XML file name by changing the extension to .yaml.
+    Args:
+        xml_file: Path to the XML configuration file
+        resources: Schema resource node to use for conversion
+        output_dir: Directory to save the converted YAML file"""
+        
+    with open(xml_file) as f:
+        raw = f.read()
+    root = ElementTree.fromstring(f"<root>{raw}</root>")
+    hostname = xml_file.split('.')[0]
+    hostname_elem = root.find(".//system/host-name")
+    if hostname_elem is not None and hostname_elem.text:
+        hostname = hostname_elem.text  
+    config = root.find(".//configuration")
+    if config is None:
+        raise ValueError(f"No <configuration> found in {xml_file}")
+    if subdir:
+        output_dir = os.path.join(output_dir, subdir)
+    xml_dict = elem_to_dict(config,"",resources['root'])
+    yaml_output = yaml.dump(xml_dict, sort_keys=False)
+    yaml_file_name = hostname + ".yaml"
+    output_path = os.path.join(output_dir, yaml_file_name)
+    os.makedirs(output_dir, exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write(yaml_output)
+    return hostname    
+
+
+def main():
+    parser = argparse.ArgumentParser(exit_on_error=True)
+    parser.add_argument('-j', '--trimmed_json', required=True, help='specify the trimmed json config file stored in the terraform provider folder')
+    parser.add_argument('-x', '--xml-config', required=True, nargs="+", help='specify one or more XML config files to create .tf files for')
+    parser.add_argument('-d', '--directory', required=True, help='specify the directory to write out hosts and host_vars/*.yaml files to')
+
+    args = parser.parse_args()
+
+    trimmed_json_file = args.trimmed_json
+    xml_files = args.xml_config
+    # --- Load JSON schema ---
+    with open(trimmed_json_file, 'r') as f:
+        schema = json.load(f)
+    config_node = None
+    for child in schema["root"]["children"]:
+        if child["name"] == "configuration":
+            config_node = child
+            break
+    if not config_node:
+        raise ValueError("No configuration node found in JSON schema")
+
+    directory = args.directory
+    
+     # Generate YAML files from XML configs and hosts file
+    hostnames=[]
+    for xml_file in xml_files:
+        hostnames.append(xml2yaml(xml_file,schema, directory, "host_vars"))
+    
+    with open(os.path.join(directory, "hosts"), "w") as f:
+        f.write("[all]\n")
+        for hostname in hostnames:
+            f.write(f"{hostname}\n")
+
+    
+
+
+if __name__ == "__main__":
+    main()

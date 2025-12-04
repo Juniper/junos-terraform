@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+import json
+import argparse
+from jinja2 import Template
+import os
+from importlib.resources import files, as_file
+from junosterraform.jtaf_common import filter_json_using_xml, load_and_merge_xmls
+
+    
+# Main Method
+def main():
+    # other arguments
+    parser = argparse.ArgumentParser(exit_on_error=True)
+    parser.add_argument('-j', '--json-schema', required=True, help='specify the json schema file')
+    parser.add_argument('-x', '--xml-config', required=True, action='append', nargs="+", help='specify one or more XML config files to combine')
+    parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
+    args = parser.parse_args()
+
+    # Merge XML files if multiple are provided 
+    xml_files = [file for group in args.xml_config for file in group]
+    xml_config = xml_files[0] if len(xml_files) == 1 else load_and_merge_xmls(xml_files)
+
+    # Step 1: Filter the schema using the config
+    resources = filter_json_using_xml(args.json_schema, xml_config)
+
+    # Step 2: Render the template into Jinja2 code
+    with as_file(files('junosterraform').joinpath('__init__.py')) as init_py:
+        package_dir = os.path.dirname(init_py)
+    templates_dir = f"{package_dir}/templates"
+    with open(f"{templates_dir}/ansible.j2") as f:
+        jinja2_source = f.read()
+    tmpl = Template(jinja2_source)
+    resource_config_provider_j2 = '\n'.join(list(filter(lambda x: x.strip() != '',tmpl.render(data=resources).splitlines())))
+
+    # Step 3: Prepare new output directory based on type
+    new_dir = f"ansible-provider-junos-{args.type}"
+
+# create roles/<rolename>/{tasks,templates} structure
+    role_name = f"{args.type}_role"
+    roles_path = os.path.join(new_dir, "roles", role_name)
+    tasks_path = os.path.join(roles_path, "tasks")
+    templates_path = os.path.join(roles_path, "templates")
+    os.makedirs(tasks_path, exist_ok=True)
+    os.makedirs(templates_path, exist_ok=True)
+    os.makedirs(os.path.join(new_dir, "host_vars"), exist_ok=True)
+    os.makedirs(os.path.join(new_dir, "configs"), exist_ok=True)
+    
+
+    # write a minimal tasks/main.yml
+    tasks_main = f"""- name: Applying template for {role_name}
+  template: src=template.j2 dest={{{{ tmp_dir }}}}/{{{{ inventory_hostname }}}}.xml
+"""
+    with open(os.path.join(tasks_path, "main.yml"), "w") as f:
+        f.write(tasks_main)
+
+    # copy rendered main.j2 into the role templates as an example
+    with open(os.path.join(templates_path, "template.j2"), "w") as f:
+        f.write(resource_config_provider_j2)
+
+   
+   # Step 4: Create a minimal ansible playbook
+    playbook_content = f"""- name: Apply Junos configuration
+  hosts: all
+  connection: local
+  gather_facts: no
+  vars:
+    tmp_dir: "configs"
+  roles:
+    - role: {role_name}
+      delegate_to: localhost
+"""
+    with open(os.path.join(new_dir, "jtaf-playbook.yml"), "w") as f:
+        f.write(playbook_content)
+        
+    # Step 5: Add trimmed_schema.json to new directory
+    trimmed_schema_path = os.path.join(new_dir, "trimmed_schema.json")
+    with open(trimmed_schema_path, "w") as f:
+        json.dump(resources, f, indent=2)
+# run main()
+if __name__ == "__main__":
+    main()

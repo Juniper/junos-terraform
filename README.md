@@ -289,3 +289,72 @@ Once the `.terraform.rc` file is set up, and the `main.tf` OR group of test file
 terraform plan
 terraform apply -auto-approve
 ```
+
+---
+### <u>Generate Ansible Playbook</u>
+
+Create an Ansible role + playbook from a Junos JSON schema and one or more XML configs. The generated playbook runs locally and renders configs (does not connect to devices) by default.
+
+Quick usage:
+```
+jtaf-ansible -j <junos.json> -x <config1.xml> [-x <config2.xml> ...] -t <device-type>
+```
+
+What is created (under ansible-provider-junos-<type>/):
+- roles/<type>_role/ (tasks/main.yml, templates/template.j2)
+- jtaf-playbook.yml (uses connection: local)
+- host_vars/, configs/, trimmed_schema.json
+
+Verify rendering without applying:
+```
+cd ansible-provider-junos-<type>
+ansible-playbook -i hosts jtaf-playbook.yml --check --diff
+```
+
+---
+
+### <u>Single command to generate ansible role</u>
+
+Generate an Ansible role + playbook in one step from YANG files and XML config(s):
+
+```
+jtaf-yang2ansible -p <path-to-common> <path-to-yang-files> -x <xml-config(s)> -t <device-type>
+```
+
+Example:
+```
+jtaf-yang2ansible -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/dc1/*spine*.xml -t qfx
+```
+
+Notes:
+- If supplying multiple XML configs they must be for the same device type.
+- Output directory: ansible-provider-junos-<type>/ containing roles/<type>_role/ (tasks/templates), jtaf-playbook.yml (connection: local), host_vars/, configs/, trimmed_schema.json.
+- Run the generated playbook in check/diff mode to verify rendered configs without applying:
+  ansible-playbook -i hosts jtaf-playbook.yml --check --diff
+```
+
+---
+
+### <u>Generate YAML for Ansible host_vars (jtaf-xml2yaml)</u>
+
+Convert one or more Junos XML configs into Ansible host_vars YAML and a simple hosts file.
+
+Usage:
+```
+jtaf-xml2yaml -j <trimmed_schema.json> -x <config1.xml> [<config2.xml> ...] -d <output-dir>
+```
+
+Example:
+```
+jtaf-xml2yaml -j ansible-provider-junos-qfx/trimmed_schema.json \
+  -x examples/qfx/device1.xml examples/qfx/device2.xml \
+  -d ansible-provider-junos-qfx
+```
+
+Output:
+- Creates host_vars/<hostname>.yaml for every XML file provided (hostname is file base name or system/host-name from XML).
+- Writes a simple hosts file at <output-dir>/hosts listing all hostnames.
+
+This is useful to feed generated host_vars into the Ansible role/playbook created by jtaf-ansible/jtaf-yang2ansible.
+
+
