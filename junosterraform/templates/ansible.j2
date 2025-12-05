@@ -1,0 +1,152 @@
+{############# COMMON VARIABLES # STARTS ################}
+{%- set parent_list = data['root']['children'][0]['children']%}
+
+{############### COMMON VARIABLES # ENDS ####################}
+
+{############### XML2Ansible Macros  ####################}
+{%- macro path2variable(path) -%}
+{{- path|replace("-","_")|replace("/",".") -}} 
+{%- endmacro -%}
+
+{%- macro preparename(name) -%}
+{{- name|replace(".","_") -}} 
+{%- endmacro -%}
+
+{#####}
+{%- macro printleaf(path,name,level,indexvar) -%}
+{% if indexvar -%}
+{%- set var1 = indexvar -%}
+{%- else -%}
+{%- set var1= path -%}
+{%- endif -%}
+{%- set name_prepared = preparename(name) -%}
+{{- '\n'+' '*4*level}}{{'{%-'}} if {{path2variable(var1+'.'+'get("'+name_prepared+'")') }} {{'%}'}}
+{{- '\n'+' '*4*level}}{{'{%-'}} if {{path2variable(var1+'.'+'get("'+name_prepared+'")')}} is boolean {{'%}'}}
+{{' '*4*level}}<{{name}}/>
+{{' '*4*level}}       {{'{%-'}} else {{'%}'}}
+{{' '*4*level}}<{{name}}>{{'{{'}}{{ path2variable(var1+'.'+name_prepared) }}{{'}}'}}</{{name}}>
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
+
+{# {{' '*4*(level+1)}} {{'{{'}} {{ path2variable(var1+'.'+name_prepared) }} {{'}}'}} #}
+{# {{' '*4*level}}</{{name}}> #}
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
+{%- endmacro -%}
+
+{#####}
+{%- macro expand_xml_recursive(ele,level,indexvar) -%}
+    {# CHECKLEAF IF #}
+    {%- if ele.type == 'leaf' -%}
+	  {{- printleaf(ele.path,ele.name,level,indexvar) -}}
+	
+	{# CHECKLEAF ELSE #}
+    {%- else -%}
+
+        {# INDEXVAR IF #}
+		{%- if indexvar -%}
+			{%- set pathvar=indexvar -%}
+		{# INDEXVAR ELSE #}
+		{%- else -%}
+			{%- set pathvar=path2variable(ele.path) -%}
+		{# INDEXVAR ENDIF #}
+		{%- endif -%}
+
+        {# LIST IF #}
+        {%- if ele.type == 'list' -%}
+
+{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}			  
+{{'\n'+' '*4*level}}{{'{%-'}} for i_{{level}} in {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
+			{%- set indexvar = 'i_{0:d}'.format(level) -%}    
+
+{%- if level>1 -%}
+{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
+{%- endif -%}
+{#{% if ele.type != "leaf-list" %}#}
+{{'\n'+' '*4*level}}<{{ele.name}}>
+{#{% endif %}#}
+
+        {# LIST ELSE #}
+		{%- else -%}	
+
+{%- if level>1 -%}
+{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
+{%- endif -%}
+{% if ele.type != "leaf-list" %}
+{{'\n'+' '*4*level}}<{{ele.name}}>
+{% endif %}
+        {# LIST ENDIF #}
+		{%- endif %} 
+
+        {# CONTAINER IF#}
+    	{%- if indexvar and ele.type == 'container' -%}
+			{%- set old_indexvar = indexvar -%}
+			{%- set indexvar = indexvar + '.' + path2variable(preparename(ele.name)) -%}
+		{# CONTAINER ENDIF#}
+        {%- endif -%}
+
+        {# LEAF-LIST IF #}
+		
+		{% if ele.type=="leaf-list" %}
+              {{'{%'}} for ii_{{level}} in {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
+{{'\n'+' '*4*(level+1)}}<{{ele.name}}>{{'{{'}}ii_{{level}}{{'}}'}}</{{ele.name}}>
+			  {{'{%'}} endfor {{'%}'}}
+        {# LEAF-LIST ELSE #}
+		{% else %}
+   
+    	{%- for child in ele['children'] -%}
+            {{ expand_xml_recursive(child,level+1,indexvar) }}
+	    {%- endfor -%}
+
+        {# LEAF-LIST ENDIF #}
+		{% endif %}
+
+		{%- set indexvar=old_indexvar -%}
+
+		{# LIST IF #}
+		{%- if ele.type == 'list' %}
+
+{#{%- if level>1 -%}#}
+{#{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}#}
+{#{%- endif %}#}
+
+{{- '\n'+' '*4*level}}</{{ele.name}}>
+
+{%- if level>1 -%}
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
+{%- endif %}
+
+{{ ' '*4*level}}{{'{%-'}} endfor {{'%}'}}
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
+
+
+		{# LIST ELSE#}
+		{%- else -%}
+
+{#{%- if level>1 -%}#}
+{#{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}#}
+{#{%- endif %}#}
+{%- if ele.type != "leaf-list" -%}
+{{'\n'+' '*4*level}}</{{ele.name}}>
+{% endif %}
+{%- if level>1 -%}
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
+{%- endif %}
+
+        {# LIST ENDIF#}
+        {%- endif -%}
+
+	{# CHECKLEAF ENDIF #}	
+    {%- endif -%}
+{%- endmacro -%}
+
+{################ COMMON MACROS #ENDS ################}
+#jinja2: trim_blocks: False, lstrip_blocks: False
+<configuration>
+    <groups>
+        <name> JTAF_ANSIBLE </name>
+{%- for parent in parent_list -%}
+  {{ expand_xml_recursive(parent,1,None) }}
+{%- endfor %}
+    </groups>
+	<apply-groups> JTAF_ANSIBLE </apply-groups>
+</configuration>
+{################ STRUCT FROM XML # ENDS #############}
