@@ -78,8 +78,7 @@ def parse_element(element, explicit_empty_tags, type_lookup, parent_path="", fou
             return None  # Avoid duplicate warnings
         else:
             found.add(full_xml_path)
-            print(f"[WARN] Unknown path in XML not found in schema: '{full_xml_path}'\n\tYou will be responsible for adding schema representing this path in the trimmed json schema.\n\tTerraform will not track changes to this path unlesss added to the schema.\n", file=sys.stderr)
-
+            print(f"[WARN] Unknown XML path not in schema: '{full_xml_path}'\n\tAdd this path to an augmented YANG file and re-run yang2go to regenerate the JSON schema.\n\tTerraform cannot track this path until it is added.\n", file=sys.stderr)
     # Check if this element should be a leaf-list
     type_info = type_lookup.get(normalized_path, {})
     is_leaf_list = type_info.get("type") == "leaf-list"
