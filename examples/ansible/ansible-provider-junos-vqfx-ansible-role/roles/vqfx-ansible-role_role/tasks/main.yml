@@ -1,0 +1,2 @@
+- name: Applying template for vqfx-ansible-role_role
+  template: src=template.j2 dest={{ tmp_dir }}/{{ inventory_hostname }}.xml
