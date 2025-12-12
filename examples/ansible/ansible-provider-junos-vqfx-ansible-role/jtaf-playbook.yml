@@ -1,0 +1,9 @@
+- name: Apply Junos configuration
+  hosts: all
+  connection: local
+  gather_facts: no
+  vars:
+    tmp_dir: "configs"
+  roles:
+    - role: vqfx-ansible-role_role
+      delegate_to: localhost

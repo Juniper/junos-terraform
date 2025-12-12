@@ -7,6 +7,8 @@ import re
 import os
 from xml.etree import ElementTree
 
+missing_xpaths = set()
+
 def convert_to_hcl(value, indent=2):
     """
     Converts Python dictionary or list into Terraform-compatible HCL syntax.
@@ -55,19 +57,26 @@ def build_type_map(node, parent_path=""):
 
     return type_map
 
-def parse_element(element, explicit_empty_tags, type_lookup,parent_path=""):
+def parse_element(element, explicit_empty_tags, type_lookup, parent_path=""):
     """
     Recursively parse an XML element into a nested structure for HCL conversion.
     - Empty tags become `True`
     - Tags with only text return scalar value
     - Tags with children return list[dict] to enforce HCL consistency
-    """
+    """    
     tag_name = etree.QName(element.tag).localname
     has_text = element.text is not None and element.text.strip() != ""
     has_children = len(element) > 0
     path = f"{parent_path}/{tag_name}" if parent_path and parent_path != tag_name else tag_name
     normalized_path = normalize_tag(path)
 
+    # Check if path is valid in schema
+    if normalized_path not in type_lookup:
+        full_xml_path = path  # non-normalized, user-facing path
+        if full_xml_path not in missing_xpaths:
+            missing_xpaths.add(full_xml_path)
+            # print(f"\t -- [WARN] Unknown XML path not in schema: '{full_xml_path}'\n\t\tAdd this path to an augmented YANG file and re-run yang2go to regenerate the JSON schema.\n\t\tTerraform cannot track this path until it is added.\n", file=sys.stderr)
+            print(f"\t-- [WARN] XML config '{full_xml_path}' not defined in YANG.\n\t\tTo enable configuration of this element, add it to a YANG augment file.\n\t\t - Regenerate the provider using jtaf-yang2go and including this file using the -p option in addition to the existing YANG files.\n", file=sys.stderr)
     # Check if this element should be a leaf-list
     type_info = type_lookup.get(normalized_path, {})
     is_leaf_list = type_info.get("type") == "leaf-list"
@@ -342,40 +351,55 @@ def main():
     # Using the trimmed json schema, build map of path to its type
     type_lookup = build_type_map(config_node)
     
+    # --- Normalize schema lookup to match normalized XML paths ---
+    normalized_type_lookup = {}
+    for key, val in type_lookup.items():
+        normalized_type_lookup[normalize_tag(key)] = val
+    type_lookup = normalized_type_lookup
+
     # Traverse xml to create HCL resources
     # Create provider source block in providers.tf 
     directory = args.directory
-    if os.path.exists(f"{directory}/providers.tf"):  # Check if providers.tf exists
-        # If it does, edit the provider block to include the new device type and source
-        # make sure if a device type is already present, we don't add it again
-        with open(f"{directory}/providers.tf", "r") as f:
+    provider_file = f"{directory}/providers.tf"
+    if os.path.exists(provider_file):
+        with open(provider_file, "r") as f:
             provider_block = f.read()
-            provider_block = edit_provider_block(device_type, provider_block)
-            with open(f"{directory}/providers.tf", "w") as f:
-                f.write(provider_block)
+        
+        # Edit the provider block to include device type (idempotent)
+        provider_block = edit_provider_block(device_type, provider_block)
+
+        with open(provider_file, "w") as f:
+            f.write(provider_block)
     else:
-        # If it doesn't, create a new provider block
+        # Create fresh provider block
         provider_block = create_provider_block(device_type)
         os.makedirs(directory, exist_ok=True)
-        with open(f"{directory}/providers.tf", "w") as f:
+        with open(provider_file, "w") as f:
             f.write(provider_block)
-    # Write a separate tf file for each xml file
+
     for file in xml_files:
+        print(f"\nProcessing XML file: {file}")
         hostname = file.split("/")[-1].split(".")[0]
         head_block = create_head_block(device_type, hostname, username, password)
         if head_block:
-            with open(f"{directory}/providers.tf", "r") as f:
-                provider_block = f.read()
-                provider_block = provider_block + head_block
-            with open(f"{directory}/providers.tf", "w") as f:
-                f.write(provider_block)
+            with open(provider_file, "r") as f:
+                existing = f.read()
+
+            # Append only if hostname NOT already in providers.tf
+            if hostname not in existing:
+                with open(provider_file, "a") as f:
+                    f.write("\n" + head_block)
+            else:
+                print(f"\n\tSkipping provider block for hostname '{hostname}' (already exists).\n")
+
+        # Write per-device .tf file
         hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup)
         if hcl_output:
             filename = f"{directory}/{hostname}.tf"
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             with open(filename, "w") as f:
                 f.write(hcl_output)
-            print(f"Wrote output to {filename}")
+            print(f"   --->  DONE: Wrote output to {filename}\n")
 
 if __name__ == "__main__":
     main()

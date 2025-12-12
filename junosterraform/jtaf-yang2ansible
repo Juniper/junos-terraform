@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+
+import os
+import pkg_resources
+import argparse
+import subprocess
+import glob
+import sys
+
+package_dir = os.path.dirname(pkg_resources.resource_filename('jtaf_pyang_plugin', '__init__.py'))
+
+parser = argparse.ArgumentParser(description='Convert YANG to Ansible role')
+parser.add_argument('-p', type=str, help='Path to YANG files, if there are multiple files, use double quotes to wrap the path', required=True, nargs='*', action='extend')
+parser.add_argument('-x', type=str, action='append', nargs="+", help='Path of one or more Junos OS XML files')
+parser.add_argument('-t', type=str, help='Device type', required=True)
+
+args = parser.parse_args()
+
+# Combine all XML file names into one string
+xml_files = [file for group in args.x for file in group]
+device_type = args.t
+
+# Separate search paths and yang files (expand globs)
+search_paths = []
+yang_files = []
+for path in args.p:
+    if os.path.isdir(path):
+        search_paths.append(path)
+    elif path.endswith('.yang'):
+        yang_files.append(path)
+    else:
+        # fallback: if not a dir and not a .yang file, ignore or warn
+        print(f"Warning: {path} is not a directory or .yang file, skipping.", file=sys.stderr)
+
+pyang_args = [
+    'pyang',
+    '--plugindir', package_dir,
+    '-f', 'jtaf',
+    '-p', ':'.join(search_paths)
+] + yang_files
+
+# Run pyang and capture output/errors
+p1 = subprocess.Popen(pyang_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+pyang_out, pyang_err = p1.communicate()
+
+# Only run jtaf-provider if pyang succeeded and produced output
+if p1.returncode == 0 and pyang_out:
+    p2 = subprocess.Popen([
+        'jtaf-ansible',
+        '-j', '-',
+        '-x', *xml_files,
+        '-t', device_type
+    ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, error = p2.communicate(input=pyang_out)
+    print(output.decode(), file=sys.stdout)
+    if error:
+        print(error.decode(), file=sys.stdout)
+else:
+    print('pyang failed or produced no output, skipping jtaf-provider.', file=sys.stdout)

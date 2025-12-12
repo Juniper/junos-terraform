@@ -1,0 +1,1207 @@
+#jinja2: trim_blocks: False, lstrip_blocks: False
+<configuration>
+    <groups>
+        <name> JTAF_ANSIBLE </name>
+    <chassis>
+        {%- if chassis.get("aggregated_devices") %}
+        <aggregated-devices>
+            {%- if chassis.aggregated_devices.get("ethernet") %}
+            <ethernet>
+                {%- if chassis.aggregated_devices.ethernet.get("device_count") %}
+                {%- if chassis.aggregated_devices.ethernet.get("device_count") is boolean %}
+                <device-count/>
+                       {%- else %}
+                <device-count>{{chassis.aggregated_devices.ethernet.device_count}}</device-count>
+                {%- endif %}
+                {%- endif %}
+            </ethernet>
+            {%- endif %}
+        </aggregated-devices>
+        {%- endif %}
+    </chassis>
+    <forwarding-options>
+        {%- if forwarding_options.get("storm_control_profiles") %}			  
+        {%- for i_2 in forwarding_options.get("storm_control_profiles") %}
+        {%- if forwarding_options.get("storm_control_profiles") %}
+        <storm-control-profiles>
+            {%- if i_2.get("name") %}
+            {%- if i_2.get("name") is boolean %}
+            <name/>
+                   {%- else %}
+            <name>{{i_2.name}}</name>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("all") %}
+            <all>
+            </all>
+            {%- endif %}
+        </storm-control-profiles>        {%- endif %}
+        {%- endfor %}
+        {%- endif %}
+    </forwarding-options>
+    <interfaces>
+        {%- if interfaces.get("interface") %}			  
+        {%- for i_2 in interfaces.get("interface") %}
+        {%- if interfaces.get("interface") %}
+        <interface>
+            {%- if i_2.get("name") %}
+            {%- if i_2.get("name") is boolean %}
+            <name/>
+                   {%- else %}
+            <name>{{i_2.name}}</name>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("description") %}
+            {%- if i_2.get("description") is boolean %}
+            <description/>
+                   {%- else %}
+            <description>{{i_2.description}}</description>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("vlan_tagging") %}
+            {%- if i_2.get("vlan_tagging") is boolean %}
+            <vlan-tagging/>
+                   {%- else %}
+            <vlan-tagging>{{i_2.vlan_tagging}}</vlan-tagging>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("esi") %}
+            <esi>
+                {%- if i_2.esi.get("identifier") %}
+                {%- if i_2.esi.get("identifier") is boolean %}
+                <identifier/>
+                       {%- else %}
+                <identifier>{{i_2.esi.identifier}}</identifier>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_2.esi.get("all_active") %}
+                {%- if i_2.esi.get("all_active") is boolean %}
+                <all-active/>
+                       {%- else %}
+                <all-active>{{i_2.esi.all_active}}</all-active>
+                {%- endif %}
+                {%- endif %}
+            </esi>
+            {%- endif %}
+            {%- if i_2.get("ether_options") %}
+            <ether-options>
+                {%- if i_2.ether_options.get("ieee_802_3ad") %}
+                <ieee-802.3ad>
+                    {%- if i_2.ether_options.ieee_802_3ad.get("bundle") %}
+                    {%- if i_2.ether_options.ieee_802_3ad.get("bundle") is boolean %}
+                    <bundle/>
+                           {%- else %}
+                    <bundle>{{i_2.ether_options.ieee_802_3ad.bundle}}</bundle>
+                    {%- endif %}
+                    {%- endif %}
+                </ieee-802.3ad>
+                {%- endif %}
+            </ether-options>
+            {%- endif %}
+            {%- if i_2.get("aggregated_ether_options") %}
+            <aggregated-ether-options>
+                {%- if i_2.aggregated_ether_options.get("lacp") %}
+                <lacp>
+                    {%- if i_2.aggregated_ether_options.lacp.get("active") %}
+                    {%- if i_2.aggregated_ether_options.lacp.get("active") is boolean %}
+                    <active/>
+                           {%- else %}
+                    <active>{{i_2.aggregated_ether_options.lacp.active}}</active>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_2.aggregated_ether_options.lacp.get("periodic") %}
+                    {%- if i_2.aggregated_ether_options.lacp.get("periodic") is boolean %}
+                    <periodic/>
+                           {%- else %}
+                    <periodic>{{i_2.aggregated_ether_options.lacp.periodic}}</periodic>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_2.aggregated_ether_options.lacp.get("system_id") %}
+                    {%- if i_2.aggregated_ether_options.lacp.get("system_id") is boolean %}
+                    <system-id/>
+                           {%- else %}
+                    <system-id>{{i_2.aggregated_ether_options.lacp.system_id}}</system-id>
+                    {%- endif %}
+                    {%- endif %}
+                </lacp>
+                {%- endif %}
+            </aggregated-ether-options>
+            {%- endif %}
+            {%- if i_2.get("unit") %}			  
+            {%- for i_3 in i_2.get("unit") %}
+            {%- if i_2.get("unit") %}
+            <unit>
+                {%- if i_3.get("name") %}
+                {%- if i_3.get("name") is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("description") %}
+                {%- if i_3.get("description") is boolean %}
+                <description/>
+                       {%- else %}
+                <description>{{i_3.description}}</description>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("vlan_id") %}
+                {%- if i_3.get("vlan_id") is boolean %}
+                <vlan-id/>
+                       {%- else %}
+                <vlan-id>{{i_3.vlan_id}}</vlan-id>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("family") %}
+                <family>
+                    {%- if i_3.family.get("inet") %}
+                    <inet>
+                        {%- if i_3.family.inet.get("address") %}			  
+                        {%- for i_6 in i_3.family.inet.get("address") %}
+                        {%- if i_3.family.inet.get("address") %}
+                        <address>
+                            {%- if i_6.get("name") %}
+                            {%- if i_6.get("name") is boolean %}
+                            <name/>
+                                   {%- else %}
+                            <name>{{i_6.name}}</name>
+                            {%- endif %}
+                            {%- endif %}
+                        </address>                        {%- endif %}
+                        {%- endfor %}
+                        {%- endif %}
+                    </inet>
+                    {%- endif %}
+                    {%- if i_3.family.get("ethernet_switching") %}
+                    <ethernet-switching>
+                        {%- if i_3.family.ethernet_switching.get("vlan") %}
+                        <vlan>
+                            {%- if i_3.family.ethernet_switching.vlan.get("members") %}
+              {% for ii_7 in i_3.family.ethernet_switching.vlan.get("members") %}
+                                <members>{{ii_7}}</members>
+			  {% endfor %}
+                            {%- endif %}
+                        </vlan>
+                        {%- endif %}
+                    </ethernet-switching>
+                    {%- endif %}
+                </family>
+                {%- endif %}
+                {%- if i_3.get("mac") %}
+                {%- if i_3.get("mac") is boolean %}
+                <mac/>
+                       {%- else %}
+                <mac>{{i_3.mac}}</mac>
+                {%- endif %}
+                {%- endif %}
+            </unit>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+        </interface>        {%- endif %}
+        {%- endfor %}
+        {%- endif %}
+    </interfaces>
+    <policy-options>
+        {%- if policy_options.get("policy_statement") %}			  
+        {%- for i_2 in policy_options.get("policy_statement") %}
+        {%- if policy_options.get("policy_statement") %}
+        <policy-statement>
+            {%- if i_2.get("name") %}
+            {%- if i_2.get("name") is boolean %}
+            <name/>
+                   {%- else %}
+            <name>{{i_2.name}}</name>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("term") %}			  
+            {%- for i_3 in i_2.get("term") %}
+            {%- if i_2.get("term") %}
+            <term>
+                {%- if i_3.get("name") %}
+                {%- if i_3.get("name") is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("from") %}
+                <from>
+                    {%- if i_3.from.get("protocol") %}
+              {% for ii_5 in i_3.from.get("protocol") %}
+                        <protocol>{{ii_5}}</protocol>
+			  {% endfor %}
+                    {%- endif %}
+                    {%- if i_3.from.get("route_filter") %}			  
+                    {%- for i_5 in i_3.from.get("route_filter") %}
+                    {%- if i_3.from.get("route_filter") %}
+                    <route-filter>
+                        {%- if i_5.get("address") %}
+                        {%- if i_5.get("address") is boolean %}
+                        <address/>
+                               {%- else %}
+                        <address>{{i_5.address}}</address>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_5.get("exact") %}
+                        {%- if i_5.get("exact") is boolean %}
+                        <exact/>
+                               {%- else %}
+                        <exact>{{i_5.exact}}</exact>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_5.get("orlonger") %}
+                        {%- if i_5.get("orlonger") is boolean %}
+                        <orlonger/>
+                               {%- else %}
+                        <orlonger>{{i_5.orlonger}}</orlonger>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_5.get("prefix_length_range") %}
+                        {%- if i_5.get("prefix_length_range") is boolean %}
+                        <prefix-length-range/>
+                               {%- else %}
+                        <prefix-length-range>{{i_5.prefix_length_range}}</prefix-length-range>
+                        {%- endif %}
+                        {%- endif %}
+                    </route-filter>                    {%- endif %}
+                    {%- endfor %}
+                    {%- endif %}
+                </from>
+                {%- endif %}
+                {%- if i_3.get("then") %}
+                <then>
+                    {%- if i_3.then.get("community") %}			  
+                    {%- for i_5 in i_3.then.get("community") %}
+                    {%- if i_3.then.get("community") %}
+                    <community>
+                        {%- if i_5.get("add") %}
+                        {%- if i_5.get("add") is boolean %}
+                        <add/>
+                               {%- else %}
+                        <add>{{i_5.add}}</add>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_5.get("community_name") %}
+                        {%- if i_5.get("community_name") is boolean %}
+                        <community-name/>
+                               {%- else %}
+                        <community-name>{{i_5.community_name}}</community-name>
+                        {%- endif %}
+                        {%- endif %}
+                    </community>                    {%- endif %}
+                    {%- endfor %}
+                    {%- endif %}
+                    {%- if i_3.then.get("accept") %}
+                    {%- if i_3.then.get("accept") is boolean %}
+                    <accept/>
+                           {%- else %}
+                    <accept>{{i_3.then.accept}}</accept>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_3.then.get("reject") %}
+                    {%- if i_3.then.get("reject") is boolean %}
+                    <reject/>
+                           {%- else %}
+                    <reject>{{i_3.then.reject}}</reject>
+                    {%- endif %}
+                    {%- endif %}
+                </then>
+                {%- endif %}
+            </term>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+            {%- if i_2.get("then") %}
+            <then>
+                {%- if i_2.then.get("load_balance") %}
+                <load-balance>
+                    {%- if i_2.then.load_balance.get("per_packet") %}
+                    {%- if i_2.then.load_balance.get("per_packet") is boolean %}
+                    <per-packet/>
+                           {%- else %}
+                    <per-packet>{{i_2.then.load_balance.per_packet}}</per-packet>
+                    {%- endif %}
+                    {%- endif %}
+                </load-balance>
+                {%- endif %}
+            </then>
+            {%- endif %}
+        </policy-statement>        {%- endif %}
+        {%- endfor %}
+        {%- endif %}
+        {%- if policy_options.get("community") %}			  
+        {%- for i_2 in policy_options.get("community") %}
+        {%- if policy_options.get("community") %}
+        <community>
+            {%- if i_2.get("name") %}
+            {%- if i_2.get("name") is boolean %}
+            <name/>
+                   {%- else %}
+            <name>{{i_2.name}}</name>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("members") %}
+              {% for ii_3 in i_2.get("members") %}
+                <members>{{ii_3}}</members>
+			  {% endfor %}
+            {%- endif %}
+        </community>        {%- endif %}
+        {%- endfor %}
+        {%- endif %}
+    </policy-options>
+    <protocols>
+        {%- if protocols.get("bgp") %}
+        <bgp>
+            {%- if protocols.bgp.get("group") %}			  
+            {%- for i_3 in protocols.bgp.get("group") %}
+            {%- if protocols.bgp.get("group") %}
+            <group>
+                {%- if i_3.get("name") %}
+                {%- if i_3.get("name") is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("type") %}
+                {%- if i_3.get("type") is boolean %}
+                <type/>
+                       {%- else %}
+                <type>{{i_3.type}}</type>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("multihop") %}
+                <multihop>
+                    {%- if i_3.multihop.get("no_nexthop_change") %}
+                    {%- if i_3.multihop.get("no_nexthop_change") is boolean %}
+                    <no-nexthop-change/>
+                           {%- else %}
+                    <no-nexthop-change>{{i_3.multihop.no_nexthop_change}}</no-nexthop-change>
+                    {%- endif %}
+                    {%- endif %}
+                </multihop>
+                {%- endif %}
+                {%- if i_3.get("local_address") %}
+                {%- if i_3.get("local_address") is boolean %}
+                <local-address/>
+                       {%- else %}
+                <local-address>{{i_3.local_address}}</local-address>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("mtu_discovery") %}
+                {%- if i_3.get("mtu_discovery") is boolean %}
+                <mtu-discovery/>
+                       {%- else %}
+                <mtu-discovery>{{i_3.mtu_discovery}}</mtu-discovery>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("import") %}
+              {% for ii_4 in i_3.get("import") %}
+                    <import>{{ii_4}}</import>
+			  {% endfor %}
+                {%- endif %}
+                {%- if i_3.get("family") %}
+                <family>
+                    {%- if i_3.family.get("evpn") %}
+                    <evpn>
+                        {%- if i_3.family.evpn.get("signaling") %}
+                        <signaling>
+                            {%- if i_3.family.evpn.signaling.get("delay_route_advertisements") %}
+                            <delay-route-advertisements>
+                                {%- if i_3.family.evpn.signaling.delay_route_advertisements.get("minimum_delay") %}
+                                <minimum-delay>
+                                    {%- if i_3.family.evpn.signaling.delay_route_advertisements.minimum_delay.get("routing_uptime") %}
+                                    {%- if i_3.family.evpn.signaling.delay_route_advertisements.minimum_delay.get("routing_uptime") is boolean %}
+                                    <routing-uptime/>
+                                           {%- else %}
+                                    <routing-uptime>{{i_3.family.evpn.signaling.delay_route_advertisements.minimum_delay.routing_uptime}}</routing-uptime>
+                                    {%- endif %}
+                                    {%- endif %}
+                                </minimum-delay>
+                                {%- endif %}
+                            </delay-route-advertisements>
+                            {%- endif %}
+                        </signaling>
+                        {%- endif %}
+                    </evpn>
+                    {%- endif %}
+                </family>
+                {%- endif %}
+                {%- if i_3.get("export") %}
+              {% for ii_4 in i_3.get("export") %}
+                    <export>{{ii_4}}</export>
+			  {% endfor %}
+                {%- endif %}
+                {%- if i_3.get("vpn_apply_export") %}
+                {%- if i_3.get("vpn_apply_export") is boolean %}
+                <vpn-apply-export/>
+                       {%- else %}
+                <vpn-apply-export>{{i_3.vpn_apply_export}}</vpn-apply-export>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("cluster") %}
+                {%- if i_3.get("cluster") is boolean %}
+                <cluster/>
+                       {%- else %}
+                <cluster>{{i_3.cluster}}</cluster>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("local_as") %}
+                <local-as>
+                    {%- if i_3.local_as.get("as_number") %}
+                    {%- if i_3.local_as.get("as_number") is boolean %}
+                    <as-number/>
+                           {%- else %}
+                    <as-number>{{i_3.local_as.as_number}}</as-number>
+                    {%- endif %}
+                    {%- endif %}
+                </local-as>
+                {%- endif %}
+                {%- if i_3.get("multipath") %}
+                <multipath>
+                    {%- if i_3.multipath.get("multiple_as") %}
+                    {%- if i_3.multipath.get("multiple_as") is boolean %}
+                    <multiple-as/>
+                           {%- else %}
+                    <multiple-as>{{i_3.multipath.multiple_as}}</multiple-as>
+                    {%- endif %}
+                    {%- endif %}
+                </multipath>
+                {%- endif %}
+                {%- if i_3.get("bfd_liveness_detection") %}
+                <bfd-liveness-detection>
+                    {%- if i_3.bfd_liveness_detection.get("minimum_interval") %}
+                    {%- if i_3.bfd_liveness_detection.get("minimum_interval") is boolean %}
+                    <minimum-interval/>
+                           {%- else %}
+                    <minimum-interval>{{i_3.bfd_liveness_detection.minimum_interval}}</minimum-interval>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_3.bfd_liveness_detection.get("multiplier") %}
+                    {%- if i_3.bfd_liveness_detection.get("multiplier") is boolean %}
+                    <multiplier/>
+                           {%- else %}
+                    <multiplier>{{i_3.bfd_liveness_detection.multiplier}}</multiplier>
+                    {%- endif %}
+                    {%- endif %}
+                </bfd-liveness-detection>
+                {%- endif %}
+                {%- if i_3.get("allow") %}
+              {% for ii_4 in i_3.get("allow") %}
+                    <allow>{{ii_4}}</allow>
+			  {% endfor %}
+                {%- endif %}
+                {%- if i_3.get("neighbor") %}			  
+                {%- for i_4 in i_3.get("neighbor") %}
+                {%- if i_3.get("neighbor") %}
+                <neighbor>
+                    {%- if i_4.get("name") %}
+                    {%- if i_4.get("name") is boolean %}
+                    <name/>
+                           {%- else %}
+                    <name>{{i_4.name}}</name>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_4.get("description") %}
+                    {%- if i_4.get("description") is boolean %}
+                    <description/>
+                           {%- else %}
+                    <description>{{i_4.description}}</description>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_4.get("peer_as") %}
+                    {%- if i_4.get("peer_as") is boolean %}
+                    <peer-as/>
+                           {%- else %}
+                    <peer-as>{{i_4.peer_as}}</peer-as>
+                    {%- endif %}
+                    {%- endif %}
+                </neighbor>                {%- endif %}
+                {%- endfor %}
+                {%- endif %}
+            </group>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+        </bgp>
+        {%- endif %}
+        {%- if protocols.get("evpn") %}
+        <evpn>
+            {%- if protocols.evpn.get("encapsulation") %}
+            {%- if protocols.evpn.get("encapsulation") is boolean %}
+            <encapsulation/>
+                   {%- else %}
+            <encapsulation>{{protocols.evpn.encapsulation}}</encapsulation>
+            {%- endif %}
+            {%- endif %}
+            {%- if protocols.evpn.get("multicast_mode") %}
+            {%- if protocols.evpn.get("multicast_mode") is boolean %}
+            <multicast-mode/>
+                   {%- else %}
+            <multicast-mode>{{protocols.evpn.multicast_mode}}</multicast-mode>
+            {%- endif %}
+            {%- endif %}
+            {%- if protocols.evpn.get("default_gateway") %}
+            {%- if protocols.evpn.get("default_gateway") is boolean %}
+            <default-gateway/>
+                   {%- else %}
+            <default-gateway>{{protocols.evpn.default_gateway}}</default-gateway>
+            {%- endif %}
+            {%- endif %}
+            {%- if protocols.evpn.get("extended_vni_list") %}
+              {% for ii_3 in protocols.evpn.get("extended_vni_list") %}
+                <extended-vni-list>{{ii_3}}</extended-vni-list>
+			  {% endfor %}
+            {%- endif %}
+            {%- if protocols.evpn.get("no_core_isolation") %}
+            {%- if protocols.evpn.get("no_core_isolation") is boolean %}
+            <no-core-isolation/>
+                   {%- else %}
+            <no-core-isolation>{{protocols.evpn.no_core_isolation}}</no-core-isolation>
+            {%- endif %}
+            {%- endif %}
+        </evpn>
+        {%- endif %}
+        {%- if protocols.get("lldp") %}
+        <lldp>
+            {%- if protocols.lldp.get("interface") %}			  
+            {%- for i_3 in protocols.lldp.get("interface") %}
+            {%- if protocols.lldp.get("interface") %}
+            <interface>
+                {%- if i_3.get("name") %}
+                {%- if i_3.get("name") is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+            </interface>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+        </lldp>
+        {%- endif %}
+        {%- if protocols.get("igmp_snooping") %}
+        <igmp-snooping>
+            {%- if protocols.igmp_snooping.get("vlan") %}			  
+            {%- for i_3 in protocols.igmp_snooping.get("vlan") %}
+            {%- if protocols.igmp_snooping.get("vlan") %}
+            <vlan>
+                {%- if i_3.get("name") %}
+                {%- if i_3.get("name") is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+            </vlan>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+        </igmp-snooping>
+        {%- endif %}
+    </protocols>
+    <routing-instances>
+        {%- if routing_instances.get("instance") %}			  
+        {%- for i_2 in routing_instances.get("instance") %}
+        {%- if routing_instances.get("instance") %}
+        <instance>
+            {%- if i_2.get("name") %}
+            {%- if i_2.get("name") is boolean %}
+            <name/>
+                   {%- else %}
+            <name>{{i_2.name}}</name>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("instance_type") %}
+            {%- if i_2.get("instance_type") is boolean %}
+            <instance-type/>
+                   {%- else %}
+            <instance-type>{{i_2.instance_type}}</instance-type>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("interface") %}			  
+            {%- for i_3 in i_2.get("interface") %}
+            {%- if i_2.get("interface") %}
+            <interface>
+                {%- if i_3.get("name") %}
+                {%- if i_3.get("name") is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+            </interface>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+            {%- if i_2.get("route_distinguisher") %}
+            <route-distinguisher>
+                {%- if i_2.route_distinguisher.get("rd_type") %}
+                {%- if i_2.route_distinguisher.get("rd_type") is boolean %}
+                <rd-type/>
+                       {%- else %}
+                <rd-type>{{i_2.route_distinguisher.rd_type}}</rd-type>
+                {%- endif %}
+                {%- endif %}
+            </route-distinguisher>
+            {%- endif %}
+            {%- if i_2.get("vrf_target") %}
+            <vrf-target>
+                {%- if i_2.vrf_target.get("community") %}
+                {%- if i_2.vrf_target.get("community") is boolean %}
+                <community/>
+                       {%- else %}
+                <community>{{i_2.vrf_target.community}}</community>
+                {%- endif %}
+                {%- endif %}
+            </vrf-target>
+            {%- endif %}
+            {%- if i_2.get("vrf_table_label") %}
+            <vrf-table-label>
+            </vrf-table-label>
+            {%- endif %}
+            {%- if i_2.get("routing_options") %}
+            <routing-options>
+                {%- if i_2.routing_options.get("auto_export") %}
+                <auto-export>
+                </auto-export>
+                {%- endif %}
+            </routing-options>
+            {%- endif %}
+            {%- if i_2.get("protocols") %}
+            <protocols>
+                {%- if i_2.protocols.get("ospf") %}
+                <ospf>
+                    {%- if i_2.protocols.ospf.get("export") %}
+              {% for ii_5 in i_2.protocols.ospf.get("export") %}
+                        <export>{{ii_5}}</export>
+			  {% endfor %}
+                    {%- endif %}
+                    {%- if i_2.protocols.ospf.get("area") %}			  
+                    {%- for i_5 in i_2.protocols.ospf.get("area") %}
+                    {%- if i_2.protocols.ospf.get("area") %}
+                    <area>
+                        {%- if i_5.get("name") %}
+                        {%- if i_5.get("name") is boolean %}
+                        <name/>
+                               {%- else %}
+                        <name>{{i_5.name}}</name>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_5.get("interface") %}			  
+                        {%- for i_6 in i_5.get("interface") %}
+                        {%- if i_5.get("interface") %}
+                        <interface>
+                            {%- if i_6.get("name") %}
+                            {%- if i_6.get("name") is boolean %}
+                            <name/>
+                                   {%- else %}
+                            <name>{{i_6.name}}</name>
+                            {%- endif %}
+                            {%- endif %}
+                            {%- if i_6.get("metric") %}
+                            {%- if i_6.get("metric") is boolean %}
+                            <metric/>
+                                   {%- else %}
+                            <metric>{{i_6.metric}}</metric>
+                            {%- endif %}
+                            {%- endif %}
+                        </interface>                        {%- endif %}
+                        {%- endfor %}
+                        {%- endif %}
+                    </area>                    {%- endif %}
+                    {%- endfor %}
+                    {%- endif %}
+                </ospf>
+                {%- endif %}
+                {%- if i_2.protocols.get("evpn") %}
+                <evpn>
+                    {%- if i_2.protocols.evpn.get("ip_prefix_routes") %}
+                    <ip-prefix-routes>
+                        {%- if i_2.protocols.evpn.ip_prefix_routes.get("advertise") %}
+                        {%- if i_2.protocols.evpn.ip_prefix_routes.get("advertise") is boolean %}
+                        <advertise/>
+                               {%- else %}
+                        <advertise>{{i_2.protocols.evpn.ip_prefix_routes.advertise}}</advertise>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_2.protocols.evpn.ip_prefix_routes.get("encapsulation") %}
+                        {%- if i_2.protocols.evpn.ip_prefix_routes.get("encapsulation") is boolean %}
+                        <encapsulation/>
+                               {%- else %}
+                        <encapsulation>{{i_2.protocols.evpn.ip_prefix_routes.encapsulation}}</encapsulation>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_2.protocols.evpn.ip_prefix_routes.get("vni") %}
+                        {%- if i_2.protocols.evpn.ip_prefix_routes.get("vni") is boolean %}
+                        <vni/>
+                               {%- else %}
+                        <vni>{{i_2.protocols.evpn.ip_prefix_routes.vni}}</vni>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_2.protocols.evpn.ip_prefix_routes.get("export") %}
+              {% for ii_6 in i_2.protocols.evpn.ip_prefix_routes.get("export") %}
+                            <export>{{ii_6}}</export>
+			  {% endfor %}
+                        {%- endif %}
+                    </ip-prefix-routes>
+                    {%- endif %}
+                </evpn>
+                {%- endif %}
+            </protocols>
+            {%- endif %}
+        </instance>        {%- endif %}
+        {%- endfor %}
+        {%- endif %}
+    </routing-instances>
+    <routing-options>
+        {%- if routing_options.get("static") %}
+        <static>
+            {%- if routing_options.static.get("route") %}			  
+            {%- for i_3 in routing_options.static.get("route") %}
+            {%- if routing_options.static.get("route") %}
+            <route>
+                {%- if i_3.get("name") %}
+                {%- if i_3.get("name") is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("next_hop") %}
+              {% for ii_4 in i_3.get("next_hop") %}
+                    <next-hop>{{ii_4}}</next-hop>
+			  {% endfor %}
+                {%- endif %}
+            </route>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+        </static>
+        {%- endif %}
+        {%- if routing_options.get("router_id") %}
+        {%- if routing_options.get("router_id") is boolean %}
+        <router-id/>
+               {%- else %}
+        <router-id>{{routing_options.router_id}}</router-id>
+        {%- endif %}
+        {%- endif %}
+        {%- if routing_options.get("forwarding_table") %}
+        <forwarding-table>
+            {%- if routing_options.forwarding_table.get("export") %}
+              {% for ii_3 in routing_options.forwarding_table.get("export") %}
+                <export>{{ii_3}}</export>
+			  {% endfor %}
+            {%- endif %}
+            {%- if routing_options.forwarding_table.get("ecmp_fast_reroute") %}
+            {%- if routing_options.forwarding_table.get("ecmp_fast_reroute") is boolean %}
+            <ecmp-fast-reroute/>
+                   {%- else %}
+            <ecmp-fast-reroute>{{routing_options.forwarding_table.ecmp_fast_reroute}}</ecmp-fast-reroute>
+            {%- endif %}
+            {%- endif %}
+            {%- if routing_options.forwarding_table.get("chained_composite_next_hop") %}
+            <chained-composite-next-hop>
+                {%- if routing_options.forwarding_table.chained_composite_next_hop.get("ingress") %}
+                <ingress>
+                    {%- if routing_options.forwarding_table.chained_composite_next_hop.ingress.get("evpn") %}
+                    {%- if routing_options.forwarding_table.chained_composite_next_hop.ingress.get("evpn") is boolean %}
+                    <evpn/>
+                           {%- else %}
+                    <evpn>{{routing_options.forwarding_table.chained_composite_next_hop.ingress.evpn}}</evpn>
+                    {%- endif %}
+                    {%- endif %}
+                </ingress>
+                {%- endif %}
+            </chained-composite-next-hop>
+            {%- endif %}
+        </forwarding-table>
+        {%- endif %}
+    </routing-options>
+    <snmp>
+        {%- if snmp.get("location") %}
+        {%- if snmp.get("location") is boolean %}
+        <location/>
+               {%- else %}
+        <location>{{snmp.location}}</location>
+        {%- endif %}
+        {%- endif %}
+        {%- if snmp.get("contact") %}
+        {%- if snmp.get("contact") is boolean %}
+        <contact/>
+               {%- else %}
+        <contact>{{snmp.contact}}</contact>
+        {%- endif %}
+        {%- endif %}
+        {%- if snmp.get("community") %}			  
+        {%- for i_2 in snmp.get("community") %}
+        {%- if snmp.get("community") %}
+        <community>
+            {%- if i_2.get("name") %}
+            {%- if i_2.get("name") is boolean %}
+            <name/>
+                   {%- else %}
+            <name>{{i_2.name}}</name>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("authorization") %}
+            {%- if i_2.get("authorization") is boolean %}
+            <authorization/>
+                   {%- else %}
+            <authorization>{{i_2.authorization}}</authorization>
+            {%- endif %}
+            {%- endif %}
+        </community>        {%- endif %}
+        {%- endfor %}
+        {%- endif %}
+    </snmp>
+    <switch-options>
+        {%- if switch_options.get("vtep_source_interface") %}
+        <vtep-source-interface>
+            {%- if switch_options.vtep_source_interface.get("interface_name") %}
+            {%- if switch_options.vtep_source_interface.get("interface_name") is boolean %}
+            <interface-name/>
+                   {%- else %}
+            <interface-name>{{switch_options.vtep_source_interface.interface_name}}</interface-name>
+            {%- endif %}
+            {%- endif %}
+        </vtep-source-interface>
+        {%- endif %}
+        {%- if switch_options.get("route_distinguisher") %}
+        <route-distinguisher>
+            {%- if switch_options.route_distinguisher.get("rd_type") %}
+            {%- if switch_options.route_distinguisher.get("rd_type") is boolean %}
+            <rd-type/>
+                   {%- else %}
+            <rd-type>{{switch_options.route_distinguisher.rd_type}}</rd-type>
+            {%- endif %}
+            {%- endif %}
+        </route-distinguisher>
+        {%- endif %}
+        {%- if switch_options.get("vrf_target") %}
+        <vrf-target>
+            {%- if switch_options.vrf_target.get("community") %}
+            {%- if switch_options.vrf_target.get("community") is boolean %}
+            <community/>
+                   {%- else %}
+            <community>{{switch_options.vrf_target.community}}</community>
+            {%- endif %}
+            {%- endif %}
+            {%- if switch_options.vrf_target.get("auto") %}
+            <auto>
+            </auto>
+            {%- endif %}
+        </vrf-target>
+        {%- endif %}
+    </switch-options>
+    <system>
+        {%- if system.get("login") %}
+        <login>
+            {%- if system.login.get("user") %}			  
+            {%- for i_3 in system.login.get("user") %}
+            {%- if system.login.get("user") %}
+            <user>
+                {%- if i_3.get("name") %}
+                {%- if i_3.get("name") is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("uid") %}
+                {%- if i_3.get("uid") is boolean %}
+                <uid/>
+                       {%- else %}
+                <uid>{{i_3.uid}}</uid>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("class") %}
+                {%- if i_3.get("class") is boolean %}
+                <class/>
+                       {%- else %}
+                <class>{{i_3.class}}</class>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("authentication") %}
+                <authentication>
+                    {%- if i_3.authentication.get("encrypted_password") %}
+                    {%- if i_3.authentication.get("encrypted_password") is boolean %}
+                    <encrypted-password/>
+                           {%- else %}
+                    <encrypted-password>{{i_3.authentication.encrypted_password}}</encrypted-password>
+                    {%- endif %}
+                    {%- endif %}
+                </authentication>
+                {%- endif %}
+            </user>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+            {%- if system.login.get("message") %}
+            {%- if system.login.get("message") is boolean %}
+            <message/>
+                   {%- else %}
+            <message>{{system.login.message}}</message>
+            {%- endif %}
+            {%- endif %}
+        </login>
+        {%- endif %}
+        {%- if system.get("root_authentication") %}
+        <root-authentication>
+            {%- if system.root_authentication.get("encrypted_password") %}
+            {%- if system.root_authentication.get("encrypted_password") is boolean %}
+            <encrypted-password/>
+                   {%- else %}
+            <encrypted-password>{{system.root_authentication.encrypted_password}}</encrypted-password>
+            {%- endif %}
+            {%- endif %}
+        </root-authentication>
+        {%- endif %}
+        {%- if system.get("host_name") %}
+        {%- if system.get("host_name") is boolean %}
+        <host-name/>
+               {%- else %}
+        <host-name>{{system.host_name}}</host-name>
+        {%- endif %}
+        {%- endif %}
+        {%- if system.get("services") %}
+        <services>
+            {%- if system.services.get("ssh") %}
+            <ssh>
+                {%- if system.services.ssh.get("root_login") %}
+                {%- if system.services.ssh.get("root_login") is boolean %}
+                <root-login/>
+                       {%- else %}
+                <root-login>{{system.services.ssh.root_login}}</root-login>
+                {%- endif %}
+                {%- endif %}
+            </ssh>
+            {%- endif %}
+            {%- if system.services.get("extension_service") %}
+            <extension-service>
+                {%- if system.services.extension_service.get("request_response") %}
+                <request-response>
+                    {%- if system.services.extension_service.request_response.get("grpc") %}
+                    <grpc>
+                        {%- if system.services.extension_service.request_response.grpc.get("max_connections") %}
+                        {%- if system.services.extension_service.request_response.grpc.get("max_connections") is boolean %}
+                        <max-connections/>
+                               {%- else %}
+                        <max-connections>{{system.services.extension_service.request_response.grpc.max_connections}}</max-connections>
+                        {%- endif %}
+                        {%- endif %}
+                    </grpc>
+                    {%- endif %}
+                </request-response>
+                {%- endif %}
+                {%- if system.services.extension_service.get("notification") %}
+                <notification>
+                    {%- if system.services.extension_service.notification.get("allow_clients") %}
+                    <allow-clients>
+                        {%- if system.services.extension_service.notification.allow_clients.get("address") %}
+              {% for ii_6 in system.services.extension_service.notification.allow_clients.get("address") %}
+                            <address>{{ii_6}}</address>
+			  {% endfor %}
+                        {%- endif %}
+                    </allow-clients>
+                    {%- endif %}
+                </notification>
+                {%- endif %}
+            </extension-service>
+            {%- endif %}
+            {%- if system.services.get("netconf") %}
+            <netconf>
+                {%- if system.services.netconf.get("ssh") %}
+                <ssh>
+                </ssh>
+                {%- endif %}
+            </netconf>
+            {%- endif %}
+            {%- if system.services.get("rest") %}
+            <rest>
+                {%- if system.services.rest.get("http") %}
+                <http>
+                    {%- if system.services.rest.http.get("port") %}
+                    {%- if system.services.rest.http.get("port") is boolean %}
+                    <port/>
+                           {%- else %}
+                    <port>{{system.services.rest.http.port}}</port>
+                    {%- endif %}
+                    {%- endif %}
+                </http>
+                {%- endif %}
+                {%- if system.services.rest.get("enable_explorer") %}
+                {%- if system.services.rest.get("enable_explorer") is boolean %}
+                <enable-explorer/>
+                       {%- else %}
+                <enable-explorer>{{system.services.rest.enable_explorer}}</enable-explorer>
+                {%- endif %}
+                {%- endif %}
+            </rest>
+            {%- endif %}
+        </services>
+        {%- endif %}
+        {%- if system.get("syslog") %}
+        <syslog>
+            {%- if system.syslog.get("user") %}			  
+            {%- for i_3 in system.syslog.get("user") %}
+            {%- if system.syslog.get("user") %}
+            <user>
+                {%- if i_3.get("name") %}
+                {%- if i_3.get("name") is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("contents") %}			  
+                {%- for i_4 in i_3.get("contents") %}
+                {%- if i_3.get("contents") %}
+                <contents>
+                    {%- if i_4.get("name") %}
+                    {%- if i_4.get("name") is boolean %}
+                    <name/>
+                           {%- else %}
+                    <name>{{i_4.name}}</name>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_4.get("emergency") %}
+                    {%- if i_4.get("emergency") is boolean %}
+                    <emergency/>
+                           {%- else %}
+                    <emergency>{{i_4.emergency}}</emergency>
+                    {%- endif %}
+                    {%- endif %}
+                </contents>                {%- endif %}
+                {%- endfor %}
+                {%- endif %}
+            </user>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+            {%- if system.syslog.get("file") %}			  
+            {%- for i_3 in system.syslog.get("file") %}
+            {%- if system.syslog.get("file") %}
+            <file>
+                {%- if i_3.get("name") %}
+                {%- if i_3.get("name") is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("contents") %}			  
+                {%- for i_4 in i_3.get("contents") %}
+                {%- if i_3.get("contents") %}
+                <contents>
+                    {%- if i_4.get("name") %}
+                    {%- if i_4.get("name") is boolean %}
+                    <name/>
+                           {%- else %}
+                    <name>{{i_4.name}}</name>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_4.get("any") %}
+                    {%- if i_4.get("any") is boolean %}
+                    <any/>
+                           {%- else %}
+                    <any>{{i_4.any}}</any>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_4.get("notice") %}
+                    {%- if i_4.get("notice") is boolean %}
+                    <notice/>
+                           {%- else %}
+                    <notice>{{i_4.notice}}</notice>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_4.get("info") %}
+                    {%- if i_4.get("info") is boolean %}
+                    <info/>
+                           {%- else %}
+                    <info>{{i_4.info}}</info>
+                    {%- endif %}
+                    {%- endif %}
+                </contents>                {%- endif %}
+                {%- endfor %}
+                {%- endif %}
+            </file>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+        </syslog>
+        {%- endif %}
+        {%- if system.get("extensions") %}
+        <extensions>
+            {%- if system.extensions.get("providers") %}			  
+            {%- for i_3 in system.extensions.get("providers") %}
+            {%- if system.extensions.get("providers") %}
+            <providers>
+                {%- if i_3.get("name") %}
+                {%- if i_3.get("name") is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.get("license_type") %}			  
+                {%- for i_4 in i_3.get("license_type") %}
+                {%- if i_3.get("license_type") %}
+                <license-type>
+                    {%- if i_4.get("name") %}
+                    {%- if i_4.get("name") is boolean %}
+                    <name/>
+                           {%- else %}
+                    <name>{{i_4.name}}</name>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_4.get("deployment_scope") %}
+              {% for ii_5 in i_4.get("deployment_scope") %}
+                        <deployment-scope>{{ii_5}}</deployment-scope>
+			  {% endfor %}
+                    {%- endif %}
+                </license-type>                {%- endif %}
+                {%- endfor %}
+                {%- endif %}
+            </providers>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+        </extensions>
+        {%- endif %}
+    </system>
+    <vlans>
+        {%- if vlans.get("vlan") %}			  
+        {%- for i_2 in vlans.get("vlan") %}
+        {%- if vlans.get("vlan") %}
+        <vlan>
+            {%- if i_2.get("name") %}
+            {%- if i_2.get("name") is boolean %}
+            <name/>
+                   {%- else %}
+            <name>{{i_2.name}}</name>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("vlan_id") %}
+            {%- if i_2.get("vlan_id") is boolean %}
+            <vlan-id/>
+                   {%- else %}
+            <vlan-id>{{i_2.vlan_id}}</vlan-id>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("l3_interface") %}
+            {%- if i_2.get("l3_interface") is boolean %}
+            <l3-interface/>
+                   {%- else %}
+            <l3-interface>{{i_2.l3_interface}}</l3-interface>
+            {%- endif %}
+            {%- endif %}
+            {%- if i_2.get("vxlan") %}
+            <vxlan>
+                {%- if i_2.vxlan.get("vni") %}
+                {%- if i_2.vxlan.get("vni") is boolean %}
+                <vni/>
+                       {%- else %}
+                <vni>{{i_2.vxlan.vni}}</vni>
+                {%- endif %}
+                {%- endif %}
+            </vxlan>
+            {%- endif %}
+        </vlan>        {%- endif %}
+        {%- endfor %}
+        {%- endif %}
+    </vlans>
+    </groups>
+	<apply-groups> JTAF_ANSIBLE </apply-groups>
+</configuration>
