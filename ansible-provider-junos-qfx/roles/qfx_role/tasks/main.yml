@@ -1,2 +1,0 @@
-- name: Applying template for qfx_role
-  template: src=template.j2 dest={{ tmp_dir }}/{{ inventory_hostname }}.xml
