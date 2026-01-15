@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ElementTree
 import json
 import sys
-from typing import Any, List, Union
+from typing import Any, Union
 
 def get_xpaths(root:ElementTree.Element) -> dict[str, bool]:
     # defined a recursive function to walk the xml and populate result[]
