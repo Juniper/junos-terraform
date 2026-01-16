@@ -206,6 +206,7 @@ provider_installation {
 	dev_overrides {
 		"registry.terraform.io/hashicorp/junos-<device-type>" = "<path-to-go/bin>"
 	}
+	direct {}
 }
 ```
 
@@ -215,6 +216,7 @@ provider_installation {
 	dev_overrides {
 		"registry.terraform.io/hashicorp/junos-vqfx" = "/Users/patelv/go/bin"
 	}
+	direct {}
 }
 ```
 
