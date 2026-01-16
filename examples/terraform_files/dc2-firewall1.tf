@@ -39,19 +39,6 @@ resource "terraform-provider-junos-vsrx-evpn-vxlan" "dc2-firewall1-base-config" 
                 {
                   grpc = [
                     {
-                      undocumented = [
-                        {
-                          clear_text = [
-                            {
-                              address = "0.0.0.0"
-                              port = 32767
-                            }
-                          ]
-                        },
-                        {
-                          skip_authentication = ""
-                        }
-                      ]
                       max_connections = 30
                     }
                   ]
@@ -194,11 +181,6 @@ resource "terraform-provider-junos-vsrx-evpn-vxlan" "dc2-firewall1-base-config" 
                       attack_threshold = 200
                       source_threshold = 1024
                       destination_threshold = 2048
-                      undocumented = [
-                        {
-                          queue_size = 2000
-                        }
-                      ]
                       timeout = 20
                     }
                   ]

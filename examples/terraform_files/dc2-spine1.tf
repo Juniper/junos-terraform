@@ -39,19 +39,6 @@ resource "terraform-provider-junos-vqfx-evpn-vxlan" "dc2-spine1-base-config" {
                 {
                   grpc = [
                     {
-                      undocumented = [
-                        {
-                          clear_text = [
-                            {
-                              address = "0.0.0.0"
-                              port = 32767
-                            }
-                          ]
-                        },
-                        {
-                          skip_authentication = ""
-                        }
-                      ]
                       max_connections = 30
                     }
                   ]
