@@ -1,6 +1,7 @@
 import json
 import pytest
 import os
+print("PATH seen by pytest:", os.environ["PATH"])
 from glob import glob
 import subprocess
 import shutil
@@ -24,7 +25,7 @@ def test_yang2go():
     # Building full paths to YANG dirs / files
     common_dir = os.path.join(yang_root, "18.2", "18.2R3", "common")
     conf_glob = os.path.join(yang_root, "18.2", "18.2R3", "junos-qfx", "conf", "*.yang")
-    conf_files = glob(conf_glob)
+    conf_files = sorted(glob(conf_glob))
 
     assert os.path.isdir(common_dir), f"common_dir does not exist: {common_dir}"
     assert conf_files, f"No .yang files found under {conf_glob}"
