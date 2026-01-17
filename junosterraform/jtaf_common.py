@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ElementTree
 import json
 import sys
-from typing import Any
+from typing import Any, Union
 
 def get_xpaths(root:ElementTree.Element) -> dict[str, bool]:
     # defined a recursive function to walk the xml and populate result[]
@@ -82,7 +82,7 @@ def check_for_enums(elem:dict[str,Any], node_parent:list[Any])-> list[Any]:
             children.append(tmp_dict)
     return children
         
-def check_children(paths:list[str], elem:dict[str,Any], node_parent:list[Any], current_path:str)-> list[Any]|bool:
+def check_children(paths:list[str], elem:dict[str,Any], node_parent:list[Any], current_path:str)-> Union[list[Any], bool]:
     if isinstance(node_parent[-2], dict):
         if "children" in node_parent[-2].keys():
             if isinstance(elem, dict):
@@ -128,7 +128,7 @@ def remove_tags_by_name(root:ElementTree.Element, tag_names:list[str]) -> None:
             if parent is not None:
                 parent.remove(elem)
 
-def find_parent(root:ElementTree.Element, child:ElementTree.Element)-> ElementTree.Element|None:
+def find_parent(root:ElementTree.Element, child:ElementTree.Element)-> Union[ElementTree.Element, None]:
     # Find parent of a given element 
     for parent in root.iter():
         for elem in parent:
@@ -136,7 +136,7 @@ def find_parent(root:ElementTree.Element, child:ElementTree.Element)-> ElementTr
                 return parent
     return None
  
-def walk_schema(paths:list[str], node:Any, parent:list[Any] = [])-> str|Any:
+def walk_schema(paths:list[str], node:Any, parent:list[Any] = [])-> Union[str, Any]:
     result = None
     emit_data = check_path(paths, parent)
     current_path = get_path(parent)
@@ -182,7 +182,7 @@ def walk_schema(paths:list[str], node:Any, parent:list[Any] = [])-> str|Any:
     return result
  
 # Method which starts the walk
-def filter_json_using_xml(schema:str, xml:ElementTree.Element|str) -> str:
+def filter_json_using_xml(schema:str, xml: Union[ElementTree.Element,str]) -> str:
     if schema == "-":
         schema = json.load(sys.stdin)
     else:
