@@ -333,7 +333,6 @@ Notes:
 - Output directory: ansible-provider-junos-<type>/ containing roles/<type>_role/ (tasks/templates), jtaf-playbook.yml (connection: local), host_vars/, configs/, trimmed_schema.json.
 - Run the generated playbook in check/diff mode to verify rendered configs without applying:
   ansible-playbook -i hosts jtaf-playbook.yml --check --diff
-```
 
 ---
 
@@ -360,3 +359,17 @@ Output:
 This is useful to feed generated host_vars into the Ansible role/playbook created by jtaf-ansible/jtaf-yang2ansible.
 
 
+---
+
+### Running Unit Tests
+
+Unit tests are created and stored under /junosterraform/unit_tests/
+
+Run from home /junos-terraform directory:
+```
+python setup.py test
+```
+
+Current unit tests:
+	- test_worflow.py
+		- Ensures that the current workflow will emit the correct output .tf files from a specified set of yang_files (ex: 18.2) based the files located in /examples directory which is considered a source of truth.
