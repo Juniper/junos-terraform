@@ -1,12 +1,16 @@
 import json
-import pytest
 import os
-print("PATH seen by pytest:", os.environ["PATH"])
 from glob import glob
 import subprocess
 import shutil
 import sys
+import unittest
 
+class TestWorkflow(unittest.TestCase):
+
+    def test_workflow_basic(self):
+        self.assertTrue(True)
+        
 # Note for any changes need to rerun "pip install ./junos-terraform"
 
 def test_yang2go():
