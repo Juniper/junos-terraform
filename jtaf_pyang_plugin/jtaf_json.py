@@ -179,11 +179,11 @@ class FoghornPlugin(plugin.PyangPlugin):
     def add_opts(self, optparser):
         optlist = [
             optparse.make_option("--jtaf-strip-apply",
-                                 dest="foghorn_strip_apply",
+                                 dest="jtaf_strip_apply",
                                  action="store_true",
                                  help="Don't output apply-* nodes"),
             optparse.make_option("--jtaf-no-restrictions",
-                                 dest="foghorn_no_restrictions",
+                                 dest="jtaf_no_restrictions",
                                  action="store_true",
                                  help="Don't output restrictions"),
             ]
@@ -192,7 +192,7 @@ class FoghornPlugin(plugin.PyangPlugin):
 
     def setup_ctx(self, ctx):
         if ctx.opts.tree_help:
-            fog_print_help()
+            jtaf_print_help()
             sys.exit(0)
 
     def setup_fmt(self, ctx):
@@ -210,10 +210,10 @@ class FoghornPlugin(plugin.PyangPlugin):
         else:
             path = None
 
-        fog_emit_tree(ctx, fd, modules)
+        jtaf_emit_tree(ctx, fd, modules)
 
 
-def fog_print_help():
+def jtaf_print_help():
     print("""
 jtaf plugin
 """)
@@ -229,14 +229,14 @@ def serialize(obj):
 #
 # Generate the json from the statement-tree
 #
-def fog_emit_tree(ctx, fd, modules):
+def jtaf_emit_tree(ctx, fd, modules):
     for module in modules:
-        fog_walk_identities(module)
-        fog_walk_top_level(ctx, module)
+        jtaf_walk_identities(module)
+        jtaf_walk_top_level(ctx, module)
 
     fd.write(json.dumps(jt, indent = 2, default=serialize))
     
-def fog_get_keyvalue(stmt, kw):
+def jtaf_get_keyvalue(stmt, kw):
     v = stmt.search((fh_prefix, kw))
     if len(v) == 1:
         return v[0].arg
@@ -248,12 +248,12 @@ def fog_get_keyvalue(stmt, kw):
             p.append(a)
         return a
 
-def fog_walk_dts(node, ch):
+def jtaf_walk_dts(node, ch):
     if ch.keyword[0] != fh_prefix:
         return
     node["dts_" + ch.keyword[1]] = ch.arg
     
-def fog_walk_type(ctx, ch):
+def jtaf_walk_type(ctx, ch):
     t = ch.search_one("type")
     if t != None:
         leaf_type = t.arg
@@ -271,14 +271,14 @@ def fog_walk_type(ctx, ch):
         # Add any restrictions on the type, unless the user doesn't want us to
         # For enum, we always generate the restrictions, as jt depends on this.
         enum_type = (leaf_type == "enumeration") or (base_type.arg == "enumeration")
-        if ctx.opts.foghorn_no_restrictions and not(enum_type):
+        if ctx.opts.jtaf_no_restrictions and not(enum_type):
             properties = {}
         else:
             properties = get_type_restrictions(t)
         for k, v in properties.items():
             jt.set_attr(k, v)
 
-def fog_walk_identities(mod):
+def jtaf_walk_identities(mod):
     if len(mod.i_identities.items()) == 0:
         return
 
@@ -292,7 +292,7 @@ def fog_walk_identities(mod):
                 ident[child.keyword] = child.arg
         jt.append_ident(ident)
     
-def fog_walk_top_level(ctx, mod):
+def jtaf_walk_top_level(ctx, mod):
     if len(mod.i_children) == 0:
         return
 
@@ -300,19 +300,19 @@ def fog_walk_top_level(ctx, mod):
         if not ch.keyword in ["container", "list", "leaf", "leaf-list"]:
             continue
 
-        fog_walk_child(ctx, ch)
+        jtaf_walk_child(ctx, ch)
 
 
-def fog_walk_child(ctx, ch):
+def jtaf_walk_child(ctx, ch):
     if hasattr(ch, 'keyword') == False:
         return
 
-    if hasattr(ch, 'arg') and ctx.opts.foghorn_strip_apply and ch.arg.startswith("apply-"):
+    if hasattr(ch, 'arg') and ctx.opts.jtaf_strip_apply and ch.arg.startswith("apply-"):
         return
     
     if ch.keyword == 'uses':
         for child in ch.i_grouping.substmts:
-            fog_walk_child(ctx, child)
+            jtaf_walk_child(ctx, child)
         return
 
     if ch.keyword == 'typedef':
@@ -320,7 +320,7 @@ def fog_walk_child(ctx, ch):
         return
     
     if type(ch.keyword) is tuple:
-        fog_walk_dts(fh_cur_node, ch)
+        jtaf_walk_dts(fh_cur_node, ch)
         return
 
     if ch.keyword in yang_type:
@@ -329,7 +329,7 @@ def fog_walk_child(ctx, ch):
     else:
         jt.set_attr(ch.keyword, ch.arg)
 
-    fog_walk_type(ctx, ch)
+    jtaf_walk_type(ctx, ch)
         
     for p in yang_props:
         jt.add_prop(ch, p)
@@ -345,7 +345,7 @@ def fog_walk_child(ctx, ch):
             if not child.keyword in yang_type + ["uses"]:
                 pass
 
-            fog_walk_child(ctx, child)
+            jtaf_walk_child(ctx, child)
     jt.pop()
 
 
