@@ -73,7 +73,7 @@ def elem_to_dict(element:ElementTree.Element,path:str,resources:Any)-> dict[str,
             if len(child) > 0:
                 result[prepared_tag] = elem_to_dict(child,prepared_path,resources)
             else:
-                result[prepared_tag] = {}
+                result[prepared_tag] = true
         else:
             # For other types, decide based on children
             if len(child) > 0:
