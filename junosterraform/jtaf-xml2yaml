@@ -13,7 +13,8 @@ def prepare_tag(tag:str) -> str:
     """Prepare XML tag to be used as YAML key by replacing '-' and '.' with '_'."""
     return tag.replace("-", "_").replace(".", "_")
 
-def element_node(element:ElementTree.Element,path:str,resources:dict[str,Any]) -> dict[str,Any]|None:
+# def element_node(element:ElementTree.Element,path:str,resources:dict[str,Any]) -> dict[str,Any]|None:
+def element_node(element:ElementTree.Element,path:str,resources:dict[str,Any]):
     """Return the resource node matching the given XML element and path.
     Args:
         element: XML element to match
@@ -86,7 +87,8 @@ def elem_to_dict(element:ElementTree.Element,path:str,resources:Any)-> dict[str,
                     result[prepared_tag] = child.text     
     return result
 
-def xml2yaml(xml_file:str, resources:dict[str,Any],output_dir:str, subdir:str|None=None)-> str:
+# def xml2yaml(xml_file:str, resources:dict[str,Any],output_dir:str, subdir:str|None=None)-> str:
+def xml2yaml(xml_file:str, resources:dict[str,Any],output_dir:str, subdir=None)-> str:
     """Convert an XML configuration file to YAML format using the provided schema resources.
     Output file name is derived from the XML file name by changing the extension to .yaml.
     Args:

@@ -30,10 +30,9 @@ system:
           max_connections: '30'
       notification:
         allow_clients:
-          address:
-          - 0.0.0.0/0
+          address: 0.0.0.0/0
     netconf:
-      ssh: {}
+      ssh: ''
     rest:
       http:
         port: '3000'
@@ -60,13 +59,11 @@ system:
     - name: juniper
       license_type:
       - name: juniper
-        deployment_scope:
-        - commercial
+        deployment_scope: commercial
     - name: chef
       license_type:
       - name: juniper
-        deployment_scope:
-        - commercial
+        deployment_scope: commercial
 chassis:
   aggregated_devices:
     ethernet:
@@ -129,8 +126,7 @@ interfaces:
       family:
         ethernet_switching:
           vlan:
-            members:
-            - '1002'
+            members: '1002'
   - name: ae1
     esi:
       identifier: 00:00:00:00:00:00:00:01:02:00
@@ -145,8 +141,7 @@ interfaces:
       family:
         ethernet_switching:
           vlan:
-            members:
-            - '1002'
+            members: '1002'
   - name: em0
     unit:
     - name: '0'
@@ -194,17 +189,15 @@ snmp:
 forwarding_options:
   storm_control_profiles:
   - name: default
-    all: {}
+    all: ''
 routing_options:
   static:
     route:
     - name: 0.0.0.0/0
-      next_hop:
-      - 100.123.0.1
+      next_hop: 100.123.0.1
   router_id: 10.30.100.9
   forwarding_table:
-    export:
-    - PFE-LB
+    export: PFE-LB
     ecmp_fast_reroute: true
     chained_composite_next_hop:
       ingress:
@@ -239,20 +232,18 @@ protocols:
       local_address: 10.30.100.9
       family:
         evpn:
-          signaling: {}
+          signaling: ''
       cluster: 10.30.100.9
       local_as:
         as_number: '65201'
-      multipath: {}
+      multipath: ''
       neighbor:
       - name: 10.30.100.8
     - name: IPCLOS_eBGP
       type: external
       mtu_discovery: true
-      import:
-      - IPCLOS_BGP_IMP
-      export:
-      - IPCLOS_BGP_EXP
+      import: IPCLOS_BGP_IMP
+      export: IPCLOS_BGP_EXP
       vpn_apply_export: true
       local_as:
         as_number: '65521'
@@ -272,8 +263,7 @@ protocols:
     encapsulation: vxlan
     multicast_mode: ingress-replication
     default_gateway: do-not-advertise
-    extended_vni_list:
-    - all
+    extended_vni_list: all
     no_core_isolation: true
   lldp:
     interface:
@@ -287,21 +277,17 @@ policy_options:
     term:
     - name: fm_direct
       from:
-        protocol:
-        - direct
+        protocol: direct
       then:
         accept: true
     - name: fm_static
       from:
-        protocol:
-        - static
+        protocol: static
       then:
         accept: true
     - name: fm_v4_default
       from:
-        protocol:
-        - evpn
-        - ospf
+        protocol: ospf
         route_filter:
         - address: 0.0.0.0/0
           exact: true
@@ -309,8 +295,7 @@ policy_options:
         accept: true
     - name: fm_v4_host
       from:
-        protocol:
-        - evpn
+        protocol: evpn
         route_filter:
         - address: 0.0.0.0/0
           prefix_length_range: /32-/32
@@ -318,8 +303,7 @@ policy_options:
         accept: true
     - name: fm_v6_host
       from:
-        protocol:
-        - evpn
+        protocol: evpn
         route_filter:
         - address: 0::0/0
           prefix_length_range: /128-/128
@@ -329,9 +313,7 @@ policy_options:
     term:
     - name: loopback
       from:
-        protocol:
-        - direct
-        - bgp
+        protocol: bgp
       then:
         community:
         - add: true
@@ -344,9 +326,7 @@ policy_options:
     term:
     - name: loopback
       from:
-        protocol:
-        - bgp
-        - direct
+        protocol: direct
       then:
         accept: true
     - name: default
@@ -360,8 +340,7 @@ policy_options:
     term:
     - name: '10'
       from:
-        protocol:
-        - evpn
+        protocol: evpn
         route_filter:
         - address: 10.1.2.0/24
           orlonger: true
@@ -372,8 +351,7 @@ policy_options:
         reject: true
   community:
   - name: dc2-spine2
-    members:
-    - '65521:1'
+    members: '65521:1'
 routing_instances:
   instance:
   - name: VRF_10001
@@ -387,13 +365,12 @@ routing_instances:
       rd_type: 10.40.101.2:10001
     vrf_target:
       community: target:1:10001
-    vrf_table_label: {}
+    vrf_table_label: ''
     routing_options:
-      auto_export: {}
+      auto_export: ''
     protocols:
       ospf:
-        export:
-        - to-ospf
+        export: to-ospf
         area:
         - name: 0.0.0.0
           interface:
@@ -406,8 +383,7 @@ routing_instances:
           advertise: direct-nexthop
           encapsulation: vxlan
           vni: '10001'
-          export:
-          - EVPN_T5_EXPORT
+          export: EVPN_T5_EXPORT
 switch_options:
   vtep_source_interface:
     interface_name: lo0.0
@@ -415,7 +391,7 @@ switch_options:
     rd_type: 10.30.100.9:9999
   vrf_target:
     community: target:9999:9999
-    auto: {}
+    auto: ''
 vlans:
   vlan:
   - name: vlan_1002

@@ -497,6 +497,714 @@
               {
                 "name": "log",
                 "type": "container",
+                "children": [
+                  {
+                    "name": "mode",
+                    "type": "leaf",
+                    "leaf-type": "enumeration",
+                    "enums": [
+                      {
+                        "id": "stream",
+                        "value": 0,
+                        "path": "security/log/mode"
+                      },
+                      {
+                        "id": "event",
+                        "value": 1,
+                        "path": "security/log/mode"
+                      }
+                    ],
+                    "path": "security/log"
+                  },
+                  {
+                    "name": "report",
+                    "type": "container",
+                    "path": "security/log"
+                  }
+                ],
+                "path": "security"
+              },
+              {
+                "name": "screen",
+                "type": "container",
+                "children": [
+                  {
+                    "name": "ids-option",
+                    "type": "list",
+                    "key": "name",
+                    "children": [
+                      {
+                        "name": "name",
+                        "type": "leaf",
+                        "leaf-type": "string",
+                        "lengths": [
+                          {
+                            "min": 1,
+                            "max": 64,
+                            "path": "security/screen/ids-option/name"
+                          }
+                        ],
+                        "path": "security/screen/ids-option"
+                      },
+                      {
+                        "name": "icmp",
+                        "type": "container",
+                        "children": [
+                          {
+                            "name": "ping-death",
+                            "type": "leaf",
+                            "leaf-type": "empty",
+                            "path": "security/screen/ids-option/icmp"
+                          }
+                        ],
+                        "path": "security/screen/ids-option"
+                      },
+                      {
+                        "name": "ip",
+                        "type": "container",
+                        "children": [
+                          {
+                            "name": "source-route-option",
+                            "type": "leaf",
+                            "leaf-type": "empty",
+                            "path": "security/screen/ids-option/ip"
+                          },
+                          {
+                            "name": "tear-drop",
+                            "type": "leaf",
+                            "leaf-type": "empty",
+                            "path": "security/screen/ids-option/ip"
+                          }
+                        ],
+                        "path": "security/screen/ids-option"
+                      },
+                      {
+                        "name": "tcp",
+                        "type": "container",
+                        "children": [
+                          {
+                            "name": "syn-flood",
+                            "type": "container",
+                            "children": [
+                              {
+                                "name": "alarm-threshold",
+                                "type": "leaf",
+                                "leaf-type": "union",
+                                "types": [
+                                  {
+                                    "type": "string",
+                                    "patterns": [
+                                      "<.*>|$.*"
+                                    ],
+                                    "path": "security/screen/ids-option/tcp/syn-flood/alarm-threshold"
+                                  },
+                                  {
+                                    "type": "uint32",
+                                    "path": "security/screen/ids-option/tcp/syn-flood/alarm-threshold"
+                                  }
+                                ],
+                                "default": "512",
+                                "units": "requests per second",
+                                "path": "security/screen/ids-option/tcp/syn-flood"
+                              },
+                              {
+                                "name": "attack-threshold",
+                                "type": "leaf",
+                                "leaf-type": "union",
+                                "types": [
+                                  {
+                                    "type": "string",
+                                    "patterns": [
+                                      "<.*>|$.*"
+                                    ],
+                                    "path": "security/screen/ids-option/tcp/syn-flood/attack-threshold"
+                                  },
+                                  {
+                                    "type": "uint32",
+                                    "path": "security/screen/ids-option/tcp/syn-flood/attack-threshold"
+                                  }
+                                ],
+                                "default": "200",
+                                "units": "proxied requests per second",
+                                "path": "security/screen/ids-option/tcp/syn-flood"
+                              },
+                              {
+                                "name": "source-threshold",
+                                "type": "leaf",
+                                "leaf-type": "union",
+                                "types": [
+                                  {
+                                    "type": "string",
+                                    "patterns": [
+                                      "<.*>|$.*"
+                                    ],
+                                    "path": "security/screen/ids-option/tcp/syn-flood/source-threshold"
+                                  },
+                                  {
+                                    "type": "uint32",
+                                    "path": "security/screen/ids-option/tcp/syn-flood/source-threshold"
+                                  }
+                                ],
+                                "default": "4000",
+                                "units": "SYN pps",
+                                "path": "security/screen/ids-option/tcp/syn-flood"
+                              },
+                              {
+                                "name": "destination-threshold",
+                                "type": "leaf",
+                                "leaf-type": "union",
+                                "types": [
+                                  {
+                                    "type": "string",
+                                    "patterns": [
+                                      "<.*>|$.*"
+                                    ],
+                                    "path": "security/screen/ids-option/tcp/syn-flood/destination-threshold"
+                                  },
+                                  {
+                                    "type": "uint32",
+                                    "path": "security/screen/ids-option/tcp/syn-flood/destination-threshold"
+                                  }
+                                ],
+                                "default": "4000",
+                                "units": "SYN pps",
+                                "path": "security/screen/ids-option/tcp/syn-flood"
+                              },
+                              {
+                                "name": "timeout",
+                                "type": "leaf",
+                                "leaf-type": "union",
+                                "types": [
+                                  {
+                                    "type": "string",
+                                    "patterns": [
+                                      "<.*>|$.*"
+                                    ],
+                                    "path": "security/screen/ids-option/tcp/syn-flood/timeout"
+                                  },
+                                  {
+                                    "type": "uint32",
+                                    "ranges": [
+                                      {
+                                        "min": 1,
+                                        "max": 50,
+                                        "path": "security/screen/ids-option/tcp/syn-flood/timeout"
+                                      }
+                                    ],
+                                    "path": "security/screen/ids-option/tcp/syn-flood/timeout"
+                                  }
+                                ],
+                                "default": "20",
+                                "units": "seconds",
+                                "path": "security/screen/ids-option/tcp/syn-flood"
+                              }
+                            ],
+                            "path": "security/screen/ids-option/tcp"
+                          },
+                          {
+                            "name": "land",
+                            "type": "leaf",
+                            "leaf-type": "empty",
+                            "path": "security/screen/ids-option/tcp"
+                          }
+                        ],
+                        "path": "security/screen/ids-option"
+                      }
+                    ],
+                    "path": "security/screen"
+                  }
+                ],
+                "path": "security"
+              },
+              {
+                "name": "policies",
+                "type": "container",
+                "children": [
+                  {
+                    "name": "policy",
+                    "type": "list",
+                    "key": "from-zone-name to-zone-name",
+                    "children": [
+                      {
+                        "name": "from-zone-name",
+                        "type": "leaf",
+                        "leaf-type": "string",
+                        "lengths": [
+                          {
+                            "min": 1,
+                            "max": 63,
+                            "path": "security/policies/policy/from-zone-name"
+                          }
+                        ],
+                        "path": "security/policies/policy"
+                      },
+                      {
+                        "name": "to-zone-name",
+                        "type": "leaf",
+                        "leaf-type": "string",
+                        "lengths": [
+                          {
+                            "min": 1,
+                            "max": 63,
+                            "path": "security/policies/policy/to-zone-name"
+                          }
+                        ],
+                        "path": "security/policies/policy"
+                      },
+                      {
+                        "name": "policy",
+                        "type": "list",
+                        "key": "name",
+                        "children": [
+                          {
+                            "name": "name",
+                            "type": "leaf",
+                            "leaf-type": "string",
+                            "lengths": [
+                              {
+                                "min": 1,
+                                "max": 63,
+                                "path": "security/policies/policy/policy/name"
+                              }
+                            ],
+                            "path": "security/policies/policy/policy"
+                          },
+                          {
+                            "name": "match",
+                            "type": "container",
+                            "children": [
+                              {
+                                "name": "source-address",
+                                "type": "leaf-list",
+                                "leaf-type": "string",
+                                "ordered-by": "user",
+                                "path": "security/policies/policy/policy/match"
+                              },
+                              {
+                                "name": "destination-address",
+                                "type": "leaf-list",
+                                "leaf-type": "string",
+                                "ordered-by": "user",
+                                "path": "security/policies/policy/policy/match"
+                              },
+                              {
+                                "name": "application",
+                                "type": "leaf-list",
+                                "leaf-type": "string",
+                                "ordered-by": "user",
+                                "path": "security/policies/policy/policy/match"
+                              }
+                            ],
+                            "path": "security/policies/policy/policy"
+                          },
+                          {
+                            "name": "then",
+                            "type": "container",
+                            "children": [
+                              {
+                                "name": "permit",
+                                "type": "container",
+                                "path": "security/policies/policy/policy/then"
+                              }
+                            ],
+                            "path": "security/policies/policy/policy"
+                          }
+                        ],
+                        "ordered-by": "user",
+                        "path": "security/policies/policy"
+                      }
+                    ],
+                    "ordered-by": "user",
+                    "path": "security/policies"
+                  }
+                ],
+                "path": "security"
+              },
+              {
+                "name": "zones",
+                "type": "container",
+                "children": [
+                  {
+                    "name": "security-zone",
+                    "type": "list",
+                    "key": "name",
+                    "children": [
+                      {
+                        "name": "name",
+                        "type": "leaf",
+                        "leaf-type": "string",
+                        "lengths": [
+                          {
+                            "min": 1,
+                            "max": 63,
+                            "path": "security/zones/security-zone/name"
+                          }
+                        ],
+                        "path": "security/zones/security-zone"
+                      },
+                      {
+                        "name": "tcp-rst",
+                        "type": "leaf",
+                        "leaf-type": "empty",
+                        "path": "security/zones/security-zone"
+                      },
+                      {
+                        "name": "screen",
+                        "type": "leaf",
+                        "leaf-type": "string",
+                        "lengths": [
+                          {
+                            "min": 1,
+                            "max": 32,
+                            "path": "security/zones/security-zone/screen"
+                          }
+                        ],
+                        "path": "security/zones/security-zone"
+                      },
+                      {
+                        "name": "host-inbound-traffic",
+                        "type": "container",
+                        "children": [
+                          {
+                            "name": "system-services",
+                            "type": "list",
+                            "key": "name",
+                            "children": [
+                              {
+                                "name": "name",
+                                "type": "leaf",
+                                "leaf-type": "enumeration",
+                                "enums": [
+                                  {
+                                    "id": "all",
+                                    "value": 0,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "bootp",
+                                    "value": 1,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "dhcp",
+                                    "value": 2,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "dhcpv6",
+                                    "value": 3,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "dns",
+                                    "value": 4,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "finger",
+                                    "value": 5,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "ftp",
+                                    "value": 6,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "ident-reset",
+                                    "value": 7,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "http",
+                                    "value": 8,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "https",
+                                    "value": 9,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "ike",
+                                    "value": 10,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "netconf",
+                                    "value": 11,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "ping",
+                                    "value": 12,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "rlogin",
+                                    "value": 13,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "reverse-telnet",
+                                    "value": 14,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "reverse-ssh",
+                                    "value": 15,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "rpm",
+                                    "value": 16,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "rsh",
+                                    "value": 17,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "snmp",
+                                    "value": 18,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "snmp-trap",
+                                    "value": 19,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "ssh",
+                                    "value": 20,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "telnet",
+                                    "value": 21,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "traceroute",
+                                    "value": 22,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "xnm-ssl",
+                                    "value": 23,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "xnm-clear-text",
+                                    "value": 24,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "tftp",
+                                    "value": 25,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "lsping",
+                                    "value": 26,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "ntp",
+                                    "value": 27,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "sip",
+                                    "value": 28,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "r2cp",
+                                    "value": 29,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "webapi-clear-text",
+                                    "value": 30,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "webapi-ssl",
+                                    "value": 31,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "tcp-encap",
+                                    "value": 32,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "appqoe",
+                                    "value": 33,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  },
+                                  {
+                                    "id": "any-service",
+                                    "value": 34,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/system-services/name"
+                                  }
+                                ],
+                                "path": "security/zones/security-zone/host-inbound-traffic/system-services"
+                              }
+                            ],
+                            "ordered-by": "user",
+                            "path": "security/zones/security-zone/host-inbound-traffic"
+                          },
+                          {
+                            "name": "protocols",
+                            "type": "list",
+                            "key": "name",
+                            "children": [
+                              {
+                                "name": "name",
+                                "type": "leaf",
+                                "leaf-type": "enumeration",
+                                "enums": [
+                                  {
+                                    "id": "all",
+                                    "value": 0,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "bfd",
+                                    "value": 1,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "bgp",
+                                    "value": 2,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "dvmrp",
+                                    "value": 3,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "igmp",
+                                    "value": 4,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "ldp",
+                                    "value": 5,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "msdp",
+                                    "value": 6,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "ndp",
+                                    "value": 7,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "nhrp",
+                                    "value": 8,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "ospf",
+                                    "value": 9,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "ospf3",
+                                    "value": 10,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "pgm",
+                                    "value": 11,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "pim",
+                                    "value": 12,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "rip",
+                                    "value": 13,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "ripng",
+                                    "value": 14,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "router-discovery",
+                                    "value": 15,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "rsvp",
+                                    "value": 16,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "sap",
+                                    "value": 17,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  },
+                                  {
+                                    "id": "vrrp",
+                                    "value": 18,
+                                    "path": "security/zones/security-zone/host-inbound-traffic/protocols/name"
+                                  }
+                                ],
+                                "path": "security/zones/security-zone/host-inbound-traffic/protocols"
+                              }
+                            ],
+                            "ordered-by": "user",
+                            "path": "security/zones/security-zone/host-inbound-traffic"
+                          }
+                        ],
+                        "path": "security/zones/security-zone"
+                      },
+                      {
+                        "name": "interfaces",
+                        "type": "list",
+                        "key": "name",
+                        "children": [
+                          {
+                            "name": "name",
+                            "type": "leaf",
+                            "leaf-type": "union",
+                            "types": [
+                              {
+                                "type": "string",
+                                "path": "security/zones/security-zone/interfaces/name"
+                              },
+                              {
+                                "type": "string",
+                                "patterns": [
+                                  "<.*>|$.*"
+                                ],
+                                "path": "security/zones/security-zone/interfaces/name"
+                              }
+                            ],
+                            "path": "security/zones/security-zone/interfaces"
+                          }
+                        ],
+                        "ordered-by": "user",
+                        "path": "security/zones/security-zone"
+                      }
+                    ],
+                    "ordered-by": "user",
+                    "path": "security/zones"
+                  }
+                ],
                 "path": "security"
               }
             ],
@@ -670,7 +1378,7 @@
                 "leaf-type": "string",
                 "lengths": [
                   {
-                    "min": 1,
+                    "min": 0,
                     "max": 255,
                     "path": "system/host-name"
                   }

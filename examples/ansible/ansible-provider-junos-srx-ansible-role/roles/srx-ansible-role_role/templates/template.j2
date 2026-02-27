@@ -3,12 +3,12 @@
     <groups>
         <name> JTAF_ANSIBLE </name>
     <chassis>
-        {%- if chassis.get("aggregated_devices") %}
+        {%- if chassis.aggregated_devices is defined %}
         <aggregated-devices>
-            {%- if chassis.aggregated_devices.get("ethernet") %}
+            {%- if chassis.aggregated_devices.ethernet is defined %}
             <ethernet>
-                {%- if chassis.aggregated_devices.ethernet.get("device_count") %}
-                {%- if chassis.aggregated_devices.ethernet.get("device_count") is boolean %}
+                {%- if chassis.aggregated_devices.ethernet.device_count is defined %}
+                {%- if chassis.aggregated_devices.ethernet.device_count is boolean %}
                 <device-count/>
                        {%- else %}
                 <device-count>{{chassis.aggregated_devices.ethernet.device_count}}</device-count>
@@ -20,59 +20,59 @@
         {%- endif %}
     </chassis>
     <interfaces>
-        {%- if interfaces.get("interface") %}			  
+        {%- if interfaces.interface is defined %}
         {%- for i_2 in interfaces.get("interface") %}
-        {%- if interfaces.get("interface") %}
+        {%- if interfaces.interface is defined %}
         <interface>
-            {%- if i_2.get("name") %}
-            {%- if i_2.get("name") is boolean %}
+            {%- if i_2.name is defined %}
+            {%- if i_2.name is boolean %}
             <name/>
                    {%- else %}
             <name>{{i_2.name}}</name>
             {%- endif %}
             {%- endif %}
-            {%- if i_2.get("vlan_tagging") %}
-            {%- if i_2.get("vlan_tagging") is boolean %}
+            {%- if i_2.vlan_tagging is defined %}
+            {%- if i_2.vlan_tagging is boolean %}
             <vlan-tagging/>
                    {%- else %}
             <vlan-tagging>{{i_2.vlan_tagging}}</vlan-tagging>
             {%- endif %}
             {%- endif %}
-            {%- if i_2.get("unit") %}			  
+            {%- if i_2.unit is defined %}
             {%- for i_3 in i_2.get("unit") %}
-            {%- if i_2.get("unit") %}
+            {%- if i_2.unit is defined %}
             <unit>
-                {%- if i_3.get("name") %}
-                {%- if i_3.get("name") is boolean %}
+                {%- if i_3.name is defined %}
+                {%- if i_3.name is boolean %}
                 <name/>
                        {%- else %}
                 <name>{{i_3.name}}</name>
                 {%- endif %}
                 {%- endif %}
-                {%- if i_3.get("description") %}
-                {%- if i_3.get("description") is boolean %}
+                {%- if i_3.description is defined %}
+                {%- if i_3.description is boolean %}
                 <description/>
                        {%- else %}
                 <description>{{i_3.description}}</description>
                 {%- endif %}
                 {%- endif %}
-                {%- if i_3.get("vlan_id") %}
-                {%- if i_3.get("vlan_id") is boolean %}
+                {%- if i_3.vlan_id is defined %}
+                {%- if i_3.vlan_id is boolean %}
                 <vlan-id/>
                        {%- else %}
                 <vlan-id>{{i_3.vlan_id}}</vlan-id>
                 {%- endif %}
                 {%- endif %}
-                {%- if i_3.get("family") %}
+                {%- if i_3.family is defined %}
                 <family>
-                    {%- if i_3.family.get("inet") %}
+                    {%- if i_3.family.inet is defined %}
                     <inet>
-                        {%- if i_3.family.inet.get("address") %}			  
+                        {%- if i_3.family.inet.address is defined %}
                         {%- for i_6 in i_3.family.inet.get("address") %}
-                        {%- if i_3.family.inet.get("address") %}
+                        {%- if i_3.family.inet.address is defined %}
                         <address>
-                            {%- if i_6.get("name") %}
-                            {%- if i_6.get("name") is boolean %}
+                            {%- if i_6.name is defined %}
+                            {%- if i_6.name is boolean %}
                             <name/>
                                    {%- else %}
                             <name>{{i_6.name}}</name>
@@ -93,50 +93,50 @@
         {%- endif %}
     </interfaces>
     <policy-options>
-        {%- if policy_options.get("policy_statement") %}			  
+        {%- if policy_options.policy_statement is defined %}
         {%- for i_2 in policy_options.get("policy_statement") %}
-        {%- if policy_options.get("policy_statement") %}
+        {%- if policy_options.policy_statement is defined %}
         <policy-statement>
-            {%- if i_2.get("name") %}
-            {%- if i_2.get("name") is boolean %}
+            {%- if i_2.name is defined %}
+            {%- if i_2.name is boolean %}
             <name/>
                    {%- else %}
             <name>{{i_2.name}}</name>
             {%- endif %}
             {%- endif %}
-            {%- if i_2.get("term") %}			  
+            {%- if i_2.term is defined %}
             {%- for i_3 in i_2.get("term") %}
-            {%- if i_2.get("term") %}
+            {%- if i_2.term is defined %}
             <term>
-                {%- if i_3.get("name") %}
-                {%- if i_3.get("name") is boolean %}
+                {%- if i_3.name is defined %}
+                {%- if i_3.name is boolean %}
                 <name/>
                        {%- else %}
                 <name>{{i_3.name}}</name>
                 {%- endif %}
                 {%- endif %}
-                {%- if i_3.get("from") %}
+                {%- if i_3.from is defined %}
                 <from>
-                    {%- if i_3.from.get("route_filter") %}			  
+                    {%- if i_3.from.route_filter is defined %}
                     {%- for i_5 in i_3.from.get("route_filter") %}
-                    {%- if i_3.from.get("route_filter") %}
+                    {%- if i_3.from.route_filter is defined %}
                     <route-filter>
-                        {%- if i_5.get("address") %}
-                        {%- if i_5.get("address") is boolean %}
+                        {%- if i_5.address is defined %}
+                        {%- if i_5.address is boolean %}
                         <address/>
                                {%- else %}
                         <address>{{i_5.address}}</address>
                         {%- endif %}
                         {%- endif %}
-                        {%- if i_5.get("exact") %}
-                        {%- if i_5.get("exact") is boolean %}
+                        {%- if i_5.exact is defined %}
+                        {%- if i_5.exact is boolean %}
                         <exact/>
                                {%- else %}
                         <exact>{{i_5.exact}}</exact>
                         {%- endif %}
                         {%- endif %}
-                        {%- if i_5.get("accept") %}
-                        {%- if i_5.get("accept") is boolean %}
+                        {%- if i_5.accept is defined %}
+                        {%- if i_5.accept is boolean %}
                         <accept/>
                                {%- else %}
                         <accept>{{i_5.accept}}</accept>
@@ -155,14 +155,14 @@
         {%- endif %}
     </policy-options>
     <protocols>
-        {%- if protocols.get("lldp") %}
+        {%- if protocols.lldp is defined %}
         <lldp>
-            {%- if protocols.lldp.get("interface") %}			  
+            {%- if protocols.lldp.interface is defined %}
             {%- for i_3 in protocols.lldp.get("interface") %}
-            {%- if protocols.lldp.get("interface") %}
+            {%- if protocols.lldp.interface is defined %}
             <interface>
-                {%- if i_3.get("name") %}
-                {%- if i_3.get("name") is boolean %}
+                {%- if i_3.name is defined %}
+                {%- if i_3.name is boolean %}
                 <name/>
                        {%- else %}
                 <name>{{i_3.name}}</name>
@@ -175,30 +175,30 @@
         {%- endif %}
     </protocols>
     <routing-instances>
-        {%- if routing_instances.get("instance") %}			  
+        {%- if routing_instances.instance is defined %}
         {%- for i_2 in routing_instances.get("instance") %}
-        {%- if routing_instances.get("instance") %}
+        {%- if routing_instances.instance is defined %}
         <instance>
-            {%- if i_2.get("name") %}
-            {%- if i_2.get("name") is boolean %}
+            {%- if i_2.name is defined %}
+            {%- if i_2.name is boolean %}
             <name/>
                    {%- else %}
             <name>{{i_2.name}}</name>
             {%- endif %}
             {%- endif %}
-            {%- if i_2.get("instance_type") %}
-            {%- if i_2.get("instance_type") is boolean %}
+            {%- if i_2.instance_type is defined %}
+            {%- if i_2.instance_type is boolean %}
             <instance-type/>
                    {%- else %}
             <instance-type>{{i_2.instance_type}}</instance-type>
             {%- endif %}
             {%- endif %}
-            {%- if i_2.get("interface") %}			  
+            {%- if i_2.interface is defined %}
             {%- for i_3 in i_2.get("interface") %}
-            {%- if i_2.get("interface") %}
+            {%- if i_2.interface is defined %}
             <interface>
-                {%- if i_3.get("name") %}
-                {%- if i_3.get("name") is boolean %}
+                {%- if i_3.name is defined %}
+                {%- if i_3.name is boolean %}
                 <name/>
                        {%- else %}
                 <name>{{i_3.name}}</name>
@@ -207,23 +207,23 @@
             </interface>            {%- endif %}
             {%- endfor %}
             {%- endif %}
-            {%- if i_2.get("routing_options") %}
+            {%- if i_2.routing_options is defined %}
             <routing-options>
-                {%- if i_2.routing_options.get("static") %}
+                {%- if i_2.routing_options.static is defined %}
                 <static>
-                    {%- if i_2.routing_options.static.get("route") %}			  
+                    {%- if i_2.routing_options.static.route is defined %}
                     {%- for i_5 in i_2.routing_options.static.get("route") %}
-                    {%- if i_2.routing_options.static.get("route") %}
+                    {%- if i_2.routing_options.static.route is defined %}
                     <route>
-                        {%- if i_5.get("name") %}
-                        {%- if i_5.get("name") is boolean %}
+                        {%- if i_5.name is defined %}
+                        {%- if i_5.name is boolean %}
                         <name/>
                                {%- else %}
                         <name>{{i_5.name}}</name>
                         {%- endif %}
                         {%- endif %}
-                        {%- if i_5.get("discard") %}
-                        {%- if i_5.get("discard") is boolean %}
+                        {%- if i_5.discard is defined %}
+                        {%- if i_5.discard is boolean %}
                         <discard/>
                                {%- else %}
                         <discard>{{i_5.discard}}</discard>
@@ -236,32 +236,34 @@
                 {%- endif %}
             </routing-options>
             {%- endif %}
-            {%- if i_2.get("protocols") %}
+            {%- if i_2.protocols is defined %}
             <protocols>
-                {%- if i_2.protocols.get("ospf") %}
+                {%- if i_2.protocols.ospf is defined %}
                 <ospf>
-                    {%- if i_2.protocols.ospf.get("export") %}
-              {% for ii_5 in i_2.protocols.ospf.get("export") %}
-                        <export>{{ii_5}}</export>
-			  {% endfor %}
+                    {%- if i_2.protocols.ospf.export is defined %}
+                    {%- if i_2.protocols.ospf.export is boolean %}
+                    <export/>
+                    {%- else %}
+                    <export>{{i_2.protocols.ospf.export}}</export>
                     {%- endif %}
-                    {%- if i_2.protocols.ospf.get("area") %}			  
+                    {%- endif %}
+                    {%- if i_2.protocols.ospf.area is defined %}
                     {%- for i_5 in i_2.protocols.ospf.get("area") %}
-                    {%- if i_2.protocols.ospf.get("area") %}
+                    {%- if i_2.protocols.ospf.area is defined %}
                     <area>
-                        {%- if i_5.get("name") %}
-                        {%- if i_5.get("name") is boolean %}
+                        {%- if i_5.name is defined %}
+                        {%- if i_5.name is boolean %}
                         <name/>
                                {%- else %}
                         <name>{{i_5.name}}</name>
                         {%- endif %}
                         {%- endif %}
-                        {%- if i_5.get("interface") %}			  
+                        {%- if i_5.interface is defined %}
                         {%- for i_6 in i_5.get("interface") %}
-                        {%- if i_5.get("interface") %}
+                        {%- if i_5.interface is defined %}
                         <interface>
-                            {%- if i_6.get("name") %}
-                            {%- if i_6.get("name") is boolean %}
+                            {%- if i_6.name is defined %}
+                            {%- if i_6.name is boolean %}
                             <name/>
                                    {%- else %}
                             <name>{{i_6.name}}</name>
@@ -282,23 +284,25 @@
         {%- endif %}
     </routing-instances>
     <routing-options>
-        {%- if routing_options.get("static") %}
+        {%- if routing_options.static is defined %}
         <static>
-            {%- if routing_options.static.get("route") %}			  
+            {%- if routing_options.static.route is defined %}
             {%- for i_3 in routing_options.static.get("route") %}
-            {%- if routing_options.static.get("route") %}
+            {%- if routing_options.static.route is defined %}
             <route>
-                {%- if i_3.get("name") %}
-                {%- if i_3.get("name") is boolean %}
+                {%- if i_3.name is defined %}
+                {%- if i_3.name is boolean %}
                 <name/>
                        {%- else %}
                 <name>{{i_3.name}}</name>
                 {%- endif %}
                 {%- endif %}
-                {%- if i_3.get("next_hop") %}
-              {% for ii_4 in i_3.get("next_hop") %}
-                    <next-hop>{{ii_4}}</next-hop>
-			  {% endfor %}
+                {%- if i_3.next_hop is defined %}
+                {%- if i_3.next_hop is boolean %}
+                <next-hop/>
+                {%- else %}
+                <next-hop>{{i_3.next_hop}}</next-hop>
+                {%- endif %}
                 {%- endif %}
             </route>            {%- endif %}
             {%- endfor %}
@@ -307,39 +311,297 @@
         {%- endif %}
     </routing-options>
     <security>
-        {%- if security.get("log") %}
+        {%- if security.log is defined %}
         <log>
+            {%- if security.log.mode is defined %}
+            {%- if security.log.mode is boolean %}
+            <mode/>
+                   {%- else %}
+            <mode>{{security.log.mode}}</mode>
+            {%- endif %}
+            {%- endif %}
+            {%- if security.log.report is defined %}
+            <report>
+            </report>
+            {%- endif %}
         </log>
+        {%- endif %}
+        {%- if security.screen is defined %}
+        <screen>
+            {%- if security.screen.ids_option is defined %}
+            {%- for i_3 in security.screen.get("ids_option") %}
+            {%- if security.screen.ids_option is defined %}
+            <ids-option>
+                {%- if i_3.name is defined %}
+                {%- if i_3.name is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.icmp is defined %}
+                <icmp>
+                    {%- if i_3.icmp.ping_death is defined %}
+                    {%- if i_3.icmp.ping_death is boolean %}
+                    <ping-death/>
+                           {%- else %}
+                    <ping-death>{{i_3.icmp.ping_death}}</ping-death>
+                    {%- endif %}
+                    {%- endif %}
+                </icmp>
+                {%- endif %}
+                {%- if i_3.ip is defined %}
+                <ip>
+                    {%- if i_3.ip.source_route_option is defined %}
+                    {%- if i_3.ip.source_route_option is boolean %}
+                    <source-route-option/>
+                           {%- else %}
+                    <source-route-option>{{i_3.ip.source_route_option}}</source-route-option>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_3.ip.tear_drop is defined %}
+                    {%- if i_3.ip.tear_drop is boolean %}
+                    <tear-drop/>
+                           {%- else %}
+                    <tear-drop>{{i_3.ip.tear_drop}}</tear-drop>
+                    {%- endif %}
+                    {%- endif %}
+                </ip>
+                {%- endif %}
+                {%- if i_3.tcp is defined %}
+                <tcp>
+                    {%- if i_3.tcp.syn_flood is defined %}
+                    <syn-flood>
+                        {%- if i_3.tcp.syn_flood.alarm_threshold is defined %}
+                        {%- if i_3.tcp.syn_flood.alarm_threshold is boolean %}
+                        <alarm-threshold/>
+                               {%- else %}
+                        <alarm-threshold>{{i_3.tcp.syn_flood.alarm_threshold}}</alarm-threshold>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_3.tcp.syn_flood.attack_threshold is defined %}
+                        {%- if i_3.tcp.syn_flood.attack_threshold is boolean %}
+                        <attack-threshold/>
+                               {%- else %}
+                        <attack-threshold>{{i_3.tcp.syn_flood.attack_threshold}}</attack-threshold>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_3.tcp.syn_flood.source_threshold is defined %}
+                        {%- if i_3.tcp.syn_flood.source_threshold is boolean %}
+                        <source-threshold/>
+                               {%- else %}
+                        <source-threshold>{{i_3.tcp.syn_flood.source_threshold}}</source-threshold>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_3.tcp.syn_flood.destination_threshold is defined %}
+                        {%- if i_3.tcp.syn_flood.destination_threshold is boolean %}
+                        <destination-threshold/>
+                               {%- else %}
+                        <destination-threshold>{{i_3.tcp.syn_flood.destination_threshold}}</destination-threshold>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_3.tcp.syn_flood.timeout is defined %}
+                        {%- if i_3.tcp.syn_flood.timeout is boolean %}
+                        <timeout/>
+                               {%- else %}
+                        <timeout>{{i_3.tcp.syn_flood.timeout}}</timeout>
+                        {%- endif %}
+                        {%- endif %}
+                    </syn-flood>
+                    {%- endif %}
+                    {%- if i_3.tcp.land is defined %}
+                    {%- if i_3.tcp.land is boolean %}
+                    <land/>
+                           {%- else %}
+                    <land>{{i_3.tcp.land}}</land>
+                    {%- endif %}
+                    {%- endif %}
+                </tcp>
+                {%- endif %}
+            </ids-option>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+        </screen>
+        {%- endif %}
+        {%- if security.policies is defined %}
+        <policies>
+            {%- if security.policies.policy is defined %}
+            {%- for i_3 in security.policies.get("policy") %}
+            {%- if security.policies.policy is defined %}
+            <policy>
+                {%- if i_3.from_zone_name is defined %}
+                {%- if i_3.from_zone_name is boolean %}
+                <from-zone-name/>
+                       {%- else %}
+                <from-zone-name>{{i_3.from_zone_name}}</from-zone-name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.to_zone_name is defined %}
+                {%- if i_3.to_zone_name is boolean %}
+                <to-zone-name/>
+                       {%- else %}
+                <to-zone-name>{{i_3.to_zone_name}}</to-zone-name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.policy is defined %}
+                {%- for i_4 in i_3.get("policy") %}
+                {%- if i_3.policy is defined %}
+                <policy>
+                    {%- if i_4.name is defined %}
+                    {%- if i_4.name is boolean %}
+                    <name/>
+                           {%- else %}
+                    <name>{{i_4.name}}</name>
+                    {%- endif %}
+                    {%- endif %}
+                    {%- if i_4.match is defined %}
+                    <match>
+                        {%- if i_4.match.source_address is defined %}
+                        {%- if i_4.match.source_address is boolean %}
+                        <source-address/>
+                        {%- else %}
+                        <source-address>{{i_4.match.source_address}}</source-address>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_4.match.destination_address is defined %}
+                        {%- if i_4.match.destination_address is boolean %}
+                        <destination-address/>
+                        {%- else %}
+                        <destination-address>{{i_4.match.destination_address}}</destination-address>
+                        {%- endif %}
+                        {%- endif %}
+                        {%- if i_4.match.application is defined %}
+                        {%- if i_4.match.application is boolean %}
+                        <application/>
+                        {%- else %}
+                        <application>{{i_4.match.application}}</application>
+                        {%- endif %}
+                        {%- endif %}
+                    </match>
+                    {%- endif %}
+                    {%- if i_4.then is defined %}
+                    <then>
+                        {%- if i_4.then.permit is defined %}
+                        <permit>
+                        </permit>
+                        {%- endif %}
+                    </then>
+                    {%- endif %}
+                </policy>                {%- endif %}
+                {%- endfor %}
+                {%- endif %}
+            </policy>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+        </policies>
+        {%- endif %}
+        {%- if security.zones is defined %}
+        <zones>
+            {%- if security.zones.security_zone is defined %}
+            {%- for i_3 in security.zones.get("security_zone") %}
+            {%- if security.zones.security_zone is defined %}
+            <security-zone>
+                {%- if i_3.name is defined %}
+                {%- if i_3.name is boolean %}
+                <name/>
+                       {%- else %}
+                <name>{{i_3.name}}</name>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.tcp_rst is defined %}
+                {%- if i_3.tcp_rst is boolean %}
+                <tcp-rst/>
+                       {%- else %}
+                <tcp-rst>{{i_3.tcp_rst}}</tcp-rst>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.screen is defined %}
+                {%- if i_3.screen is boolean %}
+                <screen/>
+                       {%- else %}
+                <screen>{{i_3.screen}}</screen>
+                {%- endif %}
+                {%- endif %}
+                {%- if i_3.host_inbound_traffic is defined %}
+                <host-inbound-traffic>
+                    {%- if i_3.host_inbound_traffic.system_services is defined %}
+                    {%- for i_5 in i_3.host_inbound_traffic.get("system_services") %}
+                    {%- if i_3.host_inbound_traffic.system_services is defined %}
+                    <system-services>
+                        {%- if i_5.name is defined %}
+                        {%- if i_5.name is boolean %}
+                        <name/>
+                               {%- else %}
+                        <name>{{i_5.name}}</name>
+                        {%- endif %}
+                        {%- endif %}
+                    </system-services>                    {%- endif %}
+                    {%- endfor %}
+                    {%- endif %}
+                    {%- if i_3.host_inbound_traffic.protocols is defined %}
+                    {%- for i_5 in i_3.host_inbound_traffic.get("protocols") %}
+                    {%- if i_3.host_inbound_traffic.protocols is defined %}
+                    <protocols>
+                        {%- if i_5.name is defined %}
+                        {%- if i_5.name is boolean %}
+                        <name/>
+                               {%- else %}
+                        <name>{{i_5.name}}</name>
+                        {%- endif %}
+                        {%- endif %}
+                    </protocols>                    {%- endif %}
+                    {%- endfor %}
+                    {%- endif %}
+                </host-inbound-traffic>
+                {%- endif %}
+                {%- if i_3.interfaces is defined %}
+                {%- for i_4 in i_3.get("interfaces") %}
+                {%- if i_3.interfaces is defined %}
+                <interfaces>
+                    {%- if i_4.name is defined %}
+                    {%- if i_4.name is boolean %}
+                    <name/>
+                           {%- else %}
+                    <name>{{i_4.name}}</name>
+                    {%- endif %}
+                    {%- endif %}
+                </interfaces>                {%- endif %}
+                {%- endfor %}
+                {%- endif %}
+            </security-zone>            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+        </zones>
         {%- endif %}
     </security>
     <snmp>
-        {%- if snmp.get("location") %}
-        {%- if snmp.get("location") is boolean %}
+        {%- if snmp.location is defined %}
+        {%- if snmp.location is boolean %}
         <location/>
                {%- else %}
         <location>{{snmp.location}}</location>
         {%- endif %}
         {%- endif %}
-        {%- if snmp.get("contact") %}
-        {%- if snmp.get("contact") is boolean %}
+        {%- if snmp.contact is defined %}
+        {%- if snmp.contact is boolean %}
         <contact/>
                {%- else %}
         <contact>{{snmp.contact}}</contact>
         {%- endif %}
         {%- endif %}
-        {%- if snmp.get("community") %}			  
+        {%- if snmp.community is defined %}
         {%- for i_2 in snmp.get("community") %}
-        {%- if snmp.get("community") %}
+        {%- if snmp.community is defined %}
         <community>
-            {%- if i_2.get("name") %}
-            {%- if i_2.get("name") is boolean %}
+            {%- if i_2.name is defined %}
+            {%- if i_2.name is boolean %}
             <name/>
                    {%- else %}
             <name>{{i_2.name}}</name>
             {%- endif %}
             {%- endif %}
-            {%- if i_2.get("authorization") %}
-            {%- if i_2.get("authorization") is boolean %}
+            {%- if i_2.authorization is defined %}
+            {%- if i_2.authorization is boolean %}
             <authorization/>
                    {%- else %}
             <authorization>{{i_2.authorization}}</authorization>
@@ -350,37 +612,37 @@
         {%- endif %}
     </snmp>
     <system>
-        {%- if system.get("login") %}
+        {%- if system.login is defined %}
         <login>
-            {%- if system.login.get("user") %}			  
+            {%- if system.login.user is defined %}
             {%- for i_3 in system.login.get("user") %}
-            {%- if system.login.get("user") %}
+            {%- if system.login.user is defined %}
             <user>
-                {%- if i_3.get("name") %}
-                {%- if i_3.get("name") is boolean %}
+                {%- if i_3.name is defined %}
+                {%- if i_3.name is boolean %}
                 <name/>
                        {%- else %}
                 <name>{{i_3.name}}</name>
                 {%- endif %}
                 {%- endif %}
-                {%- if i_3.get("uid") %}
-                {%- if i_3.get("uid") is boolean %}
+                {%- if i_3.uid is defined %}
+                {%- if i_3.uid is boolean %}
                 <uid/>
                        {%- else %}
                 <uid>{{i_3.uid}}</uid>
                 {%- endif %}
                 {%- endif %}
-                {%- if i_3.get("class") %}
-                {%- if i_3.get("class") is boolean %}
+                {%- if i_3.class is defined %}
+                {%- if i_3.class is boolean %}
                 <class/>
                        {%- else %}
                 <class>{{i_3.class}}</class>
                 {%- endif %}
                 {%- endif %}
-                {%- if i_3.get("authentication") %}
+                {%- if i_3.authentication is defined %}
                 <authentication>
-                    {%- if i_3.authentication.get("encrypted_password") %}
-                    {%- if i_3.authentication.get("encrypted_password") is boolean %}
+                    {%- if i_3.authentication.encrypted_password is defined %}
+                    {%- if i_3.authentication.encrypted_password is boolean %}
                     <encrypted-password/>
                            {%- else %}
                     <encrypted-password>{{i_3.authentication.encrypted_password}}</encrypted-password>
@@ -391,8 +653,8 @@
             </user>            {%- endif %}
             {%- endfor %}
             {%- endif %}
-            {%- if system.login.get("message") %}
-            {%- if system.login.get("message") is boolean %}
+            {%- if system.login.message is defined %}
+            {%- if system.login.message is boolean %}
             <message/>
                    {%- else %}
             <message>{{system.login.message}}</message>
@@ -400,10 +662,10 @@
             {%- endif %}
         </login>
         {%- endif %}
-        {%- if system.get("root_authentication") %}
+        {%- if system.root_authentication is defined %}
         <root-authentication>
-            {%- if system.root_authentication.get("encrypted_password") %}
-            {%- if system.root_authentication.get("encrypted_password") is boolean %}
+            {%- if system.root_authentication.encrypted_password is defined %}
+            {%- if system.root_authentication.encrypted_password is boolean %}
             <encrypted-password/>
                    {%- else %}
             <encrypted-password>{{system.root_authentication.encrypted_password}}</encrypted-password>
@@ -411,19 +673,19 @@
             {%- endif %}
         </root-authentication>
         {%- endif %}
-        {%- if system.get("host_name") %}
-        {%- if system.get("host_name") is boolean %}
+        {%- if system.host_name is defined %}
+        {%- if system.host_name is boolean %}
         <host-name/>
                {%- else %}
         <host-name>{{system.host_name}}</host-name>
         {%- endif %}
         {%- endif %}
-        {%- if system.get("services") %}
+        {%- if system.services is defined %}
         <services>
-            {%- if system.services.get("ssh") %}
+            {%- if system.services.ssh is defined %}
             <ssh>
-                {%- if system.services.ssh.get("root_login") %}
-                {%- if system.services.ssh.get("root_login") is boolean %}
+                {%- if system.services.ssh.root_login is defined %}
+                {%- if system.services.ssh.root_login is boolean %}
                 <root-login/>
                        {%- else %}
                 <root-login>{{system.services.ssh.root_login}}</root-login>
@@ -431,14 +693,14 @@
                 {%- endif %}
             </ssh>
             {%- endif %}
-            {%- if system.services.get("extension_service") %}
+            {%- if system.services.extension_service is defined %}
             <extension-service>
-                {%- if system.services.extension_service.get("request_response") %}
+                {%- if system.services.extension_service.request_response is defined %}
                 <request-response>
-                    {%- if system.services.extension_service.request_response.get("grpc") %}
+                    {%- if system.services.extension_service.request_response.grpc is defined %}
                     <grpc>
-                        {%- if system.services.extension_service.request_response.grpc.get("max_connections") %}
-                        {%- if system.services.extension_service.request_response.grpc.get("max_connections") is boolean %}
+                        {%- if system.services.extension_service.request_response.grpc.max_connections is defined %}
+                        {%- if system.services.extension_service.request_response.grpc.max_connections is boolean %}
                         <max-connections/>
                                {%- else %}
                         <max-connections>{{system.services.extension_service.request_response.grpc.max_connections}}</max-connections>
@@ -448,14 +710,16 @@
                     {%- endif %}
                 </request-response>
                 {%- endif %}
-                {%- if system.services.extension_service.get("notification") %}
+                {%- if system.services.extension_service.notification is defined %}
                 <notification>
-                    {%- if system.services.extension_service.notification.get("allow_clients") %}
+                    {%- if system.services.extension_service.notification.allow_clients is defined %}
                     <allow-clients>
-                        {%- if system.services.extension_service.notification.allow_clients.get("address") %}
-              {% for ii_6 in system.services.extension_service.notification.allow_clients.get("address") %}
-                            <address>{{ii_6}}</address>
-			  {% endfor %}
+                        {%- if system.services.extension_service.notification.allow_clients.address is defined %}
+                        {%- if system.services.extension_service.notification.allow_clients.address is boolean %}
+                        <address/>
+                        {%- else %}
+                        <address>{{system.services.extension_service.notification.allow_clients.address}}</address>
+                        {%- endif %}
                         {%- endif %}
                     </allow-clients>
                     {%- endif %}
@@ -463,20 +727,20 @@
                 {%- endif %}
             </extension-service>
             {%- endif %}
-            {%- if system.services.get("netconf") %}
+            {%- if system.services.netconf is defined %}
             <netconf>
-                {%- if system.services.netconf.get("ssh") %}
+                {%- if system.services.netconf.ssh is defined %}
                 <ssh>
                 </ssh>
                 {%- endif %}
             </netconf>
             {%- endif %}
-            {%- if system.services.get("rest") %}
+            {%- if system.services.rest is defined %}
             <rest>
-                {%- if system.services.rest.get("http") %}
+                {%- if system.services.rest.http is defined %}
                 <http>
-                    {%- if system.services.rest.http.get("port") %}
-                    {%- if system.services.rest.http.get("port") is boolean %}
+                    {%- if system.services.rest.http.port is defined %}
+                    {%- if system.services.rest.http.port is boolean %}
                     <port/>
                            {%- else %}
                     <port>{{system.services.rest.http.port}}</port>
@@ -484,8 +748,8 @@
                     {%- endif %}
                 </http>
                 {%- endif %}
-                {%- if system.services.rest.get("enable_explorer") %}
-                {%- if system.services.rest.get("enable_explorer") is boolean %}
+                {%- if system.services.rest.enable_explorer is defined %}
+                {%- if system.services.rest.enable_explorer is boolean %}
                 <enable-explorer/>
                        {%- else %}
                 <enable-explorer>{{system.services.rest.enable_explorer}}</enable-explorer>
@@ -495,32 +759,32 @@
             {%- endif %}
         </services>
         {%- endif %}
-        {%- if system.get("syslog") %}
+        {%- if system.syslog is defined %}
         <syslog>
-            {%- if system.syslog.get("user") %}			  
+            {%- if system.syslog.user is defined %}
             {%- for i_3 in system.syslog.get("user") %}
-            {%- if system.syslog.get("user") %}
+            {%- if system.syslog.user is defined %}
             <user>
-                {%- if i_3.get("name") %}
-                {%- if i_3.get("name") is boolean %}
+                {%- if i_3.name is defined %}
+                {%- if i_3.name is boolean %}
                 <name/>
                        {%- else %}
                 <name>{{i_3.name}}</name>
                 {%- endif %}
                 {%- endif %}
-                {%- if i_3.get("contents") %}			  
+                {%- if i_3.contents is defined %}
                 {%- for i_4 in i_3.get("contents") %}
-                {%- if i_3.get("contents") %}
+                {%- if i_3.contents is defined %}
                 <contents>
-                    {%- if i_4.get("name") %}
-                    {%- if i_4.get("name") is boolean %}
+                    {%- if i_4.name is defined %}
+                    {%- if i_4.name is boolean %}
                     <name/>
                            {%- else %}
                     <name>{{i_4.name}}</name>
                     {%- endif %}
                     {%- endif %}
-                    {%- if i_4.get("emergency") %}
-                    {%- if i_4.get("emergency") is boolean %}
+                    {%- if i_4.emergency is defined %}
+                    {%- if i_4.emergency is boolean %}
                     <emergency/>
                            {%- else %}
                     <emergency>{{i_4.emergency}}</emergency>
@@ -532,37 +796,37 @@
             </user>            {%- endif %}
             {%- endfor %}
             {%- endif %}
-            {%- if system.syslog.get("file") %}			  
+            {%- if system.syslog.file is defined %}
             {%- for i_3 in system.syslog.get("file") %}
-            {%- if system.syslog.get("file") %}
+            {%- if system.syslog.file is defined %}
             <file>
-                {%- if i_3.get("name") %}
-                {%- if i_3.get("name") is boolean %}
+                {%- if i_3.name is defined %}
+                {%- if i_3.name is boolean %}
                 <name/>
                        {%- else %}
                 <name>{{i_3.name}}</name>
                 {%- endif %}
                 {%- endif %}
-                {%- if i_3.get("contents") %}			  
+                {%- if i_3.contents is defined %}
                 {%- for i_4 in i_3.get("contents") %}
-                {%- if i_3.get("contents") %}
+                {%- if i_3.contents is defined %}
                 <contents>
-                    {%- if i_4.get("name") %}
-                    {%- if i_4.get("name") is boolean %}
+                    {%- if i_4.name is defined %}
+                    {%- if i_4.name is boolean %}
                     <name/>
                            {%- else %}
                     <name>{{i_4.name}}</name>
                     {%- endif %}
                     {%- endif %}
-                    {%- if i_4.get("any") %}
-                    {%- if i_4.get("any") is boolean %}
+                    {%- if i_4.any is defined %}
+                    {%- if i_4.any is boolean %}
                     <any/>
                            {%- else %}
                     <any>{{i_4.any}}</any>
                     {%- endif %}
                     {%- endif %}
-                    {%- if i_4.get("info") %}
-                    {%- if i_4.get("info") is boolean %}
+                    {%- if i_4.info is defined %}
+                    {%- if i_4.info is boolean %}
                     <info/>
                            {%- else %}
                     <info>{{i_4.info}}</info>
@@ -576,16 +840,16 @@
             {%- endif %}
         </syslog>
         {%- endif %}
-        {%- if system.get("license") %}
+        {%- if system.license is defined %}
         <license>
-            {%- if system.license.get("autoupdate") %}
+            {%- if system.license.autoupdate is defined %}
             <autoupdate>
-                {%- if system.license.autoupdate.get("url") %}			  
+                {%- if system.license.autoupdate.url is defined %}
                 {%- for i_4 in system.license.autoupdate.get("url") %}
-                {%- if system.license.autoupdate.get("url") %}
+                {%- if system.license.autoupdate.url is defined %}
                 <url>
-                    {%- if i_4.get("name") %}
-                    {%- if i_4.get("name") is boolean %}
+                    {%- if i_4.name is defined %}
+                    {%- if i_4.name is boolean %}
                     <name/>
                            {%- else %}
                     <name>{{i_4.name}}</name>

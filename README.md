@@ -367,7 +367,7 @@ Unit tests are created and stored under /junosterraform/unit_tests/
 
 Run from home /junos-terraform directory:
 ```
-python setup.py test
+pytest -v
 ```
 
 Current unit tests:
