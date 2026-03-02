@@ -50,13 +50,13 @@ type TransportBasicIO struct {
 // Send a well formated NETCONF rpc message as a slice of bytes adding on the
 // necessary framing messages.
 func (t *TransportBasicIO) Send(data []byte) error {
-	t.Write(data)
+	t.ReadWriteCloser.Write(data)
 	// Pad to make sure the msgSeparator isn't sent across a 4096-byte boundary
 	if (len(data)+len(msgSeperator))%4096 < 6 {
-		t.Write([]byte("      "))
+		t.ReadWriteCloser.Write([]byte("      "))
 	}
-	t.Write([]byte(msgSeperator))
-	t.Write([]byte("\n"))
+	t.ReadWriteCloser.Write([]byte(msgSeperator))
+	t.ReadWriteCloser.Write([]byte("\n"))
 	return nil // TODO: Implement error handling!
 }
 
@@ -104,8 +104,8 @@ func (t *TransportBasicIO) ReceiveHello() (*HelloMessage, error) {
 
 // Writeln over transport
 func (t *TransportBasicIO) Writeln(b []byte) (int, error) {
-	t.Write(b)
-	t.Write([]byte("\n"))
+	t.ReadWriteCloser.Write(b)
+	t.ReadWriteCloser.Write([]byte("\n"))
 	return 0, nil
 }
 
@@ -116,7 +116,7 @@ func (t *TransportBasicIO) WaitForFunc(f func([]byte) (int, error)) ([]byte, err
 
 	pos := 0
 	for {
-		n, err := t.Read(buf[pos : pos+(len(buf)/2)])
+		n, err := t.ReadWriteCloser.Read(buf[pos : pos+(len(buf)/2)])
 		if err != nil {
 			if err != io.EOF {
 				return nil, err

@@ -15,7 +15,7 @@ This library is a simple NETCONF client based on [RFC6241](http://tools.ietf.org
 * Independent of XML library.  Free to choose encoding/xml or another third party library to parse the results.
 
 ## Install
-* Requires Go 1.4 or later
+* Requires Go 1.25.6 or later
 * Tests pass for 1.8 and later using Travis-CI (this is WIP)
 * Please use `git clone` because this is a library and not an application
 

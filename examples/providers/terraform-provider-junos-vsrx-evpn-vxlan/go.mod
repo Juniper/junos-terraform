@@ -1,6 +1,6 @@
 module terraform-provider-junos-vsrx-evpn-vxlan
 
-go 1.25.0
+go 1.25
 
 require (
 	github.com/chrismarget/lambda-tf-registry v0.0.1
