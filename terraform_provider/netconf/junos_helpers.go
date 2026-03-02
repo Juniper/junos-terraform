@@ -157,7 +157,7 @@ func (g *GoNCClient) DeleteConfigNoCommit(applygroup string) (string, error) {
 		return "", fmt.Errorf("driver error: %+v, driver close error: %+s", err, errInternal)
 	}
 
-	output := strings.Replace(reply.Data, "\n", "", -1)
+	output := strings.ReplaceAll(reply.Data, "\n", "")
 
 	err = g.Driver.Close()
 

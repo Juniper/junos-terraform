@@ -4,15 +4,15 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//lint:file-ignore SA1019 encrypted PEM handling required for compatibility with older keys
 package netconf
 
 import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
-	"net"
 	"os"
+	"net"
 	"strings"
 	"time"
 
@@ -172,7 +172,8 @@ func DialSSHTimeout(target string, config *ssh.ClientConfig, timeout time.Durati
 		ticker := time.NewTicker(timeout / 2)
 		defer ticker.Stop()
 		for range ticker.C {
-			_, _, err := t.SSHClient.Conn.SendRequest("KEEP_ALIVE", true, nil)
+			// Call SendRequest directly on SSHClient rather than via Conn field
+		_, _, err := t.SSHClient.SendRequest("KEEP_ALIVE", true, nil)
 			if err != nil {
 				return
 			}
@@ -204,7 +205,7 @@ func SSHConfigPassword(user string, pass string) *ssh.ClientConfig {
 // and passphrase and returns a new ssh.ClientConfig setup to pass credentials
 // to DialSSH
 func SSHConfigPubKeyFile(user string, file string, passphrase string) (*ssh.ClientConfig, error) {
-	buf, err := ioutil.ReadFile(file)
+	buf, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -213,8 +214,8 @@ func SSHConfigPubKeyFile(user string, file string, passphrase string) (*ssh.Clie
 		return nil, fmt.Errorf("pem: unable to decode file %s", file)
 	}
 
-	if x509.IsEncryptedPEMBlock(block) {
-		b, err := x509.DecryptPEMBlock(block, []byte(passphrase))
+	if x509.IsEncryptedPEMBlock(block) { // staticcheck:ignore SA1019 deprecated by Go 1.16 but preserved for compatibility
+		b, err := x509.DecryptPEMBlock(block, []byte(passphrase)) // staticcheck:ignore SA1019 deprecated by Go 1.16; legacy encryption support
 		if err != nil {
 			return nil, err
 		}
@@ -276,11 +277,13 @@ type deadlineConn struct {
 }
 
 func (c *deadlineConn) Read(b []byte) (n int, err error) {
-	c.Conn.SetReadDeadline(time.Now().Add(c.timeout))
-	return c.Conn.Read(b)
+    // ignore error from setting deadline
+    _ = c.Conn.SetReadDeadline(time.Now().Add(c.timeout))
+    return c.Conn.Read(b)
 }
 
 func (c *deadlineConn) Write(b []byte) (n int, err error) {
-	c.Conn.SetWriteDeadline(time.Now().Add(c.timeout))
-	return c.Conn.Write(b)
+    // ignore error from setting deadline
+    _ = c.Conn.SetWriteDeadline(time.Now().Add(c.timeout))
+    return c.Conn.Write(b)
 }
