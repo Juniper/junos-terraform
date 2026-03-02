@@ -3,7 +3,6 @@ import os
 import tempfile
 import unittest
 import xml.etree.ElementTree as ElementTree
-from unittest import mock
 
 from junosterraform import jtaf_common
 
@@ -22,7 +21,7 @@ class TestGetXpaths(unittest.TestCase):
         </root>"""
         root = ElementTree.fromstring(xml_string)
         result = jtaf_common.get_xpaths(root)
-        
+
         self.assertIn('', result)  # Root path
         self.assertIn('interfaces', result)
         self.assertIn('interfaces/interface', result)
@@ -38,7 +37,7 @@ class TestGetXpaths(unittest.TestCase):
         </root>"""
         root = ElementTree.fromstring(xml_string)
         result = jtaf_common.get_xpaths(root)
-        
+
         self.assertIn('system', result)
         self.assertIn('system/hostname', result)
         self.assertIn('system/domain-name', result)
@@ -47,7 +46,7 @@ class TestGetXpaths(unittest.TestCase):
         """Test XPath extraction from minimal XML tree."""
         root = ElementTree.Element("root")
         result = jtaf_common.get_xpaths(root)
-        
+
         self.assertIn('', result)
 
 
@@ -62,7 +61,7 @@ class TestUniqueXpaths(unittest.TestCase):
             'system': True
         }
         result = jtaf_common.unique_xpaths(paths)
-        
+
         self.assertNotIn('groups/name', result)
         self.assertIn('interfaces', result)
         self.assertIn('system', result)
@@ -75,7 +74,7 @@ class TestUniqueXpaths(unittest.TestCase):
             'vlans': True
         }
         result = jtaf_common.unique_xpaths(paths)
-        
+
         self.assertIn('interfaces', result)
         self.assertIn('system', result)
         self.assertIn('vlans', result)
@@ -93,7 +92,7 @@ class TestUniqueXpaths(unittest.TestCase):
             'system': True
         }
         result = jtaf_common.unique_xpaths(paths)
-        
+
         # Should have unique entries
         self.assertEqual(len(result), 2)
         self.assertIn('interfaces', result)
@@ -113,7 +112,7 @@ class TestGetPath(unittest.TestCase):
             {"name": "level4"}
         ]
         result = jtaf_common.get_path(parent)
-        
+
         self.assertEqual(result, "level2/level3/level4")
 
     def test_get_path_minimum(self):
@@ -124,7 +123,7 @@ class TestGetPath(unittest.TestCase):
             {"name": "level2"}
         ]
         result = jtaf_common.get_path(parent)
-        
+
         self.assertEqual(result, "level2")
 
     def test_get_path_no_name_field(self):
@@ -137,7 +136,7 @@ class TestGetPath(unittest.TestCase):
             {"name": "level4"}
         ]
         result = jtaf_common.get_path(parent)
-        
+
         # Items without 'name' are skipped
         self.assertIn("level4", result)
 
@@ -161,7 +160,7 @@ class TestCheckPath(unittest.TestCase):
             {"name": "eth0"}
         ]
         result = jtaf_common.check_path(paths, node)
-        
+
         self.assertTrue(result)
 
     def test_check_path_not_found(self):
@@ -175,7 +174,7 @@ class TestCheckPath(unittest.TestCase):
             {"name": "hostname"}
         ]
         result = jtaf_common.check_path(paths, node)
-        
+
         self.assertFalse(result)
 
     def test_check_path_empty_path(self):
@@ -187,7 +186,7 @@ class TestCheckPath(unittest.TestCase):
             {"name": "level2"}
         ]
         result = jtaf_common.check_path(paths, node)
-        
+
         # With only 3 elements, get_path returns "level2", which is not in paths,
         # so this should return False
         self.assertFalse(result)
@@ -203,7 +202,7 @@ class TestCheckForChoice(unittest.TestCase):
             "name": "hostname"
         }
         result = jtaf_common.check_for_choice(elem)
-        
+
         self.assertEqual(result, [])
 
     def test_check_for_choice_with_children(self):
@@ -223,7 +222,7 @@ class TestCheckForChoice(unittest.TestCase):
             ]
         }
         result = jtaf_common.check_for_choice(elem)
-        
+
         self.assertEqual(len(result), 2)
         self.assertIn([{"name": "option1"}], result)
         self.assertIn([{"name": "option2"}], result)
@@ -235,7 +234,7 @@ class TestCheckForChoice(unittest.TestCase):
             "name": "choice-elem"
         }
         result = jtaf_common.check_for_choice(elem)
-        
+
         self.assertEqual(result, [])
 
     def test_check_for_choice_children_without_subchildren(self):
@@ -249,7 +248,7 @@ class TestCheckForChoice(unittest.TestCase):
             ]
         }
         result = jtaf_common.check_for_choice(elem)
-        
+
         self.assertEqual(result, [])
 
 
@@ -272,7 +271,7 @@ class TestCheckForEnums(unittest.TestCase):
             {}
         ]
         result = jtaf_common.check_for_enums(elem, node_parent)
-        
+
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0]["name"], "option1")
         self.assertEqual(result[0]["type"], "leaf")
@@ -291,7 +290,7 @@ class TestCheckForEnums(unittest.TestCase):
             {}
         ]
         result = jtaf_common.check_for_enums(elem, node_parent)
-        
+
         self.assertEqual(result, [])
 
     def test_check_for_enums_filters_by_parent_key(self):
@@ -310,7 +309,7 @@ class TestCheckForEnums(unittest.TestCase):
             {}
         ]
         result = jtaf_common.check_for_enums(elem, node_parent)
-        
+
         # only "not_in_key" should be included
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["name"], "not_in_key")
@@ -323,27 +322,27 @@ class TestCalcElemPath(unittest.TestCase):
         """Test element path calculation with existing current_path."""
         elem = {"name": "eth0"}
         result = jtaf_common._calc_elem_path("interfaces", elem)
-        
+
         self.assertEqual(result, "interfaces/eth0")
 
     def test_calc_elem_path_empty_current(self):
         """Test element path calculation with empty current_path."""
         elem = {"name": "interfaces"}
         result = jtaf_common._calc_elem_path("", elem)
-        
+
         self.assertEqual(result, "interfaces")
 
     def test_calc_elem_path_non_dict(self):
         """Test element path calculation with non-dict input."""
         result = jtaf_common._calc_elem_path("path", "string_not_dict")
-        
+
         self.assertEqual(result, "")
 
     def test_calc_elem_path_missing_name(self):
         """Test element path calculation with missing 'name' key."""
         elem = {"type": "leaf"}
         result = jtaf_common._calc_elem_path("interfaces", elem)
-        
+
         self.assertEqual(result, "interfaces/")
 
 
@@ -358,7 +357,7 @@ class TestMatchChoices(unittest.TestCase):
             [{"name": "eth1"}]
         ]
         result = jtaf_common._match_choices(paths, "interfaces", choices)
-        
+
         self.assertEqual(len(result), 1)
         self.assertIn([{"name": "eth0"}], result)
 
@@ -370,7 +369,7 @@ class TestMatchChoices(unittest.TestCase):
             [{"name": "eth1"}]
         ]
         result = jtaf_common._match_choices(paths, "interfaces", choices)
-        
+
         self.assertEqual(result, [])
 
     def test_match_choices_multiple_matches(self):
@@ -381,7 +380,7 @@ class TestMatchChoices(unittest.TestCase):
             [{"name": "eth1"}]
         ]
         result = jtaf_common._match_choices(paths, "interfaces", choices)
-        
+
         self.assertEqual(len(result), 2)
 
 
@@ -396,7 +395,7 @@ class TestMatchEnums(unittest.TestCase):
             {"name": "udp"}
         ]
         result = jtaf_common._match_enums(paths, "protocol", enums)
-        
+
         self.assertEqual(len(result), 1)
         self.assertIn({"name": "tcp"}, result)
 
@@ -408,7 +407,7 @@ class TestMatchEnums(unittest.TestCase):
             {"name": "udp"}
         ]
         result = jtaf_common._match_enums(paths, "protocol", enums)
-        
+
         self.assertEqual(result, [])
 
     def test_match_enums_multiple_matches(self):
@@ -420,7 +419,7 @@ class TestMatchEnums(unittest.TestCase):
             {"name": "icmp"}
         ]
         result = jtaf_common._match_enums(paths, "protocol", enums)
-        
+
         self.assertEqual(len(result), 2)
 
 
@@ -433,9 +432,9 @@ class TestCheckChildren(unittest.TestCase):
         elem = {"name": "eth0"}
         # node_parent needs at least 2 elements, with [-2] being non-dict
         node_parent = [{"name": "root"}, "not_dict"]
-        
+
         result = jtaf_common.check_children(paths, elem, node_parent, "interfaces")
-        
+
         self.assertTrue(result)
 
     def test_check_children_direct_match(self):
@@ -443,9 +442,9 @@ class TestCheckChildren(unittest.TestCase):
         paths = ["configuration/interfaces"]
         elem = {"name": "interfaces"}
         node_parent = [{}, {}]
-        
+
         result = jtaf_common.check_children(paths, elem, node_parent, "configuration")
-        
+
         self.assertTrue(result)
 
     def test_check_children_configuration_match(self):
@@ -453,9 +452,9 @@ class TestCheckChildren(unittest.TestCase):
         paths = ["something/else"]
         elem = {"name": "configuration"}
         node_parent = [{}, {}]
-        
+
         result = jtaf_common.check_children(paths, elem, node_parent, "")
-        
+
         self.assertTrue(result)
 
     def test_check_children_no_children_in_parent(self):
@@ -463,9 +462,9 @@ class TestCheckChildren(unittest.TestCase):
         paths = ["interfaces"]
         elem = {"name": "eth0"}
         node_parent = [{"name": "interfaces"}, {}]
-        
+
         result = jtaf_common.check_children(paths, elem, node_parent, "interfaces")
-        
+
         self.assertTrue(result)
 
 
@@ -481,9 +480,9 @@ class TestRemoveTagsByName(unittest.TestCase):
             </system>
         </root>"""
         root = ElementTree.fromstring(xml_string)
-        
+
         jtaf_common.remove_tags_by_name(root, ["version"])
-        
+
         version = root.find(".//version")
         self.assertIsNone(version)
         hostname = root.find(".//hostname")
@@ -499,13 +498,13 @@ class TestRemoveTagsByName(unittest.TestCase):
             </system>
         </root>"""
         root = ElementTree.fromstring(xml_string)
-        
+
         jtaf_common.remove_tags_by_name(root, ["version", "model"])
-        
+
         version = root.find(".//version")
         model = root.find(".//model")
         hostname = root.find(".//hostname")
-        
+
         self.assertIsNone(version)
         self.assertIsNone(model)
         self.assertIsNotNone(hostname)
@@ -521,9 +520,9 @@ class TestRemoveTagsByName(unittest.TestCase):
             </system>
         </root>"""
         root = ElementTree.fromstring(xml_string)
-        
+
         jtaf_common.remove_tags_by_name(root, ["version"])
-        
+
         version = root.find(".//version")
         self.assertIsNone(version)
 
@@ -535,10 +534,10 @@ class TestRemoveTagsByName(unittest.TestCase):
             </system>
         </root>"""
         root = ElementTree.fromstring(xml_string)
-        
+
         # Should not raise an error
         jtaf_common.remove_tags_by_name(root, ["nonexistent"])
-        
+
         hostname = root.find(".//hostname")
         self.assertIsNotNone(hostname)
 
@@ -555,9 +554,9 @@ class TestFindParent(unittest.TestCase):
         </root>"""
         root = ElementTree.fromstring(xml_string)
         system = root.find("system")
-        
+
         parent = jtaf_common.find_parent(root, system)
-        
+
         self.assertEqual(parent, root)
 
     def test_find_parent_nested_child(self):
@@ -570,9 +569,9 @@ class TestFindParent(unittest.TestCase):
         root = ElementTree.fromstring(xml_string)
         hostname = root.find(".//hostname")
         system = root.find("system")
-        
+
         parent = jtaf_common.find_parent(root, hostname)
-        
+
         self.assertEqual(parent, system)
 
     def test_find_parent_not_found(self):
@@ -580,17 +579,17 @@ class TestFindParent(unittest.TestCase):
         xml_string = "<root><system><hostname>router1</hostname></system></root>"
         root = ElementTree.fromstring(xml_string)
         other_elem = ElementTree.Element("other")
-        
+
         parent = jtaf_common.find_parent(root, other_elem)
-        
+
         self.assertIsNone(parent)
 
     def test_find_parent_root_element(self):
         """Test find_parent when looking for root's parent."""
         root = ElementTree.Element("root")
-        
+
         parent = jtaf_common.find_parent(root, root)
-        
+
         self.assertIsNone(parent)
 
 
@@ -606,9 +605,9 @@ class TestWalkSchema(unittest.TestCase):
                 "interfaces": {"name": "interfaces"}
             }
         }
-        
+
         result = jtaf_common.walk_schema(paths, schema)
-        
+
         self.assertIsInstance(result, dict)
 
     def test_walk_schema_list(self):
@@ -620,18 +619,18 @@ class TestWalkSchema(unittest.TestCase):
         ]
         # Provide a proper parent structure with at least 2 elements
         parent = [{"name": "root"}, {"name": "level1"}]
-        
+
         result = jtaf_common.walk_schema(paths, schema, parent)
-        
+
         self.assertIsInstance(result, list)
 
     def test_walk_schema_scalar(self):
         """Test walk_schema with scalar value."""
         paths = []
         schema = "string_value"
-        
+
         result = jtaf_common.walk_schema(paths, schema)
-        
+
         self.assertEqual(result, "string_value")
 
 
@@ -644,23 +643,23 @@ class TestFilterJsonUsingXml(unittest.TestCase):
             "name": "configuration",
             "children": {}
         }
-        
+
         xml_string = """<configuration>
             <system>
                 <hostname>router1</hostname>
             </system>
         </configuration>"""
-        
+
         # Create XML element at configuration level
         root = ElementTree.fromstring(xml_string)
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             json.dump(schema_dict, f)
             schema_file = f.name
-        
+
         try:
             result = jtaf_common.filter_json_using_xml(schema_file, root)
-            
+
             self.assertIsInstance(result, dict)
             self.assertEqual(result["name"], "configuration")
         finally:
@@ -672,7 +671,7 @@ class TestFilterJsonUsingXml(unittest.TestCase):
             "name": "configuration",
             "children": {}
         }
-        
+
         xml_string = """<root>
             <configuration>
                 <version>18.2</version>
@@ -681,16 +680,16 @@ class TestFilterJsonUsingXml(unittest.TestCase):
                 </system>
             </configuration>
         </root>"""
-        
+
         root = ElementTree.fromstring(xml_string)
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             json.dump(schema_dict, f)
             schema_file = f.name
-        
+
         try:
             result = jtaf_common.filter_json_using_xml(schema_file, root)
-            
+
             # The filtering should have removed version tag
             self.assertIsInstance(result, dict)
         finally:
@@ -709,14 +708,14 @@ class TestLoadAndMergeXmls(unittest.TestCase):
                 </system>
             </configuration>
         </root>"""
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f:
             f.write(xml_content)
             xml_file = f.name
-        
+
         try:
             result = jtaf_common.load_and_merge_xmls([xml_file])
-            
+
             self.assertEqual(result.tag, "configuration")
             system = result.find("system")
             self.assertIsNotNone(system)
@@ -732,7 +731,7 @@ class TestLoadAndMergeXmls(unittest.TestCase):
                 </system>
             </configuration>
         </root>"""
-        
+
         xml_content2 = """<root>
             <configuration>
                 <interfaces>
@@ -740,18 +739,18 @@ class TestLoadAndMergeXmls(unittest.TestCase):
                 </interfaces>
             </configuration>
         </root>"""
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f1:
             f1.write(xml_content1)
             xml_file1 = f1.name
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f2:
             f2.write(xml_content2)
             xml_file2 = f2.name
-        
+
         try:
             result = jtaf_common.load_and_merge_xmls([xml_file1, xml_file2])
-            
+
             self.assertEqual(result.tag, "configuration")
             system = result.find("system")
             interfaces = result.find("interfaces")
@@ -768,11 +767,11 @@ class TestLoadAndMergeXmls(unittest.TestCase):
                 <hostname>router1</hostname>
             </system>
         </root>"""
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f:
             f.write(xml_content)
             xml_file = f.name
-        
+
         try:
             with self.assertRaises(ValueError):
                 jtaf_common.load_and_merge_xmls([xml_file])
@@ -800,11 +799,11 @@ class TestIntegration(unittest.TestCase):
                 <hostname>router1</hostname>
             </system>
         </root>"""
-        
+
         root = ElementTree.fromstring(xml_string)
         xpaths = jtaf_common.get_xpaths(root)
         unique = jtaf_common.unique_xpaths(xpaths)
-        
+
         self.assertIn('interfaces', unique)
         self.assertIn('interfaces/interface', unique)
         self.assertIn('system', unique)
@@ -812,7 +811,7 @@ class TestIntegration(unittest.TestCase):
     def test_path_validation_workflow(self):
         """Test complete path validation workflow."""
         paths = ["level2/interfaces/eth0", "level2/system/hostname"]
-        
+
         # Valid path - matches "level2/interfaces/eth0"
         node1 = [
             {"name": "root"},
@@ -821,7 +820,7 @@ class TestIntegration(unittest.TestCase):
             {"name": "interfaces"},
             {"name": "eth0"}
         ]
-        
+
         # Invalid path - doesn't match any allowed paths
         node2 = [
             {"name": "root"},
@@ -830,7 +829,7 @@ class TestIntegration(unittest.TestCase):
             {"name": "interfaces"},
             {"name": "eth1"}
         ]
-        
+
         self.assertTrue(jtaf_common.check_path(paths, node1))
         self.assertFalse(jtaf_common.check_path(paths, node2))
 
