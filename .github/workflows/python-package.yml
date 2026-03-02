@@ -44,7 +44,7 @@ jobs:
         coverage report -m
         coverage xml -i
     - name: Upload coverage report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v6
       with:
         name: python-coverage
         path: coverage.xml
