@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import yaml
-from jinja2 import Environment, FileSystemLoader,Undefined
+from jinja2 import Environment, FileSystemLoader, Undefined
 import os
 import argparse
 
@@ -15,12 +15,14 @@ def load_yaml(file_path):
     with open(file_path, 'r') as file:
         return yaml.safe_load(file)
 
+
 # Render Jinja2 template
 def render_template(template_path, context):
-    env = Environment(loader=FileSystemLoader(os.path.dirname(template_path)),undefined=SilentUndefined)
+    env = Environment(loader=FileSystemLoader(os.path.dirname(template_path)), undefined=SilentUndefined)
     template_name = os.path.basename(template_path)
     template = env.get_template(template_name)
-    return template.render(context,undefined=SilentUndefined)
+    return template.render(context, undefined=SilentUndefined)
+
 
 # Main function to test YAML and Jinja2
 def main(yaml_file, template_file):
@@ -33,6 +35,7 @@ def main(yaml_file, template_file):
     # Save the output to an XML file
     with open('output.xml', 'w') as xml_file:
         xml_file.write(xml_output)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process YAML and Jinja2 template files.')

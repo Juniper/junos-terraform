@@ -1,5 +1,4 @@
-from setuptools import setup, find_packages
-from setuptools.command.install import install
+from setuptools import setup
 
 setup(
     name='junosterraform',
@@ -9,9 +8,16 @@ setup(
     author="Juniper Networks",
     description="Junos Terraform Framework",
     packages=["junosterraform", "jtaf_pyang_plugin", "terraform_provider"],
-    scripts=["junosterraform/jtaf-provider","junosterraform/jtaf-ansible","junosterraform/jtaf-xml2yaml", "jtaf_pyang_plugin/jtaf-pyang-plugindir", "junosterraform/jtaf-xml2tf", "junosterraform/jtaf-yang2go",
-             "junosterraform/jtaf-yang2ansible"],
-    package_data = {
+    scripts=[
+        "junosterraform/jtaf-provider",
+        "junosterraform/jtaf-ansible",
+        "junosterraform/jtaf-xml2yaml",
+        "jtaf_pyang_plugin/jtaf-pyang-plugindir",
+        "junosterraform/jtaf-xml2tf",
+        "junosterraform/jtaf-yang2go",
+        "junosterraform/jtaf-yang2ansible"
+    ],
+    package_data={
         "terraform_provider": [
             "*",
             "netconf/*",
@@ -26,10 +32,10 @@ setup(
             "go-netconf/session/*",
             "go-netconf/transport/*"
         ],
-        "junosterraform": [ 
+        "junosterraform": [
             "templates/*",
             "jtaf_common.py"
-            ]
+        ]
     },
     install_requires=[
         'pytest',
