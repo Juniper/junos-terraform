@@ -4,7 +4,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//lint:file-ignore SA1019 encrypted PEM handling required for compatibility with older keys
 package netconf
 
 import (
@@ -214,8 +213,9 @@ func SSHConfigPubKeyFile(user string, file string, passphrase string) (*ssh.Clie
 		return nil, fmt.Errorf("pem: unable to decode file %s", file)
 	}
 
-	if x509.IsEncryptedPEMBlock(block) { // staticcheck:ignore SA1019 deprecated by Go 1.16 but preserved for compatibility
-		b, err := x509.DecryptPEMBlock(block, []byte(passphrase)) // staticcheck:ignore SA1019 deprecated by Go 1.16; legacy encryption support
+	//nolint:staticcheck // deprecated encryption support preserved for compatibility
+	if x509.IsEncryptedPEMBlock(block) {
+		b, err := x509.DecryptPEMBlock(block, []byte(passphrase)) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}

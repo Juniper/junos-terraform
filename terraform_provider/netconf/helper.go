@@ -158,11 +158,8 @@ func (g *GoNCClient) SendCommit() error {
 		return err
 	}
 	if _, err := g.Driver.SendRaw(commitStr); err != nil {
-		// attempt to discard changes; if this fails we ignore since the
-		// primary error to return is from the commit attempt.
-		if _, _ = g.Driver.SendRaw(discardChanges); err != nil {
-			// intentionally ignore error on discard
-		}
+		// attempt to discard changes; ignore any error from this call
+		_, _ = g.Driver.SendRaw(discardChanges)
 		return err
 	}
 	return nil
