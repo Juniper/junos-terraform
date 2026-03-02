@@ -133,23 +133,19 @@ func TestDriverJunosTimeout(t *testing.T) {
 // TestDriverJunosStructure tests the structure of DriverJunos
 func TestDriverJunosStructure(t *testing.T) {
 	d := New()
+	if d == nil {
+		t.Fatal("driver instance is nil")
+	}
 
 	// Verify all expected fields exist
 	_ = d.Timeout
 	_ = d.Datastore
 	_ = d.Session
-
-	if d == nil {
-		t.Fatal("driver instance is nil")
-	}
 }
 
 // TestDriverJunosImplementsDriver verifies DriverJunos implements Driver interface
 func TestDriverJunosImplementsDriver(t *testing.T) {
 	var d Driver = New()
-	if d == nil {
-		t.Fatal("expected non-nil Driver instance")
-	}
 
 	// Verify the driver implements the Driver interface type
 	_ = interface{}(d).(Driver)

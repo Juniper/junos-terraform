@@ -269,10 +269,6 @@ func TestInterfaceCompliance(t *testing.T) {
 	mockDriver := &MockDriver{}
 	var client Client = &GoNCClient{Driver: mockDriver}
 
-	if client == nil {
-		t.Fatal("client should not be nil")
-	}
-
 	// Methods should be callable
 	_ = client.Close()
 }

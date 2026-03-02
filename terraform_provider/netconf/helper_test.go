@@ -361,6 +361,7 @@ func TestGoNCClientStructure(t *testing.T) {
 
 	// Verify Lock can be used for synchronization
 	client.Lock.RLock()
+	_ = client.Driver
 	client.Lock.RUnlock()
 }
 

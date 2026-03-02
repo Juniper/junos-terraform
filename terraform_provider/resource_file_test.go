@@ -298,7 +298,9 @@ func TestFileModel(t *testing.T) {
 func TestResourceFileWithSubdirectories(t *testing.T) {
 	tmpDir := t.TempDir()
 	subdir := "subdir"
-	os.MkdirAll(path.Join(tmpDir, subdir), 0755)
+	if err := os.MkdirAll(path.Join(tmpDir, subdir), 0755); err != nil {
+		t.Fatalf("failed to create subdirectory: %v", err)
+	}
 
 	rf := &resourceFile{dir: tmpDir}
 	ctx := context.Background()

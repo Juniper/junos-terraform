@@ -61,21 +61,13 @@ func TestTransportJunosStructure(t *testing.T) {
 	// Verify fields can be accessed
 	_ = transport.cmd
 	_ = transport.TransportBasicIO
-
-	if transport != nil {
-		t.Log("TransportJunos structure is accessible")
-	}
+	t.Log("TransportJunos structure is accessible")
 }
 
 // TestTransportJunosCommand tests command creation
 func TestTransportJunosCommand(t *testing.T) {
 	// Test that we can create exec.Command without issues
 	cmd := exec.Command("xml-mode", "netconf", "need-trailer")
-
-	if cmd == nil {
-		t.Error("expected non-nil command")
-	}
-
 	if cmd.Path != "xml-mode" && cmd.Args[0] != "xml-mode" {
 		t.Logf("command path: %s, args: %v", cmd.Path, cmd.Args)
 	}
@@ -152,11 +144,6 @@ func TestTransportJunosIoConfig(t *testing.T) {
 
 	// Verify StdinPipe and StdoutPipe would be available
 	// (We can't actually call them without exec.Command running)
-
-	if transport == nil {
-		t.Fatal("transport should not be nil")
-	}
-
 	t.Log("StdinPipe and StdoutPipe methods are available via exec.Cmd")
 }
 
@@ -234,12 +221,9 @@ func TestTransportJunosCommandFormat(t *testing.T) {
 	// The command should be: xml-mode netconf need-trailer
 
 	transport := &TransportJunos{}
-
-	if transport != nil {
-		// Document the expected command format
-		expectedCommand := "xml-mode netconf need-trailer"
-		t.Logf("Expected command format: %s", expectedCommand)
-	}
+	// Document the expected command format
+	expectedCommand := "xml-mode netconf need-trailer"
+	t.Logf("Expected command format: %s", expectedCommand)
 }
 
 // TestTransportJunosClose tests Close with proper ReadWriteCloser
@@ -294,10 +278,6 @@ func TestTransportJunosWithMockIO(t *testing.T) {
 		TransportBasicIO: TransportBasicIO{
 			ReadWriteCloser: mockRWC,
 		},
-	}
-
-	if transport == nil {
-		t.Fatal("transport should not be nil")
 	}
 
 	// Verify we can close
