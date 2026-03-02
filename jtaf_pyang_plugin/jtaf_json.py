@@ -224,6 +224,7 @@ def jtaf_print_help():
 jtaf plugin
 """)
 
+
 def serialize(obj):
     if isinstance(obj, FNode):
         return obj.to_json_dict()
