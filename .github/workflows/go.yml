@@ -21,11 +21,6 @@ jobs:
       with:
         go-version: '1.25.6'
 
-    - uses: golangci/golangci-lint-action@v7
-      with:
-        version: v2.10
-        working-directory: terraform_provider
-
     - name: Build
       working-directory: terraform_provider
       run: go build -v ./...
@@ -33,3 +28,9 @@ jobs:
     - name: Test
       working-directory: terraform_provider
       run: go test -v ./...
+
+    - uses: golangci/golangci-lint-action@v7
+      with:
+        version: v2.10
+        working-directory: terraform_provider
+
