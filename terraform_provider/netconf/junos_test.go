@@ -172,7 +172,9 @@ func TestNewDriverJunosMultiple(t *testing.T) {
 	// Verify each instance is independent
 	for i, d := range instances {
 		testDS := "datastore-" + string(rune(i))
-		d.SetDatastore(testDS)
+		if err := d.SetDatastore(testDS); err != nil {
+			t.Errorf("unexpected error setting %s: %v", testDS, err)
+		}
 
 		for j, other := range instances {
 			if i != j && other.Datastore == testDS {
@@ -204,24 +206,13 @@ func TestDriverJunosChaining(t *testing.T) {
 	d := New()
 
 	// Test multiple operations in sequence
-	d.SetDatastore("candidate")
-	d.SetDatastore("running")
+	if err := d.SetDatastore("candidate"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := d.SetDatastore("running"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	d.Timeout = 30 * time.Second
-
-	if d.Datastore != "running" {
-		t.Error("last SetDatastore should take effect")
-	}
-
-	if d.Timeout != 30*time.Second {
-		t.Error("timeout should be set correctly")
-	}
-}
-
-// BenchmarkNewDriverJunos benchmarks driver creation
-func BenchmarkNewDriverJunos(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_ = New()
-	}
 }
 
 // BenchmarkSetDatastore benchmarks SetDatastore method

@@ -475,11 +475,11 @@ func TestSessionMarshalXML(t *testing.T) {
 
 	// Verify XML contains expected elements
 	_ = string(mockTransport.SendData)
-	if bytes.Index(mockTransport.SendData, []byte("<?xml")) == -1 {
+	if !bytes.Contains(mockTransport.SendData, []byte("<?xml")) {
 		t.Error("expected XML header")
 	}
 
-	if bytes.Index(mockTransport.SendData, []byte("<rpc")) == -1 {
+	if !bytes.Contains(mockTransport.SendData, []byte("<rpc")) {
 		t.Error("expected rpc element")
 	}
 }
@@ -516,7 +516,7 @@ func TestSessionZeroValues(t *testing.T) {
 		t.Error("zero SessionID should be 0")
 	}
 
-	if s.ServerCapabilities != nil && len(s.ServerCapabilities) > 0 {
+	if len(s.ServerCapabilities) > 0 {
 		t.Error("zero ServerCapabilities should be empty")
 	}
 

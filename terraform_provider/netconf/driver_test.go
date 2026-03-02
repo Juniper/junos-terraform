@@ -38,8 +38,8 @@ func TestNewDriverWithMockDriver(t *testing.T) {
 		t.Error("NewDriver should return the provided driver unchanged")
 	}
 
-	// Verify the returned driver implements Driver interface
-	var _ Driver = d
+	// Verify the returned driver implements Driver interface (compile-time assertion)
+	_ = interface{}(d).(Driver)
 }
 
 // TestNewDriverWithNil tests NewDriver with nil driver
@@ -61,8 +61,8 @@ func TestNewDriverWithJunosDriver(t *testing.T) {
 		t.Error("NewDriver should return DriverJunos unchanged")
 	}
 
-	// Verify it implements Driver interface
-	var _ Driver = d
+	// Verify it implements Driver interface (compile-time assertion)
+	_ = interface{}(d).(Driver)
 }
 
 // TestNewDriverPreservesType tests that NewDriver preserves driver type

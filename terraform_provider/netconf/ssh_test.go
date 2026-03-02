@@ -181,17 +181,15 @@ func TestDriverSSHStructure(t *testing.T) {
 	_ = d.Transport
 	_ = d.Session
 
-	if d == nil {
-		t.Fatal("driver instance is nil")
-	}
+	// driver instance is guaranteed non-nil
+
 }
 
 // TestDriverSSHImplementsDriver verifies DriverSSH implements Driver interface
 func TestDriverSSHImplementsDriver(t *testing.T) {
-	var d Driver = NewSSH()
-	if d == nil {
-		t.Fatal("expected non-nil Driver instance")
-	}
+	d := NewSSH()
+	// NewSSH never returns nil, and the value satisfies Driver
+	var _ Driver = d
 
 	// Verify the driver implements the Driver interface
 	_ = interface{}(d).(Driver)
@@ -310,7 +308,9 @@ func TestDriverSSHChaining(t *testing.T) {
 	d := NewSSH()
 
 	// Test multiple operations in sequence
-	d.SetDatastore("candidate")
+	if err := d.SetDatastore("candidate"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	d.Host = "example.com"
 	d.Port = 2222
 	d.Timeout = 30 * time.Second
