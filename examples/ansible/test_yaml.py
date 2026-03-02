@@ -21,7 +21,7 @@ def load_yaml(file_path):
     Returns:
         Parsed YAML data structure.
     """
-    with open(file_path, 'r') as file:
+    with open(file_path) as file:
         return yaml.safe_load(file)
 
 
