@@ -114,7 +114,7 @@ def test_yang2go():
         f"Expected trimmed_schema.json not found at {generated_trimmed_schema}"
     )
 
-    with open(generated_trimmed_schema, "r") as f:
+    with open(generated_trimmed_schema) as f:
         generated_json = json.load(f)
 
     # Compare against expected trimmed_schema.json in examples/providers
@@ -129,7 +129,7 @@ def test_yang2go():
         f"Expected example trimmed_schema.json not found at {expected_trimmed_schema}"
     )
 
-    with open(expected_trimmed_schema, "r") as f:
+    with open(expected_trimmed_schema) as f:
         expected_json = json.load(f)
 
     assert generated_json == expected_json, "Generated trimmed_schema.json differs from expected example"
