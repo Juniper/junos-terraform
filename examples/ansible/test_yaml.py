@@ -6,18 +6,36 @@ import argparse
 
 
 class SilentUndefined(Undefined):
+    """Jinja2 Undefined subclass that silently returns empty string for undefined vars."""
     def _fail_with_undefined_error(self, *args, **kwargs):
         return ''
 
 
 # Load YAML data
 def load_yaml(file_path):
+    """Load and parse YAML file.
+
+    Args:
+        file_path: Path to YAML file.
+
+    Returns:
+        Parsed YAML data structure.
+    """
     with open(file_path, 'r') as file:
         return yaml.safe_load(file)
 
 
 # Render Jinja2 template
 def render_template(template_path, context):
+    """Render Jinja2 template with provided context.
+
+    Args:
+        template_path: Path to Jinja2 template file.
+        context: Dictionary of variables for template rendering.
+
+    Returns:
+        Rendered template string.
+    """
     env = Environment(loader=FileSystemLoader(os.path.dirname(template_path)), undefined=SilentUndefined)
     template_name = os.path.basename(template_path)
     template = env.get_template(template_name)
@@ -26,6 +44,12 @@ def render_template(template_path, context):
 
 # Main function to test YAML and Jinja2
 def main(yaml_file, template_file):
+    """Load YAML, render Jinja2 template, and save XML output.
+
+    Args:
+        yaml_file: Path to YAML data file.
+        template_file: Path to Jinja2 template file.
+    """
     # Load YAML data
     yaml_data = load_yaml(yaml_file)
 

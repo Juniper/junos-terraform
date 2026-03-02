@@ -68,7 +68,9 @@ class FNode:
 
 
 class FNodeTree:
+    """Tree structure for building JTAF configuration nodes."""
     def __init__(self):
+        """Initialize tree with root node and identities list."""
         root = FNode("root")
         self.tree = {
             "root": root,
@@ -78,12 +80,26 @@ class FNodeTree:
         self.cur = root
 
     def to_json_dict(self):
+        """Return tree structure as dictionary."""
         return self.tree
 
     def append_ident(self, ident):
+        """Append identity definition to identities list.
+
+        Args:
+            ident: Identity dictionary to append.
+        """
         self.tree["identities"].append(ident)
 
     def push(self, name):
+        """Push new child node onto stack and set as current.
+
+        Args:
+            name: Name of new node.
+
+        Returns:
+            The newly created child node.
+        """
         child = FNode(name)
         if self.cur is None:
             self.tree["root"] = child
@@ -96,6 +112,7 @@ class FNodeTree:
         return child
 
     def pop(self):
+        """Pop current node from stack and restore parent as current."""
         if len(self.stack) > 0:
             self.stack = self.stack[:-1]
             if len(self.stack) > 0:
@@ -104,12 +121,23 @@ class FNodeTree:
                 self.cur = None
 
     def top(self):
+        """Return current top node on stack.
+
+        Returns:
+            Top node if stack is non-empty, None otherwise.
+        """
         if len(self.stack) > 0:
             return self.stack[-1]
         else:
             return None
 
     def set_attr(self, attr, val):
+        """Set attribute on current top node with optional coercion.
+
+        Args:
+            attr: Attribute name.
+            val: Attribute value (may be coerced by yang_coerce mapping).
+        """
         n = self.top()
         if attr in yang_coerce:
             val = yang_coerce[attr](n, attr, val)
@@ -117,6 +145,12 @@ class FNodeTree:
         n[attr] = val
 
     def add_prop(self, ch, key):
+        """Search and add property from pyang statement.
+
+        Args:
+            ch: pyang statement object to search.
+            key: Property key to search for.
+        """
         for p in ch.search(key):
             if p is not None:
                 self.set_attr(p.keyword, p.arg)
@@ -137,6 +171,16 @@ yang_type = ["list", "container", "leaf", "leaf-list", "leafref",
 
 
 def to_bool(obj, key, val):
+    """Coerce string 'true'/'false' values to Python bool.
+
+    Args:
+        obj: Object (unused).
+        key: Key (unused).
+        val: String value to coerce.
+
+    Returns:
+        True if val is 'true', False otherwise.
+    """
     if val == "true":
         return True
     else:
@@ -144,10 +188,30 @@ def to_bool(obj, key, val):
 
 
 def to_int(obj, key, val):
+    """Coerce value to integer.
+
+    Args:
+        obj: Object (unused).
+        key: Key (unused).
+        val: Value to coerce to int.
+
+    Returns:
+        Integer value.
+    """
     return int(val)
 
 
 def to_array(obj, key, val):
+    """Append value to array attribute or create new array.
+
+    Args:
+        obj: Object with potential array attribute.
+        key: Key for array attribute.
+        val: Value to append.
+
+    Returns:
+        Existing array with appended value, or new single-item array.
+    """
     if hasattr(obj, key):
         return obj[key] + [val]
     else:
@@ -168,18 +232,31 @@ yang_props_skip = ["type", "description"]
 
 
 def pyang_plugin_init():
+    """Initialize and register the JTAF pyang plugin."""
     plugin.register_plugin(FoghornPlugin())
 
 
 class FoghornPlugin(plugin.PyangPlugin):
+    """pyang plugin for JTAF JSON output generation."""
     def __init__(self):
+        """Initialize plugin with JTAF prefix."""
         plugin.PyangPlugin.__init__(self, jtaf_prefix)
 
     def add_output_format(self, fmts):
+        """Register JTAF as output format for pyang.
+
+        Args:
+            fmts: Formats dictionary to register with.
+        """
         self.multiple_modules = True
         fmts[jtaf_prefix] = self
 
     def add_opts(self, optparser):
+        """Add JTAF-specific command-line options to parser.
+
+        Args:
+            optparser: Option parser instance.
+        """
         optlist = [
             optparse.make_option("--jtaf-strip-apply",
                                  dest="jtaf_strip_apply",
@@ -194,14 +271,34 @@ class FoghornPlugin(plugin.PyangPlugin):
         g.add_options(optlist)
 
     def setup_ctx(self, ctx):
+        """Setup context, handle help display if requested.
+
+        Args:
+            ctx: pyang context.
+        """
         if ctx.opts.tree_help:
             jtaf_print_help()
             sys.exit(0)
 
     def setup_fmt(self, ctx):
+        """Setup format-specific context settings.
+
+        Args:
+            ctx: pyang context.
+        """
         ctx.implicit_errors = False
 
     def emit(self, ctx, modules, fd):
+        """Emit JTAF JSON output for modules.
+
+        Args:
+            ctx: pyang context.
+            modules: List of pyang module objects.
+            fd: File descriptor to write output to.
+
+        Raises:
+            error.EmitError: If modules contain errors.
+        """
         for epos, etag, eargs in ctx.errors:
             if error.is_error(error.err_level(etag)):
                 raise error.EmitError(
@@ -220,12 +317,21 @@ class FoghornPlugin(plugin.PyangPlugin):
 
 
 def jtaf_print_help():
+    """Print usage help for JTAF pyang plugin."""
     print("""
 jtaf plugin
 """)
 
 
 def serialize(obj):
+    """Serialize FNode/FNodeTree objects to JSON-compatible dictionaries.
+
+    Args:
+        obj: Object to serialize (FNode, FNodeTree, or other).
+
+    Returns:
+        JSON-serializable dict or object's __dict__.
+    """
     if isinstance(obj, FNode):
         return obj.to_json_dict()
     if isinstance(obj, FNodeTree):
@@ -238,6 +344,13 @@ def serialize(obj):
 # Generate the json from the statement-tree
 #
 def jtaf_emit_tree(ctx, fd, modules):
+    """Walk modules and emit JTAF JSON tree to file descriptor.
+
+    Args:
+        ctx: pyang context.
+        fd: File descriptor for output.
+        modules: List of pyang module objects to walk.
+    """
     for module in modules:
         jtaf_walk_identities(module)
         jtaf_walk_top_level(ctx, module)
@@ -246,6 +359,15 @@ def jtaf_emit_tree(ctx, fd, modules):
 
 
 def jtaf_get_keyvalue(stmt, kw):
+    """Search for pyang statement property and return its argument.
+
+    Args:
+        stmt: pyang statement to search.
+        kw: Keyword tuple to search for.
+
+    Returns:
+        Argument value if found, None if not found or multiple matches.
+    """
     v = stmt.search((jtaf_prefix, kw))
     if len(v) == 1:
         return v[0].arg
@@ -259,12 +381,24 @@ def jtaf_get_keyvalue(stmt, kw):
 
 
 def jtaf_walk_dts(node, ch):
+    """Add JTAF-prefixed properties from statement to node.
+
+    Args:
+        node: Node dict to add properties to.
+        ch: pyang statement to extract properties from.
+    """
     if ch.keyword[0] != jtaf_prefix:
         return
     node["dts_" + ch.keyword[1]] = ch.arg
 
 
 def jtaf_walk_type(ctx, ch):
+    """Process type statement and extract type restrictions.
+
+    Args:
+        ctx: pyang context.
+        ch: pyang statement with type definition.
+    """
     t = ch.search_one("type")
     if t is not None:
         leaf_type = t.arg
@@ -292,6 +426,11 @@ def jtaf_walk_type(ctx, ch):
 
 
 def jtaf_walk_identities(mod):
+    """Extract identity definitions from module and append to tree.
+
+    Args:
+        mod: pyang module with i_identities property.
+    """
     if len(mod.i_identities.items()) == 0:
         return
 
@@ -307,6 +446,12 @@ def jtaf_walk_identities(mod):
 
 
 def jtaf_walk_top_level(ctx, mod):
+    """Process top-level module children (containers, lists, leaves).
+
+    Args:
+        ctx: pyang context with parsed options.
+        mod: pyang module with i_children property.
+    """
     if len(mod.i_children) == 0:
         return
 
@@ -318,6 +463,16 @@ def jtaf_walk_top_level(ctx, mod):
 
 
 def jtaf_walk_child(ctx, ch):  # noqa: C901
+    """Recursively walk and process YANG data tree nodes.
+
+    Processes containers, lists, leaves, leaf-lists, and grouping
+    references; extracts type restrictions and properties; builds
+    nested tree structure in JTAF format.
+
+    Args:
+        ctx: pyang context with parsed options.
+        ch: pyang statement node to process.
+    """
     if not hasattr(ch, 'keyword'):
         return
 
@@ -365,18 +520,29 @@ def jtaf_walk_child(ctx, ch):  # noqa: C901
 
 
 def get_type_restrictions(type_stmt):
-    """Return a dictionary of restrictions associated with the given type."""
+    """Extract and return type restrictions from type statement.
+
+    Args:
+        type_stmt: pyang type statement.
+
+    Returns:
+        dict: Key-value pairs of restriction names and values.
+    """
     properties = {}
     add_restrictions(properties, type_stmt)
     return properties
 
 
 def add_restrictions(parent, type_stmt):
-    """
-    Collect restrictions defined by a chain of type specs.
+    """Collect restrictions from type statement and base types.
 
-    Type statement defines the tail of the chain.
-    Restrictions are added to the parent dictionary.
+    Recursively walks type spec base chain extracting all restrictions
+    (patterns, lengths, ranges, enums, etc.) and accumulates them in
+    the parent dictionary.
+
+    Args:
+        parent: dict to accumulate restrictions in.
+        type_stmt: pyang type statement to process.
     """
     type_spec = type_stmt.i_type_spec
 
@@ -404,7 +570,14 @@ def add_restrictions(parent, type_stmt):
 
 
 def fetch_restriction(type_spec):
-    """Return the restrictions from the specified type spec."""
+    """Fetch and return restrictions from a single type spec.
+
+    Args:
+        type_spec: pyang type spec instance.
+
+    Returns:
+        tuple: (restriction_name, restriction_value) or None.
+    """
     type_spec_name = type(type_spec).__name__
     if type_spec_name in type_specs:
         return type_specs[type_spec_name](type_spec)

@@ -3,6 +3,14 @@ from typing import Any, Union
 
 
 def get_xpaths(root: ElementTree.Element) -> dict[str, bool]:
+    """Extract all XPath expressions from an XML tree.
+
+    Args:
+        root: Root element of the XML tree to traverse.
+
+    Returns:
+        Dictionary with XPath strings as keys and True as values.
+    """
     # defined a recursive function to walk the xml and populate result[]
     def recurse_children(node: ElementTree.Element, result: dict[str, bool] = {}, path: list[str] = []) -> dict[str, bool]:
         for child in node:
@@ -18,6 +26,16 @@ def get_xpaths(root: ElementTree.Element) -> dict[str, bool]:
 
 
 def unique_xpaths(paths: dict[str, bool]) -> list[str]:
+    """Extract unique XPath strings, filtering and normalizing existing paths.
+
+    Removes 'groups/name' entirely and strips 'groups/' prefix from other paths.
+
+    Args:
+        paths: Dictionary with XPath strings as keys.
+
+    Returns:
+        List of unique, normalized XPath strings.
+    """
     path_dict = {}
     result = []
 
@@ -39,6 +57,14 @@ def unique_xpaths(paths: dict[str, bool]) -> list[str]:
 
 
 def get_path(parent: list[Any]) -> str:
+    """Construct a path string from a parent hierarchy list.
+
+    Args:
+        parent: List of objects (typically dicts) with 'name' fields.
+
+    Returns:
+        Path string constructed from element names, skipping first 3 levels.
+    """
     path = ''
     for i in parent:
         if isinstance(i, dict) and "name" in i:
@@ -49,6 +75,15 @@ def get_path(parent: list[Any]) -> str:
 
 
 def check_path(paths: list[str], node: list[Any]) -> bool:
+    """Check if computed path from node exists in allowed paths list.
+
+    Args:
+        paths: List of allowed path strings.
+        node: Hierarchy list to compute path from.
+
+    Returns:
+        True if computed path is in paths list or is empty, False otherwise.
+    """
     path = get_path(node)
     if path in paths or path == '':
         return True
@@ -56,6 +91,14 @@ def check_path(paths: list[str], node: list[Any]) -> bool:
 
 
 def check_for_choice(elem: dict[str, Any]) -> list[Any]:
+    """Extract choice children from element if element type is 'choice'.
+
+    Args:
+        elem: Element dict to inspect for choice type.
+
+    Returns:
+        List of choice child dicts, empty list if not a choice or no children.
+    """
     cases = []
     children = []
     if elem["type"] == "choice":
@@ -71,6 +114,16 @@ def check_for_choice(elem: dict[str, Any]) -> list[Any]:
 
 
 def check_for_enums(elem: dict[str, Any], node_parent: list[Any]) -> list[Any]:
+    """Transform enum entries for choice-ident leaf elements.
+
+    Args:
+        elem: Element dict with potential 'enums' field.
+        node_parent: Parent hierarchy for context checking.
+
+    Returns:
+        List of transformed enum dicts (each with 'name', 'type', 'leaf-type'),
+        empty list if not a choice-ident or has no enums.
+    """
     cases = []
     children = []
     if elem["name"] == 'choice-ident' and elem["type"] == 'leaf':
@@ -152,6 +205,12 @@ def check_children(paths: list[str], elem: dict[str, Any], node_parent: list[Any
 
 
 def remove_tags_by_name(root: ElementTree.Element, tag_names: list[str]) -> None:
+    """Recursively remove all elements with specified tag names from tree.
+
+    Args:
+        root: Root element of XML tree.
+        tag_names: List of tag names to remove.
+    """
     # Recursively remove all nodes with matching tag names
     for tag in tag_names:
         for elem in root.findall(f".//{tag}"):
@@ -162,6 +221,15 @@ def remove_tags_by_name(root: ElementTree.Element, tag_names: list[str]) -> None
 
 def find_parent(root: ElementTree.Element,
                 child: ElementTree.Element) -> Union[ElementTree.Element, None]:
+    """Find and return the parent element of a given child element.
+
+    Args:
+        root: Root element to search from.
+        child: Child element to find parent of.
+
+    Returns:
+        Parent element if found, None otherwise.
+    """
     # Find parent of a given element
     for parent in root.iter():
         for elem in parent:
@@ -230,6 +298,18 @@ def walk_schema(paths: list[str], node: Any,
 # Method which starts the walk
 def filter_json_using_xml(schema: str,
                           xml: Union[ElementTree.Element, str]) -> str:
+    """Filter JSON schema based on paths extracted from XML configuration.
+
+    Reads schema from file or stdin, extracts configuration XPaths from XML,
+    and returns filtered schema containing only relevant configuration sections.
+
+    Args:
+        schema: Path to JSON schema file or '-' to read from stdin.
+        xml: Path to XML file or ElementTree element containing configuration.
+
+    Returns:
+        Filtered schema structure as dict (will be serialized by caller).
+    """
     import sys
     import json
     if schema == "-":
@@ -265,6 +345,17 @@ def filter_json_using_xml(schema: str,
 
 
 def load_and_merge_xmls(xml_file_list: list[str]) -> ElementTree.Element:
+    """Load and merge configuration elements from multiple XML files.
+
+    Args:
+        xml_file_list: List of paths to XML files to merge.
+
+    Returns:
+        Root element containing merged configuration.
+
+    Raises:
+        ValueError: If any file does not contain a <configuration> element.
+    """
     merged_config = ElementTree.Element("configuration")
 
     # Parse and find <configuration> in each file
