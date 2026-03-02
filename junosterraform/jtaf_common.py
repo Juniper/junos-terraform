@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ElementTree
 from typing import Any, Union
 
+
 def get_xpaths(root: ElementTree.Element) -> dict[str, bool]:
     # defined a recursive function to walk the xml and populate result[]
     def recurse_children(node: ElementTree.Element, result: dict[str, bool] = {}, path: list[str] = []) -> dict[str, bool]:
@@ -35,7 +36,8 @@ def unique_xpaths(paths: dict[str, bool]) -> list[str]:
     for key in path_dict.keys():
         result.append(path_dict[key])
     return result
- 
+
+
 def get_path(parent: list[Any]) -> str:
     path = ''
     for i in parent:
@@ -85,7 +87,8 @@ def check_for_enums(elem: dict[str, Any], node_parent: list[Any]) -> list[Any]:
     return children
 
 
-def check_children(paths: list[str], elem: dict[str, Any], node_parent: list[Any], current_path: str) -> Union[list[Any], bool]:
+def check_children(paths: list[str], elem: dict[str, Any], node_parent: list[Any],
+                   current_path: str) -> Union[list[Any], bool]:
     if isinstance(node_parent[-2], dict):
         if "children" in node_parent[-2].keys():
             if isinstance(elem, dict):

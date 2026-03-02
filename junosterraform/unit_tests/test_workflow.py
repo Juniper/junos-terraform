@@ -3,16 +3,18 @@ import os
 from glob import glob
 import subprocess
 import shutil
-import sys
 import unittest
 from subprocess import CalledProcessError
+
 
 class TestWorkflow(unittest.TestCase):
 
     def test_workflow_basic(self):
         self.assertTrue(True)
-        
+
+
 # Note for any changes need to rerun "pip install ./junos-terraform"
+
 
 def test_yang2go():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -263,7 +265,7 @@ def test_yang2ansible():
         print("RETURNCODE:", e.returncode)
         print("STDOUT:\n", e.output)
         print("STDERR:\n", e.stderr)
-        raise(e)
+        raise e
 
     # Debug output
     print("RETURNCODE:", proc.returncode)

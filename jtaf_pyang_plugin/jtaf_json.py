@@ -12,7 +12,6 @@ import json
 from collections import OrderedDict
 import os
 from pyang import plugin
-from pyang import statements
 from pyang import error
 from pyang import types
 
@@ -98,7 +97,6 @@ class FNodeTree:
 
     def pop(self):
         if len(self.stack) > 0:
-            cur = self.stack[-1]
             self.stack = self.stack[:-1]
             if len(self.stack) > 0:
                 self.cur = self.stack[-1]
@@ -137,6 +135,7 @@ yang_type = ["list", "container", "leaf", "leaf-list", "leafref",
 # These are the yang properties that we output to json,
 # all others are ignored
 
+
 def to_bool(obj, key, val):
     if val == "true":
         return True
@@ -174,7 +173,7 @@ def pyang_plugin_init():
 class FoghornPlugin(plugin.PyangPlugin):
     def __init__(self):
         plugin.PyangPlugin.__init__(self, jtaf_prefix)
-        
+
     def add_output_format(self, fmts):
         self.multiple_modules = True
         fmts[jtaf_prefix] = self
@@ -229,8 +228,9 @@ def serialize(obj):
         return obj.to_json_dict()
     if isinstance(obj, FNodeTree):
         return obj.to_json_dict()
-    
+
     return obj.__dict__
+
 
 #
 # Generate the json from the statement-tree
@@ -254,6 +254,7 @@ def jtaf_get_keyvalue(stmt, kw):
         for a in v:
             p.append(a)
         return a
+
 
 def jtaf_walk_dts(node, ch):
     if ch.keyword[0] != jtaf_prefix:
@@ -286,6 +287,7 @@ def jtaf_walk_type(ctx, ch):
             properties = get_type_restrictions(t)
         for k, v in properties.items():
             jt.set_attr(k, v)
+
 
 def jtaf_walk_identities(mod):
     if len(mod.i_identities.items()) == 0:
