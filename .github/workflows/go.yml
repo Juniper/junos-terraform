@@ -28,3 +28,12 @@ jobs:
     - name: Test
       working-directory: terraform_provider
       run: go test -v ./...
+
+    - name: Install golangci-lint
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+          | sh -s -- -b $(go env GOPATH)/bin v1.59.0
+
+    - name: Run golangci-lint
+      working-directory: terraform_provider
+      run: golangci-lint run ./...
