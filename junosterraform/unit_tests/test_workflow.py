@@ -94,7 +94,7 @@ def test_yang2go():
         print("RETURNCODE:", e.returncode)
         print("STDOUT:\n", e.output)
         print("STDERR:\n", e.stderr)
-        raise(e)
+        raise e
 
     # Debug output
     print("RETURNCODE:", proc.returncode)
@@ -210,29 +210,30 @@ def test_yang2ansible():
         print("RETURNCODE:", e.returncode)
         print("STDOUT:\n", e.output)
         print("STDERR:\n", e.stderr)
-        raise(e)
+        raise e
 
     # Debug output
     print("RETURNCODE:", proc.returncode)
     print("STDOUT:\n", proc.stdout)
     print("STDERR:\n", proc.stderr)
 
-    print("Completed jtaf-yang2ansible execution")
     assert proc.returncode == 0, (
         f"jtaf-yang2ansible failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
     )
 
     assert os.path.isdir(os.path.join(ansible_dir, "ansible-provider-junos-vqfx-ansible-role")), (
-        f"Expected ansible roles dir was not created: {ansible_dir}+/ansible-provider-junos-vqfx-ansible-role"
+        f"Expected ansible roles dir was not created: "
+        f"{os.path.join(ansible_dir, 'ansible-provider-junos-vqfx-ansible-role')}"
     )
-    
+
     trimmed_schema_path = os.path.join(
         ansible_dir, "ansible-provider-junos-vqfx-ansible-role", "trimmed_schema.json"
     )
 
     # Remove any existing ansible files dir before running
-    if os.path.exists(ansible_dir+"/vqfx_ansible_files"):
-        shutil.rmtree(ansible_dir+"/vqfx_ansible_files")
+    ansible_files_dir = os.path.join(ansible_dir, "vqfx_ansible_files")
+    if os.path.exists(ansible_files_dir):
+        shutil.rmtree(ansible_files_dir)
 
     stdin_json = "{}"
 
@@ -245,7 +246,7 @@ def test_yang2ansible():
         *xml_args,
         "-d",
         "vqfx_ansible_files",
-    ]
+    ]  # noqa: E501
     print("CMD:", cmd)
     try:
         proc = subprocess.run(
@@ -274,5 +275,6 @@ def test_yang2ansible():
     )
 
     assert os.path.isdir(os.path.join(ansible_dir, "vqfx_ansible_files")), (
-        f"Expected ansible files dir was not created: {ansible_dir}+/vqfx_ansible_files"
+        f"Expected ansible files dir was not created: "
+        f"{os.path.join(ansible_dir, 'vqfx_ansible_files')}"
     )

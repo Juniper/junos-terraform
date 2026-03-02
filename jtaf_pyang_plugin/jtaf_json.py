@@ -8,9 +8,6 @@ AST and ignores any pyang filters/paths passed on the command line.
 """
 
 import optparse
-import sys
-import string
-import pdb
 import json
 from collections import OrderedDict
 import os
@@ -18,6 +15,8 @@ from pyang import plugin
 from pyang import statements
 from pyang import error
 from pyang import types
+
+import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -37,7 +36,7 @@ class FNode:
 
     def __getitem__(self, a):
         return self.__dict__[a]
-        
+
     def to_json_dict(self):
         """Orders the output of the json attributes for
            readability
@@ -46,18 +45,18 @@ class FNode:
             "name",
             "type",
             "key",
-            "leaf_type", 
+            "leaf_type",
             "other",
             "child",
         ]
 
         for k in self.__dict__:
-            if not k in keys:
+            if k not in keys:
                 keys.append(k)
 
         # make children last
         keys.append("children")
-        
+
         d = OrderedDict()
         for k in keys:
             kk = k.replace("_", "-")
@@ -65,40 +64,41 @@ class FNode:
                 # if children, output only if children is not empty
                 if k != "children" or len(self.__dict__[k]) > 0:
                     d[kk] = self.__dict__[k]
-                
+
         return d
-        
+
+
 class FNodeTree:
     def __init__(self):
         root = FNode("root")
         self.tree = {
-            "root" : root,
-            "identities" : []
+            "root": root,
+            "identities": []
         }
-        self.stack= [self.tree["root"]]
+        self.stack = [self.tree["root"]]
         self.cur = root
 
     def to_json_dict(self):
         return self.tree
-    
+
     def append_ident(self, ident):
         self.tree["identities"].append(ident)
-    
+
     def push(self, name):
         child = FNode(name)
-        if self.cur == None:
+        if self.cur is None:
             self.tree["root"] = child
         else:
             self.cur.children.append(child)
-            
+
         self.cur = child
         self.stack.append(child)
-        
+
         return child
 
     def pop(self):
         if len(self.stack) > 0:
-            cur =  self.stack[-1]
+            cur = self.stack[-1]
             self.stack = self.stack[:-1]
             if len(self.stack) > 0:
                 self.cur = self.stack[-1]
@@ -116,14 +116,14 @@ class FNodeTree:
         if attr in yang_coerce:
             val = yang_coerce[attr](n, attr, val)
 
-
         n[attr] = val
 
     def add_prop(self, ch, key):
         for p in ch.search(key):
-            if p != None:
+            if p is not None:
                 self.set_attr(p.keyword, p.arg)
- 
+
+
 #
 # Prefix used in jtaf.yang module
 #
@@ -131,7 +131,8 @@ jtaf_prefix = 'jtaf'
 
 jt = FNodeTree()
 
-yang_type = ["list", "container", "leaf", "leaf-list", "leafref", "choice", "case"]
+yang_type = ["list", "container", "leaf", "leaf-list", "leafref",
+             "choice", "case"]
 
 # These are the yang properties that we output to json,
 # all others are ignored
@@ -142,8 +143,10 @@ def to_bool(obj, key, val):
     else:
         return False
 
+
 def to_int(obj, key, val):
     return int(val)
+
 
 def to_array(obj, key, val):
     if hasattr(obj, key):
@@ -153,10 +156,10 @@ def to_array(obj, key, val):
 
 
 yang_coerce = {
-    "mandatory" : to_bool,
-    "min-elements" : to_int,
-    "must" : to_array
-    }
+    "mandatory": to_bool,
+    "min-elements": to_int,
+    "must": to_array
+}
 
 yang_props = ["key", "if-feature", "default", "must", "units", "mandatory",
               "min-elements", "ordered-by", "config", "path", "when"]
@@ -186,7 +189,7 @@ class FoghornPlugin(plugin.PyangPlugin):
                                  dest="jtaf_no_restrictions",
                                  action="store_true",
                                  help="Don't output restrictions"),
-            ]
+        ]
         g = optparser.add_option_group("jtaf output specific options")
         g.add_options(optlist)
 
@@ -201,7 +204,10 @@ class FoghornPlugin(plugin.PyangPlugin):
     def emit(self, ctx, modules, fd):
         for epos, etag, eargs in ctx.errors:
             if error.is_error(error.err_level(etag)):
-                raise error.EmitError("fhjson plugin needs a valid module (%s, %s, %s)" % (epos, etag, eargs))
+                raise error.EmitError(
+                    f"fhjson plugin needs a valid module "
+                    f"({epos}, {etag}, {eargs})"
+                )
 
         if ctx.opts.tree_path is not None:
             path = ctx.opts.tree_path.split('/')
@@ -234,8 +240,9 @@ def jtaf_emit_tree(ctx, fd, modules):
         jtaf_walk_identities(module)
         jtaf_walk_top_level(ctx, module)
 
-    fd.write(json.dumps(jt, indent = 2, default=serialize))
-    
+    fd.write(json.dumps(jt, indent=2, default=serialize))
+
+
 def jtaf_get_keyvalue(stmt, kw):
     v = stmt.search((jtaf_prefix, kw))
     if len(v) == 1:
@@ -252,14 +259,15 @@ def jtaf_walk_dts(node, ch):
     if ch.keyword[0] != jtaf_prefix:
         return
     node["dts_" + ch.keyword[1]] = ch.arg
-    
+
+
 def jtaf_walk_type(ctx, ch):
     t = ch.search_one("type")
-    if t != None:
+    if t is not None:
         leaf_type = t.arg
         if leaf_type == "identityref":
             b = t.search_one("base")
-            if b != None:
+            if b is not None:
                 leaf_type = b.arg
         jt.set_attr("leaf-type", leaf_type)
 
@@ -270,8 +278,9 @@ def jtaf_walk_type(ctx, ch):
 
         # Add any restrictions on the type, unless the user doesn't want us to
         # For enum, we always generate the restrictions, as jt depends on this.
-        enum_type = (leaf_type == "enumeration") or (base_type.arg == "enumeration")
-        if ctx.opts.jtaf_no_restrictions and not(enum_type):
+        enum_type = (leaf_type == "enumeration") or (
+            base_type.arg == "enumeration")
+        if ctx.opts.jtaf_no_restrictions and not enum_type:
             properties = {}
         else:
             properties = get_type_restrictions(t)
@@ -284,32 +293,34 @@ def jtaf_walk_identities(mod):
 
     for identity in mod.i_identities.items():
         ch = identity[1]
-        
+
         ident = {}
         ident["name"] = ch.arg
         for child in ch.substmts:
             if child.keyword in ['base', 'description']:
                 ident[child.keyword] = child.arg
         jt.append_ident(ident)
-    
+
+
 def jtaf_walk_top_level(ctx, mod):
     if len(mod.i_children) == 0:
         return
 
     for ch in mod.i_children:
-        if not ch.keyword in ["container", "list", "leaf", "leaf-list"]:
+        if ch.keyword not in ["container", "list", "leaf", "leaf-list"]:
             continue
 
         jtaf_walk_child(ctx, ch)
 
 
 def jtaf_walk_child(ctx, ch):
-    if hasattr(ch, 'keyword') == False:
+    if not hasattr(ch, 'keyword'):
         return
 
-    if hasattr(ch, 'arg') and ctx.opts.jtaf_strip_apply and ch.arg.startswith("apply-"):
+    if hasattr(ch, 'arg') and ctx.opts.jtaf_strip_apply and \
+            ch.arg.startswith("apply-"):
         return
-    
+
     if ch.keyword == 'uses':
         for child in ch.i_grouping.substmts:
             jtaf_walk_child(ctx, child)
@@ -318,10 +329,10 @@ def jtaf_walk_child(ctx, ch):
     if ch.keyword == 'typedef':
         jt.add_typedef(ch)
         return
-    
-    #if type(ch.keyword) is tuple:
-    #    jtaf_walk_dts(jtaf_cur_node, ch)
-    #    return
+
+    # if type(ch.keyword) is tuple:
+    #     jtaf_walk_dts(jtaf_cur_node, ch)
+    #     return
 
     if ch.keyword in yang_type:
         jt.push(ch.arg)
@@ -330,10 +341,10 @@ def jtaf_walk_child(ctx, ch):
         jt.set_attr(ch.keyword, ch.arg)
 
     jtaf_walk_type(ctx, ch)
-        
+
     for p in yang_props:
         jt.add_prop(ch, p)
-        
+
     if hasattr(ch, 'i_children') and len(ch.i_children) > 0:
         for child in ch.i_children:
             if child.keyword in yang_props:
@@ -342,7 +353,7 @@ def jtaf_walk_child(ctx, ch):
             if child.keyword in yang_props_skip:
                 continue
 
-            if not child.keyword in yang_type + ["uses"]:
+            if child.keyword not in yang_type + ["uses"]:
                 pass
 
             jtaf_walk_child(ctx, child)
@@ -399,6 +410,7 @@ def fetch_restriction(type_spec):
 def fetch_decimal64_restrictions(type_spec):
     """Return the restrictions from the Decimal64TypeSpec."""
     return "fraction-digits", type_spec.fraction_digits
+
 
 def fetch_pattern_restrictions(type_spec):
     """Return the restrictions from the PatternTypeSpec."""
@@ -544,18 +556,19 @@ def fetch_union_restrictions(type_spec):
 # Associate the type of pyang type_spec with the method used to extract
 # restrictions from it.
 type_specs = {
-        "PatternTypeSpec": fetch_pattern_restrictions,
-        "EnumTypeSpec": fetch_enum_restrictions,
-        "IdentityrefTypeSpec": fetch_identityref_restrictions,
-        "Decimal64TypeSpec": fetch_decimal64_restrictions,
-        "PathTypeSpec": fetch_path_restrictions,
-        "RangeTypeSpec": fetch_range_restrictions,
-        "LengthTypeSpec": fetch_length_restrictions,
-        "BitTypeSpec": fetch_bit_restrictions,
-        "LeafrefTypeSpec": fetch_leafref_restrictions,
-        "InstanceIdentifierTypeSpec": fetch_inst_identifier_restrictions,
-        "UnionTypeSpec": fetch_union_restrictions,
-    }
+    "PatternTypeSpec": fetch_pattern_restrictions,
+    "EnumTypeSpec": fetch_enum_restrictions,
+    "IdentityrefTypeSpec": fetch_identityref_restrictions,
+    "Decimal64TypeSpec": fetch_decimal64_restrictions,
+    "PathTypeSpec": fetch_path_restrictions,
+    "RangeTypeSpec": fetch_range_restrictions,
+    "LengthTypeSpec": fetch_length_restrictions,
+    "BitTypeSpec": fetch_bit_restrictions,
+    "LeafrefTypeSpec": fetch_leafref_restrictions,
+    "InstanceIdentifierTypeSpec": fetch_inst_identifier_restrictions,
+    "UnionTypeSpec": fetch_union_restrictions,
+}
+
 
 def get_base_type(stmt):
     """Return the built-in type from which the stmt is derived."""
