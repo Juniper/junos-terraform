@@ -138,15 +138,6 @@ func TestTransportJunosCommandArgs(t *testing.T) {
 	}
 }
 
-// TestTransportJunosIoConfig tests IO configuration
-func TestTransportJunosIoConfig(t *testing.T) {
-	transport := &TransportJunos{}
-
-	// Verify StdinPipe and StdoutPipe would be available
-	// (We can't actually call them without exec.Command running)
-	t.Log("StdinPipe and StdoutPipe methods are available via exec.Cmd")
-}
-
 // TestTransportJunosImplementsTransport checks if it would implement Transport
 func TestTransportJunosImplementsTransport(t *testing.T) {
 	transport := &TransportJunos{}
@@ -214,16 +205,6 @@ func BenchmarkLowlevelDial(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, _ = lowlevelDial()
 	}
-}
-
-// TestTransportJunosCommandFormat tests the exact format of the command
-func TestTransportJunosCommandFormat(t *testing.T) {
-	// The command should be: xml-mode netconf need-trailer
-
-	transport := &TransportJunos{}
-	// Document the expected command format
-	expectedCommand := "xml-mode netconf need-trailer"
-	t.Logf("Expected command format: %s", expectedCommand)
 }
 
 // TestTransportJunosClose tests Close with proper ReadWriteCloser
