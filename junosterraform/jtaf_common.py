@@ -87,44 +87,67 @@ def check_for_enums(elem: dict[str, Any], node_parent: list[Any]) -> list[Any]:
     return children
 
 
+def _calc_elem_path(current_path: str, elem: dict[str, Any]) -> str:
+    """Return full path string for an element based on current_path."""
+    if not isinstance(elem, dict):
+        return ''
+    if current_path == '':
+        return elem.get('name', '')
+    return current_path + "/" + elem.get('name', '')
+
+
+def _match_choices(paths: list[str], current_path: str, choices: list[Any]) -> list[Any]:
+    """Return subset of choice options whose path is in the allowed paths."""
+    matches = []
+    for choice in choices:
+        temp_path = current_path + "/" + choice[0].get("name", '')
+        if temp_path in paths:
+            matches.append(choice)
+    return matches
+
+
+def _match_enums(paths: list[str], current_path: str, enums: list[Any]) -> list[Any]:
+    """Return subset of enum entries whose path is in the allowed paths."""
+    matches = []
+    for enum in enums:
+        temp_path = current_path + "/" + enum.get("name", '')
+        if temp_path in paths:
+            matches.append(enum)
+    return matches
+
+
 def check_children(paths: list[str], elem: dict[str, Any], node_parent: list[Any],
                    current_path: str) -> Union[list[Any], bool]:  # noqa: C901
-    if isinstance(node_parent[-2], dict):
-        if "children" in node_parent[-2].keys():
-            if isinstance(elem, dict):
-                elem_path = ''
-                if current_path == '':
-                    elem_path = elem['name']
-                else:
-                    elem_path = current_path + "/" + elem["name"]
+    """Determine whether an element should be included based on paths.
 
-            if elem_path in paths or elem_path == 'configuration':
-                # This code handles the logic for paths that are directly in
-                # the config and are not choices or enums
-                return True
-            else:
-                # This code handles the logic for paths that aren't directly in
-                # the config but follow type 'choice' which leads to that path
-                choices = check_for_choice(elem)
-                enums = check_for_enums(elem, node_parent)
-                if choices:
-                    choice_list = []
-                    for choice in choices:
-                        temp_path = current_path + "/" + choice[0]["name"]
-                        if temp_path in paths:
-                            choice_list.append(choice)
-                    return choice_list
-                if enums:
-                    enums_list = []
-                    for enum in enums:
-                        temp_path = current_path + "/" + enum["name"]
-                        if temp_path in paths:
-                            enums_list.append(enum)
-                    return enums_list
-        else:
-            return True
-    else:
+    Returns True if element matches directly, a list of matching
+    choice/enums, or False otherwise.
+    """
+    if not isinstance(node_parent[-2], dict):
         return True
+
+    parent = node_parent[-2]
+    if "children" not in parent.keys():
+        return True
+
+    elem_path = _calc_elem_path(current_path, elem)
+    if elem_path in paths or elem_path == 'configuration':
+        # direct match in configuration paths
+        return True
+
+    # try choices and enums
+    choices = check_for_choice(elem)
+    if choices:
+        matched = _match_choices(paths, current_path, choices)
+        if matched:
+            return matched
+
+    enums = check_for_enums(elem, node_parent)
+    if enums:
+        matched = _match_enums(paths, current_path, enums)
+        if matched:
+            return matched
+
     return False
 
 
@@ -147,53 +170,61 @@ def find_parent(root: ElementTree.Element,
     return None
 
 
+def _walk_dict(paths: list[str], node: dict, parent: list[Any],
+               emit_data: bool, current_path: str) -> dict:
+    """Process dictionary node in schema walk."""
+    node['path'] = current_path
+    result: dict = {}
+    parent.append(node)
+    for k in node.keys():
+        if not emit_data:
+            break
+        # Node with empty children list is continued as type container
+        # or list just that no children element is missing
+        tmp_result = walk_schema(paths, node[k], parent)
+        if isinstance(tmp_result, list) and len(tmp_result) == 0:
+            continue
+        result[k] = walk_schema(paths, tmp_result, parent)
+    parent.pop()
+    return result
+
+
+def _walk_list(paths: list[str], node: list, parent: list[Any],
+               current_path: str) -> list:
+    """Process list node in schema walk."""
+    result: list = []
+    parent.append(node)
+    for elem in node:
+        # UPDATE: This code now handles choice options -->
+        # vlan_tagging and vlan_id now included
+        result_val = check_children(paths, elem, parent, current_path)
+        if isinstance(result_val, list):
+            for item in result_val:
+                if isinstance(item, list):
+                    item[0]['path'] = current_path
+                    result.append(item[0])
+                elif isinstance(item, dict):
+                    item['path'] = current_path
+                    result.append(item)
+        elif isinstance(result_val, dict):
+            result_val['path'] = current_path
+            result.append(result_val)
+        elif isinstance(result_val, bool) and result_val:
+            result.append(walk_schema(paths, elem, parent))
+    parent.pop()
+    return result
+
+
 def walk_schema(paths: list[str], node: Any,
-                parent: list[Any] = []) -> Union[str, Any]:  # noqa: C901
-    result = None
+                parent: list[Any] = []) -> Union[str, Any]:
+    """Recursive schema walker that dispatches by node type."""
     emit_data = check_path(paths, parent)
     current_path = get_path(parent)
     if isinstance(node, dict):
-        node['path'] = current_path
-        result = {}
-        parent.append(node)
-        for k in node.keys():
-            if emit_data:
-                # Node with empty children list is continued as type container
-                # or list just that no children element is missing
-                tmp_result = walk_schema(paths, node[k], parent)
-                if isinstance(tmp_result, list) and len(tmp_result) == 0:
-                    continue
-                else:
-                    result[k] = walk_schema(paths, tmp_result, parent)
-
-        parent.pop()
-    elif isinstance(node, list):
-        result = []
-        parent.append(node)
-        for elem in node:
-            # UPDATE: This code now handles choice options -->
-            # vlan_tagging and vlan_id now included
-            result_val = check_children(paths, elem, parent, current_path)
-            if isinstance(result_val, list):
-                for item in result_val:
-                    if isinstance(item, list):
-                        item[0]['path'] = current_path
-                        result.append(item[0])
-                    elif isinstance(item, dict):
-                        item['path'] = current_path
-                        result.append(item)
-            elif isinstance(result_val, dict):
-                result_val['path'] = current_path
-                result.append(result_val)
-            else:
-                if isinstance(result_val, bool):
-                    if result_val:
-                        result.append(walk_schema(paths, elem, parent))
-
-        parent.pop()
-    else:
-        result = node
-    return result
+        return _walk_dict(paths, node, parent, emit_data, current_path)
+    if isinstance(node, list):
+        return _walk_list(paths, node, parent, current_path)
+    return node
 
 
 # Method which starts the walk
