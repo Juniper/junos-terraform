@@ -214,17 +214,6 @@ func SSHConfigPubKeyFile(user string, file string, passphrase string) (*ssh.Clie
 		return nil, fmt.Errorf("pem: unable to decode file %s", file)
 	}
 
-	if x509.IsEncryptedPEMBlock(block) { // staticcheck:ignore SA1019 deprecated by Go 1.16 but preserved for compatibility
-		b, err := x509.DecryptPEMBlock(block, []byte(passphrase)) // staticcheck:ignore SA1019 deprecated by Go 1.16; legacy encryption support
-		if err != nil {
-			return nil, err
-		}
-		buf = pem.EncodeToMemory(&pem.Block{
-			Type:  block.Type,
-			Bytes: b,
-		})
-	}
-
 	key, err := ssh.ParsePrivateKey(buf)
 	if err != nil {
 		return nil, err
