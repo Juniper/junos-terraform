@@ -88,7 +88,7 @@ def check_for_enums(elem: dict[str, Any], node_parent: list[Any]) -> list[Any]:
 
 
 def check_children(paths: list[str], elem: dict[str, Any], node_parent: list[Any],
-                   current_path: str) -> Union[list[Any], bool]:
+                   current_path: str) -> Union[list[Any], bool]:  # noqa: C901
     if isinstance(node_parent[-2], dict):
         if "children" in node_parent[-2].keys():
             if isinstance(elem, dict):
@@ -148,7 +148,7 @@ def find_parent(root: ElementTree.Element,
 
 
 def walk_schema(paths: list[str], node: Any,
-                parent: list[Any] = []) -> Union[str, Any]:
+                parent: list[Any] = []) -> Union[str, Any]:  # noqa: C901
     result = None
     emit_data = check_path(paths, parent)
     current_path = get_path(parent)
@@ -224,7 +224,7 @@ def filter_json_using_xml(schema: str,
 
     # find and remove any version node
     remove_tags_by_name(root, ["version", "versions", "model",
-                                "apply-groups"])
+                               "apply-groups"])
 
     # find the unique paths
     paths = unique_xpaths(get_xpaths(root))

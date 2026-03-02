@@ -134,6 +134,7 @@ def test_yang2go():
 
     assert generated_json == expected_json, "Generated trimmed_schema.json differs from expected example"
 
+
 def test_yang2ansible():
 
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))

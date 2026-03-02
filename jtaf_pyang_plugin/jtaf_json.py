@@ -26,7 +26,7 @@ class FNode:
         self.name = name
         self.type = "container"
         self.children = []
-        
+
     def __setitem__(self, a, v):
         """To allow setting of attributes directly
            eg. fn["my-attr"] = 5
@@ -169,6 +169,7 @@ yang_props_skip = ["type", "description"]
 
 def pyang_plugin_init():
     plugin.register_plugin(FoghornPlugin())
+
 
 class FoghornPlugin(plugin.PyangPlugin):
     def __init__(self):
@@ -315,7 +316,7 @@ def jtaf_walk_top_level(ctx, mod):
         jtaf_walk_child(ctx, ch)
 
 
-def jtaf_walk_child(ctx, ch):
+def jtaf_walk_child(ctx, ch):  # noqa: C901
     if not hasattr(ch, 'keyword'):
         return
 
@@ -554,6 +555,7 @@ def fetch_union_restrictions(type_spec):
         utypes.append(utype)
 
     return "types", utypes
+
 
 # Associate the type of pyang type_spec with the method used to extract
 # restrictions from it.
