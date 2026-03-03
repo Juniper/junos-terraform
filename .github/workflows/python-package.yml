@@ -48,3 +48,12 @@ jobs:
       with:
         name: python-coverage-${{ matrix.python-version }}
         path: coverage.xml
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.25.6'
+    - name: Build and test terraform-provider-junos-vqfx-evpn-vxlan
+      working-directory: terraform-provider-junos-vqfx-evpn-vxlan
+      run: |
+        go build -v ./...
+        go test -v ./...
