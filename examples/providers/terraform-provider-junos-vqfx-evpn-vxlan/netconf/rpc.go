@@ -160,7 +160,10 @@ var msgID = uuid
 // uuid generates a "good enough" uuid without adding external dependencies
 func uuid() string {
 	b := make([]byte, 16)
-	io.ReadFull(rand.Reader, b)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		// on failure return empty string (should never happen)
+		return ""
+	}
 	b[6] = (b[6] & 0x0f) | 0x40
 	b[8] = (b[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
