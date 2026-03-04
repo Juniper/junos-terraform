@@ -30,7 +30,7 @@ func TestProviderMetadata(t *testing.T) {
 
 	p.Metadata(ctx, req, resp)
 
-	expectedTypeName := "junos-vqfx-evpn-vxlan"
+	expectedTypeName := "terraform_provider"
 	if resp.TypeName != expectedTypeName {
 		t.Errorf("type name mismatch: expected %s, got %s", expectedTypeName, resp.TypeName)
 	}

@@ -70,7 +70,7 @@ func (p Provider) DataSources(_ context.Context) []func() datasource.DataSource 
 
 // Metadata implements provider.Provider.
 func (p Provider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "junos-{{data.device_type}}"
+	resp.TypeName = "terraform_provider"
 }
 
 // Resources implements provider.Provider.
@@ -92,6 +92,7 @@ func (p Provider) Schema(_ context.Context, _ provider.SchemaRequest, resp *prov
 			},
 			"password": schema.StringAttribute{
 				Optional: true,
+                                Sensitive: true,
 			},
 			"port": schema.Int64Attribute{
 				Required: true,
@@ -101,6 +102,7 @@ func (p Provider) Schema(_ context.Context, _ provider.SchemaRequest, resp *prov
 			},
 			"sshkey": schema.StringAttribute{
 				Optional: true,
+                                Sensitive: true,
 				// Will need to add eventually
 				//Validators: []validator.String{stringvalidator.AtLeastOneOf(path.MatchRoot("d")...)},
 			},
