@@ -9,7 +9,7 @@ import (
 
 // Collects the data for the crud work
 type resource_Apply_Groups struct {
-	client ProviderConfig
+	client ProviderConfig //nolint:unused
 }
 
 func (r *resource_Apply_Groups) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
