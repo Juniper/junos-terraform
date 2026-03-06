@@ -11,7 +11,7 @@ This simulator models a simplified Junos config lifecycle per device:
 - <get-configuration> returns running configuration for requested group.
 
 Usage example:
-  python .github/scripts/netconf_mock_server.py \
+    python netconf_mock/netconf_mock_server.py \
     --host 127.0.0.1 \
     --username ci-user \
     --password ci-password \

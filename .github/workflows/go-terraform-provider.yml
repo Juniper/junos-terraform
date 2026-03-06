@@ -25,6 +25,10 @@ jobs:
         python -m pip install .
         python -m pip install asyncssh
 
+    - name: Run NETCONF mock unit tests
+      run: |
+        pytest -q netconf_mock/tests/test_netconf_mock_server.py
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
@@ -90,47 +94,13 @@ jobs:
         echo "TF_IN_AUTOMATION=1" >> "$GITHUB_ENV"
 
         # Build a deterministic host->port map from generated providers.tf and rewrite providers to use mock sockets.
-        python - <<'PY'
-        import re
-        from pathlib import Path
+        python .github/scripts/rewrite_mock_providers.py \
+          --providers-file ci-evpn-vxlan-tf/providers.tf \
+          --devices-file ci-evpn-vxlan-tf/mock-devices.txt \
+          --bind-host 127.0.0.1 \
+          --base-port 8301
 
-        providers_path = Path("ci-evpn-vxlan-tf/providers.tf")
-        text = providers_path.read_text(encoding="utf-8")
-
-        block_re = re.compile(r'provider\s+"junos-vqfx-evpn-vxlan"\s*\{.*?\}', re.DOTALL)
-        host_re = re.compile(r'host\s*=\s*"([^"]+)"')
-        port_re = re.compile(r'port\s*=\s*\d+')
-
-        hosts = []
-        for block in block_re.findall(text):
-          hm = host_re.search(block)
-          if hm:
-            host = hm.group(1)
-            if host not in hosts:
-              hosts.append(host)
-
-        base_port = 8301
-        host_port = {host: base_port + i for i, host in enumerate(hosts)}
-
-        def rewrite_block(block: str) -> str:
-          hm = host_re.search(block)
-          if not hm:
-            return block
-          host = hm.group(1)
-          port = host_port[host]
-          block = host_re.sub('host     = "127.0.0.1"', block)
-          block = port_re.sub(f'port     = {port}', block)
-          return block
-
-        rewritten = block_re.sub(lambda m: rewrite_block(m.group(0)), text)
-        providers_path.write_text(rewritten, encoding="utf-8")
-
-        with Path("ci-evpn-vxlan-tf/mock-devices.txt").open("w", encoding="utf-8") as f:
-          for host in hosts:
-            f.write(f"{host}:{host_port[host]}\n")
-        PY
-
-        python .github/scripts/netconf_mock_server.py \
+        python netconf_mock/netconf_mock_server.py \
           --host 127.0.0.1 \
           --username ci-user \
           --password ci-password \
@@ -193,12 +163,14 @@ jobs:
           exit 1
         fi
 
-    - name: Mutate one resource to force replacement
+    - name: Mutate interface IP to force replacement
       working-directory: ci-evpn-vxlan-tf
       run: |
         set -euo pipefail
-        first_tf="$(ls *.tf | grep -v '^providers.tf$' | head -n 1)"
-        sed -E -i '0,/resource_name = "[^"]+"/s//resource_name = "ci-updated-group"/' "$first_tf"
+        python ../.github/scripts/mutate_first_ipv4_cidr.py \
+          --directory . \
+          --replacement 203.0.113.10/32 \
+          --exclude providers.tf
 
     - name: Terraform changed plan after mutation
       id: changed_plan
@@ -246,99 +218,35 @@ jobs:
       working-directory: ci-evpn-vxlan-tf
       run: |
         set -euo pipefail
-        before_serial="$(terraform state pull | python -c 'import json,sys; print(json.load(sys.stdin)["serial"])')"
+        before_serial="$(terraform state pull | python ../.github/scripts/tfstate_serial.py)"
         echo "serial=$before_serial" >> "$GITHUB_OUTPUT"
         # Record one managed resource path so we can assert it survives drift/reconcile cycles.
         first_resource="$(terraform state list | head -n 1)"
         echo "resource=$first_resource" >> "$GITHUB_OUTPUT"
 
+        resource_dump="$(terraform state show -no-color "$first_resource")"
+        target_host="$(printf '%s\n' "$resource_dump" | sed -n 's/^ *host *= *"\([^"]*\)"/\1/p' | head -n 1)"
+        target_group="base-config"
+
+        if [ -z "$target_host" ]; then
+          echo "Failed to extract host from terraform state for $first_resource"
+          exit 1
+        fi
+
+        echo "host=$target_host" >> "$GITHUB_OUTPUT"
+        echo "group=$target_group" >> "$GITHUB_OUTPUT"
+
     - name: Simulate out-of-band NETCONF drift
       run: |
         set -euo pipefail
-        python - <<'PY'
-        import asyncio
-        from pathlib import Path
-
-        import asyncssh
-
-        MSG_SEP = "]]>]]>"
-
-        async def recv_frame(reader) -> str:
-            buf = ""
-            while MSG_SEP not in buf:
-                chunk = await reader.read(4096)
-                if not chunk:
-                    raise RuntimeError("connection closed while waiting for NETCONF frame")
-                buf += chunk
-            frame, _rest = buf.split(MSG_SEP, 1)
-            return frame.strip()
-
-        async def send_rpc(writer, reader, message_id: str, payload: str) -> str:
-            rpc = (
-                f'<?xml version="1.0" encoding="UTF-8"?>'
-                f'<rpc message-id="{message_id}" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">'
-                f'{payload}'
-                f'</rpc>'
-            )
-            writer.write(rpc + MSG_SEP + "\n")
-            return await recv_frame(reader)
-
-        async def main() -> None:
-            first_entry = Path("ci-evpn-vxlan-tf/mock-devices.txt").read_text(encoding="utf-8").splitlines()[0].strip()
-            _name, port = first_entry.split(":", 1)
-
-            conn = await asyncssh.connect(
-                "127.0.0.1",
-                port=int(port),
-                username="ci-user",
-                password="ci-password",
-                known_hosts=None,
-            )
-            proc = None
-            try:
-                proc = await conn.create_process(subsystem="netconf")
-                reader = proc.stdout
-                writer = proc.stdin
-
-                # Consume server hello and send client hello.
-                await recv_frame(reader)
-                writer.write(
-                    '<?xml version="1.0" encoding="UTF-8"?>'
-                    '<hello xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">'
-                    '<capabilities><capability>urn:ietf:params:netconf:base:1.0</capability></capabilities>'
-                    '</hello>'
-                    + MSG_SEP
-                    + "\n"
-                )
-
-                drift_cfg = (
-                    '<load-configuration action="merge" format="xml">'
-                    '<configuration><groups><name>ci-updated-group</name>'
-                    '<system><host-name>OOB-DRIFT</host-name></system>'
-                    '</groups></configuration>'
-                    '</load-configuration>'
-                )
-
-                for mid, payload in [
-                    ("1001", "<lock><target><candidate/></target></lock>"),
-                    ("1002", drift_cfg),
-                    ("1003", "<commit/>"),
-                    ("1004", "<unlock><target><candidate/></target></unlock>"),
-                ]:
-                    reply = await send_rpc(writer, reader, mid, payload)
-                    if "<ok/>" not in reply:
-                        raise RuntimeError(f"unexpected reply for message-id {mid}: {reply}")
-            finally:
-                if proc is not None:
-                    try:
-                        proc.terminate()
-                    except Exception:
-                        pass
-                conn.close()
-                await conn.wait_closed()
-
-        asyncio.run(main())
-        PY
+        python .github/scripts/apply_netconf_drift.py \
+          --devices-file ci-evpn-vxlan-tf/mock-devices.txt \
+          --target-host '${{ steps.state_baseline.outputs.host }}' \
+          --target-group '${{ steps.state_baseline.outputs.group }}' \
+          --drift-ip 203.0.113.250/32 \
+          --username ci-user \
+          --password ci-password \
+          --connect-host 127.0.0.1
 
     - name: Terraform plan should detect out-of-band drift
       id: drift_plan
@@ -374,7 +282,7 @@ jobs:
       working-directory: ci-evpn-vxlan-tf
       run: |
         set -euo pipefail
-        after_serial="$(terraform state pull | python -c 'import json,sys; print(json.load(sys.stdin)["serial"])')"
+        after_serial="$(terraform state pull | python ../.github/scripts/tfstate_serial.py)"
         if [ "$after_serial" -le "${{ steps.state_baseline.outputs.serial }}" ]; then
           echo "Expected state serial to increase after drift reconcile (before=${{ steps.state_baseline.outputs.serial }}, after=$after_serial)"
           exit 1
@@ -387,8 +295,10 @@ jobs:
         rm -rf ci-evpn-vxlan-tf-negative
         cp -R ci-evpn-vxlan-tf ci-evpn-vxlan-tf-negative
         pushd ci-evpn-vxlan-tf-negative
-        neg_tf="$(ls *.tf | grep -v '^providers.tf$' | head -n 1)"
-        sed -E -i '0,/resource_name = "[^"]+"/s//resource_name = "ci-negative-group"/' "$neg_tf"
+        python ../.github/scripts/mutate_first_ipv4_cidr.py \
+          --directory . \
+          --replacement 203.0.113.20/32 \
+          --exclude providers.tf
         sed -E -i 's/password[[:space:]]*=[[:space:]]*"[^"]*"/password = "wrong-password"/g' providers.tf
         popd
 
