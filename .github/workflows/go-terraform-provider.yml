@@ -254,9 +254,13 @@ jobs:
 
     - name: Terraform negative apply with bad credentials
       id: negative_apply
-      continue-on-error: true
       working-directory: ci-evpn-vxlan-tf-negative
-      run: terraform apply -refresh=false -no-color -input=false -auto-approve -parallelism=1 > negative_apply.log 2>&1
+      run: |
+        set +e
+        terraform apply -refresh=false -no-color -input=false -auto-approve -parallelism=1 > negative_apply.log 2>&1
+        rc=$?
+        set -e
+        echo "exitcode=$rc" >> "$GITHUB_OUTPUT"
 
     - name: Assert negative apply failed
       run: |
