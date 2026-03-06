@@ -241,6 +241,141 @@ jobs:
           exit 1
         fi
 
+    - name: Capture baseline state metadata
+      id: state_baseline
+      working-directory: ci-evpn-vxlan-tf
+      run: |
+        set -euo pipefail
+        before_serial="$(terraform state pull | python -c 'import json,sys; print(json.load(sys.stdin)["serial"])')"
+        echo "serial=$before_serial" >> "$GITHUB_OUTPUT"
+        # Record one managed resource path so we can assert it survives drift/reconcile cycles.
+        first_resource="$(terraform state list | head -n 1)"
+        echo "resource=$first_resource" >> "$GITHUB_OUTPUT"
+
+    - name: Simulate out-of-band NETCONF drift
+      run: |
+        set -euo pipefail
+        python - <<'PY'
+        import asyncio
+        from pathlib import Path
+
+        import asyncssh
+
+        MSG_SEP = "]]>]]>"
+
+        async def recv_frame(reader: asyncssh.SSHReader[str]) -> str:
+            buf = ""
+            while MSG_SEP not in buf:
+                chunk = await reader.read(4096)
+                if not chunk:
+                    raise RuntimeError("connection closed while waiting for NETCONF frame")
+                buf += chunk
+            frame, _rest = buf.split(MSG_SEP, 1)
+            return frame.strip()
+
+        async def send_rpc(writer: asyncssh.SSHWriter[str], reader: asyncssh.SSHReader[str], message_id: str, payload: str) -> str:
+            rpc = (
+                f'<?xml version="1.0" encoding="UTF-8"?>'
+                f'<rpc message-id="{message_id}" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">'
+                f'{payload}'
+                f'</rpc>'
+            )
+            writer.write(rpc + MSG_SEP + "\n")
+            return await recv_frame(reader)
+
+        async def main() -> None:
+            first_entry = Path("ci-evpn-vxlan-tf/mock-devices.txt").read_text(encoding="utf-8").splitlines()[0].strip()
+            _name, port = first_entry.split(":", 1)
+
+            conn = await asyncssh.connect(
+                "127.0.0.1",
+                port=int(port),
+                username="ci-user",
+                password="ci-password",
+                known_hosts=None,
+            )
+            try:
+                chan, session = await conn.create_session(asyncssh.SSHClientStreamSession, subsystem="netconf")
+                del chan
+                reader: asyncssh.SSHReader[str] = session.stdout
+                writer: asyncssh.SSHWriter[str] = session.stdin
+
+                # Consume server hello and send client hello.
+                await recv_frame(reader)
+                writer.write(
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    '<hello xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">'
+                    '<capabilities><capability>urn:ietf:params:netconf:base:1.0</capability></capabilities>'
+                    '</hello>'
+                    + MSG_SEP
+                    + "\n"
+                )
+
+                drift_cfg = (
+                    '<load-configuration action="merge" format="xml">'
+                    '<configuration><groups><name>ci-updated-group</name>'
+                    '<system><host-name>OOB-DRIFT</host-name></system>'
+                    '</groups></configuration>'
+                    '</load-configuration>'
+                )
+
+                for mid, payload in [
+                    ("1001", "<lock><target><candidate/></target></lock>"),
+                    ("1002", drift_cfg),
+                    ("1003", "<commit/>"),
+                    ("1004", "<unlock><target><candidate/></target></unlock>"),
+                ]:
+                    reply = await send_rpc(writer, reader, mid, payload)
+                    if "<ok/>" not in reply:
+                        raise RuntimeError(f"unexpected reply for message-id {mid}: {reply}")
+            finally:
+                conn.close()
+                await conn.wait_closed()
+
+        asyncio.run(main())
+        PY
+
+    - name: Terraform plan should detect out-of-band drift
+      id: drift_plan
+      continue-on-error: true
+      working-directory: ci-evpn-vxlan-tf
+      run: terraform plan -no-color -input=false -detailed-exitcode -out=tfplan-drift
+
+    - name: Assert drift detection exit code
+      run: |
+        if [ "${{ steps.drift_plan.outputs.exitcode }}" != "2" ]; then
+          echo "Expected drift plan exit code 2 after out-of-band change, got ${{ steps.drift_plan.outputs.exitcode }}"
+          exit 1
+        fi
+
+    - name: Terraform reconcile out-of-band drift
+      working-directory: ci-evpn-vxlan-tf
+      run: terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-drift
+
+    - name: Terraform no-op plan after drift reconcile
+      id: drift_plan_final
+      continue-on-error: true
+      working-directory: ci-evpn-vxlan-tf
+      run: terraform plan -no-color -input=false -detailed-exitcode
+
+    - name: Assert no-op after drift reconcile
+      run: |
+        if [ "${{ steps.drift_plan_final.outputs.exitcode }}" != "0" ]; then
+          echo "Expected no-op plan after reconciling drift, got ${{ steps.drift_plan_final.outputs.exitcode }}"
+          exit 1
+        fi
+
+    - name: Assert Terraform state advanced and remains managed
+      working-directory: ci-evpn-vxlan-tf
+      run: |
+        set -euo pipefail
+        after_serial="$(terraform state pull | python -c 'import json,sys; print(json.load(sys.stdin)["serial"])')"
+        if [ "$after_serial" -le "${{ steps.state_baseline.outputs.serial }}" ]; then
+          echo "Expected state serial to increase after drift reconcile (before=${{ steps.state_baseline.outputs.serial }}, after=$after_serial)"
+          exit 1
+        fi
+        terraform state show "${{ steps.state_baseline.outputs.resource }}" >/dev/null
+
     - name: Prepare negative test inputs
       run: |
         set -euo pipefail
