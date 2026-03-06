@@ -134,6 +134,7 @@ jobs:
           --host 127.0.0.1 \
           --username ci-user \
           --password ci-password \
+          --log-level DEBUG \
           --devices-file ci-evpn-vxlan-tf/mock-devices.txt \
           --state-dump netconf-mock-state.json \
           > netconf-mock.log 2>&1 &

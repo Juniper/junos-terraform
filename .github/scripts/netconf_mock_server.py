@@ -24,8 +24,10 @@ import argparse
 import asyncio
 import copy
 import json
+import logging
 import re
 import signal
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -42,6 +44,9 @@ HELLO = (
     '<session-id>100</session-id>'
     '</hello>'
 )
+
+
+logger = logging.getLogger("netconf-mock")
 
 
 @dataclass
@@ -81,6 +86,7 @@ class DeviceSSHServer(asyncssh.SSHServer):
         return True
 
     def validate_password(self, username: str, password: str) -> bool:
+        logger.debug("auth attempt user=%s accepted=%s", username, username == self.username and password == self.password)
         return username == self.username and password == self.password
 
     def session_requested(self) -> asyncssh.SSHServerSession:
@@ -95,11 +101,14 @@ class DeviceSession(asyncssh.SSHServerSession):
 
     def connection_made(self, chan: asyncssh.SSHServerChannel) -> None:
         self._chan = chan
+        logger.debug("session opened device=%s", self._state.name)
 
     def subsystem_requested(self, subsystem: str) -> bool:
+        logger.debug("subsystem requested device=%s subsystem=%s", self._state.name, subsystem)
         return subsystem == "netconf"
 
     def session_started(self) -> None:
+        logger.debug("session started device=%s", self._state.name)
         self._send_frame(HELLO)
 
     def data_received(self, data: str, datatype: int | None = None) -> None:
@@ -135,6 +144,7 @@ class DeviceSession(asyncssh.SSHServerSession):
 
     def _append_history(self, op: str, detail: str) -> None:
         self._state.history.append({"op": op, "detail": detail})
+        logger.debug("device=%s op=%s detail=%s", self._state.name, op, detail)
 
     def _handle_load_configuration(self, xml_text: str, message_id: str) -> bool:
         if "<load-configuration" not in xml_text:
@@ -234,20 +244,36 @@ async def run_server(args: argparse.Namespace) -> None:
     servers = []
     device_states: dict[str, DeviceState] = {}
 
+    loop = asyncio.get_running_loop()
+
+    def _loop_exception_handler(_loop: asyncio.AbstractEventLoop, context: dict) -> None:
+        msg = context.get("message", "asyncio loop exception")
+        exc = context.get("exception")
+        logger.error("%s", msg)
+        if exc is not None:
+            logger.exception("event loop exception", exc_info=exc)
+        else:
+            logger.error("context: %s", context)
+
+    loop.set_exception_handler(_loop_exception_handler)
+
     def _shutdown() -> None:
+        logger.info("shutdown signal received")
         stop_event.set()
 
-    loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, _shutdown)
 
     device_specs = list(args.device)
     if args.devices_file:
+        logger.info("loading devices from file: %s", args.devices_file)
         for line in Path(args.devices_file).read_text(encoding="utf-8").splitlines():
             entry = line.strip()
             if not entry or entry.startswith("#"):
                 continue
             device_specs.append(entry)
+
+    logger.info("starting NETCONF mock for %d device listeners", len(device_specs))
 
     for device_spec in device_specs:
         name, port_str = device_spec.split(":", 1)
@@ -255,6 +281,7 @@ async def run_server(args: argparse.Namespace) -> None:
         state = DeviceState(name=name)
         device_states[name] = state
 
+        logger.info("binding device=%s host=%s port=%d", name, args.host, port)
         server = await asyncssh.create_server(
             lambda s=state: DeviceSSHServer(args.username, args.password, s),
             args.host,
@@ -264,17 +291,20 @@ async def run_server(args: argparse.Namespace) -> None:
         )
         servers.append(server)
 
+    logger.info("all device listeners started")
     await stop_event.wait()
 
     for server in servers:
         server.close()
         await server.wait_closed()
+    logger.info("all device listeners closed")
 
     if args.state_dump:
         dump_path = Path(args.state_dump)
         dump_path.parent.mkdir(parents=True, exist_ok=True)
         serialized = {name: state.snapshot() for name, state in device_states.items()}
         dump_path.write_text(json.dumps(serialized, indent=2), encoding="utf-8")
+        logger.info("state dumped to %s", dump_path)
 
 
 def parse_args() -> argparse.Namespace:
@@ -298,6 +328,11 @@ def parse_args() -> argparse.Namespace:
         default="",
         help="Optional JSON path to dump per-device running/candidate/history on shutdown.",
     )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        help="Python logging level (DEBUG, INFO, WARNING, ERROR).",
+    )
     args = parser.parse_args()
     if not args.device and not args.devices_file:
         parser.error("Provide at least one --device or a --devices-file")
@@ -306,7 +341,18 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    asyncio.run(run_server(args))
+    logging.basicConfig(
+        level=getattr(logging, args.log_level.upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    try:
+        logger.info("netconf mock booting")
+        asyncio.run(run_server(args))
+        logger.info("netconf mock exiting cleanly")
+    except Exception as exc:  # pragma: no cover - fatal diagnostics path
+        logger.error("fatal error in netconf mock: %s", exc)
+        logger.error("python traceback:\n%s", traceback.format_exc())
+        raise
 
 
 if __name__ == "__main__":
