@@ -130,23 +130,47 @@ jobs:
             f.write(f"{host}:{host_port[host]}\\n")
         PY
 
-        mapfile -t mock_devices < ci-evpn-vxlan-tf/mock-devices.txt
-        mock_args=()
-        for device in "${mock_devices[@]}"; do
-          mock_args+=(--device "$device")
-        done
-
         python .github/scripts/netconf_mock_server.py \
           --host 127.0.0.1 \
           --username ci-user \
           --password ci-password \
+          --devices-file ci-evpn-vxlan-tf/mock-devices.txt \
           --state-dump netconf-mock-state.json \
-          "${mock_args[@]}" \
           > netconf-mock.log 2>&1 &
         MOCK_PID=$!
-        trap 'kill ${MOCK_PID} || true; wait ${MOCK_PID} || true' EXIT
+        trap 'if kill -0 ${MOCK_PID} 2>/dev/null; then kill ${MOCK_PID}; wait ${MOCK_PID} || true; fi' EXIT
 
-        sleep 2
+        # Wait for all per-device listeners to be ready, or fail early with server logs.
+        all_ready=0
+        for _ in $(seq 1 30); do
+          if ! kill -0 "$MOCK_PID" 2>/dev/null; then
+            echo "NETCONF mock exited during startup"
+            cat netconf-mock.log || true
+            exit 1
+          fi
+
+          all_ready=1
+          while IFS=: read -r _dev_name dev_port; do
+            if [ -z "${dev_port}" ]; then
+              continue
+            fi
+            if ! (echo > /dev/tcp/127.0.0.1/"${dev_port}") >/dev/null 2>&1; then
+              all_ready=0
+              break
+            fi
+          done < ci-evpn-vxlan-tf/mock-devices.txt
+
+          if [ "$all_ready" -eq 1 ]; then
+            break
+          fi
+          sleep 1
+        done
+
+        if [ "$all_ready" -ne 1 ]; then
+          echo "NETCONF mock listeners were not ready in time"
+          cat netconf-mock.log || true
+          exit 1
+        fi
 
         pushd ci-evpn-vxlan-tf
 

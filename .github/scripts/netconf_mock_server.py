@@ -136,6 +136,73 @@ class DeviceSession(asyncssh.SSHServerSession):
     def _append_history(self, op: str, detail: str) -> None:
         self._state.history.append({"op": op, "detail": detail})
 
+    def _handle_load_configuration(self, xml_text: str, message_id: str) -> bool:
+        if "<load-configuration" not in xml_text:
+            return False
+
+        group_name = self._extract_group_name(xml_text)
+        cfg = self._extract_configuration(xml_text)
+        if group_name and cfg:
+            self._state.candidate_groups[group_name] = cfg
+            self._state.submitted_xml_by_group[group_name] = cfg
+            self._append_history("load-configuration", f"group={group_name}")
+        self._send_frame(self._ok_reply(message_id))
+        return True
+
+    def _handle_edit_delete(self, xml_text: str, message_id: str) -> bool:
+        if "<edit-config>" not in xml_text or 'operation="delete"' not in xml_text:
+            return False
+
+        group_name = self._extract_group_name(xml_text)
+        if group_name:
+            self._state.candidate_groups.pop(group_name, None)
+            self._append_history("edit-config-delete", f"group={group_name}")
+        self._send_frame(self._ok_reply(message_id))
+        return True
+
+    def _handle_discard_changes(self, xml_text: str, message_id: str) -> bool:
+        if "<discard-changes" not in xml_text:
+            return False
+
+        self._state.candidate_groups = copy.deepcopy(self._state.running_groups)
+        self._append_history("discard-changes", "candidate reset from running")
+        self._send_frame(self._ok_reply(message_id))
+        return True
+
+    def _handle_commit(self, xml_text: str, message_id: str) -> bool:
+        if "<commit" not in xml_text:
+            return False
+
+        self._state.running_groups = copy.deepcopy(self._state.candidate_groups)
+        self._append_history("commit", f"groups={len(self._state.running_groups)}")
+        self._send_frame(self._ok_reply(message_id))
+        return True
+
+    def _handle_get_configuration(self, xml_text: str, message_id: str) -> bool:
+        if "<get-configuration>" not in xml_text:
+            return False
+
+        group_name = self._extract_group_name(xml_text)
+        if group_name and group_name in self._state.running_groups:
+            cfg = self._state.running_groups[group_name]
+        else:
+            cfg = (
+                "<configuration><groups>"
+                f"<name>{group_name}</name>"
+                "</groups></configuration>"
+            )
+        self._append_history("get-configuration", f"group={group_name}")
+        reply = f'<rpc-reply message-id="{message_id}">{cfg}</rpc-reply>'
+        self._send_frame(reply)
+        return True
+
+    def _handle_lock_unlock(self, xml_text: str, message_id: str) -> bool:
+        if "<lock>" not in xml_text and "<unlock>" not in xml_text:
+            return False
+
+        self._send_frame(self._ok_reply(message_id))
+        return True
+
     def _handle_rpc(self, xml_text: str) -> None:
         message_id = self._extract_message_id(xml_text)
         self._state.rpc_log.append(xml_text)
@@ -144,54 +211,17 @@ class DeviceSession(asyncssh.SSHServerSession):
         if "<hello" in xml_text:
             return
 
-        if "<load-configuration" in xml_text:
-            group_name = self._extract_group_name(xml_text)
-            cfg = self._extract_configuration(xml_text)
-            if group_name and cfg:
-                self._state.candidate_groups[group_name] = cfg
-                self._state.submitted_xml_by_group[group_name] = cfg
-                self._append_history("load-configuration", f"group={group_name}")
-            self._send_frame(self._ok_reply(message_id))
-            return
-
-        if "<edit-config>" in xml_text and 'operation="delete"' in xml_text:
-            group_name = self._extract_group_name(xml_text)
-            if group_name:
-                self._state.candidate_groups.pop(group_name, None)
-                self._append_history("edit-config-delete", f"group={group_name}")
-            self._send_frame(self._ok_reply(message_id))
-            return
-
-        if "<discard-changes" in xml_text:
-            self._state.candidate_groups = copy.deepcopy(self._state.running_groups)
-            self._append_history("discard-changes", "candidate reset from running")
-            self._send_frame(self._ok_reply(message_id))
-            return
-
-        if "<commit" in xml_text:
-            self._state.running_groups = copy.deepcopy(self._state.candidate_groups)
-            self._append_history("commit", f"groups={len(self._state.running_groups)}")
-            self._send_frame(self._ok_reply(message_id))
-            return
-
-        if "<get-configuration>" in xml_text:
-            group_name = self._extract_group_name(xml_text)
-            if group_name and group_name in self._state.running_groups:
-                cfg = self._state.running_groups[group_name]
-            else:
-                cfg = (
-                    "<configuration><groups>"
-                    f"<name>{group_name}</name>"
-                    "</groups></configuration>"
-                )
-            self._append_history("get-configuration", f"group={group_name}")
-            reply = f'<rpc-reply message-id="{message_id}">{cfg}</rpc-reply>'
-            self._send_frame(reply)
-            return
-
-        if "<lock>" in xml_text or "<unlock>" in xml_text:
-            self._send_frame(self._ok_reply(message_id))
-            return
+        handlers = (
+            self._handle_load_configuration,
+            self._handle_edit_delete,
+            self._handle_discard_changes,
+            self._handle_commit,
+            self._handle_get_configuration,
+            self._handle_lock_unlock,
+        )
+        for handler in handlers:
+            if handler(xml_text, message_id):
+                return
 
         # Default success reply for unrecognized requests.
         self._append_history("unknown", "default-ok")
@@ -211,7 +241,15 @@ async def run_server(args: argparse.Namespace) -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, _shutdown)
 
-    for device_spec in args.device:
+    device_specs = list(args.device)
+    if args.devices_file:
+        for line in Path(args.devices_file).read_text(encoding="utf-8").splitlines():
+            entry = line.strip()
+            if not entry or entry.startswith("#"):
+                continue
+            device_specs.append(entry)
+
+    for device_spec in device_specs:
         name, port_str = device_spec.split(":", 1)
         port = int(port_str)
         state = DeviceState(name=name)
@@ -247,15 +285,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--device",
         action="append",
-        required=True,
+        default=[],
         help="Device listener in format <device-name>:<port>. May be repeated.",
+    )
+    parser.add_argument(
+        "--devices-file",
+        default="",
+        help="Optional file with one <device-name>:<port> entry per line.",
     )
     parser.add_argument(
         "--state-dump",
         default="",
         help="Optional JSON path to dump per-device running/candidate/history on shutdown.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.device and not args.devices_file:
+        parser.error("Provide at least one --device or a --devices-file")
+    return args
 
 
 def main() -> None:
