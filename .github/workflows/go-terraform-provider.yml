@@ -32,7 +32,26 @@ jobs:
     - name: Set up Terraform
       uses: hashicorp/setup-terraform@v3
 
-    - name: Build and test terraform-provider-junos-vqfx-evpn-vxlan
+    - name: Generate provider with jtaf-yang2go
+      run: |
+        rm -rf terraform-provider-junos-vqfx-evpn-vxlan
+
+        jtaf-yang2go \
+          -p examples/yang/18.2/18.2R3/common \
+          examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang \
+          -x \
+          examples/evpn-vxlan-dc/dc1/dc1-borderleaf1.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-borderleaf2.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-leaf2.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-leaf3.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-spine1.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-spine2.xml \
+          examples/evpn-vxlan-dc/dc2/dc2-spine1.xml \
+          examples/evpn-vxlan-dc/dc2/dc2-spine2.xml \
+          -t vqfx-evpn-vxlan
+
+    - name: Build and test generated terraform provider
       working-directory: terraform-provider-junos-vqfx-evpn-vxlan
       run: |
         go build -v ./...
