@@ -52,8 +52,40 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: '1.25.6'
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v3
     - name: Build and test terraform-provider-junos-vqfx-evpn-vxlan
       working-directory: terraform-provider-junos-vqfx-evpn-vxlan
       run: |
         go build -v ./...
         go test -v ./...
+    - name: Generate EVPN-VXLAN Terraform files
+      run: |
+        jtaf-xml2tf \
+          -j terraform-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json \
+          -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml \
+          -t vqfx-evpn-vxlan \
+          -d ci-evpn-vxlan-tf \
+          -u ci-user \
+          -p ci-password
+    - name: Terraform plan with local provider override
+      run: |
+        pushd terraform-provider-junos-vqfx-evpn-vxlan
+        go install .
+        popd
+
+        mkdir -p "$HOME/go/bin"
+        cat > "$HOME/.terraformrc" <<EOF
+        provider_installation {
+          dev_overrides {
+            "hashicorp/junos-vqfx-evpn-vxlan" = "$HOME/go/bin"
+          }
+          direct {}
+        }
+        EOF
+
+        export TF_CLI_CONFIG_FILE="$HOME/.terraformrc"
+        pushd ci-evpn-vxlan-tf
+        terraform init -no-color
+        terraform plan -refresh=false -no-color
+        popd
