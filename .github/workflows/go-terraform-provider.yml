@@ -89,20 +89,64 @@ jobs:
         export TF_CLI_CONFIG_FILE="$HOME/.terraformrc"
         export TF_IN_AUTOMATION=1
 
+        # Build a deterministic host->port map from generated providers.tf and rewrite providers to use mock sockets.
+        python - <<'PY'
+        import re
+        from pathlib import Path
+
+        providers_path = Path("ci-evpn-vxlan-tf/providers.tf")
+        text = providers_path.read_text(encoding="utf-8")
+
+        block_re = re.compile(r'provider\s+"junos-vqfx-evpn-vxlan"\s*\{.*?\}', re.DOTALL)
+        host_re = re.compile(r'host\s*=\s*"([^"]+)"')
+        port_re = re.compile(r'port\s*=\s*\d+')
+
+        hosts = []
+        for block in block_re.findall(text):
+          hm = host_re.search(block)
+          if hm:
+            host = hm.group(1)
+            if host not in hosts:
+              hosts.append(host)
+
+        base_port = 8301
+        host_port = {host: base_port + i for i, host in enumerate(hosts)}
+
+        def rewrite_block(block: str) -> str:
+          hm = host_re.search(block)
+          if not hm:
+            return block
+          host = hm.group(1)
+          port = host_port[host]
+          block = host_re.sub('host     = "127.0.0.1"', block)
+          block = port_re.sub(f'port     = {port}', block)
+          return block
+
+        rewritten = block_re.sub(lambda m: rewrite_block(m.group(0)), text)
+        providers_path.write_text(rewritten, encoding="utf-8")
+
+        with Path("ci-evpn-vxlan-tf/mock-devices.txt").open("w", encoding="utf-8") as f:
+          for host in hosts:
+            f.write(f"{host}:{host_port[host]}\\n")
+        PY
+
+        mapfile -t mock_devices < ci-evpn-vxlan-tf/mock-devices.txt
+        mock_args=()
+        for device in "${mock_devices[@]}"; do
+          mock_args+=(--device "$device")
+        done
+
         python .github/scripts/netconf_mock_server.py \
           --host 127.0.0.1 \
-          --port 8300 \
           --username ci-user \
           --password ci-password \
+          --state-dump netconf-mock-state.json \
+          "${mock_args[@]}" \
           > netconf-mock.log 2>&1 &
         MOCK_PID=$!
-        trap 'kill ${MOCK_PID} || true' EXIT
+        trap 'kill ${MOCK_PID} || true; wait ${MOCK_PID} || true' EXIT
 
         sleep 2
-
-        # Point all generated providers to the local mock NETCONF endpoint.
-        sed -E -i 's/host[[:space:]]*=[[:space:]]*"[^"]+"/host     = "127.0.0.1"/g' ci-evpn-vxlan-tf/providers.tf
-        sed -E -i 's/port[[:space:]]*=[[:space:]]*22/port     = 8300/g' ci-evpn-vxlan-tf/providers.tf
 
         pushd ci-evpn-vxlan-tf
 
@@ -179,4 +223,5 @@ jobs:
         name: netconf-integration-logs
         path: |
           netconf-mock.log
+          netconf-mock-state.json
           ci-evpn-vxlan-tf-negative/negative_apply.log
