@@ -3,6 +3,7 @@ import os
 from glob import glob
 import subprocess
 import shutil
+import tempfile
 import unittest
 from subprocess import CalledProcessError
 
@@ -54,18 +55,6 @@ def test_yang2go():
     for path in xml_args:
         assert os.path.exists(path), f"XML file does not exist: {path}"
 
-    # Test generated provider with trimmed_schema.json
-    generated_provider_dir = os.path.join(
-        repo_root, "terraform-provider-junos-vqfx-evpn-vxlan"
-    )
-    generated_trimmed_schema = os.path.join(
-        generated_provider_dir, "trimmed_schema.json"
-    )
-
-    # Remove any existing provider dir before running
-    if os.path.exists(generated_provider_dir):
-        shutil.rmtree(generated_provider_dir)
-
     stdin_json = "{}"
 
     # yang2go command
@@ -80,42 +69,51 @@ def test_yang2go():
         "vqfx-evpn-vxlan",
     ]
 
-    print("CMD:", cmd)
-    try:
-        proc = subprocess.run(
-            cmd,
-            input=stdin_json,
-            text=True,
-            capture_output=True,
-            check=True,
-            cwd=repo_root,
-            env=env
+    with tempfile.TemporaryDirectory(prefix="jtaf-yang2go-") as tmpdir:
+        # Test generated provider with trimmed_schema.json in isolated temp workspace.
+        generated_provider_dir = os.path.join(
+            tmpdir, "terraform-provider-junos-vqfx-evpn-vxlan"
         )
-    except CalledProcessError as e:
+        generated_trimmed_schema = os.path.join(
+            generated_provider_dir, "trimmed_schema.json"
+        )
+
+        print("CMD:", cmd)
+        try:
+            proc = subprocess.run(
+                cmd,
+                input=stdin_json,
+                text=True,
+                capture_output=True,
+                check=True,
+                cwd=tmpdir,
+                env=env
+            )
+        except CalledProcessError as e:
+            # Debug output
+            print("RETURNCODE:", e.returncode)
+            print("STDOUT:\n", e.output)
+            print("STDERR:\n", e.stderr)
+            raise e
+
         # Debug output
-        print("RETURNCODE:", e.returncode)
-        print("STDOUT:\n", e.output)
-        print("STDERR:\n", e.stderr)
-        raise e
+        print("RETURNCODE:", proc.returncode)
+        print("STDOUT:\n", proc.stdout)
+        print("STDERR:\n", proc.stderr)
 
-    # Debug output
-    print("RETURNCODE:", proc.returncode)
-    print("STDOUT:\n", proc.stdout)
-    print("STDERR:\n", proc.stderr)
+        assert proc.returncode == 0, (
+            f"jtaf-yang2go failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
+        )
 
-    assert proc.returncode == 0, (
-        f"jtaf-yang2go failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
-    )
+        assert os.path.isdir(generated_provider_dir), (
+            f"Expected provider dir not created: {generated_provider_dir}"
+        )
+        assert os.path.exists(generated_trimmed_schema), (
+            f"Expected trimmed_schema.json not found at {generated_trimmed_schema}"
+        )
 
-    assert os.path.isdir(generated_provider_dir), (
-        f"Expected provider dir not created: {generated_provider_dir}"
-    )
-    assert os.path.exists(generated_trimmed_schema), (
-        f"Expected trimmed_schema.json not found at {generated_trimmed_schema}"
-    )
-
-    with open(generated_trimmed_schema) as f:
-        generated_json = json.load(f)
+        with open(generated_trimmed_schema) as f:
+            generated_json = json.load(f)
 
     # Compare against expected trimmed_schema.json in examples/providers
     expected_trimmed_schema = os.path.join(
@@ -174,14 +172,6 @@ def test_yang2ansible():
     for path in xml_args:
         assert os.path.exists(path), f"XML file does not exist: {path}"
 
-    ansible_dir = os.path.join(
-        repo_root, "examples/ansible"
-    )
-
-    # Remove any existing ansible role dir before running
-    if os.path.exists(ansible_dir+"/ansible-provider-junos-vqfx-ansible-role"):
-        shutil.rmtree(ansible_dir+"/ansible-provider-junos-vqfx-ansible-role")
-
     stdin_json = "{}"
 
     # yang2ansible command
@@ -196,88 +186,82 @@ def test_yang2ansible():
         "vqfx-ansible-role",
     ]
 
-    print("CMD:", cmd)
+    with tempfile.TemporaryDirectory(prefix="jtaf-yang2ansible-") as ansible_dir:
+        print("CMD:", cmd)
 
-    try:
-        proc = subprocess.run(
-            cmd,
-            input=stdin_json,
-            text=True,
-            capture_output=True,
-            check=True,
-            cwd=ansible_dir,
-            env=env
-        )
-    except CalledProcessError as e:
+        try:
+            proc = subprocess.run(
+                cmd,
+                input=stdin_json,
+                text=True,
+                capture_output=True,
+                check=True,
+                cwd=ansible_dir,
+                env=env
+            )
+        except CalledProcessError as e:
+            # Debug output
+            print("RETURNCODE:", e.returncode)
+            print("STDOUT:\n", e.output)
+            print("STDERR:\n", e.stderr)
+            raise e
+
         # Debug output
-        print("RETURNCODE:", e.returncode)
-        print("STDOUT:\n", e.output)
-        print("STDERR:\n", e.stderr)
-        raise e
+        print("RETURNCODE:", proc.returncode)
+        print("STDOUT:\n", proc.stdout)
+        print("STDERR:\n", proc.stderr)
 
-    # Debug output
-    print("RETURNCODE:", proc.returncode)
-    print("STDOUT:\n", proc.stdout)
-    print("STDERR:\n", proc.stderr)
-
-    assert proc.returncode == 0, (
-        f"jtaf-yang2ansible failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
-    )
-
-    assert os.path.isdir(os.path.join(ansible_dir, "ansible-provider-junos-vqfx-ansible-role")), (
-        f"Expected ansible roles dir was not created: "
-        f"{os.path.join(ansible_dir, 'ansible-provider-junos-vqfx-ansible-role')}"
-    )
-
-    trimmed_schema_path = os.path.join(
-        ansible_dir, "ansible-provider-junos-vqfx-ansible-role", "trimmed_schema.json"
-    )
-
-    # Remove any existing ansible files dir before running
-    ansible_files_dir = os.path.join(ansible_dir, "vqfx_ansible_files")
-    if os.path.exists(ansible_files_dir):
-        shutil.rmtree(ansible_files_dir)
-
-    stdin_json = "{}"
-
-    # xml2yaml command
-    cmd = [
-        'jtaf-xml2yaml',
-        "-j",
-        trimmed_schema_path,
-        "-x",
-        *xml_args,
-        "-d",
-        "vqfx_ansible_files",
-    ]  # noqa: E501
-    print("CMD:", cmd)
-    try:
-        proc = subprocess.run(
-            cmd,
-            input=stdin_json,
-            text=True,
-            capture_output=True,
-            check=True,
-            cwd=ansible_dir,
-            env=env
+        assert proc.returncode == 0, (
+            f"jtaf-yang2ansible failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
         )
-    except CalledProcessError as e:
+
+        role_dir = os.path.join(ansible_dir, "ansible-provider-junos-vqfx-ansible-role")
+        assert os.path.isdir(role_dir), (
+            f"Expected ansible roles dir was not created: {role_dir}"
+        )
+
+        trimmed_schema_path = os.path.join(
+            role_dir, "trimmed_schema.json"
+        )
+
+        # xml2yaml command
+        cmd = [
+            'jtaf-xml2yaml',
+            "-j",
+            trimmed_schema_path,
+            "-x",
+            *xml_args,
+            "-d",
+            "vqfx_ansible_files",
+        ]  # noqa: E501
+        print("CMD:", cmd)
+        try:
+            proc = subprocess.run(
+                cmd,
+                input=stdin_json,
+                text=True,
+                capture_output=True,
+                check=True,
+                cwd=ansible_dir,
+                env=env
+            )
+        except CalledProcessError as e:
+            # Debug output
+            print("RETURNCODE:", e.returncode)
+            print("STDOUT:\n", e.output)
+            print("STDERR:\n", e.stderr)
+            raise e
+
         # Debug output
-        print("RETURNCODE:", e.returncode)
-        print("STDOUT:\n", e.output)
-        print("STDERR:\n", e.stderr)
-        raise e
+        print("RETURNCODE:", proc.returncode)
+        print("STDOUT:\n", proc.stdout)
+        print("STDERR:\n", proc.stderr)
 
-    # Debug output
-    print("RETURNCODE:", proc.returncode)
-    print("STDOUT:\n", proc.stdout)
-    print("STDERR:\n", proc.stderr)
+        assert proc.returncode == 0, (
+            f"jtaf-xml2yaml failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
+        )
 
-    assert proc.returncode == 0, (
-        f"jtaf-xml2yaml failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
-    )
-
-    assert os.path.isdir(os.path.join(ansible_dir, "vqfx_ansible_files")), (
-        f"Expected ansible files dir was not created: "
-        f"{os.path.join(ansible_dir, 'vqfx_ansible_files')}"
-    )
+        ansible_files_dir = os.path.join(ansible_dir, "vqfx_ansible_files")
+        assert os.path.isdir(ansible_files_dir), (
+            f"Expected ansible files dir was not created: {ansible_files_dir}"
+        )

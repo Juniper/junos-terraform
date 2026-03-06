@@ -9,7 +9,9 @@ package netconf
 import (
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"net"
 	"strings"
@@ -40,24 +42,42 @@ func (t *TransportSSH) Close() error {
 	// Close the SSH Session if we have one
 
 	if t.SSHSession != nil {
-		if err := t.SSHSession.Close(); err != nil && err.Error() != "EOF" {
+		if err := t.SSHSession.Close(); !isBenignCloseError(err) {
 			return err
 		}
 	}
 
 	// Close and check for nil. Even though closed, it will retain data for session etc.
-	err := t.SSHClient.Close()
+	err := error(nil)
+	if t.SSHClient != nil {
+		err = t.SSHClient.Close()
+	}
 
-	if err != nil {
+	if !isBenignCloseError(err) {
 		return (err)
 	}
 
 	err = t.TransportBasicIO.Close()
-	if err != nil {
+	if !isBenignCloseError(err) {
 		return (err)
 	}
 
 	return nil
+}
+
+// isBenignCloseError filters expected errors when the remote side closes first.
+func isBenignCloseError(err error) bool {
+	if err == nil {
+		return true
+	}
+
+	if errors.Is(err, io.EOF) || strings.EqualFold(err.Error(), "EOF") {
+		return true
+	}
+
+	errText := strings.ToLower(err.Error())
+	return strings.Contains(errText, "closed pipe") ||
+		strings.Contains(errText, "use of closed network connection")
 }
 
 // DialSSH connects and establishes SSH sessions
