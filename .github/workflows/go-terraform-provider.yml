@@ -27,7 +27,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.25.6'
+        go-version: 'stable'
 
     - name: Set up Terraform
       uses: hashicorp/setup-terraform@v3

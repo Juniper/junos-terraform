@@ -13,13 +13,17 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ['1.25.6', 'stable']
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Go
+    - name: Set up Go ${{ matrix.go-version }}
       uses: actions/setup-go@v4
       with:
-        go-version: '1.25.6'
+        go-version: ${{ matrix.go-version }}
 
     - name: Build
       working-directory: terraform_provider
@@ -34,7 +38,7 @@ jobs:
     - name: Upload coverage report
       uses: actions/upload-artifact@v6
       with:
-        name: go-coverage
+        name: go-coverage-${{ matrix.go-version }}
         path: terraform_provider/coverage.out
 
     - uses: golangci/golangci-lint-action@v7
