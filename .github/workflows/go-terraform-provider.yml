@@ -68,7 +68,7 @@ jobs:
           -u ci-user \
           -p ci-password
 
-    - name: Terraform integration tests with NETCONF mock
+    - name: Prepare Terraform integration environment
       run: |
         set -euo pipefail
 
@@ -86,8 +86,8 @@ jobs:
         }
         EOF
 
-        export TF_CLI_CONFIG_FILE="$HOME/.terraformrc"
-        export TF_IN_AUTOMATION=1
+        echo "TF_CLI_CONFIG_FILE=$HOME/.terraformrc" >> "$GITHUB_ENV"
+        echo "TF_IN_AUTOMATION=1" >> "$GITHUB_ENV"
 
         # Build a deterministic host->port map from generated providers.tf and rewrite providers to use mock sockets.
         python - <<'PY'
@@ -138,13 +138,12 @@ jobs:
           --devices-file ci-evpn-vxlan-tf/mock-devices.txt \
           --state-dump netconf-mock-state.json \
           > netconf-mock.log 2>&1 &
-        MOCK_PID=$!
-        trap 'if kill -0 ${MOCK_PID} 2>/dev/null; then kill ${MOCK_PID}; wait ${MOCK_PID} || true; fi' EXIT
+        echo "$!" > .netconf_mock.pid
 
         # Wait for all per-device listeners to be ready, or fail early with server logs.
         all_ready=0
         for _ in $(seq 1 30); do
-          if ! kill -0 "$MOCK_PID" 2>/dev/null; then
+          if ! kill -0 "$(cat .netconf_mock.pid)" 2>/dev/null; then
             echo "NETCONF mock exited during startup"
             cat netconf-mock.log || true
             exit 1
@@ -173,46 +172,68 @@ jobs:
           exit 1
         fi
 
-        pushd ci-evpn-vxlan-tf
-
+    - name: Terraform initial apply
+      working-directory: ci-evpn-vxlan-tf
+      run: |
+        set -euo pipefail
         # With provider dev_overrides, skip `terraform init` to avoid registry lookups for unpublished providers.
         terraform plan -refresh=false -no-color -input=false -out=tfplan-initial
         terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-initial
 
-        # After initial apply there should be no pending changes.
-        set +e
-        terraform plan -refresh=false -no-color -input=false -detailed-exitcode
-        plan_rc=$?
-        set -e
-        if [ "$plan_rc" -ne 0 ]; then
-          echo "Expected no-op plan after apply, got exit code $plan_rc"
+    - name: Terraform no-op plan after initial apply
+      id: no_op_plan_initial
+      continue-on-error: true
+      working-directory: ci-evpn-vxlan-tf
+      run: terraform plan -refresh=false -no-color -input=false -detailed-exitcode
+
+    - name: Assert no-op exit code after initial apply
+      run: |
+        if [ "${{ steps.no_op_plan_initial.outputs.exitcode }}" != "0" ]; then
+          echo "Expected no-op plan after apply, got exit code ${{ steps.no_op_plan_initial.outputs.exitcode }}"
           exit 1
         fi
 
-        # Mutate one generated resource to force an update and verify diff/apply/state behavior.
+    - name: Mutate one resource to force replacement
+      working-directory: ci-evpn-vxlan-tf
+      run: |
+        set -euo pipefail
         first_tf="$(ls *.tf | grep -v '^providers.tf$' | head -n 1)"
         sed -E -i '0,/resource_name = "[^"]+"/s//resource_name = "ci-updated-group"/' "$first_tf"
 
-        set +e
-        terraform plan -refresh=false -no-color -input=false -detailed-exitcode -out=tfplan-updated
-        update_plan_rc=$?
-        set -e
-        if [ "$update_plan_rc" -ne 2 ]; then
-          echo "Expected changed plan exit code 2, got $update_plan_rc"
+    - name: Terraform changed plan after mutation
+      id: changed_plan
+      continue-on-error: true
+      working-directory: ci-evpn-vxlan-tf
+      run: terraform plan -refresh=false -no-color -input=false -detailed-exitcode -out=tfplan-updated
+
+    - name: Assert changed plan exit code
+      run: |
+        if [ "${{ steps.changed_plan.outputs.exitcode }}" != "2" ]; then
+          echo "Expected changed plan exit code 2, got ${{ steps.changed_plan.outputs.exitcode }}"
           exit 1
         fi
 
-        terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-updated
+    - name: Terraform apply changed plan
+      working-directory: ci-evpn-vxlan-tf
+      run: terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-updated
 
-        set +e
-        terraform plan -refresh=false -no-color -input=false -detailed-exitcode
-        final_plan_rc=$?
-        set -e
-        if [ "$final_plan_rc" -ne 0 ]; then
-          echo "Expected no-op plan after second apply, got exit code $final_plan_rc"
+    - name: Terraform final no-op plan
+      id: no_op_plan_final
+      continue-on-error: true
+      working-directory: ci-evpn-vxlan-tf
+      run: terraform plan -refresh=false -no-color -input=false -detailed-exitcode
+
+    - name: Assert final no-op exit code
+      run: |
+        if [ "${{ steps.no_op_plan_final.outputs.exitcode }}" != "0" ]; then
+          echo "Expected no-op plan after second apply, got exit code ${{ steps.no_op_plan_final.outputs.exitcode }}"
           exit 1
         fi
 
+    - name: Validate terraform state entries
+      working-directory: ci-evpn-vxlan-tf
+      run: |
+        set -euo pipefail
         test -f terraform.tfstate
         state_count="$(terraform state list | wc -l)"
         if [ "$state_count" -le 0 ]; then
@@ -220,26 +241,41 @@ jobs:
           exit 1
         fi
 
-        popd
-
-        # Negative test: wrong credentials should fail apply.
+    - name: Prepare negative test inputs
+      run: |
+        set -euo pipefail
         rm -rf ci-evpn-vxlan-tf-negative
         cp -R ci-evpn-vxlan-tf ci-evpn-vxlan-tf-negative
         pushd ci-evpn-vxlan-tf-negative
         neg_tf="$(ls *.tf | grep -v '^providers.tf$' | head -n 1)"
         sed -E -i '0,/resource_name = "[^"]+"/s//resource_name = "ci-negative-group"/' "$neg_tf"
         sed -E -i 's/password[[:space:]]*=[[:space:]]*"[^"]*"/password = "wrong-password"/g' providers.tf
+        popd
 
-        set +e
-        terraform apply -refresh=false -no-color -input=false -auto-approve -parallelism=1 > negative_apply.log 2>&1
-        neg_rc=$?
-        set -e
-        if [ "$neg_rc" -eq 0 ]; then
+    - name: Terraform negative apply with bad credentials
+      id: negative_apply
+      continue-on-error: true
+      working-directory: ci-evpn-vxlan-tf-negative
+      run: terraform apply -refresh=false -no-color -input=false -auto-approve -parallelism=1 > negative_apply.log 2>&1
+
+    - name: Assert negative apply failed
+      run: |
+        if [ "${{ steps.negative_apply.outputs.exitcode }}" = "0" ]; then
           echo "Expected apply to fail with wrong credentials, but it succeeded"
-          cat negative_apply.log
+          cat ci-evpn-vxlan-tf-negative/negative_apply.log
           exit 1
         fi
-        popd
+
+    - name: Stop NETCONF mock
+      if: always()
+      run: |
+        if [ -f .netconf_mock.pid ]; then
+          MOCK_PID="$(cat .netconf_mock.pid)"
+          if kill -0 "$MOCK_PID" 2>/dev/null; then
+            kill "$MOCK_PID"
+            wait "$MOCK_PID" || true
+          fi
+        fi
 
     - name: Upload NETCONF integration logs
       if: always()
