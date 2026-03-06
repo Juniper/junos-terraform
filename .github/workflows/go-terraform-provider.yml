@@ -127,7 +127,7 @@ jobs:
 
         with Path("ci-evpn-vxlan-tf/mock-devices.txt").open("w", encoding="utf-8") as f:
           for host in hosts:
-            f.write(f"{host}:{host_port[host]}\\n")
+            f.write(f"{host}:{host_port[host]}\n")
         PY
 
         python .github/scripts/netconf_mock_server.py \

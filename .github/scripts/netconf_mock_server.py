@@ -240,10 +240,25 @@ class DeviceSession(asyncssh.SSHServerSession):
 
 async def run_server(args: argparse.Namespace) -> None:
     stop_event = asyncio.Event()
-    host_key = asyncssh.generate_private_key("ssh-rsa")
-    servers = []
-    device_states: dict[str, DeviceState] = {}
+    _install_loop_exception_handler()
+    _install_signal_handlers(stop_event)
 
+    device_specs = _collect_device_specs(args)
+    logger.info("starting NETCONF mock for %d device listeners", len(device_specs))
+
+    host_key = asyncssh.generate_private_key("ssh-rsa")
+    servers, device_states = await _start_device_listeners(args, host_key, device_specs)
+
+    logger.info("all device listeners started")
+    await stop_event.wait()
+
+    await _close_servers(servers)
+    logger.info("all device listeners closed")
+
+    _dump_state_if_requested(args.state_dump, device_states)
+
+
+def _install_loop_exception_handler() -> None:
     loop = asyncio.get_running_loop()
 
     def _loop_exception_handler(_loop: asyncio.AbstractEventLoop, context: dict) -> None:
@@ -257,6 +272,10 @@ async def run_server(args: argparse.Namespace) -> None:
 
     loop.set_exception_handler(_loop_exception_handler)
 
+
+def _install_signal_handlers(stop_event: asyncio.Event) -> None:
+    loop = asyncio.get_running_loop()
+
     def _shutdown() -> None:
         logger.info("shutdown signal received")
         stop_event.set()
@@ -264,16 +283,31 @@ async def run_server(args: argparse.Namespace) -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, _shutdown)
 
-    device_specs = list(args.device)
-    if args.devices_file:
-        logger.info("loading devices from file: %s", args.devices_file)
-        for line in Path(args.devices_file).read_text(encoding="utf-8").splitlines():
-            entry = line.strip()
-            if not entry or entry.startswith("#"):
-                continue
-            device_specs.append(entry)
 
-    logger.info("starting NETCONF mock for %d device listeners", len(device_specs))
+def _collect_device_specs(args: argparse.Namespace) -> list[str]:
+    device_specs = list(args.device)
+    if not args.devices_file:
+        return device_specs
+
+    logger.info("loading devices from file: %s", args.devices_file)
+    file_data = Path(args.devices_file).read_text(encoding="utf-8")
+    # Be tolerant of accidentally escaped newlines ("\\n") from shell-generated files.
+    file_data = file_data.replace("\\n", "\n")
+    for line in file_data.splitlines():
+        entry = line.strip()
+        if not entry or entry.startswith("#"):
+            continue
+        device_specs.append(entry)
+    return device_specs
+
+
+async def _start_device_listeners(
+    args: argparse.Namespace,
+    host_key: asyncssh.SSHKey,
+    device_specs: list[str],
+) -> tuple[list[asyncssh.SSHAcceptor], dict[str, DeviceState]]:
+    servers: list[asyncssh.SSHAcceptor] = []
+    device_states: dict[str, DeviceState] = {}
 
     for device_spec in device_specs:
         name, port_str = device_spec.split(":", 1)
@@ -291,20 +325,24 @@ async def run_server(args: argparse.Namespace) -> None:
         )
         servers.append(server)
 
-    logger.info("all device listeners started")
-    await stop_event.wait()
+    return servers, device_states
 
+
+async def _close_servers(servers: list[asyncssh.SSHAcceptor]) -> None:
     for server in servers:
         server.close()
         await server.wait_closed()
-    logger.info("all device listeners closed")
 
-    if args.state_dump:
-        dump_path = Path(args.state_dump)
-        dump_path.parent.mkdir(parents=True, exist_ok=True)
-        serialized = {name: state.snapshot() for name, state in device_states.items()}
-        dump_path.write_text(json.dumps(serialized, indent=2), encoding="utf-8")
-        logger.info("state dumped to %s", dump_path)
+
+def _dump_state_if_requested(state_dump: str, device_states: dict[str, DeviceState]) -> None:
+    if not state_dump:
+        return
+
+    dump_path = Path(state_dump)
+    dump_path.parent.mkdir(parents=True, exist_ok=True)
+    serialized = {name: state.snapshot() for name, state in device_states.items()}
+    dump_path.write_text(json.dumps(serialized, indent=2), encoding="utf-8")
+    logger.info("state dumped to %s", dump_path)
 
 
 def parse_args() -> argparse.Namespace:
