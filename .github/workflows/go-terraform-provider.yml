@@ -23,6 +23,7 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         python -m pip install .
+        python -m pip install asyncssh
 
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -67,8 +68,10 @@ jobs:
           -u ci-user \
           -p ci-password
 
-    - name: Terraform plan with local provider override
+    - name: Terraform integration tests with NETCONF mock
       run: |
+        set -euo pipefail
+
         pushd terraform-provider-junos-vqfx-evpn-vxlan
         go install .
         popd
@@ -85,7 +88,95 @@ jobs:
 
         export TF_CLI_CONFIG_FILE="$HOME/.terraformrc"
         export TF_IN_AUTOMATION=1
+
+        python .github/scripts/netconf_mock_server.py \
+          --host 127.0.0.1 \
+          --port 8300 \
+          --username ci-user \
+          --password ci-password \
+          > netconf-mock.log 2>&1 &
+        MOCK_PID=$!
+        trap 'kill ${MOCK_PID} || true' EXIT
+
+        sleep 2
+
+        # Point all generated providers to the local mock NETCONF endpoint.
+        sed -E -i 's/host[[:space:]]*=[[:space:]]*"[^"]+"/host     = "127.0.0.1"/g' ci-evpn-vxlan-tf/providers.tf
+        sed -E -i 's/port[[:space:]]*=[[:space:]]*22/port     = 8300/g' ci-evpn-vxlan-tf/providers.tf
+
         pushd ci-evpn-vxlan-tf
+
         # With provider dev_overrides, skip `terraform init` to avoid registry lookups for unpublished providers.
-        terraform plan -refresh=false -no-color -input=false
+        terraform plan -refresh=false -no-color -input=false -out=tfplan-initial
+        terraform apply -no-color -input=false -auto-approve tfplan-initial
+
+        # After initial apply there should be no pending changes.
+        set +e
+        terraform plan -refresh=false -no-color -input=false -detailed-exitcode
+        plan_rc=$?
+        set -e
+        if [ "$plan_rc" -ne 0 ]; then
+          echo "Expected no-op plan after apply, got exit code $plan_rc"
+          exit 1
+        fi
+
+        # Mutate one generated resource to force an update and verify diff/apply/state behavior.
+        first_tf="$(ls *.tf | grep -v '^providers.tf$' | head -n 1)"
+        sed -E -i '0,/resource_name = "[^"]+"/s//resource_name = "ci-updated-group"/' "$first_tf"
+
+        set +e
+        terraform plan -refresh=false -no-color -input=false -detailed-exitcode -out=tfplan-updated
+        update_plan_rc=$?
+        set -e
+        if [ "$update_plan_rc" -ne 2 ]; then
+          echo "Expected changed plan exit code 2, got $update_plan_rc"
+          exit 1
+        fi
+
+        terraform apply -no-color -input=false -auto-approve tfplan-updated
+
+        set +e
+        terraform plan -refresh=false -no-color -input=false -detailed-exitcode
+        final_plan_rc=$?
+        set -e
+        if [ "$final_plan_rc" -ne 0 ]; then
+          echo "Expected no-op plan after second apply, got exit code $final_plan_rc"
+          exit 1
+        fi
+
+        test -f terraform.tfstate
+        state_count="$(terraform state list | wc -l)"
+        if [ "$state_count" -le 0 ]; then
+          echo "Expected terraform state entries, got none"
+          exit 1
+        fi
+
         popd
+
+        # Negative test: wrong credentials should fail apply.
+        rm -rf ci-evpn-vxlan-tf-negative
+        cp -R ci-evpn-vxlan-tf ci-evpn-vxlan-tf-negative
+        pushd ci-evpn-vxlan-tf-negative
+        neg_tf="$(ls *.tf | grep -v '^providers.tf$' | head -n 1)"
+        sed -E -i '0,/resource_name = "[^"]+"/s//resource_name = "ci-negative-group"/' "$neg_tf"
+        sed -E -i 's/password[[:space:]]*=[[:space:]]*"[^"]*"/password = "wrong-password"/g' providers.tf
+
+        set +e
+        terraform apply -refresh=false -no-color -input=false -auto-approve > negative_apply.log 2>&1
+        neg_rc=$?
+        set -e
+        if [ "$neg_rc" -eq 0 ]; then
+          echo "Expected apply to fail with wrong credentials, but it succeeded"
+          cat negative_apply.log
+          exit 1
+        fi
+        popd
+
+    - name: Upload NETCONF integration logs
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: netconf-integration-logs
+        path: |
+          netconf-mock.log
+          ci-evpn-vxlan-tf-negative/negative_apply.log
