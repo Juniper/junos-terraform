@@ -6,6 +6,9 @@ from pathlib import Path
 import pytest
 
 
+pytest.importorskip("asyncssh")
+
+
 MODULE_PATH = (
     Path(__file__).resolve().parents[1] / "netconf_mock_server.py"
 )
