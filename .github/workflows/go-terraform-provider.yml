@@ -108,7 +108,7 @@ jobs:
 
         # With provider dev_overrides, skip `terraform init` to avoid registry lookups for unpublished providers.
         terraform plan -refresh=false -no-color -input=false -out=tfplan-initial
-        terraform apply -no-color -input=false -auto-approve tfplan-initial
+        terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-initial
 
         # After initial apply there should be no pending changes.
         set +e
@@ -133,7 +133,7 @@ jobs:
           exit 1
         fi
 
-        terraform apply -no-color -input=false -auto-approve tfplan-updated
+        terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-updated
 
         set +e
         terraform plan -refresh=false -no-color -input=false -detailed-exitcode
@@ -162,7 +162,7 @@ jobs:
         sed -E -i 's/password[[:space:]]*=[[:space:]]*"[^"]*"/password = "wrong-password"/g' providers.tf
 
         set +e
-        terraform apply -refresh=false -no-color -input=false -auto-approve > negative_apply.log 2>&1
+        terraform apply -refresh=false -no-color -input=false -auto-approve -parallelism=1 > negative_apply.log 2>&1
         neg_rc=$?
         set -e
         if [ "$neg_rc" -eq 0 ]; then

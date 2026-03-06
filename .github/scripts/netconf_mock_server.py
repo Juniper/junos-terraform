@@ -37,9 +37,10 @@ class NetconfState:
 
 
 class MockSSHServer(asyncssh.SSHServer):
-    def __init__(self, username: str, password: str):
+    def __init__(self, username: str, password: str, state: NetconfState):
         self.username = username
         self.password = password
+        self.state = state
 
     def begin_auth(self, username: str) -> bool:
         return True
@@ -49,6 +50,9 @@ class MockSSHServer(asyncssh.SSHServer):
 
     def validate_password(self, username: str, password: str) -> bool:
         return username == self.username and password == self.password
+
+    def session_requested(self) -> asyncssh.SSHServerSession:
+        return NetconfSession(self.state)
 
 
 class NetconfSession(asyncssh.SSHServerSession):
@@ -158,11 +162,10 @@ async def run_server(host: str, port: int, username: str, password: str) -> None
         loop.add_signal_handler(sig, _shutdown)
 
     await asyncssh.create_server(
-        lambda: MockSSHServer(username, password),
+        lambda: MockSSHServer(username, password, state),
         host,
         port,
         server_host_keys=[host_key],
-        session_factory=lambda: NetconfSession(state),
         encoding="utf-8",
     )
 
