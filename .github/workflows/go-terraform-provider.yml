@@ -224,12 +224,12 @@ jobs:
         first_resource="$(terraform state list | head -n 1)"
         echo "resource=$first_resource" >> "$GITHUB_OUTPUT"
 
-        resource_dump="$(terraform state show -no-color "$first_resource")"
-        target_host="$(printf '%s\n' "$resource_dump" | sed -n 's/^ *host *= *"\([^"]*\)"/\1/p' | head -n 1)"
+        # Use the generated device map as source-of-truth for mock hostnames.
+        target_host="$(head -n 1 mock-devices.txt | cut -d: -f1 | tr -d '[:space:]')"
         target_group="base-config"
 
         if [ -z "$target_host" ]; then
-          echo "Failed to extract host from terraform state for $first_resource"
+          echo "Failed to extract target host from mock-devices.txt"
           exit 1
         fi
 
