@@ -263,7 +263,7 @@ jobs:
 
         MSG_SEP = "]]>]]>"
 
-        async def recv_frame(reader: asyncssh.SSHReader[str]) -> str:
+        async def recv_frame(reader) -> str:
             buf = ""
             while MSG_SEP not in buf:
                 chunk = await reader.read(4096)
@@ -273,7 +273,7 @@ jobs:
             frame, _rest = buf.split(MSG_SEP, 1)
             return frame.strip()
 
-        async def send_rpc(writer: asyncssh.SSHWriter[str], reader: asyncssh.SSHReader[str], message_id: str, payload: str) -> str:
+        async def send_rpc(writer, reader, message_id: str, payload: str) -> str:
             rpc = (
                 f'<?xml version="1.0" encoding="UTF-8"?>'
                 f'<rpc message-id="{message_id}" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">'
@@ -294,11 +294,11 @@ jobs:
                 password="ci-password",
                 known_hosts=None,
             )
+            proc = None
             try:
-                chan, session = await conn.create_session(asyncssh.SSHClientStreamSession, subsystem="netconf")
-                del chan
-                reader: asyncssh.SSHReader[str] = session.stdout
-                writer: asyncssh.SSHWriter[str] = session.stdin
+                proc = await conn.create_process(subsystem="netconf")
+                reader = proc.stdout
+                writer = proc.stdin
 
                 # Consume server hello and send client hello.
                 await recv_frame(reader)
@@ -329,6 +329,11 @@ jobs:
                     if "<ok/>" not in reply:
                         raise RuntimeError(f"unexpected reply for message-id {mid}: {reply}")
             finally:
+                if proc is not None:
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
                 conn.close()
                 await conn.wait_closed()
 
