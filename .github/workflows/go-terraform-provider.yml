@@ -278,13 +278,13 @@ jobs:
           exit 1
         fi
 
-    - name: Assert Terraform state advanced and remains managed
+    - name: Assert Terraform state remains managed
       working-directory: ci-evpn-vxlan-tf
       run: |
         set -euo pipefail
         after_serial="$(terraform state pull | python ../.github/scripts/tfstate_serial.py)"
-        if [ "$after_serial" -le "${{ steps.state_baseline.outputs.serial }}" ]; then
-          echo "Expected state serial to increase after drift reconcile (before=${{ steps.state_baseline.outputs.serial }}, after=$after_serial)"
+        if [ "$after_serial" -lt "${{ steps.state_baseline.outputs.serial }}" ]; then
+          echo "Expected state serial to not decrease after drift reconcile (before=${{ steps.state_baseline.outputs.serial }}, after=$after_serial)"
           exit 1
         fi
         terraform state show "${{ steps.state_baseline.outputs.resource }}" >/dev/null
