@@ -207,9 +207,13 @@ jobs:
       id: drift_target
       run: |
         set -euo pipefail
-        target_host="$(head -n 1 ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt | cut -d: -f1 | tr -d '[:space:]')"
+        target_host="$(ls -1 ansible-provider-junos-vqfx-evpn-vxlan/host_vars/*.y*ml 2>/dev/null | sort | head -n 1 | xargs -r -n1 basename | sed -E 's/\.(yaml|yml)$//')"
         if [ -z "$target_host" ]; then
-          echo "failed to derive target host from mock-devices.txt"
+          echo "failed to derive target host from host_vars"
+          exit 1
+        fi
+        if ! grep -q "^${target_host}:" ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt; then
+          echo "derived drift target host '${target_host}' is missing from mock-devices mapping"
           exit 1
         fi
         echo "host=$target_host" >> "$GITHUB_OUTPUT"
@@ -290,6 +294,7 @@ jobs:
         python .github/scripts/assert_netconf_mock_state.py \
           --state-dump netconf-mock-state.json \
           --require-min-commits 3 \
+          --only-device "${{ steps.drift_target.outputs.host }}" \
           --must-contain 203.0.113.10/32 \
           --must-not-contain 203.0.113.250/32
 
