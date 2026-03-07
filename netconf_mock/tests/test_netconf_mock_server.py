@@ -178,6 +178,21 @@ def test_extract_message_id_accepts_single_quoted_attributes():
     assert MODULE.DeviceSession._extract_message_id(xml) == "77"
 
 
+def test_extract_message_id_accepts_prefixed_attribute():
+    xml = (
+        '<rpc xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" '
+        'nc:message-id="88"><lock><target><candidate/></target></lock></rpc>'
+    )
+
+    assert MODULE.DeviceSession._extract_message_id(xml) == "88"
+
+
+def test_extract_message_id_returns_empty_when_missing():
+    xml = "<rpc><lock><target><candidate/></target></lock></rpc>"
+
+    assert MODULE.DeviceSession._extract_message_id(xml) == ""
+
+
 def test_dump_state_if_requested_writes_json(tmp_path):
     out_file = tmp_path / "state.json"
     state = MODULE.DeviceState(name="leaf1")

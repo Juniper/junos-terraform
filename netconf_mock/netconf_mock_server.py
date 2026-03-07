@@ -123,6 +123,7 @@ class DeviceSession(asyncssh.SSHServerSession):
 
     def _send_frame(self, payload: str) -> None:
         if self._chan is not None:
+            logger.debug("device=%s tx frame=%s", self._state.name, payload[:300])
             self._chan.write(payload + MSG_SEP + "\n")
 
     @staticmethod
@@ -130,15 +131,19 @@ class DeviceSession(asyncssh.SSHServerSession):
         # Prefer XML parsing so attribute quoting/formatting differences do not break matching.
         try:
             root = ET.fromstring(xml_text)
-            message_id = root.attrib.get("message-id")
-            if message_id:
-                return message_id
+            for attr_name, attr_value in root.attrib.items():
+                if attr_name == "message-id" or attr_name.endswith("}message-id"):
+                    if attr_value:
+                        return attr_value
         except ET.ParseError:
             pass
 
-        # Fallback regex supports single or double quotes and optional spaces.
-        m = re.search(r"message-id\s*=\s*(['\"])(.*?)\1", xml_text)
-        return m.group(2) if m else "0"
+        # Fallback regex supports optional namespace prefixes and quote styles.
+        m = re.search(
+            r"(?:[A-Za-z_][\w.\-]*:)?message-id\s*=\s*(['\"])(.*?)\1",
+            xml_text,
+        )
+        return m.group(2) if m else ""
 
     @staticmethod
     def _extract_group_name(xml_text: str) -> str:
@@ -227,9 +232,23 @@ class DeviceSession(asyncssh.SSHServerSession):
     def _handle_rpc(self, xml_text: str) -> None:
         message_id = self._extract_message_id(xml_text)
         self._state.rpc_log.append(xml_text)
+        logger.debug(
+            "device=%s rx message_id=%s rpc=%s",
+            self._state.name,
+            message_id if message_id else "<missing>",
+            xml_text[:300],
+        )
 
         # Ignore client hello after server hello.
         if "<hello" in xml_text:
+            return
+
+        if not message_id:
+            self._append_history("invalid-rpc", "missing-message-id")
+            logger.warning(
+                "device=%s received rpc without parseable message-id; dropping request",
+                self._state.name,
+            )
             return
 
         handlers = (
