@@ -16,7 +16,7 @@ jobs:
     - name: Set up Python (pinned for Junos Ansible compatibility)
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: '3.12'
 
     - name: Install Python and Ansible dependencies
       env:
@@ -30,8 +30,7 @@ jobs:
           asyncssh==2.21.1 \
           ansible-core==2.18.8 \
           jxmlease==1.0.3 \
-          junos-eznc==2.7.4 \
-          ncclient==0.7.0
+          junos-eznc==2.7.4
         rm -rf /tmp/ansible-junos-stdlib
         git clone --depth 1 https://github.com/Juniper/ansible-junos-stdlib.git /tmp/ansible-junos-stdlib
         git -C /tmp/ansible-junos-stdlib fetch --depth 1 origin "$ANSIBLE_JUNOS_STDLIB_REF"
