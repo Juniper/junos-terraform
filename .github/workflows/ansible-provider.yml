@@ -24,7 +24,7 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         python -m pip install .
         python -m pip install asyncssh ansible-core ncclient jxmlease
-        ansible-galaxy collection install junipernetworks.junos ansible.netcommon
+        ansible-galaxy collection install juniper.device ansible.netcommon
 
     - name: Run NETCONF mock unit tests
       run: |
@@ -94,16 +94,16 @@ jobs:
                 name: "{{ generated_role_name }}"
 
             - name: Push rendered XML via Junos NETCONF plugin
-              junipernetworks.junos.junos_config:
+              connection: ansible.netcommon.netconf
+              juniper.device.junos_config:
                 src: "{{ tmp_dir }}/{{ inventory_hostname }}.xml"
                 src_format: xml
                 update: merge
                 comment: "CI apply generated role"
-                provider:
-                  host: "{{ ansible_host }}"
-                  port: "{{ ansible_port }}"
-                  username: "{{ ci_netconf_username }}"
-                  password: "{{ ci_netconf_password }}"
+              vars:
+                ansible_network_os: juniper.device.junos
+                ansible_user: "{{ ci_netconf_username }}"
+                ansible_password: "{{ ci_netconf_password }}"
               register: junos_apply_result
 
             - name: Emit concise module result for debugging
@@ -163,6 +163,7 @@ jobs:
       working-directory: ansible-provider-junos-vqfx-evpn-vxlan
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
+        ANSIBLE_DEPRECATION_WARNINGS: "False"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
       run: |
@@ -173,6 +174,7 @@ jobs:
       working-directory: ansible-provider-junos-vqfx-evpn-vxlan
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
+        ANSIBLE_DEPRECATION_WARNINGS: "False"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
       run: |
@@ -183,6 +185,7 @@ jobs:
       working-directory: ansible-provider-junos-vqfx-evpn-vxlan
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
+        ANSIBLE_DEPRECATION_WARNINGS: "False"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
       run: |
@@ -216,6 +219,7 @@ jobs:
       working-directory: ansible-provider-junos-vqfx-evpn-vxlan
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
+        ANSIBLE_DEPRECATION_WARNINGS: "False"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
       run: |
@@ -227,6 +231,7 @@ jobs:
       working-directory: ansible-provider-junos-vqfx-evpn-vxlan
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
+        ANSIBLE_DEPRECATION_WARNINGS: "False"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: wrong-password
       run: |

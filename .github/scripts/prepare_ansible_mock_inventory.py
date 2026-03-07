@@ -40,6 +40,7 @@ def write_inventory(inventory_file: Path, hosts: list[str], bind_host: str, base
     lines.append("")
     lines.append("[all:vars]")
     lines.append("ansible_connection=local")
+    lines.append("ansible_python_interpreter=auto_silent")
     lines.append("")
     inventory_file.parent.mkdir(parents=True, exist_ok=True)
     inventory_file.write_text("\n".join(lines), encoding="utf-8")
