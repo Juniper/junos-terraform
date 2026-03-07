@@ -1,0 +1,4 @@
+asyncssh>=2.21.1
+ansible-core>=2.18.8
+jxmlease>=1.0.3
+junos-eznc>=2.7.4
