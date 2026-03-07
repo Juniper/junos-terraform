@@ -95,6 +95,10 @@ class DeviceSSHServer(asyncssh.SSHServer):
 
 
 class DeviceSession(asyncssh.SSHServerSession):
+    @staticmethod
+    def _local_name(tag: str) -> str:
+        return tag.rsplit("}", 1)[-1] if "}" in tag else tag
+
     def __init__(self, state: DeviceState):
         self._chan: asyncssh.SSHServerChannel | None = None
         self._buf = ""
@@ -147,8 +151,21 @@ class DeviceSession(asyncssh.SSHServerSession):
 
     @staticmethod
     def _extract_group_name(xml_text: str) -> str:
-        m = re.search(r"<name>([^<]+)</name>", xml_text)
-        return m.group(1) if m else ""
+        # Prefer XML parsing and only consider <configuration><groups><name>.
+        try:
+            root = ET.fromstring(xml_text)
+            for elem in root.iter():
+                if DeviceSession._local_name(elem.tag) != "groups":
+                    continue
+                for child in list(elem):
+                    if DeviceSession._local_name(child.tag) == "name" and child.text:
+                        return child.text.strip()
+        except ET.ParseError:
+            pass
+
+        # Regex fallback restricted to groups/name to avoid matching unrelated <name> tags.
+        m = re.search(r"<groups>\s*<name>([^<]+)</name>", xml_text, flags=re.DOTALL)
+        return m.group(1).strip() if m else ""
 
     @staticmethod
     def _extract_configuration(xml_text: str) -> str:

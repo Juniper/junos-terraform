@@ -193,6 +193,19 @@ def test_extract_message_id_returns_empty_when_missing():
     assert MODULE.DeviceSession._extract_message_id(xml) == ""
 
 
+def test_extract_group_name_prefers_groups_name_over_nested_name():
+    xml = (
+        '<rpc message-id="101">'
+        '<load-configuration action="replace" format="xml">'
+        '<configuration><groups><name>base-config</name>'
+        '<interfaces><interface><name>lo0</name></interface></interfaces>'
+        '</groups></configuration>'
+        '</load-configuration></rpc>'
+    )
+
+    assert MODULE.DeviceSession._extract_group_name(xml) == "base-config"
+
+
 def test_dump_state_if_requested_writes_json(tmp_path):
     out_file = tmp_path / "state.json"
     state = MODULE.DeviceState(name="leaf1")

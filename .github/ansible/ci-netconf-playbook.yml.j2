@@ -29,7 +29,7 @@
         diff: false
         commit: true
         src: "{{ tmp_dir }}/{{ inventory_hostname }}.xml"
-        load: merge
+        load: replace
         comment: "CI apply generated role"
       failed_when: false
       register: junos_apply_result
