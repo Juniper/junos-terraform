@@ -145,28 +145,46 @@ jobs:
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
+        ANSIBLE_DEBUG: "1"
+        ANSIBLE_VERBOSITY: "4"
+        ANSIBLE_DISPLAY_TRACEBACK: "always"
+        ANSIBLE_KEEP_REMOTE_FILES: "1"
+        ANSIBLE_LOG_PATH: "../ansible-debug.log"
+        PYTHONFAULTHANDLER: "1"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
       run: |
         set -euo pipefail
-        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vv | tee ../ansible-initial.log
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vvvv | tee ../ansible-initial.log
 
     - name: Second apply should be safe (imperative rerun)
       working-directory: ansible-provider-junos-vqfx-evpn-vxlan
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
+        ANSIBLE_DEBUG: "1"
+        ANSIBLE_VERBOSITY: "4"
+        ANSIBLE_DISPLAY_TRACEBACK: "always"
+        ANSIBLE_KEEP_REMOTE_FILES: "1"
+        ANSIBLE_LOG_PATH: "../ansible-debug.log"
+        PYTHONFAULTHANDLER: "1"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
       run: |
         set -euo pipefail
-        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vv | tee ../ansible-rerun.log
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vvvv | tee ../ansible-rerun.log
 
     - name: Mutate generated YAML and apply updated intent
       working-directory: ansible-provider-junos-vqfx-evpn-vxlan
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
+        ANSIBLE_DEBUG: "1"
+        ANSIBLE_VERBOSITY: "4"
+        ANSIBLE_DISPLAY_TRACEBACK: "always"
+        ANSIBLE_KEEP_REMOTE_FILES: "1"
+        ANSIBLE_LOG_PATH: "../ansible-debug.log"
+        PYTHONFAULTHANDLER: "1"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
       run: |
@@ -174,7 +192,7 @@ jobs:
         python ../.github/scripts/mutate_first_yaml_ipv4_cidr.py \
           --directory host_vars \
           --replacement 203.0.113.10/32
-        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vv | tee ../ansible-mutated.log
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vvvv | tee ../ansible-mutated.log
 
     - name: Simulate out-of-band NETCONF drift
       id: drift_target
@@ -201,11 +219,17 @@ jobs:
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
+        ANSIBLE_DEBUG: "1"
+        ANSIBLE_VERBOSITY: "4"
+        ANSIBLE_DISPLAY_TRACEBACK: "always"
+        ANSIBLE_KEEP_REMOTE_FILES: "1"
+        ANSIBLE_LOG_PATH: "../ansible-debug.log"
+        PYTHONFAULTHANDLER: "1"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
       run: |
         set -euo pipefail
-        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vv | tee ../ansible-reconcile.log
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vvvv | tee ../ansible-reconcile.log
 
     - name: Negative test apply with bad credentials
       id: negative_apply
@@ -213,6 +237,12 @@ jobs:
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
+        ANSIBLE_DEBUG: "1"
+        ANSIBLE_VERBOSITY: "4"
+        ANSIBLE_DISPLAY_TRACEBACK: "always"
+        ANSIBLE_KEEP_REMOTE_FILES: "1"
+        ANSIBLE_LOG_PATH: "../ansible-debug.log"
+        PYTHONFAULTHANDLER: "1"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: wrong-password
       run: |
@@ -220,7 +250,7 @@ jobs:
         ansible-playbook \
           -i mock-inventory.ini \
           ci-netconf-playbook.yml \
-          -vv > ../ansible-negative.log 2>&1
+          -vvvv > ../ansible-negative.log 2>&1
         rc=$?
         set -e
         echo "exitcode=$rc" >> "$GITHUB_OUTPUT"
@@ -267,3 +297,4 @@ jobs:
           ansible-mutated.log
           ansible-reconcile.log
           ansible-negative.log
+          ansible-debug.log

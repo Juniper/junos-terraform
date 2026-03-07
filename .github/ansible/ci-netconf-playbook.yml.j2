@@ -31,7 +31,22 @@
         src: "{{ tmp_dir }}/{{ inventory_hostname }}.xml"
         load: merge
         comment: "CI apply generated role"
+      failed_when: false
       register: junos_apply_result
+
+    - name: Emit full module result for debugging
+      ansible.builtin.debug:
+        var: junos_apply_result
+
+    - name: Fail with detailed module diagnostics
+      ansible.builtin.fail:
+        msg: |
+          juniper.device.config task failed for {{ inventory_hostname }}
+          msg={{ junos_apply_result.msg | default('') }}
+          exception={{ junos_apply_result.exception | default('') }}
+          module_stdout={{ junos_apply_result.module_stdout | default('') }}
+          module_stderr={{ junos_apply_result.module_stderr | default('') }}
+      when: junos_apply_result.failed | default(false)
 
     - name: Emit concise module result for debugging
       ansible.builtin.debug:
