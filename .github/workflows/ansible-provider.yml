@@ -23,7 +23,7 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         python -m pip install .
-        python -m pip install asyncssh ansible-core ncclient jxmlease junos-eznc
+        python -m pip install asyncssh ansible-core jxmlease junos-eznc
         rm -rf /tmp/ansible-junos-stdlib
         git clone --depth 1 https://github.com/Juniper/ansible-junos-stdlib.git /tmp/ansible-junos-stdlib
         ansible-galaxy collection install /tmp/ansible-junos-stdlib/ansible_collections/juniper/device
@@ -105,6 +105,9 @@ jobs:
                 port: "{{ ansible_port | default(830) }}"
                 user: "{{ ci_netconf_username }}"
                 passwd: "{{ ci_netconf_password }}"
+                check: false
+                diff: false
+                commit: true
                 src: "{{ tmp_dir }}/{{ inventory_hostname }}.xml"
                 format: xml
                 load: merge
