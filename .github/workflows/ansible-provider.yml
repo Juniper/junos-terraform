@@ -23,7 +23,7 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         python -m pip install .
-        python -m pip install asyncssh ansible-core ncclient jxmlease py-junos-eznc
+        python -m pip install asyncssh ansible-core ncclient jxmlease junos-eznc
         ansible-galaxy collection install git+https://github.com/Juniper/ansible-junos-stdlib.git
         ansible-galaxy collection install ansible.netcommon
 
