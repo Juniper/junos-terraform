@@ -109,7 +109,6 @@ jobs:
                 diff: false
                 commit: true
                 src: "{{ tmp_dir }}/{{ inventory_hostname }}.xml"
-                format: xml
                 load: merge
                 comment: "CI apply generated role"
               register: junos_apply_result
