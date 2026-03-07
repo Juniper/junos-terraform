@@ -86,8 +86,8 @@ jobs:
           vars:
             tmp_dir: configs
             generated_role_name: "$role_name"
-            netconf_username: "{{ netconf_username | default(lookup('env', 'NETCONF_USERNAME')) }}"
-            netconf_password: "{{ netconf_password | default(lookup('env', 'NETCONF_PASSWORD')) }}"
+            ci_netconf_username: "{{ lookup('env', 'NETCONF_USERNAME') }}"
+            ci_netconf_password: "{{ lookup('env', 'NETCONF_PASSWORD') }}"
           tasks:
             - name: Render XML using generated role
               ansible.builtin.include_role:
@@ -102,8 +102,8 @@ jobs:
                 provider:
                   host: "{{ ansible_host }}"
                   port: "{{ ansible_port }}"
-                  username: "{{ netconf_username }}"
-                  password: "{{ netconf_password }}"
+                  username: "{{ ci_netconf_username }}"
+                  password: "{{ ci_netconf_password }}"
               register: junos_apply_result
 
             - name: Emit concise module result for debugging
@@ -228,12 +228,12 @@ jobs:
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         NETCONF_USERNAME: ci-user
+        NETCONF_PASSWORD: wrong-password
       run: |
         set +e
         ansible-playbook \
           -i mock-inventory.ini \
           ci-netconf-playbook.yml \
-          -e netconf_password=wrong-password \
           -vv > ../ansible-negative.log 2>&1
         rc=$?
         set -e
