@@ -401,6 +401,6 @@ def build_type_map(node, parent_path=""):
     return type_map
 
 
-def normalize_tag(tag:str) -> str:
+def normalize_tag(tag: str) -> str:
     """Prepare XML tag to be used as YAML key by replacing '-' and '.' with '_'."""
     return tag.replace("-", "_").replace(".", "_")
