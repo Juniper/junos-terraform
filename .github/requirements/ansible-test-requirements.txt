@@ -1,4 +1,7 @@
 asyncssh>=2.21.1
-ansible-core>=2.18.8
+# ansible-core support is tied to Python runtime version.
+ansible-core>=2.15.13,<2.16; python_version < "3.10"
+ansible-core>=2.16,<2.18; python_version >= "3.10" and python_version < "3.11"
+ansible-core>=2.18.8; python_version >= "3.11"
 jxmlease>=1.0.3
 junos-eznc>=2.7.4
