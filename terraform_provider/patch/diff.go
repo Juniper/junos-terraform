@@ -1,36 +1,36 @@
 package patch
 
 import (
+	"bytes"
 	"encoding/xml"
-	"strings"
 	"fmt"
-    "io"
-    "bytes"
+	"io"
+	"strings"
 )
 
 // ------------------------- Type Definitions [START] -------------------------
 
 // XML tree node
 type Node struct {
-	Name     string           
-	Attrs    map[string]string 
-	Text     string           
-	Children []*Node           
-    Parent   *Node 
+	Name     string
+	Attrs    map[string]string
+	Text     string
+	Children []*Node
+	Parent   *Node
 }
 
 // Diff struct
 type Change struct {
-    Op   string // "create" | "delete" | "replace"
-    OldV string
-    NewV string
+	Op   string // "create" | "delete" | "replace"
+	OldV string
+	NewV string
 }
 
 // Minimal XML element with an operation
 type PatchNode struct {
-	XMLName xml.Name
-	AttrOp  string  `xml:"operation,attr,omitempty"`
-	Text    string  `xml:",chardata"`
+	XMLName  xml.Name
+	AttrOp   string       `xml:"operation,attr,omitempty"`
+	Text     string       `xml:",chardata"`
 	Children []*PatchNode `xml:",any"`
 }
 
@@ -66,7 +66,7 @@ func BuildTree(xmlBytes []byte) (*Node, error) {
 				root = n
 			} else {
 				parent := stack[len(stack)-1]
-                n.Parent = parent
+				n.Parent = parent
 				parent.Children = append(parent.Children, n)
 			}
 			stack = append(stack, n)
@@ -113,18 +113,18 @@ func LeafMap(root *Node) map[string]string {
 		// Plain scalar leaf
 		case !otherKids && n.Name != "name" && textVal != "":
 			path := strings.Join(stack, "/")
-                i := 0
-                basePath := path
+			i := 0
+			basePath := path
 
-                for {
-                    if _, ok := out[path]; !ok {
-                        break
-                    }
-                    i++
-                    path = fmt.Sprintf("%s#%d", basePath, i)
-                }
+			for {
+				if _, ok := out[path]; !ok {
+					break
+				}
+				i++
+				path = fmt.Sprintf("%s#%d", basePath, i)
+			}
 
-                out[path] = textVal
+			out[path] = textVal
 
 		//  Node whose only real payload is <name>child</name>
 		case !otherKids && hasName && n.Name != "name" && textVal == "":
@@ -147,24 +147,24 @@ func LeafMap(root *Node) map[string]string {
 }
 
 // CreateDiffMap creates a map of differences between plan and state
-func CreateDiffMap(planMap map[string]string, stateMap map[string]string, idx map[string]*NodeInfo) (changes map[string]Change){
+func CreateDiffMap(planMap map[string]string, stateMap map[string]string, idx map[string]*NodeInfo) (changes map[string]Change) {
 	changes = make(map[string]Change)
 
 	// Deletions & candidates for replace
-    for k, lv := range stateMap {
-        if rv, ok := planMap[k]; !ok {
-            changes[k] = Change{Op: "delete", OldV: lv, NewV: ""}
-        } else if rv != lv {
-            changes[k] = Change{Op: "replace", OldV: lv, NewV: rv}
-        }
-    }
+	for k, lv := range stateMap {
+		if rv, ok := planMap[k]; !ok {
+			changes[k] = Change{Op: "delete", OldV: lv, NewV: ""}
+		} else if rv != lv {
+			changes[k] = Change{Op: "replace", OldV: lv, NewV: rv}
+		}
+	}
 
-    // Creations
-    for k, rv := range planMap {
-        if _, ok := stateMap[k]; !ok {
-            changes[k] = Change{Op: "create", OldV: "", NewV: rv}
-        }
-    }
+	// Creations
+	for k, rv := range planMap {
+		if _, ok := stateMap[k]; !ok {
+			changes[k] = Change{Op: "create", OldV: "", NewV: rv}
+		}
+	}
 
 	return changes
 }
@@ -177,9 +177,9 @@ func CreateDiffPatch(changes map[string]Change, group string) (string, error) {
 		segs := splitPathRespectQuotes(path)[1:] // drop leading "configuration"
 		parent := ensurePath(root, segs[:len(segs)-1])
 		leafName := segs[len(segs)-1]
-        if i := strings.IndexByte(leafName, '#'); i >= 0 {
-            leafName = leafName[:i]
-        }
+		if i := strings.IndexByte(leafName, '#'); i >= 0 {
+			leafName = leafName[:i]
+		}
 		switch change.Op {
 		case "delete":
 			node := &PatchNode{XMLName: xml.Name{Local: leafName}, AttrOp: "delete"}
@@ -203,9 +203,9 @@ func CreateDiffPatch(changes map[string]Change, group string) (string, error) {
 	if err := enc.Encode(root); err != nil {
 		return "", err
 	}
-	enc.Flush()
+	_ = enc.Flush()
 
-    diff := buf.String()
+	diff := buf.String()
 
 	return diff, nil
 }
@@ -292,53 +292,53 @@ func ensurePath(root *PatchNode, segs []string) *PatchNode {
 	cur := root
 	for _, s := range segs {
 		// Parse name and optional key value
-        name := s
-        var key string
-        if i := strings.IndexByte(s, '#'); i >= 0 {
-            name = s[:i]
-        }
-        if i := strings.IndexByte(s, '['); i >= 0 {
-            name = s[:i]
-            // Extract value between quotes in [name="..."]
-            start := strings.IndexByte(s[i:], '"')
-            end := strings.LastIndexByte(s, '"')
-            if start >= 0 && end > i+start {
-                // adjust start to absolute index
-                start = i + start
-                key = s[start+1 : end]
-            }
-        }
+		name := s
+		var key string
+		if i := strings.IndexByte(s, '#'); i >= 0 {
+			name = s[:i]
+		}
+		if i := strings.IndexByte(s, '['); i >= 0 {
+			name = s[:i]
+			// Extract value between quotes in [name="..."]
+			start := strings.IndexByte(s[i:], '"')
+			end := strings.LastIndexByte(s, '"')
+			if start >= 0 && end > i+start {
+				// adjust start to absolute index
+				start = i + start
+				key = s[start+1 : end]
+			}
+		}
 
-        // Find or create the child element for this name
-        var child *PatchNode
-        for _, c := range cur.Children {
-            if c.XMLName.Local == name {
-                child = c
-                break
-            }
-        }
-        if child == nil {
-            child = &PatchNode{XMLName: xml.Name{Local: name}}
-            cur.Children = append(cur.Children, child)
-        }
+		// Find or create the child element for this name
+		var child *PatchNode
+		for _, c := range cur.Children {
+			if c.XMLName.Local == name {
+				child = c
+				break
+			}
+		}
+		if child == nil {
+			child = &PatchNode{XMLName: xml.Name{Local: name}}
+			cur.Children = append(cur.Children, child)
+		}
 
-        // If we have a [name="..."], ensure the child has a <name> first-child
-        if key != "" {
-            hasName := false
-            for _, c := range child.Children {
-                if c.XMLName.Local == "name" {
-                    hasName = true
-                    break
-                }
-            }
-            if !hasName {
-                nameNode := &PatchNode{
-                    XMLName: xml.Name{Local: "name"},
-                    Text:    key,
-                }
-                child.Children = append([]*PatchNode{nameNode}, child.Children...)
-            }
-        }
+		// If we have a [name="..."], ensure the child has a <name> first-child
+		if key != "" {
+			hasName := false
+			for _, c := range child.Children {
+				if c.XMLName.Local == "name" {
+					hasName = true
+					break
+				}
+			}
+			if !hasName {
+				nameNode := &PatchNode{
+					XMLName: xml.Name{Local: "name"},
+					Text:    key,
+				}
+				child.Children = append([]*PatchNode{nameNode}, child.Children...)
+			}
+		}
 		cur = child
 	}
 	return cur
