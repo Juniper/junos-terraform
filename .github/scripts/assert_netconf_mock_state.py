@@ -12,10 +12,29 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Assert expected invariants from a NETCONF mock state dump."
     )
-    parser.add_argument("--state-dump", required=True, help="Path to netconf mock state JSON.")
-    parser.add_argument("--require-min-commits", type=int, default=1, help="Minimum total commit operations.")
-    parser.add_argument("--must-contain", action="append", default=[], help="String that must appear in running config.")
-    parser.add_argument("--must-not-contain", action="append", default=[], help="String that must not appear in running config.")
+    parser.add_argument(
+        "--state-dump",
+        required=True,
+        help="Path to netconf mock state JSON.",
+    )
+    parser.add_argument(
+        "--require-min-commits",
+        type=int,
+        default=1,
+        help="Minimum total commit operations.",
+    )
+    parser.add_argument(
+        "--must-contain",
+        action="append",
+        default=[],
+        help="String that must appear in running config.",
+    )
+    parser.add_argument(
+        "--must-not-contain",
+        action="append",
+        default=[],
+        help="String that must not appear in running config.",
+    )
     parser.add_argument(
         "--only-device",
         default="",
