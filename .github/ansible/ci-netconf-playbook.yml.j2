@@ -46,7 +46,11 @@
           exception={{ junos_apply_result.exception | default('') }}
           module_stdout={{ junos_apply_result.module_stdout | default('') }}
           module_stderr={{ junos_apply_result.module_stderr | default('') }}
-      when: junos_apply_result.failed | default(false)
+      when: >-
+        (junos_apply_result.failed | default(false))
+        or ((junos_apply_result.msg | default('')) is search('ConnectAuthError|Unable to make a PyEZ connection|MODULE FAILURE|Traceback'))
+        or ((junos_apply_result.exception | default('')) is search('Traceback|Exception|Error'))
+        or ((junos_apply_result.module_stderr | default('')) is search('MODULE FAILURE|Traceback|Exception|Error'))
 
     - name: Emit concise module result for debugging
       ansible.builtin.debug:
