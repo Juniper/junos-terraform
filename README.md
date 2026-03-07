@@ -261,7 +261,9 @@ provider "junos-vqfx" {
 }
 ```
 
-You can either specify the exact IP address in the host field OR use a hostname (like in the example above) and provide the IP address for every hostname in the system file `/etc/hosts`.
+You can either specify the exact IP address in the host field OR use a hostname (like in the example above) and provide the IP address for every hostname in the system file `/etc/hosts` using `vi`.
+
+*NOTE:* If the `/etc/hosts` file is a **READ-ONLY** file, then try using `sudo su` then re-run `vi /etc/hosts`. Exit after editing and return back to user control. 
 
 Example:
 ```

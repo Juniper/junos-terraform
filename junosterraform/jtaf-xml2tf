@@ -6,6 +6,7 @@ import sys
 import re
 import os
 from xml.etree import ElementTree
+from junosterraform.jtaf_common import build_type_map, normalize_tag
 
 missing_xpaths = set()
 
@@ -24,38 +25,6 @@ def convert_to_hcl(value, indent=2):
         return str(value)
     else:
         return f'"{value}"'
-
-# Replace hyphens and dots with underscores
-def normalize_tag(tag):
-    return tag.replace('-', '_').replace('.', '_') 
-
-# Using trimmed json, build mapping of path and path type
-def build_type_map(node, parent_path=""):
-    type_map = {}
-
-    # Normalize node name
-    node_name = normalize_tag(node["name"])
-    path = f"{parent_path}/{node_name}" if parent_path else node_name
-
-    # Strip leading 'root/configuration' to match XML traversal
-    for prefix in ["root/configuration/", "configuration/"]:
-        if path.startswith(prefix):
-            path = path[len(prefix):]
-
-    # Store type info
-    node_info = {"type": node.get("type")}
-    if "leaf-type" in node:
-        node_info["leaf-type"] = node["leaf-type"]
-    if "types" in node:
-        node_info["types"] = node["types"]
-
-    type_map[path] = node_info
-
-    # Recurse into children
-    for child in node.get("children", []):
-        type_map.update(build_type_map(child, path))
-
-    return type_map
 
 def parse_element(element, explicit_empty_tags, type_lookup, parent_path=""):
     """

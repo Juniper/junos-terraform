@@ -72,6 +72,8 @@ import (
 {############### STATIC STATEMENTS #ENDS ###############}
 
 {################ STRUCT FROM XML # STARTS #############}
+var TrimmedSchemaJSON = `{{ data | tojson(indent=2) }}`
+
 {%- set ele_xml_struct = [] %}
 {%- macro xml_struct_definition(parent, arg1) -%}
 {%- if parent[0] is defined  %}

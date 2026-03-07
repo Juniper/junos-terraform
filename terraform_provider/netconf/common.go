@@ -6,4 +6,5 @@ type Client interface {
 	SendCommit() error
 	MarshalGroup(id string, obj interface{}) error
 	SendTransaction(id string, obj interface{}, commit bool) error
+	SendUpdate(id string, diff string, commit bool) error
 }

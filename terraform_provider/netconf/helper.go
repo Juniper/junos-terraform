@@ -158,7 +158,6 @@ func (g *GoNCClient) SendCommit() error {
 		return err
 	}
 	if _, err := g.Driver.SendRaw(commitStr); err != nil {
-		// attempt to discard changes; ignore any error from this call
 		_, _ = g.Driver.SendRaw(discardChanges)
 		return err
 	}
@@ -174,7 +173,8 @@ func (g *GoNCClient) SendApplyGroups() error {
 	// Insert group names into correct syntax
 	var applyG configuration
 	applyG.ApplyGroup = make([]string, len(applyGroupsList))
-    copy(applyG.ApplyGroup, applyGroupsList)
+	copy(applyG.ApplyGroup, applyGroupsList)
+
 	cfg, err := xml.Marshal(applyG)
 	if err != nil {
 		return err
@@ -260,6 +260,46 @@ func sortApplyGroupsList() {
 	applyGroupsList = filteredGroups
 }
 
+// SendUpdate is a method that applies an xml patch
+func (g *GoNCClient) SendUpdate(id string, diff string, commit bool) error {
+	g.Lock.Lock()
+	defer g.Lock.Unlock()
+
+	if err := g.Driver.Dial(); err != nil {
+		return err
+	}
+
+	// Extract the string between <name> tags
+	nameStart := strings.Index(diff, "<name>")
+	nameEnd := strings.Index(diff, "</name>")
+	if nameStart == -1 || nameEnd == -1 {
+		return fmt.Errorf("failed to extract the group name from the netconfcall")
+	}
+	groupName := diff[nameStart+6 : nameEnd]
+
+	// Add the groupName to the applyGroupsList
+	addToApplyGroupsList(groupName)
+
+	groupString := fmt.Sprintf(groupStrXML, diff)
+
+	_, err := g.Driver.SendRaw(groupString)
+	if err != nil {
+		errInternal := g.Driver.Close()
+		return fmt.Errorf("driver error: %+v, driver close error: %s", err, errInternal)
+	}
+	if commit {
+		if _, err = g.Driver.SendRaw(commitStr); err != nil {
+			errInternal := g.Driver.Close()
+			return fmt.Errorf("driver error: %+v, driver close error: %s", err, errInternal)
+		}
+	}
+
+	if err := g.Driver.Close(); err != nil {
+		return fmt.Errorf("driver close error: %s", err)
+	}
+	return nil
+}
+
 // sendRawConfig is a wrapper for driver.SendRaw()
 func (g *GoNCClient) sendRawConfig(netconfCall string, commit bool) (string, error) {
 	g.Lock.Lock()
@@ -322,16 +362,16 @@ func (g *GoNCClient) readRawGroup(applyGroup string) (string, error) {
 }
 
 func publicKeyFile(file string) ssh.AuthMethod {
-    buffer, err := os.ReadFile(file)
-    if err != nil {
-        return nil
-    }
+	buffer, err := os.ReadFile(file)
+	if err != nil {
+		return nil
+	}
 
-    key, err := ssh.ParsePrivateKey(buffer)
-    if err != nil {
-        return nil
-    }
-    return ssh.PublicKeys(key)
+	key, err := ssh.ParsePrivateKey(buffer)
+	if err != nil {
+		return nil
+	}
+	return ssh.PublicKeys(key)
 }
 
 // NewClient returns go-netconf new client driver
