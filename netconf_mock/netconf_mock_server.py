@@ -28,6 +28,7 @@ import logging
 import re
 import signal
 import traceback
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -126,8 +127,18 @@ class DeviceSession(asyncssh.SSHServerSession):
 
     @staticmethod
     def _extract_message_id(xml_text: str) -> str:
-        m = re.search(r'message-id="([^"]+)"', xml_text)
-        return m.group(1) if m else "0"
+        # Prefer XML parsing so attribute quoting/formatting differences do not break matching.
+        try:
+            root = ET.fromstring(xml_text)
+            message_id = root.attrib.get("message-id")
+            if message_id:
+                return message_id
+        except ET.ParseError:
+            pass
+
+        # Fallback regex supports single or double quotes and optional spaces.
+        m = re.search(r"message-id\s*=\s*(['\"])(.*?)\1", xml_text)
+        return m.group(2) if m else "0"
 
     @staticmethod
     def _extract_group_name(xml_text: str) -> str:

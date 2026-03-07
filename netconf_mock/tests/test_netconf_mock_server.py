@@ -172,6 +172,12 @@ def test_handle_rpc_hello_and_unknown(state_and_session):
     assert state.history[-1]["op"] == "unknown"
 
 
+def test_extract_message_id_accepts_single_quoted_attributes():
+    xml = "<rpc message-id='77'><lock><target><candidate/></target></lock></rpc>"
+
+    assert MODULE.DeviceSession._extract_message_id(xml) == "77"
+
+
 def test_dump_state_if_requested_writes_json(tmp_path):
     out_file = tmp_path / "state.json"
     state = MODULE.DeviceState(name="leaf1")
