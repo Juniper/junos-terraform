@@ -3,7 +3,7 @@ package netconf
 import (
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -134,7 +134,7 @@ func (g *GoNCClient) DeleteConfig(applyGroup string, commit bool) (string, error
 
 	}
 
-	output := strings.Replace(reply.Data, "\n", "", -1)
+	output := strings.ReplaceAll(reply.Data, "\n", "")
 
 	if err := g.Driver.Close(); err != nil {
 		return "", err
@@ -158,7 +158,8 @@ func (g *GoNCClient) SendCommit() error {
 		return err
 	}
 	if _, err := g.Driver.SendRaw(commitStr); err != nil {
-		g.Driver.SendRaw(discardChanges)
+		// attempt to discard changes; ignore any error from this call
+		_, _ = g.Driver.SendRaw(discardChanges)
 		return err
 	}
 	return nil
@@ -173,10 +174,7 @@ func (g *GoNCClient) SendApplyGroups() error {
 	// Insert group names into correct syntax
 	var applyG configuration
 	applyG.ApplyGroup = make([]string, len(applyGroupsList))
-	for i, item := range applyGroupsList {
-		applyG.ApplyGroup[i] = item
-	}
-
+    copy(applyG.ApplyGroup, applyGroupsList)
 	cfg, err := xml.Marshal(applyG)
 	if err != nil {
 		return err
@@ -271,7 +269,7 @@ func (g *GoNCClient) sendRawConfig(netconfCall string, commit bool) (string, err
 	nameStart := strings.Index(netconfCall, "<name>")
 	nameEnd := strings.Index(netconfCall, "</name>")
 	if nameStart == -1 || nameEnd == -1 {
-		return "", fmt.Errorf("Failed to extract the group name from the netconfCall")
+		return "", fmt.Errorf("failed to extract the group name from the netconfCall")
 	}
 	groupName := netconfCall[nameStart+6 : nameEnd]
 
@@ -324,16 +322,16 @@ func (g *GoNCClient) readRawGroup(applyGroup string) (string, error) {
 }
 
 func publicKeyFile(file string) ssh.AuthMethod {
-	buffer, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil
-	}
+    buffer, err := os.ReadFile(file)
+    if err != nil {
+        return nil
+    }
 
-	key, err := ssh.ParsePrivateKey(buffer)
-	if err != nil {
-		return nil
-	}
-	return ssh.PublicKeys(key)
+    key, err := ssh.ParsePrivateKey(buffer)
+    if err != nil {
+        return nil
+    }
+    return ssh.PublicKeys(key)
 }
 
 // NewClient returns go-netconf new client driver

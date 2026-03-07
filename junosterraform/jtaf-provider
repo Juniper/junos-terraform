@@ -55,6 +55,10 @@ def main():
     # Step 4: copy the template go files into place
     distutils.dir_util.copy_tree(go_dir, new_dir)
     shutil.copytree(go_dir, new_dir, dirs_exist_ok=True)
+    # if there is a terraform_provider executable left over from go testing, remove it
+    tp_exe = f"{new_dir}/terraform_provider"
+    if os.path.exists(tp_exe):
+        os.remove(tp_exe)
 
     # Step 5: Save rendered Go file into new directory
     resource_config_provider_go_fullpath = os.path.join(new_dir, "resource_config_provider.go")

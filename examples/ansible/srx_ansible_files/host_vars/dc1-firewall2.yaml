@@ -30,10 +30,9 @@ system:
           max_connections: '30'
       notification:
         allow_clients:
-          address:
-          - 0.0.0.0/0
+          address: 0.0.0.0/0
     netconf:
-      ssh: {}
+      ssh: ''
     rest:
       http:
         port: '3000'
@@ -66,15 +65,15 @@ chassis:
 security:
   log:
     mode: stream
-    report: "\n                    "
+    report: ''
   screen:
     ids_option:
-      name: untrust-screen
+    - name: untrust-screen
       icmp:
-        ping_death: null
+        ping_death: true
       ip:
-        source_route_option: null
-        tear_drop: null
+        source_route_option: true
+        tear_drop: true
       tcp:
         syn_flood:
           alarm_threshold: '1024'
@@ -84,29 +83,107 @@ security:
           undocumented:
             queue_size: '2000'
           timeout: '20'
-        land: null
+        land: true
   policies:
     policy:
-      from_zone_name: VRF_10003
-      to_zone_name: VRF_10002
+    - from_zone_name: trust
+      to_zone_name: trust
       policy:
-        name: default-permit
+      - name: default-permit
         match:
           source_address: any
           destination_address: any
           application: any
         then:
-          permit: "\n                                "
+          permit: ''
+    - from_zone_name: trust
+      to_zone_name: untrust
+      policy:
+      - name: default-permit
+        match:
+          source_address: any
+          destination_address: any
+          application: any
+        then:
+          permit: ''
+    - from_zone_name: VRF_10001
+      to_zone_name: VRF_10002
+      policy:
+      - name: default-permit
+        match:
+          source_address: any
+          destination_address: any
+          application: any
+        then:
+          permit: ''
+    - from_zone_name: VRF_10002
+      to_zone_name: VRF_10001
+      policy:
+      - name: default-permit
+        match:
+          source_address: any
+          destination_address: any
+          application: any
+        then:
+          permit: ''
+    - from_zone_name: VRF_10002
+      to_zone_name: VRF_10003
+      policy:
+      - name: default-permit
+        match:
+          source_address: any
+          destination_address: any
+          application: any
+        then:
+          permit: ''
+    - from_zone_name: VRF_10003
+      to_zone_name: VRF_10002
+      policy:
+      - name: default-permit
+        match:
+          source_address: any
+          destination_address: any
+          application: any
+        then:
+          permit: ''
   zones:
     security_zone:
-      name: VRF_10003
+    - name: trust
+      tcp_rst: true
       host_inbound_traffic:
         system_services:
-          name: all
+        - name: all
         protocols:
-          name: all
+        - name: all
+    - name: untrust
+      screen: untrust-screen
+    - name: VRF_10001
+      host_inbound_traffic:
+        system_services:
+        - name: all
+        protocols:
+        - name: all
       interfaces:
-        name: ge-0/0/1.3
+      - name: ge-0/0/0.1
+      - name: ge-0/0/1.1
+    - name: VRF_10002
+      host_inbound_traffic:
+        system_services:
+        - name: all
+        protocols:
+        - name: all
+      interfaces:
+      - name: ge-0/0/0.2
+      - name: ge-0/0/1.2
+    - name: VRF_10003
+      host_inbound_traffic:
+        system_services:
+        - name: all
+        protocols:
+        - name: all
+      interfaces:
+      - name: ge-0/0/0.3
+      - name: ge-0/0/1.3
 interfaces:
   interface:
   - name: ge-0/0/0
@@ -175,8 +252,7 @@ routing_options:
   static:
     route:
     - name: 0.0.0.0/0
-      next_hop:
-      - 100.123.0.1
+      next_hop: 100.123.0.1
 protocols:
   lldp:
     interface:
@@ -209,8 +285,7 @@ routing_instances:
           discard: true
     protocols:
       ospf:
-        export:
-        - ospf-default
+        export: ospf-default
         area:
         - name: 0.0.0.0
           interface:

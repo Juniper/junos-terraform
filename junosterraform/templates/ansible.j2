@@ -20,8 +20,8 @@
 {%- set var1= path -%}
 {%- endif -%}
 {%- set name_prepared = preparename(name) -%}
-{{- '\n'+' '*4*level}}{{'{%-'}} if {{path2variable(var1+'.'+'get("'+name_prepared+'")') }} {{'%}'}}
-{{- '\n'+' '*4*level}}{{'{%-'}} if {{path2variable(var1+'.'+'get("'+name_prepared+'")')}} is boolean {{'%}'}}
+{{- '\n'+' '*4*level}}{{'{%-'}} if {{ path2variable(var1 + '.' + name_prepared) }} is defined {{'%}'}}
+{{- '\n'+' '*4*level}}{{'{%-'}} if {{ path2variable(var1+'.'+name_prepared) }} is boolean {{'%}'}}
 {{' '*4*level}}<{{name}}/>
 {{' '*4*level}}       {{'{%-'}} else {{'%}'}}
 {{' '*4*level}}<{{name}}>{{'{{'}}{{ path2variable(var1+'.'+name_prepared) }}{{'}}'}}</{{name}}>
@@ -53,12 +53,12 @@
         {# LIST IF #}
         {%- if ele.type == 'list' -%}
 
-{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}			  
+{{'\n'+' '*4*level}}{{'{%-'}} if {{ pathvar + '.' + path2variable(preparename(ele.name)) }} is defined {{'%}'}}
 {{'\n'+' '*4*level}}{{'{%-'}} for i_{{level}} in {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
 			{%- set indexvar = 'i_{0:d}'.format(level) -%}    
 
 {%- if level>1 -%}
-{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
+{{'\n'+' '*4*level}}{{'{%-'}} if {{ pathvar + '.' + path2variable(preparename(ele.name)) }} is defined {{'%}'}}
 {%- endif -%}
 {#{% if ele.type != "leaf-list" %}#}
 {{'\n'+' '*4*level}}<{{ele.name}}>
@@ -68,7 +68,7 @@
 		{%- else -%}	
 
 {%- if level>1 -%}
-{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
+{{'\n'+' '*4*level}}{{'{%-'}} if {{ pathvar + '.' + path2variable(preparename(ele.name)) }} is defined {{'%}'}}
 {%- endif -%}
 {% if ele.type != "leaf-list" %}
 {{'\n'+' '*4*level}}<{{ele.name}}>
@@ -86,10 +86,11 @@
         {# LEAF-LIST IF #}
 		
 		{% if ele.type=="leaf-list" %}
-		{{- printleaf(ele.path,ele.name,level,indexvar) -}}
-              {# {{'{%'}} for ii_{{level}} in {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}
-{{'\n'+' '*4*(level+1)}}<{{ele.name}}>{{'{{'}}ii_{{level}}{{'}}'}}</{{ele.name}}>
-			  {{'{%'}} endfor {{'%}'}} #}
+		{{- '\n'+' '*4*level}}{{'{%-'}} if {{ pathvar + '.' + path2variable(preparename(ele.name)) }} is boolean {{'%}'}}
+{{' '*4*level}}<{{ele.name}}/>
+{{' '*4*level}}{{'{%-'}} else {{'%}'}}
+{{' '*4*level}}<{{ele.name}}>{{'{{'}}{{ pathvar + '.' + path2variable(preparename(ele.name)) }}{{'}}'}}</{{ele.name}}>
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
         {# LEAF-LIST ELSE #}
 		{% else %}
    

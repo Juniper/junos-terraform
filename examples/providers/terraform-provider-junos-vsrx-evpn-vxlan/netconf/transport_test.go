@@ -116,12 +116,14 @@ func TestSendHello(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			trans, out := newTransportTest("")
-			trans.SendHello(tc.input)
-			rawHello := out.String()
+		if err := trans.SendHello(tc.input); err != nil {
+			t.Fatalf("SendHello failed: %v", err)
+		}
 
-			if rawHello != tc.expected {
-				t.Errorf("unexpected result: (want %q, got %q)", tc.expected, rawHello)
-			}
+		rawHello := out.String()
+		if rawHello != tc.expected {
+			t.Errorf("unexpected result: (want %q, got %q)", tc.expected, rawHello)
+		}
 		})
 	}
 }

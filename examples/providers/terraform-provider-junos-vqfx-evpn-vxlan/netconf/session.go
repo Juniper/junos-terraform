@@ -71,7 +71,9 @@ func NewSession(t Transport) (*Session, error) {
 	s.ServerCapabilities = serverHello.Capabilities
 
 	// Send our hello using default capabilities.
-	t.SendHello(&HelloMessage{Capabilities: DefaultCapabilities})
+	if err := t.SendHello(&HelloMessage{Capabilities: DefaultCapabilities}); err != nil {
+		return nil, err
+	}
 
 	return s, nil
 }

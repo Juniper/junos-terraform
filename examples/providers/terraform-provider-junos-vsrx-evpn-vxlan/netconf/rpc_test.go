@@ -164,7 +164,7 @@ var RPCReplytests = []struct {
 </commit-results>
 <ok/>
 </rpc-reply>`,
-		false,
+		true,
 	},
 	{
 		`
@@ -219,14 +219,18 @@ configuration check-out failed: (missing mandatory statements)
 </commit-results>
 <ok/>
 </rpc-reply>`,
-		false,
+		true,
 	},
 }
 
 func TestNewRPCReply(t *testing.T) {
 	for _, tc := range RPCReplytests {
 		reply, err := NewRPCReply([]byte(tc.rawXML), false)
-		if err != nil {
+		// err == nil && tc.replyOk is true --> we are good -- something that shouldnt error doesnt 1 1 --> 0
+		// err != nil && tc.replyOk is true --> FAIL -- something that shouldnt error does 0 1 --> 1 
+		// err == nil && tc.replyOK false --> FAIL -- something that should err didnt 1 0 --> 1 
+		// err != nil && tc.replyOK false --> we are good 0 0 --> 0 
+		if (err == nil) != tc.replyOk {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if reply.RawReply != tc.rawXML {
