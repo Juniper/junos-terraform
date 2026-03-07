@@ -468,10 +468,12 @@ def _dump_state_if_requested(state_dump: str, device_states: dict[str, DeviceSta
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--username", default="ci-user")
-    parser.add_argument("--password", default="ci-password")
+    parser = argparse.ArgumentParser(
+        description="Run a stateful NETCONF-over-SSH mock server for integration tests."
+    )
+    parser.add_argument("--host", default="127.0.0.1", help="Bind address for all device listeners.")
+    parser.add_argument("--username", default="ci-user", help="Accepted NETCONF username.")
+    parser.add_argument("--password", default="ci-password", help="Accepted NETCONF password.")
     parser.add_argument(
         "--device",
         action="append",
@@ -481,12 +483,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--devices-file",
         default="",
-        help="Optional file with one <device-name>:<port> entry per line.",
+        help="File with one <device-name>:<port> entry per line.",
     )
     parser.add_argument(
         "--state-dump",
         default="",
-        help="Optional JSON path to dump per-device running/candidate/history on shutdown.",
+        help="JSON path to write per-device running/candidate/history at shutdown.",
     )
     parser.add_argument(
         "--log-level",

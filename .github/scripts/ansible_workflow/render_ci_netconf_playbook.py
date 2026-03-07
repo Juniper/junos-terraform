@@ -10,21 +10,23 @@ from jinja2 import Template
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Render the CI NETCONF playbook template using detected generated role name."
+    )
     parser.add_argument(
         "--roles-root",
         default="ansible-provider-junos-vqfx-evpn-vxlan/roles",
-        help="Directory containing generated role subdirectories",
+        help="Directory containing generated role subdirectories.",
     )
     parser.add_argument(
         "--template-path",
         default=".github/ansible/ci-netconf-playbook.yml.j2",
-        help="Path to Jinja2 playbook template",
+        help="Path to Jinja2 playbook template.",
     )
     parser.add_argument(
         "--output-path",
         default="ansible-provider-junos-vqfx-evpn-vxlan/ci-netconf-playbook.yml",
-        help="Output path for rendered playbook",
+        help="Output path for rendered playbook.",
     )
     return parser.parse_args()
 

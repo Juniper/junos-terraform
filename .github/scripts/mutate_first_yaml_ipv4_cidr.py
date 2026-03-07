@@ -12,9 +12,11 @@ CIDR_RE = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}/\d{1,2}\b")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--directory", default=".", help="Directory containing YAML files")
-    parser.add_argument("--replacement", required=True, help="CIDR replacement value")
+    parser = argparse.ArgumentParser(
+        description="Replace the first IPv4 CIDR found in YAML files."
+    )
+    parser.add_argument("--directory", default=".", help="Directory containing YAML files.")
+    parser.add_argument("--replacement", required=True, help="Replacement IPv4 CIDR value.")
     return parser.parse_args()
 
 

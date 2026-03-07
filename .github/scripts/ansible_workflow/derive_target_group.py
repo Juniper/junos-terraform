@@ -9,8 +9,10 @@ from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config-xml", required=True, help="Path to rendered host XML")
+    parser = argparse.ArgumentParser(
+        description="Extract the first <groups><name> value from rendered host XML."
+    )
+    parser.add_argument("--config-xml", required=True, help="Path to rendered host XML file.")
     return parser.parse_args()
 
 

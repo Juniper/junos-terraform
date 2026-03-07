@@ -8,12 +8,14 @@ from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--hosts-file", required=True, help="Source hosts file")
-    parser.add_argument("--inventory-file", required=True, help="Output inventory")
-    parser.add_argument("--devices-file", required=True, help="Output host:port map")
-    parser.add_argument("--bind-host", default="127.0.0.1", help="Mock bind host")
-    parser.add_argument("--base-port", type=int, default=8301, help="Starting NETCONF port")
+    parser = argparse.ArgumentParser(
+        description="Generate mock Ansible inventory and host:port device map from a hosts file."
+    )
+    parser.add_argument("--hosts-file", required=True, help="Source hosts file (Ansible-style host list).")
+    parser.add_argument("--inventory-file", required=True, help="Output inventory file path.")
+    parser.add_argument("--devices-file", required=True, help="Output host:port device map path.")
+    parser.add_argument("--bind-host", default="127.0.0.1", help="Mock bind address written to inventory.")
+    parser.add_argument("--base-port", type=int, default=8301, help="Starting NETCONF port for host mapping.")
     return parser.parse_args()
 
 
