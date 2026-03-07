@@ -9,14 +9,18 @@ on:
 jobs:
   build-and-apply:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.x"]
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: '3.x'
+        python-version: ${{ matrix.python-version }}
 
     - name: Install Python and Ansible test dependencies
       env:
@@ -282,7 +286,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v6
       with:
-        name: ansible-netconf-integration-logs
+        name: ansible-netconf-integration-logs-${{ matrix.python-version }}
         path: |
           netconf-mock.log
           netconf-mock-state.json
