@@ -1,0 +1,41 @@
+- name: Render generated Junos configuration XML
+  hosts: all
+  gather_facts: false
+  connection: local
+  vars:
+    tmp_dir: configs
+    generated_role_name: "[[ generated_role_name ]]"
+  tasks:
+    - name: Render XML using generated role
+      ansible.builtin.include_role:
+        name: "[[ generated_role_name ]]"
+
+- name: Apply rendered XML via Juniper ansible-junos-stdlib
+  hosts: all
+  gather_facts: false
+  connection: local
+  vars:
+    tmp_dir: configs
+    ci_netconf_username: "{{ lookup('env', 'NETCONF_USERNAME') }}"
+    ci_netconf_password: "{{ lookup('env', 'NETCONF_PASSWORD') }}"
+  tasks:
+    - name: Push rendered XML via Juniper ansible-junos-stdlib
+      juniper.device.config:
+        host: "{{ ansible_host | default(inventory_hostname) }}"
+        port: "{{ ansible_port | default(830) }}"
+        user: "{{ ci_netconf_username }}"
+        passwd: "{{ ci_netconf_password }}"
+        check: false
+        diff: false
+        commit: true
+        src: "{{ tmp_dir }}/{{ inventory_hostname }}.xml"
+        load: merge
+        comment: "CI apply generated role"
+      register: junos_apply_result
+
+    - name: Emit concise module result for debugging
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          changed: "{{ junos_apply_result.changed | default(false) }}"
+          failed: "{{ junos_apply_result.failed | default(false) }}"

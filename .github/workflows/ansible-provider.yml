@@ -77,49 +77,23 @@ jobs:
           exit 1
         fi
 
-        cat > ansible-provider-junos-vqfx-evpn-vxlan/ci-netconf-playbook.yml <<EOF
-        - name: Render generated Junos configuration XML
-          hosts: all
-          gather_facts: false
-          connection: local
-          vars:
-            tmp_dir: configs
-            generated_role_name: "$role_name"
-          tasks:
-            - name: Render XML using generated role
-              ansible.builtin.include_role:
-                name: "{{ generated_role_name }}"
+        ROLE_NAME="$role_name" python - <<'PY'
+        from pathlib import Path
+        import os
+        from jinja2 import Template
 
-        - name: Apply rendered XML via Juniper ansible-junos-stdlib
-          hosts: all
-          gather_facts: false
-          connection: local
-          vars:
-            tmp_dir: configs
-            ci_netconf_username: "{{ lookup('env', 'NETCONF_USERNAME') }}"
-            ci_netconf_password: "{{ lookup('env', 'NETCONF_PASSWORD') }}"
-          tasks:
-            - name: Push rendered XML via Juniper ansible-junos-stdlib
-              juniper.device.config:
-                host: "{{ ansible_host | default(inventory_hostname) }}"
-                port: "{{ ansible_port | default(830) }}"
-                user: "{{ ci_netconf_username }}"
-                passwd: "{{ ci_netconf_password }}"
-                check: false
-                diff: false
-                commit: true
-                src: "{{ tmp_dir }}/{{ inventory_hostname }}.xml"
-                load: merge
-                comment: "CI apply generated role"
-              register: junos_apply_result
+        template_path = Path('.github/ansible/ci-netconf-playbook.yml.j2')
+        output_path = Path('ansible-provider-junos-vqfx-evpn-vxlan/ci-netconf-playbook.yml')
 
-            - name: Emit concise module result for debugging
-              ansible.builtin.debug:
-                msg:
-                  host: "{{ inventory_hostname }}"
-                  changed: "{{ junos_apply_result.changed | default(false) }}"
-                  failed: "{{ junos_apply_result.failed | default(false) }}"
-        EOF
+        rendered = Template(
+          template_path.read_text(encoding='utf-8'),
+          variable_start_string='[[',
+          variable_end_string=']]'
+        ).render(
+          generated_role_name=os.environ['ROLE_NAME']
+        )
+        output_path.write_text(rendered, encoding='utf-8')
+        PY
 
     - name: Start NETCONF mock and wait for listeners
       run: |
