@@ -1,0 +1,283 @@
+name: Ansible provider and NETCONF integration
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build-and-apply:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python (latest)
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install Python and Ansible dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        python -m pip install .
+        python -m pip install asyncssh ansible-core ncclient jxmlease
+        ansible-galaxy collection install junipernetworks.junos ansible.netcommon
+
+    - name: Run NETCONF mock unit tests
+      run: |
+        pytest -q netconf_mock/tests/test_netconf_mock_server.py
+
+    - name: Generate Ansible provider role with jtaf-yang2ansible
+      run: |
+        rm -rf ansible-provider-junos-vqfx-evpn-vxlan
+
+        jtaf-yang2ansible \
+          -p examples/yang/18.2/18.2R3/common \
+          examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang \
+          -x \
+          examples/evpn-vxlan-dc/dc1/dc1-borderleaf1.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-borderleaf2.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-leaf2.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-leaf3.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-spine1.xml \
+          examples/evpn-vxlan-dc/dc1/dc1-spine2.xml \
+          examples/evpn-vxlan-dc/dc2/dc2-spine1.xml \
+          examples/evpn-vxlan-dc/dc2/dc2-spine2.xml \
+          -t vqfx-evpn-vxlan
+
+    - name: Generate host YAML with jtaf-xml2yaml
+      run: |
+        rm -rf ci-evpn-vxlan-ansible
+
+        jtaf-xml2yaml \
+          -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml \
+          -j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json \
+          -d ci-evpn-vxlan-ansible
+
+    - name: Prepare generated role and CI playbook
+      run: |
+        set -euo pipefail
+
+        rm -rf ansible-provider-junos-vqfx-evpn-vxlan/host_vars
+        cp -R ci-evpn-vxlan-ansible/host_vars ansible-provider-junos-vqfx-evpn-vxlan/
+
+        python .github/scripts/prepare_ansible_mock_inventory.py \
+          --hosts-file ci-evpn-vxlan-ansible/hosts \
+          --inventory-file ansible-provider-junos-vqfx-evpn-vxlan/mock-inventory.ini \
+          --devices-file ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt \
+          --bind-host 127.0.0.1 \
+          --base-port 8301
+
+        role_name="$(find ansible-provider-junos-vqfx-evpn-vxlan/roles -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | head -n 1)"
+        if [ -z "$role_name" ]; then
+          echo "failed to detect generated role name"
+          exit 1
+        fi
+
+        cat > ansible-provider-junos-vqfx-evpn-vxlan/ci-netconf-playbook.yml <<EOF
+        - name: Render and apply generated Junos configuration
+          hosts: all
+          gather_facts: false
+          connection: local
+          vars:
+            tmp_dir: configs
+            generated_role_name: "$role_name"
+            netconf_username: "{{ netconf_username | default(lookup('env', 'NETCONF_USERNAME')) }}"
+            netconf_password: "{{ netconf_password | default(lookup('env', 'NETCONF_PASSWORD')) }}"
+          tasks:
+            - name: Render XML using generated role
+              ansible.builtin.include_role:
+                name: "{{ generated_role_name }}"
+
+            - name: Push rendered XML via Junos NETCONF plugin
+              junipernetworks.junos.junos_config:
+                src: "{{ tmp_dir }}/{{ inventory_hostname }}.xml"
+                src_format: xml
+                update: merge
+                comment: "CI apply generated role"
+                provider:
+                  host: "{{ ansible_host }}"
+                  port: "{{ ansible_port }}"
+                  username: "{{ netconf_username }}"
+                  password: "{{ netconf_password }}"
+              register: junos_apply_result
+
+            - name: Emit concise module result for debugging
+              ansible.builtin.debug:
+                msg:
+                  host: "{{ inventory_hostname }}"
+                  changed: "{{ junos_apply_result.changed | default(false) }}"
+                  failed: "{{ junos_apply_result.failed | default(false) }}"
+        EOF
+
+    - name: Start NETCONF mock and wait for listeners
+      run: |
+        set -euo pipefail
+
+        python netconf_mock/netconf_mock_server.py \
+          --host 127.0.0.1 \
+          --username ci-user \
+          --password ci-password \
+          --log-level DEBUG \
+          --devices-file ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt \
+          --state-dump netconf-mock-state.json \
+          > netconf-mock.log 2>&1 &
+        echo "$!" > .netconf_mock.pid
+
+        all_ready=0
+        for _ in $(seq 1 30); do
+          if ! kill -0 "$(cat .netconf_mock.pid)" 2>/dev/null; then
+            echo "NETCONF mock exited during startup"
+            cat netconf-mock.log || true
+            exit 1
+          fi
+
+          all_ready=1
+          while IFS=: read -r _dev_name dev_port; do
+            if [ -z "${dev_port}" ]; then
+              continue
+            fi
+            if ! (echo > /dev/tcp/127.0.0.1/"${dev_port}") >/dev/null 2>&1; then
+              all_ready=0
+              break
+            fi
+          done < ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt
+
+          if [ "$all_ready" -eq 1 ]; then
+            break
+          fi
+          sleep 1
+        done
+
+        if [ "$all_ready" -ne 1 ]; then
+          echo "NETCONF mock listeners were not ready in time"
+          cat netconf-mock.log || true
+          exit 1
+        fi
+
+    - name: Initial Ansible apply via generated role and Junos plugin
+      working-directory: ansible-provider-junos-vqfx-evpn-vxlan
+      env:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+        NETCONF_USERNAME: ci-user
+        NETCONF_PASSWORD: ci-password
+      run: |
+        set -euo pipefail
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vv | tee ../ansible-initial.log
+
+    - name: Second apply should be safe (imperative rerun)
+      working-directory: ansible-provider-junos-vqfx-evpn-vxlan
+      env:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+        NETCONF_USERNAME: ci-user
+        NETCONF_PASSWORD: ci-password
+      run: |
+        set -euo pipefail
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vv | tee ../ansible-rerun.log
+
+    - name: Mutate generated YAML and apply updated intent
+      working-directory: ansible-provider-junos-vqfx-evpn-vxlan
+      env:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+        NETCONF_USERNAME: ci-user
+        NETCONF_PASSWORD: ci-password
+      run: |
+        set -euo pipefail
+        python ../.github/scripts/mutate_first_yaml_ipv4_cidr.py \
+          --directory host_vars \
+          --replacement 203.0.113.10/32
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vv | tee ../ansible-mutated.log
+
+    - name: Simulate out-of-band NETCONF drift
+      id: drift_target
+      run: |
+        set -euo pipefail
+        target_host="$(head -n 1 ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt | cut -d: -f1 | tr -d '[:space:]')"
+        if [ -z "$target_host" ]; then
+          echo "failed to derive target host from mock-devices.txt"
+          exit 1
+        fi
+        echo "host=$target_host" >> "$GITHUB_OUTPUT"
+
+        python .github/scripts/apply_netconf_drift.py \
+          --devices-file ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt \
+          --target-host "$target_host" \
+          --target-group base-config \
+          --drift-ip 203.0.113.250/32 \
+          --username ci-user \
+          --password ci-password \
+          --connect-host 127.0.0.1
+
+    - name: Re-apply playbook to reconcile out-of-band drift
+      working-directory: ansible-provider-junos-vqfx-evpn-vxlan
+      env:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+        NETCONF_USERNAME: ci-user
+        NETCONF_PASSWORD: ci-password
+      run: |
+        set -euo pipefail
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -vv | tee ../ansible-reconcile.log
+
+    - name: Negative test apply with bad credentials
+      id: negative_apply
+      working-directory: ansible-provider-junos-vqfx-evpn-vxlan
+      env:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+        NETCONF_USERNAME: ci-user
+      run: |
+        set +e
+        ansible-playbook \
+          -i mock-inventory.ini \
+          ci-netconf-playbook.yml \
+          -e netconf_password=wrong-password \
+          -vv > ../ansible-negative.log 2>&1
+        rc=$?
+        set -e
+        echo "exitcode=$rc" >> "$GITHUB_OUTPUT"
+
+    - name: Assert negative apply failed
+      run: |
+        if [ "${{ steps.negative_apply.outputs.exitcode }}" = "0" ]; then
+          echo "Expected ansible apply to fail with wrong credentials, but it succeeded"
+          cat ansible-negative.log
+          exit 1
+        fi
+
+    - name: Stop NETCONF mock
+      if: always()
+      run: |
+        if [ -f .netconf_mock.pid ]; then
+          MOCK_PID="$(cat .netconf_mock.pid)"
+          if kill -0 "$MOCK_PID" 2>/dev/null; then
+            kill "$MOCK_PID"
+            wait "$MOCK_PID" || true
+          fi
+        fi
+
+    - name: Validate NETCONF state transitions
+      run: |
+        set -euo pipefail
+        test -f netconf-mock-state.json
+        python .github/scripts/assert_netconf_mock_state.py \
+          --state-dump netconf-mock-state.json \
+          --require-min-commits 3 \
+          --must-contain 203.0.113.10/32 \
+          --must-not-contain 203.0.113.250/32
+
+    - name: Upload Ansible and NETCONF integration logs
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: ansible-netconf-integration-logs
+        path: |
+          netconf-mock.log
+          netconf-mock-state.json
+          ansible-initial.log
+          ansible-rerun.log
+          ansible-mutated.log
+          ansible-reconcile.log
+          ansible-negative.log
