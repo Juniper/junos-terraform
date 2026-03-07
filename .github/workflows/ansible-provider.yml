@@ -241,6 +241,7 @@ jobs:
         PYTHONFAULTHANDLER: "1"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: wrong-password
+        NETCONF_EXPECT_FAILURE: "1"
       run: |
         set +e
         ansible-playbook \

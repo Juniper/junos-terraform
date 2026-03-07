@@ -18,6 +18,7 @@
     tmp_dir: configs
     ci_netconf_username: "{{ lookup('env', 'NETCONF_USERNAME') }}"
     ci_netconf_password: "{{ lookup('env', 'NETCONF_PASSWORD') }}"
+    ci_expect_failure: "{{ (lookup('env', 'NETCONF_EXPECT_FAILURE') | default('0')) == '1' }}"
   tasks:
     - name: Push rendered XML via Juniper ansible-junos-stdlib
       juniper.device.config:
@@ -38,6 +39,7 @@
       ansible.builtin.fail:
         msg: |
           juniper.device.config task failed for {{ inventory_hostname }}
+          expect_failure={{ ci_expect_failure }}
           msg={{ junos_apply_result.msg | default('') }}
           exception={{ junos_apply_result.exception | default('') }}
           module_stdout={{ junos_apply_result.module_stdout | default('') }}
@@ -47,3 +49,11 @@
         or ((junos_apply_result.msg | default('')) is search('ConnectAuthError|Unable to make a PyEZ connection|MODULE FAILURE|Traceback'))
         or ((junos_apply_result.exception | default('')) is search('Traceback|Exception|Error'))
         or ((junos_apply_result.module_stderr | default('')) is search('MODULE FAILURE|Traceback|Exception|Error'))
+        or (
+          ci_expect_failure
+          and not (
+            ((junos_apply_result.msg | default('')) is search('ConnectAuthError|Unable to make a PyEZ connection|MODULE FAILURE|Traceback'))
+            or ((junos_apply_result.exception | default('')) is search('Traceback|Exception|Error'))
+            or ((junos_apply_result.module_stderr | default('')) is search('MODULE FAILURE|Traceback|Exception|Error'))
+          )
+        )
