@@ -173,41 +173,45 @@ class DeviceSession(asyncssh.SSHServerSession):
         return m.group(1) if m else ""
 
     @staticmethod
-    def _extract_groups_configurations(xml_text: str) -> dict[str, str]:
-        """Extract per-group configuration blobs from a load-configuration RPC.
-
-        Returns mapping of group-name -> <configuration><groups>...</groups></configuration>.
-        """
-
-        groups_by_name: dict[str, str] = {}
-
+    def _parse_xml(xml_text: str) -> ET.Element | None:
         try:
-            root = ET.fromstring(xml_text)
+            return ET.fromstring(xml_text)
         except ET.ParseError:
-            return groups_by_name
+            return None
 
-        config_elem = None
+    @staticmethod
+    def _find_first_configuration(root: ET.Element) -> ET.Element | None:
         for elem in root.iter():
             if DeviceSession._local_name(elem.tag) == "configuration":
-                config_elem = elem
-                break
+                return elem
+        return None
 
+    @staticmethod
+    def _extract_group_name_from_groups_elem(groups_elem: ET.Element) -> str:
+        for child in list(groups_elem):
+            if DeviceSession._local_name(child.tag) == "name" and child.text:
+                return child.text.strip()
+        return ""
+
+    @staticmethod
+    def _extract_groups_configurations(xml_text: str) -> dict[str, str]:
+        """Extract per-group configuration blobs from a load-configuration RPC."""
+
+        groups_by_name: dict[str, str] = {}
+        root = DeviceSession._parse_xml(xml_text)
+        if root is None:
+            return groups_by_name
+
+        config_elem = DeviceSession._find_first_configuration(root)
         if config_elem is None:
             return groups_by_name
 
         for child in list(config_elem):
             if DeviceSession._local_name(child.tag) != "groups":
                 continue
-
-            group_name = ""
-            for grandchild in list(child):
-                if DeviceSession._local_name(grandchild.tag) == "name" and grandchild.text:
-                    group_name = grandchild.text.strip()
-                    break
-
+            group_name = DeviceSession._extract_group_name_from_groups_elem(child)
             if not group_name:
                 continue
-
             groups_xml = ET.tostring(child, encoding="unicode")
             groups_by_name[group_name] = f"<configuration>{groups_xml}</configuration>"
 
