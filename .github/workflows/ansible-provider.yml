@@ -24,7 +24,9 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         python -m pip install .
         python -m pip install asyncssh ansible-core ncclient jxmlease junos-eznc
-        ansible-galaxy collection install git+https://github.com/Juniper/ansible-junos-stdlib.git
+        rm -rf /tmp/ansible-junos-stdlib
+        git clone --depth 1 https://github.com/Juniper/ansible-junos-stdlib.git /tmp/ansible-junos-stdlib
+        ansible-galaxy collection install /tmp/ansible-junos-stdlib/ansible_collections/juniper/device
         ansible-galaxy collection install ansible.netcommon
 
     - name: Generate Ansible provider role with jtaf-yang2ansible
