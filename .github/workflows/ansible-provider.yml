@@ -136,7 +136,6 @@ jobs:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
         ANSIBLE_DEBUG: "0"
-        ANSIBLE_VERBOSITY: "1"
         ANSIBLE_DISPLAY_TRACEBACK: "error"
         ANSIBLE_KEEP_REMOTE_FILES: "0"
         ANSIBLE_LOG_PATH: "../ansible-debug.log"
@@ -145,7 +144,7 @@ jobs:
         NETCONF_PASSWORD: ci-password
       run: |
         set -euo pipefail
-        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -v | tee ../ansible-initial.log
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml | tee ../ansible-initial.log
 
     - name: Second apply should be safe (imperative rerun)
       working-directory: ansible-provider-junos-vqfx-evpn-vxlan
@@ -153,7 +152,6 @@ jobs:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
         ANSIBLE_DEBUG: "0"
-        ANSIBLE_VERBOSITY: "1"
         ANSIBLE_DISPLAY_TRACEBACK: "error"
         ANSIBLE_KEEP_REMOTE_FILES: "0"
         ANSIBLE_LOG_PATH: "../ansible-debug.log"
@@ -162,7 +160,7 @@ jobs:
         NETCONF_PASSWORD: ci-password
       run: |
         set -euo pipefail
-        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -v | tee ../ansible-rerun.log
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml | tee ../ansible-rerun.log
 
     - name: Mutate generated YAML and apply updated intent
       working-directory: ansible-provider-junos-vqfx-evpn-vxlan
@@ -170,7 +168,6 @@ jobs:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
         ANSIBLE_DEBUG: "0"
-        ANSIBLE_VERBOSITY: "1"
         ANSIBLE_DISPLAY_TRACEBACK: "error"
         ANSIBLE_KEEP_REMOTE_FILES: "0"
         ANSIBLE_LOG_PATH: "../ansible-debug.log"
@@ -182,7 +179,7 @@ jobs:
         python ../.github/scripts/mutate_first_yaml_ipv4_cidr.py \
           --directory host_vars \
           --replacement 203.0.113.10/32
-        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -v | tee ../ansible-mutated.log
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml | tee ../ansible-mutated.log
 
     - name: Simulate out-of-band NETCONF drift
       id: drift_target
@@ -221,7 +218,6 @@ jobs:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
         ANSIBLE_DEBUG: "0"
-        ANSIBLE_VERBOSITY: "1"
         ANSIBLE_DISPLAY_TRACEBACK: "error"
         ANSIBLE_KEEP_REMOTE_FILES: "0"
         ANSIBLE_LOG_PATH: "../ansible-debug.log"
@@ -230,7 +226,7 @@ jobs:
         NETCONF_PASSWORD: ci-password
       run: |
         set -euo pipefail
-        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml -v | tee ../ansible-reconcile.log
+        ansible-playbook -i mock-inventory.ini ci-netconf-playbook.yml | tee ../ansible-reconcile.log
 
     - name: Negative test apply with bad credentials
       id: negative_apply
@@ -239,7 +235,6 @@ jobs:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
         ANSIBLE_DEBUG: "0"
-        ANSIBLE_VERBOSITY: "1"
         ANSIBLE_DISPLAY_TRACEBACK: "error"
         ANSIBLE_KEEP_REMOTE_FILES: "0"
         ANSIBLE_LOG_PATH: "../ansible-debug.log"
@@ -251,7 +246,7 @@ jobs:
         ansible-playbook \
           -i mock-inventory.ini \
           ci-netconf-playbook.yml \
-          -v > ../ansible-negative.log 2>&1
+          > ../ansible-negative.log 2>&1
         rc=$?
         set -e
         echo "exitcode=$rc" >> "$GITHUB_OUTPUT"

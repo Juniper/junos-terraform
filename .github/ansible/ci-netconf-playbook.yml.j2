@@ -34,10 +34,6 @@
       failed_when: false
       register: junos_apply_result
 
-    - name: Emit full module result for debugging
-      ansible.builtin.debug:
-        var: junos_apply_result
-
     - name: Fail with detailed module diagnostics
       ansible.builtin.fail:
         msg: |
@@ -51,10 +47,3 @@
         or ((junos_apply_result.msg | default('')) is search('ConnectAuthError|Unable to make a PyEZ connection|MODULE FAILURE|Traceback'))
         or ((junos_apply_result.exception | default('')) is search('Traceback|Exception|Error'))
         or ((junos_apply_result.module_stderr | default('')) is search('MODULE FAILURE|Traceback|Exception|Error'))
-
-    - name: Emit concise module result for debugging
-      ansible.builtin.debug:
-        msg:
-          host: "{{ inventory_hostname }}"
-          changed: "{{ junos_apply_result.changed | default(false) }}"
-          failed: "{{ junos_apply_result.failed | default(false) }}"
