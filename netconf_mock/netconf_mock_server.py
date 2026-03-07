@@ -81,16 +81,20 @@ class DeviceSSHServer(asyncssh.SSHServer):
         self.state = state
 
     def begin_auth(self, username: str) -> bool:
+        logger.info("device=%s begin_auth username=%s", self.state.name, username)
         return True
 
     def password_auth_supported(self) -> bool:
+        logger.info("device=%s password_auth_supported=true", self.state.name)
         return True
 
     def validate_password(self, username: str, password: str) -> bool:
-        logger.debug("auth attempt user=%s accepted=%s", username, username == self.username and password == self.password)
-        return username == self.username and password == self.password
+        accepted = username == self.username and password == self.password
+        logger.info("device=%s validate_password username=%s accepted=%s", self.state.name, username, accepted)
+        return accepted
 
     def session_requested(self) -> asyncssh.SSHServerSession:
+        logger.info("device=%s session_requested", self.state.name)
         return DeviceSession(self.state)
 
 
@@ -109,7 +113,7 @@ class DeviceSession(asyncssh.SSHServerSession):
         logger.debug("session opened device=%s", self._state.name)
 
     def subsystem_requested(self, subsystem: str) -> bool:
-        logger.debug("subsystem requested device=%s subsystem=%s", self._state.name, subsystem)
+        logger.info("device=%s subsystem_requested subsystem=%s", self._state.name, subsystem)
         return subsystem == "netconf"
 
     def session_started(self) -> None:
@@ -194,17 +198,30 @@ class DeviceSession(asyncssh.SSHServerSession):
         return ""
 
     @staticmethod
+    def _extract_groups_configurations_regex(xml_text: str) -> dict[str, str]:
+        groups_by_name: dict[str, str] = {}
+        for group_block in re.findall(r"(<groups>.*?</groups>)", xml_text, flags=re.DOTALL):
+            name_match = re.search(r"<name>\s*([^<]+?)\s*</name>", group_block)
+            if not name_match:
+                continue
+            group_name = name_match.group(1).strip()
+            if not group_name:
+                continue
+            groups_by_name[group_name] = f"<configuration>{group_block}</configuration>"
+        return groups_by_name
+
+    @staticmethod
     def _extract_groups_configurations(xml_text: str) -> dict[str, str]:
         """Extract per-group configuration blobs from a load-configuration RPC."""
 
         groups_by_name: dict[str, str] = {}
         root = DeviceSession._parse_xml(xml_text)
         if root is None:
-            return groups_by_name
+            return DeviceSession._extract_groups_configurations_regex(xml_text)
 
         config_elem = DeviceSession._find_first_configuration(root)
         if config_elem is None:
-            return groups_by_name
+            return DeviceSession._extract_groups_configurations_regex(xml_text)
 
         for child in list(config_elem):
             if DeviceSession._local_name(child.tag) != "groups":
@@ -215,7 +232,9 @@ class DeviceSession(asyncssh.SSHServerSession):
             groups_xml = ET.tostring(child, encoding="unicode")
             groups_by_name[group_name] = f"<configuration>{groups_xml}</configuration>"
 
-        return groups_by_name
+        if groups_by_name:
+            return groups_by_name
+        return DeviceSession._extract_groups_configurations_regex(xml_text)
 
     def _ok_reply(self, message_id: str) -> str:
         return f'<rpc-reply message-id="{message_id}"><ok/></rpc-reply>'

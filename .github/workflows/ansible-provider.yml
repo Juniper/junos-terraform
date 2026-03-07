@@ -80,29 +80,10 @@ jobs:
           --bind-host 127.0.0.1 \
           --base-port 8301
 
-        role_name="$(find ansible-provider-junos-vqfx-evpn-vxlan/roles -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | head -n 1)"
-        if [ -z "$role_name" ]; then
-          echo "failed to detect generated role name"
-          exit 1
-        fi
-
-        ROLE_NAME="$role_name" python - <<'PY'
-        from pathlib import Path
-        import os
-        from jinja2 import Template
-
-        template_path = Path('.github/ansible/ci-netconf-playbook.yml.j2')
-        output_path = Path('ansible-provider-junos-vqfx-evpn-vxlan/ci-netconf-playbook.yml')
-
-        rendered = Template(
-          template_path.read_text(encoding='utf-8'),
-          variable_start_string='[[',
-          variable_end_string=']]'
-        ).render(
-          generated_role_name=os.environ['ROLE_NAME']
-        )
-        output_path.write_text(rendered, encoding='utf-8')
-        PY
+        python .github/scripts/ansible_workflow/render_ci_netconf_playbook.py \
+          --roles-root ansible-provider-junos-vqfx-evpn-vxlan/roles \
+          --template-path .github/ansible/ci-netconf-playbook.yml.j2 \
+          --output-path ansible-provider-junos-vqfx-evpn-vxlan/ci-netconf-playbook.yml
 
     - name: Start NETCONF mock and wait for listeners
       run: |
@@ -216,12 +197,19 @@ jobs:
           echo "derived drift target host '${target_host}' is missing from mock-devices mapping"
           exit 1
         fi
+        target_group="$(python .github/scripts/ansible_workflow/derive_target_group.py \
+          --config-xml "ansible-provider-junos-vqfx-evpn-vxlan/configs/${target_host}.xml")"
+        if [ -z "$target_group" ]; then
+          echo "failed to derive drift target group"
+          exit 1
+        fi
         echo "host=$target_host" >> "$GITHUB_OUTPUT"
+        echo "group=$target_group" >> "$GITHUB_OUTPUT"
 
         python .github/scripts/apply_netconf_drift.py \
           --devices-file ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt \
           --target-host "$target_host" \
-          --target-group base-config \
+          --target-group "$target_group" \
           --drift-ip 203.0.113.250/32 \
           --username ci-user \
           --password ci-password \
@@ -295,6 +283,7 @@ jobs:
           --state-dump netconf-mock-state.json \
           --require-min-commits 3 \
           --only-device "${{ steps.drift_target.outputs.host }}" \
+          --only-group "${{ steps.drift_target.outputs.group }}" \
           --must-contain 203.0.113.10/32 \
           --must-not-contain 203.0.113.250/32
 
