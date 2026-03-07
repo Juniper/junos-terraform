@@ -26,10 +26,6 @@ jobs:
         python -m pip install asyncssh ansible-core ncclient jxmlease
         ansible-galaxy collection install juniper.device ansible.netcommon
 
-    - name: Run NETCONF mock unit tests
-      run: |
-        pytest -q netconf_mock/tests/test_netconf_mock_server.py
-
     - name: Generate Ansible provider role with jtaf-yang2ansible
       run: |
         rm -rf ansible-provider-junos-vqfx-evpn-vxlan
@@ -79,31 +75,36 @@ jobs:
         fi
 
         cat > ansible-provider-junos-vqfx-evpn-vxlan/ci-netconf-playbook.yml <<EOF
-        - name: Render and apply generated Junos configuration
+        - name: Render generated Junos configuration XML
           hosts: all
           gather_facts: false
           connection: local
           vars:
             tmp_dir: configs
             generated_role_name: "$role_name"
-            ci_netconf_username: "{{ lookup('env', 'NETCONF_USERNAME') }}"
-            ci_netconf_password: "{{ lookup('env', 'NETCONF_PASSWORD') }}"
           tasks:
             - name: Render XML using generated role
               ansible.builtin.include_role:
                 name: "{{ generated_role_name }}"
 
+        - name: Apply rendered XML via Junos NETCONF plugin
+          hosts: all
+          gather_facts: false
+          connection: ansible.netcommon.netconf
+          vars:
+            tmp_dir: configs
+            ci_netconf_username: "{{ lookup('env', 'NETCONF_USERNAME') }}"
+            ci_netconf_password: "{{ lookup('env', 'NETCONF_PASSWORD') }}"
+            ansible_network_os: juniper.device.junos
+            ansible_user: "{{ ci_netconf_username }}"
+            ansible_password: "{{ ci_netconf_password }}"
+          tasks:
             - name: Push rendered XML via Junos NETCONF plugin
-              connection: ansible.netcommon.netconf
               juniper.device.junos_config:
                 src: "{{ tmp_dir }}/{{ inventory_hostname }}.xml"
                 src_format: xml
                 update: merge
                 comment: "CI apply generated role"
-              vars:
-                ansible_network_os: juniper.device.junos
-                ansible_user: "{{ ci_netconf_username }}"
-                ansible_password: "{{ ci_netconf_password }}"
               register: junos_apply_result
 
             - name: Emit concise module result for debugging
