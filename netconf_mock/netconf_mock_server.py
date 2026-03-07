@@ -172,6 +172,47 @@ class DeviceSession(asyncssh.SSHServerSession):
         m = re.search(r"(<configuration>.*?</configuration>)", xml_text, flags=re.DOTALL)
         return m.group(1) if m else ""
 
+    @staticmethod
+    def _extract_groups_configurations(xml_text: str) -> dict[str, str]:
+        """Extract per-group configuration blobs from a load-configuration RPC.
+
+        Returns mapping of group-name -> <configuration><groups>...</groups></configuration>.
+        """
+
+        groups_by_name: dict[str, str] = {}
+
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError:
+            return groups_by_name
+
+        config_elem = None
+        for elem in root.iter():
+            if DeviceSession._local_name(elem.tag) == "configuration":
+                config_elem = elem
+                break
+
+        if config_elem is None:
+            return groups_by_name
+
+        for child in list(config_elem):
+            if DeviceSession._local_name(child.tag) != "groups":
+                continue
+
+            group_name = ""
+            for grandchild in list(child):
+                if DeviceSession._local_name(grandchild.tag) == "name" and grandchild.text:
+                    group_name = grandchild.text.strip()
+                    break
+
+            if not group_name:
+                continue
+
+            groups_xml = ET.tostring(child, encoding="unicode")
+            groups_by_name[group_name] = f"<configuration>{groups_xml}</configuration>"
+
+        return groups_by_name
+
     def _ok_reply(self, message_id: str) -> str:
         return f'<rpc-reply message-id="{message_id}"><ok/></rpc-reply>'
 
@@ -183,12 +224,23 @@ class DeviceSession(asyncssh.SSHServerSession):
         if "<load-configuration" not in xml_text:
             return False
 
-        group_name = self._extract_group_name(xml_text)
-        cfg = self._extract_configuration(xml_text)
-        if group_name and cfg:
-            self._state.candidate_groups[group_name] = cfg
-            self._state.submitted_xml_by_group[group_name] = cfg
-            self._append_history("load-configuration", f"group={group_name}")
+        groups_cfg = self._extract_groups_configurations(xml_text)
+        if groups_cfg:
+            for group_name, cfg in groups_cfg.items():
+                self._state.candidate_groups[group_name] = cfg
+                self._state.submitted_xml_by_group[group_name] = cfg
+            self._append_history(
+                "load-configuration",
+                f"groups={','.join(sorted(groups_cfg.keys()))}",
+            )
+        else:
+            # Fallback for malformed/minimal payloads.
+            group_name = self._extract_group_name(xml_text)
+            cfg = self._extract_configuration(xml_text)
+            if group_name and cfg:
+                self._state.candidate_groups[group_name] = cfg
+                self._state.submitted_xml_by_group[group_name] = cfg
+                self._append_history("load-configuration", f"group={group_name}")
         self._send_frame(self._ok_reply(message_id))
         return True
 
