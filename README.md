@@ -322,15 +322,6 @@ This is useful to feed generated host_vars into the Ansible role/playbook create
 
 ### <u>Step-by-step: Apply the generated EVPN-VXLAN role to real Junos devices</u>
 
-This workflow mirrors the GitHub Action Ansible test flow, but is adapted for real hardware:
-- no NETCONF mock setup
-- stop after push + verification
-- include a diff preview and commit verification using `juniper.device.config`
-
-This section assumes you already generated:
-- `ansible-provider-junos-vqfx-evpn-vxlan/` with `jtaf-yang2ansible`
-- `host_vars/` and `hosts` with `jtaf-xml2yaml`
-
 1. Install Ansible dependencies on your control node
 
 ```bash
