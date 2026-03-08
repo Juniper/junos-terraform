@@ -1,0 +1,14 @@
+---
+- name: Deploy interfaces to QFX device
+  hosts: qfx
+  connection: local         
+  gather_facts: false
+  collections:
+    - juniper.device
+  vars:
+    config_file: /home/jcluser/junos-terraform/examples/evpn-vxlan-dc/dc1/dc1-leaf1-modified.xml
+    ansible_user: jcluser       
+    ansible_password: Juniper!1
+  roles:
+    - role: qfx_junos_role
+

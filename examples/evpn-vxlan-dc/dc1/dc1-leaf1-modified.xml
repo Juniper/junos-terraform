@@ -1,0 +1,225 @@
+<configuration>
+    <chassis>
+        <aggregated-devices>
+            <ethernet>
+                <device-count>24</device-count>
+            </ethernet>
+        </aggregated-devices>
+    </chassis>
+
+    <interfaces>
+        <interface>
+            <name>xe-0/0/0</name>
+            <description>*** debug to dc1-spine1 ***</description>
+            <unit>
+                <name>0</name>
+                <family>
+                    <inet>
+                        <address>
+                            <name>10.30.135.2/30</name>
+                        </address>
+                    </inet>
+                </family>
+            </unit>
+        </interface>
+
+        <interface>
+            <name>xe-0/0/1</name>
+            <description>*** to dc1-spine2 ***</description>
+            <unit>
+                <name>0</name>
+                <family>
+                    <inet>
+                        <address>
+                            <name>10.30.145.2/30</name>
+                        </address>
+                    </inet>
+                </family>
+            </unit>
+        </interface>
+
+        <interface>
+            <name>xe-0/0/2</name>
+            <ether-options>
+                <ieee-802.3ad>
+                    <bundle>ae0</bundle>
+                </ieee-802.3ad>
+            </ether-options>
+        </interface>
+
+        <interface>
+            <name>xe-0/0/3</name>
+            <ether-options>
+                <ieee-802.3ad>
+                    <bundle>ae1</bundle>
+                </ieee-802.3ad>
+            </ether-options>
+        </interface>
+
+        <interface>
+            <name>ae0</name>
+            <esi>
+                <identifier>00:00:00:00:00:00:00:00:01:00</identifier>
+                <all-active/>
+            </esi>
+            <aggregated-ether-options>
+                <lacp>
+                    <active/>
+                    <periodic>fast</periodic>
+                    <system-id>00:00:00:00:01:00</system-id>
+                </lacp>
+            </aggregated-ether-options>
+            <unit>
+                <name>0</name>
+                <family>
+                    <ethernet-switching>
+                        <vlan>
+                            <members>1001</members>
+                        </vlan>
+                    </ethernet-switching>
+                </family>
+            </unit>
+        </interface>
+
+        <interface>
+            <name>ae1</name>
+            <esi>
+                <identifier>00:00:00:00:00:00:00:00:02:00</identifier>
+                <all-active/>
+            </esi>
+            <aggregated-ether-options>
+                <lacp>
+                    <active/>
+                    <periodic>fast</periodic>
+                    <system-id>00:00:00:00:02:00</system-id>
+                </lacp>
+            </aggregated-ether-options>
+            <unit>
+                <name>0</name>
+                <family>
+                    <ethernet-switching>
+                        <vlan>
+                            <members>2001</members>
+                        </vlan>
+                    </ethernet-switching>
+                </family>
+            </unit>
+        </interface>
+
+        <interface>
+            <name>em0</name>
+            <unit>
+                <name>0</name>
+                <description>*** management ***</description>
+                <family>
+                    <inet>
+                        <address>
+                            <name>100.123.24.5/16</name>
+                        </address>
+                    </inet>
+                </family>
+            </unit>
+        </interface>
+
+        <interface>
+            <name>em1</name>
+            <unit>
+                <name>0</name>
+                <description>*** to pfe ***</description>
+                <family>
+                    <inet>
+                        <address>
+                            <name>169.254.0.2/24</name>
+                        </address>
+                    </inet>
+                </family>
+            </unit>
+        </interface>
+
+        <interface>
+            <name>irb</name>
+            <unit>
+                <name>1001</name>
+                <family>
+                    <inet>
+                        <address>
+                            <name>10.1.1.1/24</name>
+                        </address>
+                    </inet>
+                </family>
+                <mac>02:0a:01:01:01:18</mac>
+            </unit>
+            <unit>
+                <name>2001</name>
+                <family>
+                    <inet>
+                        <address>
+                            <name>10.2.1.1/24</name>
+                        </address>
+                    </inet>
+                </family>
+                <mac>02:0a:02:01:01:18</mac>
+            </unit>
+            <unit>
+                <name>3001</name>
+                <family>
+                    <inet>
+                        <address>
+                            <name>10.3.1.1/24</name>
+                        </address>
+                    </inet>
+                </family>
+                <mac>02:0a:03:01:01:18</mac>
+            </unit>
+        </interface>
+
+        <interface>
+            <name>lo0</name>
+            <unit>
+                <name>0</name>
+                <description>*** loopback ***</description>
+                <family>
+                    <inet>
+                        <address>
+                            <name>10.30.100.5/32</name>
+                        </address>
+                    </inet>
+                </family>
+            </unit>
+            <unit>
+                <name>10001</name>
+                <description>Loopback for VXLAN control packets for VRF_10001</description>
+                <family>
+                    <inet>
+                        <address>
+                            <name>10.40.100.3/32</name>
+                        </address>
+                    </inet>
+                </family>
+            </unit>
+            <unit>
+                <name>10002</name>
+                <description>Loopback for VXLAN control packets for VRF_10002</description>
+                <family>
+                    <inet>
+                        <address>
+                            <name>10.40.100.8/32</name>
+                        </address>
+                    </inet>
+                </family>
+            </unit>
+            <unit>
+                <name>10003</name>
+                <description>Loopback for VXLAN control packets for VRF_10003</description>
+                <family>
+                    <inet>
+                        <address>
+                            <name>10.40.100.13/32</name>
+                        </address>
+                    </inet>
+                </family>
+            </unit>
+        </interface>
+    </interfaces>
+</configuration>
+
