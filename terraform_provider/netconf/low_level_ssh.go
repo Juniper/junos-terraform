@@ -7,18 +7,21 @@
 package netconf
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/pem"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"net"
+	"os"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+	netconfssh "nemith.io/netconf/transport/ssh"
 )
 
 const (
@@ -35,11 +38,23 @@ type TransportSSH struct {
 	TransportBasicIO              // Embedded Transport basic IO base type
 	SSHClient        *ssh.Client  // SSH Client
 	SSHSession       *ssh.Session // SSH Client Session
+	netconfTransport msgTransport
+}
+
+type msgTransport interface {
+	MsgReader() (io.ReadCloser, error)
+	MsgWriter() (io.WriteCloser, error)
+	Close() error
 }
 
 // Close closes an existing SSH session and socket if they exist.
 func (t *TransportSSH) Close() error {
-	// Close the SSH Session if we have one
+	if t.netconfTransport != nil {
+		if err := t.netconfTransport.Close(); !isBenignCloseError(err) {
+			return err
+		}
+		return nil
+	}
 
 	if t.SSHSession != nil {
 		if err := t.SSHSession.Close(); !isBenignCloseError(err) {
@@ -47,22 +62,82 @@ func (t *TransportSSH) Close() error {
 		}
 	}
 
-	// Close and check for nil. Even though closed, it will retain data for session etc.
 	err := error(nil)
 	if t.SSHClient != nil {
 		err = t.SSHClient.Close()
 	}
 
 	if !isBenignCloseError(err) {
-		return (err)
-	}
-
-	err = t.TransportBasicIO.Close()
-	if !isBenignCloseError(err) {
-		return (err)
+		return err
 	}
 
 	return nil
+}
+
+// Send writes one NETCONF message using the underlying message-oriented transport.
+func (t *TransportSSH) Send(data []byte) error {
+	if t.netconfTransport == nil {
+		return t.TransportBasicIO.Send(data)
+	}
+
+	w, err := t.netconfTransport.MsgWriter()
+	if err != nil {
+		return err
+	}
+
+	if _, err := w.Write(data); err != nil {
+		_ = w.Close()
+		return err
+	}
+
+	return w.Close()
+}
+
+// Receive reads one NETCONF message using the underlying message-oriented transport.
+func (t *TransportSSH) Receive() ([]byte, error) {
+	if t.netconfTransport == nil {
+		return t.TransportBasicIO.Receive()
+	}
+
+	r, err := t.netconfTransport.MsgReader()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = r.Close()
+	}()
+
+	out, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+// SendHello sends a NETCONF hello message using this transport.
+func (t *TransportSSH) SendHello(hello *HelloMessage) error {
+	val, err := xml.Marshal(hello)
+	if err != nil {
+		return err
+	}
+
+	header := []byte(xml.Header)
+	val = append(header, val...)
+	return t.Send(val)
+}
+
+// ReceiveHello receives and decodes the remote NETCONF hello message.
+func (t *TransportSSH) ReceiveHello() (*HelloMessage, error) {
+	hello := new(HelloMessage)
+
+	val, err := t.Receive()
+	if err != nil {
+		return hello, err
+	}
+
+	err = xml.Unmarshal(val, hello)
+	return hello, err
 }
 
 // isBenignCloseError filters expected errors when the remote side closes first.
@@ -100,25 +175,29 @@ func (t *TransportSSH) DialSSH(target string, config *ssh.ClientConfig, port int
 		target = fmt.Sprintf("%s:%d", target, sshport)
 	}
 
-	SSHClient, err := ssh.Dial("tcp", target, config)
+	ctx := context.Background()
+	if config != nil && config.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, config.Timeout)
+		defer cancel()
+	}
+
+	transport, err := netconfssh.Dial(ctx, "tcp", target, config)
 	if err != nil {
 		return err
 	}
 
-	t.SSHClient = SSHClient
-
-	err = t.SetupSession()
-	if err != nil {
-		return err
-	}
-
+	t.netconfTransport = transport
 	return nil
 }
 
 // SetupSession sorts out wiring
 func (t *TransportSSH) SetupSession() error {
-	var err error
+	if t.netconfTransport != nil {
+		return nil
+	}
 
+	var err error
 	t.SSHSession, err = t.SSHClient.NewSession()
 	if err != nil {
 		return err
@@ -176,29 +255,15 @@ func Dial(target string, config *ssh.ClientConfig, port int) (*Session, error) {
 // See TransportSSH.Dial for arguments.
 // The timeout value is used for both connection establishment and Read/Write operations.
 func DialSSHTimeout(target string, config *ssh.ClientConfig, timeout time.Duration) (*Session, error) {
-	bareConn, err := net.DialTimeout("tcp", target, timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	transport, err := netconfssh.Dial(ctx, "tcp", target, config)
 	if err != nil {
 		return nil, err
 	}
 
-	conn := &deadlineConn{Conn: bareConn, timeout: timeout}
-	t, err := connToTransport(conn, config)
-	if err != nil {
-		return nil, err
-	}
-
-	go func() {
-		ticker := time.NewTicker(timeout / 2)
-		defer ticker.Stop()
-		for range ticker.C {
-			// Call SendRequest directly on SSHClient rather than via Conn field
-		_, _, err := t.SSHClient.SendRequest("KEEP_ALIVE", true, nil)
-			if err != nil {
-				return
-			}
-		}
-	}()
-
+	t := &TransportSSH{netconfTransport: transport}
 	s, err := NewSession(t)
 	if err != nil {
 		return nil, err
@@ -289,21 +354,4 @@ func connToTransport(conn net.Conn, config *ssh.ClientConfig) (*TransportSSH, er
 	}
 
 	return t, nil
-}
-
-type deadlineConn struct {
-	net.Conn
-	timeout time.Duration
-}
-
-func (c *deadlineConn) Read(b []byte) (n int, err error) {
-    // ignore error from setting deadline
-    _ = c.SetReadDeadline(time.Now().Add(c.timeout))
-    return c.Conn.Read(b)
-}
-
-func (c *deadlineConn) Write(b []byte) (n int, err error) {
-    // ignore error from setting deadline
-    _ = c.SetWriteDeadline(time.Now().Add(c.timeout))
-    return c.Conn.Write(b)
 }

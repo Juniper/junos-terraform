@@ -81,6 +81,20 @@ def test_collect_device_specs_reads_escaped_newlines(tmp_path):
     assert specs == ["spine1:8311", "leaf1:8301", "leaf2:8302"]
 
 
+def test_device_ssh_server_validates_password_when_auth_enabled():
+    state = MODULE.DeviceState(name="leaf1")
+    server = MODULE.DeviceSSHServer(
+        username="ci-user",
+        password="ci-password",
+        state=state,
+        disable_auth=False,
+    )
+
+    assert server.begin_auth("ci-user") is True
+    assert server.validate_password("ci-user", "ci-password") is True
+    assert server.validate_password("ci-user", "wrong-password") is False
+
+
 def test_load_configuration_updates_candidate_and_submitted(state_and_session):
     state, session, channel = state_and_session
 
