@@ -16,10 +16,10 @@ Run the following commands to set up the Junos-Terraform Environment and Workflo
 ```bash
 git clone https://github.com/juniper/junos-terraform
 git clone https://github.com/juniper/yang
+cd junos-terraform
 python3 -m venv venv
 . venv/bin/activate
-pip install ./junos-terraform
-cd junos-terraform
+pip install -e .
 ```
 
 If you do not already have Terraform installed (in general), for macOS, run the following:
@@ -39,13 +39,10 @@ pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p <path-to-common> <path-to-y
 ```
 Example: 
 ```
-pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
+pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
 ```
 
-NOTE: For Junos version >23.2 (i.e. starting from 23.4 onwards), the file path in the `yang` directory is slightly different as shown in the example below.
-```
-pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/23.4/23.4R1/native/conf-and-rpcs/common/models ../yang/23.4/23.4R1/native/conf-and-rpcs/junos/conf/models/*.yang > junos.json
-```
+NOTE: This repository includes YANG examples for 18.2 under `examples/yang/18.2`.
  
 ---
 
@@ -65,7 +62,7 @@ NOTE: If using multiple xml configurations (like the example above), ensure that
 
 All in one example (`-j` accepts `-` for `stdin` for `jtaf-provider`):
 ```bash
-pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang | jtaf-provider -j - -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml  -t vqfx
+pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang | jtaf-provider -j - -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml  -t vqfx
 ```
 
 ---
@@ -81,11 +78,11 @@ jtaf-yang2go -p <path-to-common> <path-to-yang-files> -x <xml-configuration(s)> 
 Example:
 
 ```bash
-jtaf-yang2go -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx
+jtaf-yang2go -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx
 ```
 NOTE: If using multiple xml configurations (like the example above), ensure that the configurations are for the same device type
 
-NOTE: For Junos version >23.2, the file path for the folder containing the yang files for each device is slightly different. Refer to section [Yang File(s) to JSON Conversion](./README.md#yang-files-to-json-conversion) for more information and examples.
+NOTE: The examples in this README use the YANG files shipped in this repository under `examples/yang/18.2`.
 
 ---
 
@@ -97,7 +94,7 @@ Example:
 
 ```
 cd terraform-provider-junos-vqfx
-go install
+go install .
 ```
 
 
@@ -108,7 +105,7 @@ go install
 
 Run a command to generate a `.tf` test file to deploy the Terraform provider.
 
-**NOTE:** Output will be returned to the terminal **OR** created in a directory depending on your passed flags.
+**NOTE:** Output is written to a directory (`-d`) as `providers.tf` plus one `.tf` file per XML input.
 
 **<u>Flag Options:</u>**
  * -j 
@@ -118,54 +115,16 @@ Run a command to generate a `.tf` test file to deploy the Terraform provider.
  * -t
 	* **Required:** Junos device type
  * -d
-	* **Optional:** Flag to create multiple Terraform files under specified directory name, one for each xml config
+	* **Required:** Output directory where providers.tf and per-device Terraform files are written
  * -u
 	* **Optional:** Device username
  * -p
 	* **Optional:** Device password
 
----
-
-### <u>Creating a single Terraform Testing File</u>
-
-To create a single Terraform (.tf) file from a config file(s) use the following command (output returned to terminal):
-```
-jtaf-xml2tf -j <path-to-trimmed-schema> -x <path-to-config-files(s)> -t <device-type>
-```
-
-Example: 
-
-* **trimmed_schema** - stored in terraform provider folder created from running the jtaf-provider module command (usually in terraform-provider-junos-'device-type')
-* **xml_files** - directory containing xml file(s) (ensure xml file(s) are for the same device type)
-
-```
-jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx
-```
-* If the user wants to provide the device **username** and **password**, those additional flags can be added as well
-```
-jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx -u root -p password
-```
-
-Using the output from the terminal, which represents a template for the HCL .tf file, we can create our testing folder, copy the output into a terraform file, and fill in the template with the necessary device information.
-
-#### <u>Create testing folder</u>
-
-Create a testing folder which can be used to write .tf files and apply terraform configuration.   
-
-Example
-	```
-	mkdir testbed
-	```
-
-In the `/testbed` folder created:  
-* Create a `main.tf` file with the content of terminal output from the `jtaf-xml2tf` command.  
-	* Fill in any missing information
-
-Jump to [Setting up the Test Environment](./README.md#setting-up-testing-environment)
 
 ---
 
-### <u>Creating multiple Terraform Testing Files</u>
+### <u>Creating Terraform Testing Files</u>
 
 To create multiple Terraform (.tf) files from multiple config files, where each .tf file will represent one xml file, use the following command (output returned to specified directory name):
 
@@ -186,17 +145,16 @@ jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evp
 jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx -d testbed -u root -p password
 ```
 
-Using the output which is outputted to the specifed directory from the command, which represents a template for the HCL .tf file for each input XML file, we can now create our testing environment and fill in the template with any remaining necessary device or config information.
+Using the output which is outputted to the specified directory from the command, which represents a template for the HCL .tf file for each input XML file, we can now create our testing environment and fill in the template with any remaining necessary device or config information.
 
 ---
 
 ### <u>Setting up Testing environment</u>
 
 Now that we ran the `jtaf-xml2tf` command and have our testing folder setup:
-* Note: if you created a single terraform file, you should have copied that output to a `.tf` file in a test folder in the `/junos-terrafom` directory:
-	* ex: `junos-terraform/testbed/main.tf` <-- stores output from command
+* The command writes files directly under your test folder in the `/junos-terraform` directory.
 
-#### Creating the Enviornment
+#### Creating the Environment
 
 Next, create a `.terraformrc` file in your home directory, `(cd ~)`, with `vi` and add the following contents, replacing any `<elements>` tags with your own information. This is to ensure that the terraform plugin you created and installed to `/go/bin` will be read.
 
@@ -220,12 +178,13 @@ provider_installation {
 }
 ```
 
-You should know have a file structure which looks similar to: 
+You should now have a file structure which looks similar to: 
 * (if you created one terraform test file)
 
 ```
 /junos-terraform/<testing-folder-name>/
-/junos-terraform/<testing-folder-name>/main.tf     <-- contents of jtaf-xml2tf command
+/junos-terraform/<testing-folder-name>/providers.tf
+/junos-terraform/<testing-folder-name>/<hostname>.tf
 
 /Users/<username>/.terraformrc     <-- link to provider created in /usr/go/bin/ [see details above]
 ```
@@ -285,7 +244,7 @@ Example:
 
 ### <u>Edit Test Files, Plan, and Apply</u>
 
-Once the `.terraform.rc` file is set up, and the `main.tf` OR group of test file(s) contains access to the provider, information regarding the desired devices to push the configuration to, and the desired config in `HCL` format, we are now ready to use the provider.
+Once the `.terraformrc` file is set up, and the generated test file(s) contain access to the provider, information regarding the desired devices to push the configuration to, and the desired config in `HCL` format, we are now ready to use the provider.
 
 ```
 terraform plan
@@ -310,7 +269,7 @@ What is created (under ansible-provider-junos-<type>/):
 Verify rendering without applying:
 ```
 cd ansible-provider-junos-<type>
-ansible-playbook -i hosts jtaf-playbook.yml --check --diff
+ansible-playbook -i "localhost," jtaf-playbook.yml --check --diff
 ```
 
 ---
@@ -325,14 +284,14 @@ jtaf-yang2ansible -p <path-to-common> <path-to-yang-files> -x <xml-config(s)> -t
 
 Example:
 ```
-jtaf-yang2ansible -p ../yang/18.2/18.2R3/common ../yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/dc1/*spine*.xml -t qfx
+jtaf-yang2ansible -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/dc1/*spine*.xml -t qfx
 ```
 
 Notes:
 - If supplying multiple XML configs they must be for the same device type.
 - Output directory: ansible-provider-junos-<type>/ containing roles/<type>_role/ (tasks/templates), jtaf-playbook.yml (connection: local), host_vars/, configs/, trimmed_schema.json.
 - Run the generated playbook in check/diff mode to verify rendered configs without applying:
-  ansible-playbook -i hosts jtaf-playbook.yml --check --diff
+	ansible-playbook -i "localhost," jtaf-playbook.yml --check --diff
 
 ---
 
@@ -348,7 +307,7 @@ jtaf-xml2yaml -j <trimmed_schema.json> -x <config1.xml> [<config2.xml> ...] -d <
 Example:
 ```
 jtaf-xml2yaml -j ansible-provider-junos-qfx/trimmed_schema.json \
-  -x examples/qfx/device1.xml examples/qfx/device2.xml \
+	-x examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml examples/evpn-vxlan-dc/dc1/dc1-leaf2.xml \
   -d ansible-provider-junos-qfx
 ```
 
@@ -369,7 +328,3 @@ Run from home /junos-terraform directory:
 ```
 pytest -v
 ```
-
-Current unit tests:
-	- test_worflow.py
-		- Ensures that the current workflow will emit the correct output .tf files from a specified set of yang_files (ex: 18.2) based the files located in /examples directory which is considered a source of truth.
