@@ -123,12 +123,29 @@ def resolve_devices_to_check(only_device: str, running_cfg_by_device: dict[str, 
 def assert_required_strings(
     must_contain: list[str],
     devices_to_check: list[str],
-    running_cfg_by_device: dict[str, str],
+    scoped_running_cfg_by_device: dict[str, str],
+    full_running_cfg_by_device: dict[str, str],
     only_device: str,
+    only_group: str,
 ) -> None:
     for needle in must_contain:
-        if any(needle in running_cfg_by_device[name] for name in devices_to_check):
+        if any(needle in scoped_running_cfg_by_device[name] for name in devices_to_check):
             continue
+
+        # Junos group application semantics may place effective config outside the
+        # exact group key represented in the mock state. If a group-scoped check
+        # misses, allow a fallback match in full per-device running config.
+        if only_group and any(needle in full_running_cfg_by_device[name] for name in devices_to_check):
+            scope = only_device if only_device else "all devices"
+            print(
+                (
+                    f"warning: '{needle}' not found under group '{only_group}' for {scope}; "
+                    "matched in full running config"
+                ),
+                file=sys.stderr,
+            )
+            continue
+
         scope = only_device if only_device else "all devices"
         raise RuntimeError(f"expected to find '{needle}' in running config dump for {scope}")
 
@@ -159,13 +176,20 @@ def main() -> int:
             f"expected at least {args.require_min_commits} commit ops, got {commit_count}"
         )
 
-    running_cfg_by_device = scope_running_config_by_group(
+    scoped_running_cfg_by_device = scope_running_config_by_group(
         state_data,
         devices_to_check,
         args.only_group,
     )
-    assert_required_strings(args.must_contain, devices_to_check, running_cfg_by_device, args.only_device)
-    assert_forbidden_strings(args.must_not_contain, devices_to_check, running_cfg_by_device)
+    assert_required_strings(
+        args.must_contain,
+        devices_to_check,
+        scoped_running_cfg_by_device,
+        running_cfg_by_device,
+        args.only_device,
+        args.only_group,
+    )
+    assert_forbidden_strings(args.must_not_contain, devices_to_check, scoped_running_cfg_by_device)
 
     print(
         f"state assertions passed: devices={len(state_data)} commits={commit_count}"

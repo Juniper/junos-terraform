@@ -211,6 +211,35 @@ class DeviceSession(asyncssh.SSHServerSession):
         return groups_by_name
 
     @staticmethod
+    def _extract_groups_from_configuration_set(xml_text: str) -> dict[str, str]:
+        """Extract per-group payload from set-style load-configuration RPCs.
+
+        Some client stacks send `<load-configuration format="text">` with
+        `<configuration-set>` commands instead of XML `<configuration><groups>`.
+        Capture `set groups <name> ...` lines so downstream assertions can still
+        validate expected rendered content.
+        """
+
+        m = re.search(
+            r"<configuration-set>\s*(.*?)\s*</configuration-set>",
+            xml_text,
+            flags=re.DOTALL,
+        )
+        if not m:
+            return {}
+
+        lines = [line.strip() for line in m.group(1).splitlines() if line.strip()]
+        groups_lines: dict[str, list[str]] = {}
+        for line in lines:
+            lm = re.match(r"^set\s+groups\s+(\S+)\s+(.+)$", line)
+            if not lm:
+                continue
+            group_name = lm.group(1)
+            groups_lines.setdefault(group_name, []).append(line)
+
+        return {name: "\n".join(group_lines) for name, group_lines in groups_lines.items()}
+
+    @staticmethod
     def _extract_groups_configurations(xml_text: str) -> dict[str, str]:
         """Extract per-group configuration blobs from a load-configuration RPC."""
 
@@ -248,6 +277,8 @@ class DeviceSession(asyncssh.SSHServerSession):
             return False
 
         groups_cfg = self._extract_groups_configurations(xml_text)
+        if not groups_cfg:
+            groups_cfg = self._extract_groups_from_configuration_set(xml_text)
         if groups_cfg:
             for group_name, cfg in groups_cfg.items():
                 self._state.candidate_groups[group_name] = cfg
