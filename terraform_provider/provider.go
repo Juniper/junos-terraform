@@ -3,16 +3,21 @@ package main
 import (
 	"context"
 
-	"terraform_provider/netconf"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"terraform_provider/netconf"
 )
 
 var _ provider.Provider = new(Provider)
 
+var providerClientFactory = func(cfg *Config) (netconf.Client, error) {
+	return cfg.Client()
+}
+
+// newProvider returns a provider implementation instance.
 func newProvider() provider.Provider {
 	return Provider{}
 }
@@ -34,14 +39,8 @@ type ProviderConfig struct {
 	Host string
 }
 
-// Configure implements provider.Provider.
-func (p Provider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var config providerModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
+// buildProviderConfig maps Terraform config values into ProviderConfig.
+func buildProviderConfig(config providerModel) (ProviderConfig, error) {
 	clientConfig := Config{
 		Host:     config.Host.ValueString(),
 		Port:     int(config.Port.ValueInt64()),
@@ -50,15 +49,30 @@ func (p Provider) Configure(ctx context.Context, req provider.ConfigureRequest, 
 		SSHKey:   config.SshKey.ValueString(),
 	}
 
-	client, err := clientConfig.Client()
+	client, err := providerClientFactory(&clientConfig)
+	if err != nil {
+		return ProviderConfig{}, err
+	}
+
+	return ProviderConfig{
+		Client: client,
+		Host:   clientConfig.Host,
+	}, nil
+}
+
+// Configure implements provider.Provider.
+func (p Provider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	var config providerModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	providerConfig, err := buildProviderConfig(config)
 	if err != nil {
 		resp.Diagnostics.AddError("failed to create client", err.Error())
 		return
 	}
-
-	var providerConfig ProviderConfig
-	providerConfig.Client = client
-	providerConfig.Host = config.Host.ValueString()
 
 	resp.ResourceData = providerConfig
 }
@@ -91,8 +105,8 @@ func (p Provider) Schema(_ context.Context, _ provider.SchemaRequest, resp *prov
 				Required: true,
 			},
 			"password": schema.StringAttribute{
-				Optional: true,
-                                Sensitive: true,
+				Optional:  true,
+				Sensitive: true,
 			},
 			"port": schema.Int64Attribute{
 				Required: true,
@@ -101,8 +115,8 @@ func (p Provider) Schema(_ context.Context, _ provider.SchemaRequest, resp *prov
 				//Default: int64default.StaticInt64(22),
 			},
 			"sshkey": schema.StringAttribute{
-				Optional: true,
-                                Sensitive: true,
+				Optional:  true,
+				Sensitive: true,
 				// Will need to add eventually
 				//Validators: []validator.String{stringvalidator.AtLeastOneOf(path.MatchRoot("d")...)},
 			},

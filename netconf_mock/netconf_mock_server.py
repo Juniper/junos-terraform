@@ -75,13 +75,17 @@ class DeviceState:
 
 
 class DeviceSSHServer(asyncssh.SSHServer):
-    def __init__(self, username: str, password: str, state: DeviceState):
+    def __init__(self, username: str, password: str, state: DeviceState, disable_auth: bool):
         self.username = username
         self.password = password
         self.state = state
+        self.disable_auth = disable_auth
 
     def begin_auth(self, username: str) -> bool:
         logger.info("device=%s begin_auth username=%s", self.state.name, username)
+        if self.disable_auth:
+            logger.info("device=%s auth disabled; accepting without credentials", self.state.name)
+            return False
         return True
 
     def password_auth_supported(self) -> bool:
@@ -266,7 +270,10 @@ class DeviceSession(asyncssh.SSHServerSession):
         return DeviceSession._extract_groups_configurations_regex(xml_text)
 
     def _ok_reply(self, message_id: str) -> str:
-        return f'<rpc-reply message-id="{message_id}"><ok/></rpc-reply>'
+        return (
+            '<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" '
+            f'message-id="{message_id}"><ok/></rpc-reply>'
+        )
 
     def _append_history(self, op: str, detail: str) -> None:
         self._state.history.append({"op": op, "detail": detail})
@@ -341,7 +348,10 @@ class DeviceSession(asyncssh.SSHServerSession):
                 "</groups></configuration>"
             )
         self._append_history("get-configuration", f"group={group_name}")
-        reply = f'<rpc-reply message-id="{message_id}">{cfg}</rpc-reply>'
+        reply = (
+            '<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" '
+            f'message-id="{message_id}">{cfg}</rpc-reply>'
+        )
         self._send_frame(reply)
         return True
 
@@ -470,7 +480,7 @@ async def _start_device_listeners(
 
         logger.info("binding device=%s host=%s port=%d", name, args.host, port)
         server = await asyncssh.create_server(
-            lambda s=state: DeviceSSHServer(args.username, args.password, s),
+            lambda s=state: DeviceSSHServer(args.username, args.password, s, args.disable_auth),
             args.host,
             port,
             server_host_keys=[host_key],
@@ -505,6 +515,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1", help="Bind address for all device listeners.")
     parser.add_argument("--username", default="ci-user", help="Accepted NETCONF username.")
     parser.add_argument("--password", default="ci-password", help="Accepted NETCONF password.")
+    parser.add_argument(
+        "--disable-auth",
+        action="store_true",
+        help="Disable SSH authentication checks for mock-only compatibility testing.",
+    )
     parser.add_argument(
         "--device",
         action="append",

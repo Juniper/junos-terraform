@@ -69,10 +69,10 @@ func TestConfigClientWithEmptyHost(t *testing.T) {
 // TestConfigClientWithValidParams tests client creation with all valid parameters
 func TestConfigClientWithValidParams(t *testing.T) {
 	testCases := []struct {
-		name     string
-		config   *Config
-		wantErr  bool
-		desc     string
+		name    string
+		config  *Config
+		wantErr bool
+		desc    string
 	}{
 		{
 			name: "valid with password",

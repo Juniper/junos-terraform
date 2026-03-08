@@ -122,17 +122,17 @@ func TestResourceFileCreate(t *testing.T) {
 	_ = plan
 
 	// Create a mock request
-// Use the provided APIs to set plan/state via helper structs
-    // Build a fake plan/state using the framework types
-    req := resource.CreateRequest{}
-    _ = req
-    // Calling Create directly requires using the framework runtime; instead, exercise the underlying logic by writing the file directly
-    if err := os.WriteFile(path.Join(tmpDir, testFileName), []byte(testContent), 0644); err != nil {
-        t.Fatalf("failed to write test file: %v", err)
-    }
+	// Use the provided APIs to set plan/state via helper structs
+	// Build a fake plan/state using the framework types
+	req := resource.CreateRequest{}
+	_ = req
+	// Calling Create directly requires using the framework runtime; instead, exercise the underlying logic by writing the file directly
+	if err := os.WriteFile(path.Join(tmpDir, testFileName), []byte(testContent), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
 
-    // Simulate the Create call by invoking the file write logic used by Create
-    // (We already wrote the file above; this ensures the file exists for assertions)
+	// Simulate the Create call by invoking the file write logic used by Create
+	// (We already wrote the file above; this ensures the file exists for assertions)
 
 	// Verify file was created
 	filePath := path.Join(tmpDir, testFileName)
