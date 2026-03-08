@@ -270,7 +270,10 @@ class DeviceSession(asyncssh.SSHServerSession):
         return DeviceSession._extract_groups_configurations_regex(xml_text)
 
     def _ok_reply(self, message_id: str) -> str:
-        return f'<rpc-reply message-id="{message_id}"><ok/></rpc-reply>'
+        return (
+            '<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" '
+            f'message-id="{message_id}"><ok/></rpc-reply>'
+        )
 
     def _append_history(self, op: str, detail: str) -> None:
         self._state.history.append({"op": op, "detail": detail})
@@ -345,7 +348,10 @@ class DeviceSession(asyncssh.SSHServerSession):
                 "</groups></configuration>"
             )
         self._append_history("get-configuration", f"group={group_name}")
-        reply = f'<rpc-reply message-id="{message_id}">{cfg}</rpc-reply>'
+        reply = (
+            '<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" '
+            f'message-id="{message_id}">{cfg}</rpc-reply>'
+        )
         self._send_frame(reply)
         return True
 

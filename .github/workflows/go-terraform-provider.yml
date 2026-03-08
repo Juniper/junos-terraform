@@ -100,14 +100,14 @@ jobs:
           --bind-host 127.0.0.1 \
           --base-port 8301
 
-        python netconf_mock/netconf_mock_server.py \
+        nohup python netconf_mock/netconf_mock_server.py \
           --host 127.0.0.1 \
           --username ci-user \
           --password ci-password \
           --log-level DEBUG \
           --devices-file ci-evpn-vxlan-tf/mock-devices.txt \
           --state-dump netconf-mock-state.json \
-          > netconf-mock.log 2>&1 &
+          > netconf-mock.log 2>&1 < /dev/null &
         echo "$!" > .netconf_mock.pid
 
         # Wait for all per-device listeners to be ready, or fail early with server logs.
@@ -141,6 +141,63 @@ jobs:
           cat netconf-mock.log || true
           exit 1
         fi
+
+        echo "NETCONF mock process started with PID $(cat .netconf_mock.pid)"
+        echo "Device socket map:"
+        cat ci-evpn-vxlan-tf/mock-devices.txt
+        echo "Active listener snapshot:"
+        if command -v ss >/dev/null 2>&1; then
+          ss -ltn | grep -E '127\.0\.0\.1:(830[0-9]|83[1-9][0-9])' || true
+        elif command -v netstat >/dev/null 2>&1; then
+          netstat -ltn | grep -E '127\.0\.0\.1:(830[0-9]|83[1-9][0-9])' || true
+        else
+          echo "Neither ss nor netstat is available in this runner"
+        fi
+
+    - name: Preflight NETCONF mock before Terraform apply
+      run: |
+        set -euo pipefail
+
+        if [ ! -f .netconf_mock.pid ]; then
+          echo "Missing .netconf_mock.pid"
+          exit 1
+        fi
+
+        MOCK_PID="$(cat .netconf_mock.pid)"
+        if ! kill -0 "$MOCK_PID" 2>/dev/null; then
+          echo "NETCONF mock process is not running (pid=$MOCK_PID)"
+          cat netconf-mock.log || true
+          exit 1
+        fi
+
+        python - <<'PY'
+        import pathlib
+        import socket
+        import sys
+
+        devices = pathlib.Path('ci-evpn-vxlan-tf/mock-devices.txt')
+        failures = []
+
+        for line in devices.read_text().splitlines():
+          line = line.strip()
+          if not line:
+            continue
+          host, port_text = line.rsplit(':', 1)
+          port = int(port_text)
+          try:
+            with socket.create_connection(('127.0.0.1', port), timeout=1.5):
+              pass
+          except OSError as exc:
+            failures.append(f"{host}:{port} -> {exc}")
+
+        if failures:
+          print('One or more NETCONF mock listeners are unreachable:', file=sys.stderr)
+          for failure in failures:
+            print(f"  - {failure}", file=sys.stderr)
+          sys.exit(1)
+
+        print('NETCONF mock preflight passed for all generated listeners')
+        PY
 
     - name: Terraform initial apply
       working-directory: ci-evpn-vxlan-tf
@@ -320,19 +377,55 @@ jobs:
           exit 1
         fi
 
+    - name: NETCONF failure diagnostics
+      if: failure()
+      run: |
+        set +e
+        echo "==== NETCONF mock diagnostics ===="
+        if [ -f .netconf_mock.pid ]; then
+          MOCK_PID="$(cat .netconf_mock.pid)"
+          echo "Mock PID: $MOCK_PID"
+          if kill -0 "$MOCK_PID" 2>/dev/null; then
+            echo "Mock process is still running"
+          else
+            echo "Mock process is not running"
+          fi
+        else
+          echo "No mock PID file found"
+        fi
+
+        echo "-- listener snapshot --"
+        if command -v ss >/dev/null 2>&1; then
+          ss -ltn | grep -E '127\.0\.0\.1:(830[0-9]|83[1-9][0-9])' || true
+        elif command -v netstat >/dev/null 2>&1; then
+          netstat -ltn | grep -E '127\.0\.0\.1:(830[0-9]|83[1-9][0-9])' || true
+        else
+          echo "Neither ss nor netstat is available in this runner"
+        fi
+
+        echo "-- netconf mock log tail --"
+        tail -n 200 netconf-mock.log || true
+
+        echo "-- netconf state dump head --"
+        if [ -f netconf-mock-state.json ]; then
+          head -n 120 netconf-mock-state.json || true
+        else
+          echo "netconf-mock-state.json not found"
+        fi
+
     - name: Stop NETCONF mock
       if: always()
       run: |
+        set +e
         if [ -f .netconf_mock.pid ]; then
           MOCK_PID="$(cat .netconf_mock.pid)"
           if kill -0 "$MOCK_PID" 2>/dev/null; then
             kill "$MOCK_PID"
-            wait "$MOCK_PID" || true
           fi
         fi
 
     - name: Upload NETCONF integration logs
-      if: always()
+      if: always() && env.ACTIONS_RUNTIME_TOKEN != ''
       uses: actions/upload-artifact@v6
       with:
         name: netconf-integration-logs

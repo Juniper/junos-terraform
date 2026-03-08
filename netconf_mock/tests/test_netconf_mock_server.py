@@ -115,9 +115,8 @@ def test_load_configuration_updates_candidate_and_submitted(state_and_session):
     assert state.submitted_xml_by_group["base-config"].startswith(
         "<configuration>"
     )
-    assert channel.writes[-1].startswith(
-        '<rpc-reply message-id="11"><ok/></rpc-reply>'
-    )
+    assert 'message-id="11"' in channel.writes[-1]
+    assert "<ok/>" in channel.writes[-1]
 
 
 def test_commit_discard_and_delete_flow(state_and_session):
@@ -180,9 +179,8 @@ def test_handle_rpc_hello_and_unknown(state_and_session):
     assert channel.writes == []
 
     session._handle_rpc('<rpc message-id="30"><foo/></rpc>')
-    assert channel.writes[-1].startswith(
-        '<rpc-reply message-id="30"><ok/></rpc-reply>'
-    )
+    assert 'message-id="30"' in channel.writes[-1]
+    assert "<ok/>" in channel.writes[-1]
     assert state.history[-1]["op"] == "unknown"
 
 
