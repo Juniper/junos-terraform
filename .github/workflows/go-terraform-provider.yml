@@ -278,7 +278,8 @@ jobs:
         before_serial="$(terraform state pull | python ../.github/scripts/tfstate_serial.py)"
         echo "serial=$before_serial" >> "$GITHUB_OUTPUT"
         # Record one managed resource path so we can assert it survives drift/reconcile cycles.
-        first_resource="$(terraform state list | head -n 1)"
+        # Avoid early pipe close (head) which can surface as EPIPE in the GH wrapper.
+        first_resource="$(terraform state list | sed -n '1p')"
         echo "resource=$first_resource" >> "$GITHUB_OUTPUT"
 
         # Use the generated device map as source-of-truth for mock hostnames.
