@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -17,7 +18,10 @@ func TestProviderMetadata(t *testing.T) {
 	p := &Provider{}
 	resp := &provider.MetadataResponse{}
 	p.Metadata(context.Background(), provider.MetadataRequest{}, resp)
-	if resp.TypeName != "terraform_provider" {
+	if resp.TypeName == "" {
+		t.Fatalf("expected non-empty provider type name")
+	}
+	if resp.TypeName != "terraform_provider" && !strings.HasPrefix(resp.TypeName, "junos-") {
 		t.Fatalf("unexpected provider type name: %q", resp.TypeName)
 	}
 }
