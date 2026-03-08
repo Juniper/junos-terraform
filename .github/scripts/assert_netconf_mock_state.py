@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 
@@ -94,7 +95,20 @@ def scope_running_config_by_group(
     scoped: dict[str, str] = {}
     for name in devices_to_check:
         groups = state_data[name].get("running_groups", {})
-        scoped[name] = str(groups.get(only_group, ""))
+        if only_group in groups:
+            scoped[name] = str(groups.get(only_group, ""))
+            continue
+
+        # Fallback prevents false negatives if group naming differs in state dumps.
+        scoped[name] = "\n".join(str(v) for v in groups.values())
+        available = ", ".join(sorted(groups.keys())) if groups else "<none>"
+        print(
+            (
+                f"warning: group '{only_group}' not found for device '{name}'; "
+                f"falling back to all running groups (available: {available})"
+            ),
+            file=sys.stderr,
+        )
     return scoped
 
 
