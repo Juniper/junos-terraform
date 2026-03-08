@@ -117,6 +117,9 @@ def test_yang2ansible():
     exe = shutil.which("jtaf-yang2ansible")
     assert exe, "Could not find jtaf-yang2ansible on PATH"
 
+    xml2yaml_exe = shutil.which("jtaf-xml2yaml")
+    assert xml2yaml_exe, "Could not find jtaf-xml2yaml on PATH"
+
     env = os.environ.copy()
 
     # Building full paths to YANG dirs / files
@@ -184,7 +187,7 @@ def test_yang2ansible():
 
         # xml2yaml command
         cmd = [
-            'jtaf-xml2yaml',
+            xml2yaml_exe,
             "-j",
             trimmed_schema_path,
             "-x",
