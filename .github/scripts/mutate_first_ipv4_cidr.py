@@ -12,22 +12,24 @@ CIDR_RE = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}/\d{1,2}\b")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Replace the first IPv4 CIDR found in Terraform files."
+    )
     parser.add_argument(
         "--directory",
         default=".",
-        help="Directory containing .tf files",
+        help="Directory containing .tf files.",
     )
     parser.add_argument(
         "--replacement",
         required=True,
-        help="CIDR replacement value",
+        help="Replacement IPv4 CIDR value.",
     )
     parser.add_argument(
         "--exclude",
         action="append",
         default=[],
-        help="Terraform filename to skip; can be specified multiple times",
+        help="Terraform filename to skip; may be repeated.",
     )
     return parser.parse_args()
 
