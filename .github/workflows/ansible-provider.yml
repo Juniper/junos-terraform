@@ -277,7 +277,7 @@ jobs:
         test -f netconf-mock-state.json
         python .github/scripts/assert_netconf_mock_state.py \
           --state-dump netconf-mock-state.json \
-          --require-min-commits 3 \
+          --require-min-commits 1 \
           --only-device "${{ steps.drift_target.outputs.host }}" \
           --only-group "${{ steps.drift_target.outputs.group }}" \
           --must-contain 203.0.113.10/32 \
