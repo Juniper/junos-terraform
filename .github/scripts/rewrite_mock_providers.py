@@ -9,27 +9,29 @@ from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Rewrite generated Terraform providers to point at NETCONF mock listeners."
+    )
     parser.add_argument(
         "--providers-file",
         required=True,
-        help="Path to generated providers.tf",
+        help="Path to generated providers.tf.",
     )
     parser.add_argument(
         "--devices-file",
         required=True,
-        help="Output host:port mapping file",
+        help="Output file for host:port mapping used by netconf mock.",
     )
     parser.add_argument(
         "--bind-host",
         default="127.0.0.1",
-        help="Host written into provider blocks",
+        help="Host value written into provider blocks.",
     )
     parser.add_argument(
         "--base-port",
         type=int,
         default=8301,
-        help="First mock listener port",
+        help="First mock listener port.",
     )
     return parser.parse_args()
 

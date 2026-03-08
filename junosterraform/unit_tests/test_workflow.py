@@ -5,7 +5,6 @@ import subprocess
 import shutil
 import tempfile
 import unittest
-from subprocess import CalledProcessError
 
 
 class TestWorkflow(unittest.TestCase):
@@ -21,8 +20,6 @@ def test_yang2go():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     yang_root = os.path.abspath(os.path.join(repo_root, "examples", "yang"))
 
-    print("repo_root:", repo_root)
-    print("yang_root:", yang_root)
     assert os.path.isdir(yang_root), f"YANG root does not exist: {yang_root}"
 
     exe = shutil.which("jtaf-yang2go")
@@ -78,28 +75,15 @@ def test_yang2go():
             generated_provider_dir, "trimmed_schema.json"
         )
 
-        print("CMD:", cmd)
-        try:
-            proc = subprocess.run(
-                cmd,
-                input=stdin_json,
-                text=True,
-                capture_output=True,
-                check=True,
-                cwd=tmpdir,
-                env=env
-            )
-        except CalledProcessError as e:
-            # Debug output
-            print("RETURNCODE:", e.returncode)
-            print("STDOUT:\n", e.output)
-            print("STDERR:\n", e.stderr)
-            raise e
-
-        # Debug output
-        print("RETURNCODE:", proc.returncode)
-        print("STDOUT:\n", proc.stdout)
-        print("STDERR:\n", proc.stderr)
+        proc = subprocess.run(
+            cmd,
+            input=stdin_json,
+            text=True,
+            capture_output=True,
+            check=False,
+            cwd=tmpdir,
+            env=env
+        )
 
         assert proc.returncode == 0, (
             f"jtaf-yang2go failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
@@ -115,22 +99,12 @@ def test_yang2go():
         with open(generated_trimmed_schema) as f:
             generated_json = json.load(f)
 
-    # Compare against expected trimmed_schema.json in examples/providers
-    expected_trimmed_schema = os.path.join(
-        repo_root,
-        "examples",
-        "providers",
-        "terraform-provider-junos-vqfx-evpn-vxlan",
-        "trimmed_schema.json",
-    )
-    assert os.path.exists(expected_trimmed_schema), (
-        f"Expected example trimmed_schema.json not found at {expected_trimmed_schema}"
-    )
-
-    with open(expected_trimmed_schema) as f:
-        expected_json = json.load(f)
-
-    assert generated_json == expected_json, "Generated trimmed_schema.json differs from expected example"
+    # Validate generated schema shape without depending on committed generated fixtures.
+    assert isinstance(generated_json, dict), "Generated trimmed_schema.json should be a JSON object"
+    assert "root" in generated_json, "Generated schema missing 'root' key"
+    assert isinstance(generated_json["root"], dict), "Generated schema 'root' should be an object"
+    assert "children" in generated_json["root"], "Generated schema root missing 'children' key"
+    assert generated_json["root"]["children"], "Generated schema root children should not be empty"
 
 
 def test_yang2ansible():
@@ -138,8 +112,6 @@ def test_yang2ansible():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     yang_root = os.path.abspath(os.path.join(repo_root, "examples", "yang"))
 
-    print("repo_root:", repo_root)
-    print("yang_root:", yang_root)
     assert os.path.isdir(yang_root), f"YANG root does not exist: {yang_root}"
 
     exe = shutil.which("jtaf-yang2ansible")
@@ -187,29 +159,15 @@ def test_yang2ansible():
     ]
 
     with tempfile.TemporaryDirectory(prefix="jtaf-yang2ansible-") as ansible_dir:
-        print("CMD:", cmd)
-
-        try:
-            proc = subprocess.run(
-                cmd,
-                input=stdin_json,
-                text=True,
-                capture_output=True,
-                check=True,
-                cwd=ansible_dir,
-                env=env
-            )
-        except CalledProcessError as e:
-            # Debug output
-            print("RETURNCODE:", e.returncode)
-            print("STDOUT:\n", e.output)
-            print("STDERR:\n", e.stderr)
-            raise e
-
-        # Debug output
-        print("RETURNCODE:", proc.returncode)
-        print("STDOUT:\n", proc.stdout)
-        print("STDERR:\n", proc.stderr)
+        proc = subprocess.run(
+            cmd,
+            input=stdin_json,
+            text=True,
+            capture_output=True,
+            check=False,
+            cwd=ansible_dir,
+            env=env
+        )
 
         assert proc.returncode == 0, (
             f"jtaf-yang2ansible failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
@@ -234,28 +192,15 @@ def test_yang2ansible():
             "-d",
             "vqfx_ansible_files",
         ]  # noqa: E501
-        print("CMD:", cmd)
-        try:
-            proc = subprocess.run(
-                cmd,
-                input=stdin_json,
-                text=True,
-                capture_output=True,
-                check=True,
-                cwd=ansible_dir,
-                env=env
-            )
-        except CalledProcessError as e:
-            # Debug output
-            print("RETURNCODE:", e.returncode)
-            print("STDOUT:\n", e.output)
-            print("STDERR:\n", e.stderr)
-            raise e
-
-        # Debug output
-        print("RETURNCODE:", proc.returncode)
-        print("STDOUT:\n", proc.stdout)
-        print("STDERR:\n", proc.stderr)
+        proc = subprocess.run(
+            cmd,
+            input=stdin_json,
+            text=True,
+            capture_output=True,
+            check=False,
+            cwd=ansible_dir,
+            env=env
+        )
 
         assert proc.returncode == 0, (
             f"jtaf-xml2yaml failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"

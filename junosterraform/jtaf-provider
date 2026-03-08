@@ -25,10 +25,30 @@ def render_template_and_write(input_template: str, output_file: str, context: di
 # Main Method
 def main():
     # other arguments
-    parser = argparse.ArgumentParser(exit_on_error=True)
-    parser.add_argument('-j', '--json-schema', required=True, help='specify the json schema file')
-    parser.add_argument('-x', '--xml-config', required=True, action='append', nargs="+", help='specify one or more XML config files to combine')
-    parser.add_argument('-t', '--type', required=True, help='device type (i.e. vsrx, mx960, ex4200, etc)')
+    parser = argparse.ArgumentParser(
+        description='Generate a Terraform provider from JTAF JSON and XML config.',
+        exit_on_error=True,
+    )
+    parser.add_argument(
+        '-j',
+        '--json-schema',
+        required=True,
+        help="Path to JTAF JSON schema, or '-' to read JSON from stdin.",
+    )
+    parser.add_argument(
+        '-x',
+        '--xml-config',
+        required=True,
+        action='append',
+        nargs="+",
+        help='One or more Junos XML config files to merge/filter against schema.',
+    )
+    parser.add_argument(
+        '-t',
+        '--type',
+        required=True,
+        help='Device type suffix used in output directory name.',
+    )
     args = parser.parse_args()
 
     # Merge XML files if multiple are provided 

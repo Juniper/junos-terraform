@@ -172,6 +172,111 @@ def test_handle_rpc_hello_and_unknown(state_and_session):
     assert state.history[-1]["op"] == "unknown"
 
 
+def test_extract_message_id_accepts_single_quoted_attributes():
+    xml = "<rpc message-id='77'><lock><target><candidate/></target></lock></rpc>"
+
+    assert MODULE.DeviceSession._extract_message_id(xml) == "77"
+
+
+def test_extract_message_id_accepts_prefixed_attribute():
+    xml = (
+        '<rpc xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" '
+        'nc:message-id="88"><lock><target><candidate/></target></lock></rpc>'
+    )
+
+    assert MODULE.DeviceSession._extract_message_id(xml) == "88"
+
+
+def test_extract_message_id_returns_empty_when_missing():
+    xml = "<rpc><lock><target><candidate/></target></lock></rpc>"
+
+    assert MODULE.DeviceSession._extract_message_id(xml) == ""
+
+
+def test_extract_group_name_prefers_groups_name_over_nested_name():
+    xml = (
+        '<rpc message-id="101">'
+        '<load-configuration action="replace" format="xml">'
+        '<configuration><groups><name>base-config</name>'
+        '<interfaces><interface><name>lo0</name></interface></interfaces>'
+        '</groups></configuration>'
+        '</load-configuration></rpc>'
+    )
+
+    assert MODULE.DeviceSession._extract_group_name(xml) == "base-config"
+
+
+def test_load_configuration_updates_all_groups_in_payload(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = (
+        "<configuration><groups><name>base-config</name>"
+        "<interfaces><interface><name>lo0</name><unit><name>0</name>"
+        "<family><inet><address><name>203.0.113.250/32</name></address>"
+        "</inet></family></unit></interface></interfaces>"
+        "</groups></configuration>"
+    )
+
+    rpc = (
+        '<rpc message-id="120">'
+        '<load-configuration action="replace" format="xml">'
+        '<configuration>'
+        '<groups><name>overlay-config</name><protocols/></groups>'
+        '<groups><name>base-config</name>'
+        '<interfaces><interface><name>lo0</name><unit><name>0</name>'
+        '<family><inet><address><name>203.0.113.10/32</name></address>'
+        '</inet></family></unit></interface></interfaces>'
+        '</groups>'
+        '</configuration>'
+        '</load-configuration>'
+        '</rpc>'
+    )
+
+    handled = session._handle_load_configuration(rpc, "120")
+
+    assert handled is True
+    assert "overlay-config" in state.candidate_groups
+    assert "base-config" in state.candidate_groups
+    assert "203.0.113.10/32" in state.candidate_groups["base-config"]
+    assert "203.0.113.250/32" not in state.candidate_groups["base-config"]
+
+
+def test_load_configuration_regex_fallback_updates_all_groups(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = (
+        "<configuration><groups><name>base-config</name>"
+        "<interfaces><interface><name>lo0</name><unit><name>0</name>"
+        "<family><inet><address><name>203.0.113.250/32</name></address>"
+        "</inet></family></unit></interface></interfaces>"
+        "</groups></configuration>"
+    )
+
+    # Deliberately malformed for XML parser (unbound prefixes) to force regex fallback.
+    rpc = (
+        '<nc:rpc message-id="121">'
+        '<load-configuration action="replace" format="xml">'
+        '<configuration>'
+        '<groups><name>overlay-config</name><protocols/></groups>'
+        '<groups><name>base-config</name>'
+        '<interfaces><interface><name>lo0</name><unit><name>0</name>'
+        '<family><inet><address><name>203.0.113.10/32</name></address>'
+        '</inet></family></unit></interface></interfaces>'
+        '</groups>'
+        '</configuration>'
+        '</load-configuration>'
+        '</nc:rpc>'
+    )
+
+    handled = session._handle_load_configuration(rpc, "121")
+
+    assert handled is True
+    assert "overlay-config" in state.candidate_groups
+    assert "base-config" in state.candidate_groups
+    assert "203.0.113.10/32" in state.candidate_groups["base-config"]
+    assert "203.0.113.250/32" not in state.candidate_groups["base-config"]
+
+
 def test_dump_state_if_requested_writes_json(tmp_path):
     out_file = tmp_path / "state.json"
     state = MODULE.DeviceState(name="leaf1")

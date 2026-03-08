@@ -28,6 +28,7 @@ import logging
 import re
 import signal
 import traceback
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -80,20 +81,28 @@ class DeviceSSHServer(asyncssh.SSHServer):
         self.state = state
 
     def begin_auth(self, username: str) -> bool:
+        logger.info("device=%s begin_auth username=%s", self.state.name, username)
         return True
 
     def password_auth_supported(self) -> bool:
+        logger.info("device=%s password_auth_supported=true", self.state.name)
         return True
 
     def validate_password(self, username: str, password: str) -> bool:
-        logger.debug("auth attempt user=%s accepted=%s", username, username == self.username and password == self.password)
-        return username == self.username and password == self.password
+        accepted = username == self.username and password == self.password
+        logger.info("device=%s validate_password username=%s accepted=%s", self.state.name, username, accepted)
+        return accepted
 
     def session_requested(self) -> asyncssh.SSHServerSession:
+        logger.info("device=%s session_requested", self.state.name)
         return DeviceSession(self.state)
 
 
 class DeviceSession(asyncssh.SSHServerSession):
+    @staticmethod
+    def _local_name(tag: str) -> str:
+        return tag.rsplit("}", 1)[-1] if "}" in tag else tag
+
     def __init__(self, state: DeviceState):
         self._chan: asyncssh.SSHServerChannel | None = None
         self._buf = ""
@@ -104,7 +113,7 @@ class DeviceSession(asyncssh.SSHServerSession):
         logger.debug("session opened device=%s", self._state.name)
 
     def subsystem_requested(self, subsystem: str) -> bool:
-        logger.debug("subsystem requested device=%s subsystem=%s", self._state.name, subsystem)
+        logger.info("device=%s subsystem_requested subsystem=%s", self._state.name, subsystem)
         return subsystem == "netconf"
 
     def session_started(self) -> None:
@@ -122,22 +131,139 @@ class DeviceSession(asyncssh.SSHServerSession):
 
     def _send_frame(self, payload: str) -> None:
         if self._chan is not None:
+            logger.debug("device=%s tx frame=%s", self._state.name, payload[:300])
             self._chan.write(payload + MSG_SEP + "\n")
 
     @staticmethod
     def _extract_message_id(xml_text: str) -> str:
-        m = re.search(r'message-id="([^"]+)"', xml_text)
-        return m.group(1) if m else "0"
+        # Prefer XML parsing so attribute quoting/formatting differences do not break matching.
+        try:
+            root = ET.fromstring(xml_text)
+            for attr_name, attr_value in root.attrib.items():
+                if attr_name == "message-id" or attr_name.endswith("}message-id"):
+                    if attr_value:
+                        return attr_value
+        except ET.ParseError:
+            pass
+
+        # Fallback regex supports optional namespace prefixes and quote styles.
+        m = re.search(
+            r"(?:[A-Za-z_][\w.\-]*:)?message-id\s*=\s*(['\"])(.*?)\1",
+            xml_text,
+        )
+        return m.group(2) if m else ""
 
     @staticmethod
     def _extract_group_name(xml_text: str) -> str:
-        m = re.search(r"<name>([^<]+)</name>", xml_text)
-        return m.group(1) if m else ""
+        # Prefer XML parsing and only consider <configuration><groups><name>.
+        try:
+            root = ET.fromstring(xml_text)
+            for elem in root.iter():
+                if DeviceSession._local_name(elem.tag) != "groups":
+                    continue
+                for child in list(elem):
+                    if DeviceSession._local_name(child.tag) == "name" and child.text:
+                        return child.text.strip()
+        except ET.ParseError:
+            pass
+
+        # Regex fallback restricted to groups/name to avoid matching unrelated <name> tags.
+        m = re.search(r"<groups>\s*<name>([^<]+)</name>", xml_text, flags=re.DOTALL)
+        return m.group(1).strip() if m else ""
 
     @staticmethod
     def _extract_configuration(xml_text: str) -> str:
         m = re.search(r"(<configuration>.*?</configuration>)", xml_text, flags=re.DOTALL)
         return m.group(1) if m else ""
+
+    @staticmethod
+    def _parse_xml(xml_text: str) -> ET.Element | None:
+        try:
+            return ET.fromstring(xml_text)
+        except ET.ParseError:
+            return None
+
+    @staticmethod
+    def _find_first_configuration(root: ET.Element) -> ET.Element | None:
+        for elem in root.iter():
+            if DeviceSession._local_name(elem.tag) == "configuration":
+                return elem
+        return None
+
+    @staticmethod
+    def _extract_group_name_from_groups_elem(groups_elem: ET.Element) -> str:
+        for child in list(groups_elem):
+            if DeviceSession._local_name(child.tag) == "name" and child.text:
+                return child.text.strip()
+        return ""
+
+    @staticmethod
+    def _extract_groups_configurations_regex(xml_text: str) -> dict[str, str]:
+        groups_by_name: dict[str, str] = {}
+        for group_block in re.findall(r"(<groups>.*?</groups>)", xml_text, flags=re.DOTALL):
+            name_match = re.search(r"<name>\s*([^<]+?)\s*</name>", group_block)
+            if not name_match:
+                continue
+            group_name = name_match.group(1).strip()
+            if not group_name:
+                continue
+            groups_by_name[group_name] = f"<configuration>{group_block}</configuration>"
+        return groups_by_name
+
+    @staticmethod
+    def _extract_groups_from_configuration_set(xml_text: str) -> dict[str, str]:
+        """Extract per-group payload from set-style load-configuration RPCs.
+
+        Some client stacks send `<load-configuration format="text">` with
+        `<configuration-set>` commands instead of XML `<configuration><groups>`.
+        Capture `set groups <name> ...` lines so downstream assertions can still
+        validate expected rendered content.
+        """
+
+        m = re.search(
+            r"<configuration-set>\s*(.*?)\s*</configuration-set>",
+            xml_text,
+            flags=re.DOTALL,
+        )
+        if not m:
+            return {}
+
+        lines = [line.strip() for line in m.group(1).splitlines() if line.strip()]
+        groups_lines: dict[str, list[str]] = {}
+        for line in lines:
+            lm = re.match(r"^set\s+groups\s+(\S+)\s+(.+)$", line)
+            if not lm:
+                continue
+            group_name = lm.group(1)
+            groups_lines.setdefault(group_name, []).append(line)
+
+        return {name: "\n".join(group_lines) for name, group_lines in groups_lines.items()}
+
+    @staticmethod
+    def _extract_groups_configurations(xml_text: str) -> dict[str, str]:
+        """Extract per-group configuration blobs from a load-configuration RPC."""
+
+        groups_by_name: dict[str, str] = {}
+        root = DeviceSession._parse_xml(xml_text)
+        if root is None:
+            return DeviceSession._extract_groups_configurations_regex(xml_text)
+
+        config_elem = DeviceSession._find_first_configuration(root)
+        if config_elem is None:
+            return DeviceSession._extract_groups_configurations_regex(xml_text)
+
+        for child in list(config_elem):
+            if DeviceSession._local_name(child.tag) != "groups":
+                continue
+            group_name = DeviceSession._extract_group_name_from_groups_elem(child)
+            if not group_name:
+                continue
+            groups_xml = ET.tostring(child, encoding="unicode")
+            groups_by_name[group_name] = f"<configuration>{groups_xml}</configuration>"
+
+        if groups_by_name:
+            return groups_by_name
+        return DeviceSession._extract_groups_configurations_regex(xml_text)
 
     def _ok_reply(self, message_id: str) -> str:
         return f'<rpc-reply message-id="{message_id}"><ok/></rpc-reply>'
@@ -150,12 +276,25 @@ class DeviceSession(asyncssh.SSHServerSession):
         if "<load-configuration" not in xml_text:
             return False
 
-        group_name = self._extract_group_name(xml_text)
-        cfg = self._extract_configuration(xml_text)
-        if group_name and cfg:
-            self._state.candidate_groups[group_name] = cfg
-            self._state.submitted_xml_by_group[group_name] = cfg
-            self._append_history("load-configuration", f"group={group_name}")
+        groups_cfg = self._extract_groups_configurations(xml_text)
+        if not groups_cfg:
+            groups_cfg = self._extract_groups_from_configuration_set(xml_text)
+        if groups_cfg:
+            for group_name, cfg in groups_cfg.items():
+                self._state.candidate_groups[group_name] = cfg
+                self._state.submitted_xml_by_group[group_name] = cfg
+            self._append_history(
+                "load-configuration",
+                f"groups={','.join(sorted(groups_cfg.keys()))}",
+            )
+        else:
+            # Fallback for malformed/minimal payloads.
+            group_name = self._extract_group_name(xml_text)
+            cfg = self._extract_configuration(xml_text)
+            if group_name and cfg:
+                self._state.candidate_groups[group_name] = cfg
+                self._state.submitted_xml_by_group[group_name] = cfg
+                self._append_history("load-configuration", f"group={group_name}")
         self._send_frame(self._ok_reply(message_id))
         return True
 
@@ -216,9 +355,23 @@ class DeviceSession(asyncssh.SSHServerSession):
     def _handle_rpc(self, xml_text: str) -> None:
         message_id = self._extract_message_id(xml_text)
         self._state.rpc_log.append(xml_text)
+        logger.debug(
+            "device=%s rx message_id=%s rpc=%s",
+            self._state.name,
+            message_id if message_id else "<missing>",
+            xml_text[:300],
+        )
 
         # Ignore client hello after server hello.
         if "<hello" in xml_text:
+            return
+
+        if not message_id:
+            self._append_history("invalid-rpc", "missing-message-id")
+            logger.warning(
+                "device=%s received rpc without parseable message-id; dropping request",
+                self._state.name,
+            )
             return
 
         handlers = (
@@ -346,10 +499,12 @@ def _dump_state_if_requested(state_dump: str, device_states: dict[str, DeviceSta
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--username", default="ci-user")
-    parser.add_argument("--password", default="ci-password")
+    parser = argparse.ArgumentParser(
+        description="Run a stateful NETCONF-over-SSH mock server for integration tests."
+    )
+    parser.add_argument("--host", default="127.0.0.1", help="Bind address for all device listeners.")
+    parser.add_argument("--username", default="ci-user", help="Accepted NETCONF username.")
+    parser.add_argument("--password", default="ci-password", help="Accepted NETCONF password.")
     parser.add_argument(
         "--device",
         action="append",
@@ -359,12 +514,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--devices-file",
         default="",
-        help="Optional file with one <device-name>:<port> entry per line.",
+        help="File with one <device-name>:<port> entry per line.",
     )
     parser.add_argument(
         "--state-dump",
         default="",
-        help="Optional JSON path to dump per-device running/candidate/history on shutdown.",
+        help="JSON path to write per-device running/candidate/history at shutdown.",
     )
     parser.add_argument(
         "--log-level",
