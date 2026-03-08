@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -30,6 +29,30 @@ func (r *resourceFile) Configure(_ context.Context, req resource.ConfigureReques
 type fileModel struct {
 	Name     types.String `tfsdk:"name"`
 	Contents types.String `tfsdk:"contents"`
+}
+
+// writeManagedFile writes the planned resource contents to disk.
+func writeManagedFile(dir string, plan fileModel) error {
+	return os.WriteFile(path.Join(dir, plan.Name.ValueString()), []byte(plan.Contents.ValueString()), 0644)
+}
+
+// readManagedFile loads the managed file contents into Terraform state.
+func readManagedFile(dir string, state *fileModel) error {
+	data, err := os.ReadFile(path.Join(dir, state.Name.ValueString()))
+	if err != nil {
+		return err
+	}
+	state.Contents = types.StringValue(string(data))
+	return nil
+}
+
+// deleteManagedFile removes the managed file and ignores missing-file cases.
+func deleteManagedFile(dir string, state fileModel) error {
+	err := os.Remove(path.Join(dir, state.Name.ValueString()))
+	if err != nil && os.IsNotExist(err) {
+		return nil
+	}
+	return err
 }
 
 // Metadata implements resource.Resource.
@@ -60,7 +83,7 @@ func (r *resourceFile) Create(ctx context.Context, req resource.CreateRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	err := os.WriteFile(path.Join(r.dir, plan.Name.ValueString()), []byte(plan.Contents.ValueString()), 0644)
+	err := writeManagedFile(r.dir, plan)
 	if err != nil {
 		resp.Diagnostics.AddError("failed writing file", err.Error())
 		return
@@ -77,12 +100,11 @@ func (r *resourceFile) Read(ctx context.Context, req resource.ReadRequest, resp 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	data, err := os.ReadFile(path.Join(r.dir, state.Name.ValueString()))
+	err := readManagedFile(r.dir, &state)
 	if err != nil {
 		resp.Diagnostics.AddError("failed reading file", err.Error())
 		return
 	}
-	state.Contents = types.StringValue(string(data))
 	d = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(d...)
 }
@@ -95,7 +117,7 @@ func (r *resourceFile) Update(ctx context.Context, req resource.UpdateRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	err := os.WriteFile(path.Join(r.dir, plan.Name.ValueString()), []byte(plan.Contents.ValueString()), 0644)
+	err := writeManagedFile(r.dir, plan)
 	if err != nil {
 		resp.Diagnostics.AddError("failed writing file", err.Error())
 		return
@@ -112,13 +134,9 @@ func (r *resourceFile) Delete(ctx context.Context, req resource.DeleteRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	err := os.Remove(path.Join(r.dir, state.Name.ValueString()))
+	err := deleteManagedFile(r.dir, state)
 	if err != nil {
-		if strings.Contains(err.Error(), "ound") {
-			return
-		}
 		resp.Diagnostics.AddError("failed deleting file", err.Error())
 		return
 	}
 }
-

@@ -74,6 +74,7 @@ func (g *GoNCClient) Close() error {
 	return nil
 }
 
+// execute sends a single NETCONF RPC and returns its inner XML payload.
 func (g *GoNCClient) execute(ctx context.Context, operation string) (string, error) {
 	if g.exec != nil {
 		return g.exec(ctx, operation)
@@ -106,6 +107,7 @@ func (g *GoNCClient) execute(ctx context.Context, operation string) (string, err
 	return reply.Data, nil
 }
 
+// updateRawConfig replaces an existing apply-group payload and optionally commits.
 func (g *GoNCClient) updateRawConfig(applyGroup string, netconfCall string, commit bool) (string, error) {
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
@@ -178,6 +180,7 @@ func (g *GoNCClient) SendCommit() error {
 	return nil
 }
 
+// sendApplyGroupsLocked emits the current apply-groups list as load-configuration XML.
 func (g *GoNCClient) sendApplyGroupsLocked(ctx context.Context) error {
 	applyGroupsMutex.Lock()
 	applyGroupsCopy := make([]string, len(applyGroupsList))
@@ -232,12 +235,14 @@ func (g *GoNCClient) SendTransaction(id string, obj interface{}, commit bool) er
 	return nil
 }
 
+// addToApplyGroupsList records a group ID for deferred apply-groups emission.
 func addToApplyGroupsList(id string) {
 	applyGroupsMutex.Lock()
 	defer applyGroupsMutex.Unlock()
 	applyGroupsList = append(applyGroupsList, id)
 }
 
+// sortApplyGroupsList removes empty values and keeps group ordering deterministic.
 func sortApplyGroupsList() {
 	applyGroupsMutex.Lock()
 	defer applyGroupsMutex.Unlock()
@@ -252,6 +257,7 @@ func sortApplyGroupsList() {
 	applyGroupsList = filteredGroups
 }
 
+// sendRawConfig loads raw XML config and optionally commits it.
 func (g *GoNCClient) sendRawConfig(netconfCall string, commit bool) (string, error) {
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
@@ -278,6 +284,7 @@ func (g *GoNCClient) sendRawConfig(netconfCall string, commit bool) (string, err
 	return reply, nil
 }
 
+// readRawGroup fetches a single apply-group configuration payload.
 func (g *GoNCClient) readRawGroup(applyGroup string) (string, error) {
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
@@ -285,6 +292,7 @@ func (g *GoNCClient) readRawGroup(applyGroup string) (string, error) {
 	return g.execute(context.Background(), fmt.Sprintf(getGroupXMLStr, applyGroup))
 }
 
+// publicKeyFile parses an SSH private key file into an auth method.
 func publicKeyFile(file string) ssh.AuthMethod {
 	buffer, err := os.ReadFile(file)
 	if err != nil {

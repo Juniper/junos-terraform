@@ -32,9 +32,9 @@ func TestProviderSchema(t *testing.T) {
 
 	p.Schema(ctx, req, resp)
 
-// Verify schema contains attributes map
-    if len(resp.Schema.Attributes) == 0 {
-        t.Error("expected schema to have attributes")
+	// Verify schema contains attributes map
+	if len(resp.Schema.Attributes) == 0 {
+		t.Error("expected schema to have attributes")
 	}
 
 	// Verify required attributes exist
@@ -194,7 +194,6 @@ func TestProviderConfigureWithConfig(t *testing.T) {
 
 	// direct instantiation yields non-nil provider
 
-
 	// Verify providerModel is a struct
 	_ = providerConfig
 }
@@ -288,8 +287,8 @@ func TestProviderCreation(t *testing.T) {
 			p := tc.createFn()
 			_ = p // avoid unused variable warning
 			// Verify it implements the interface
-						// p already has provider.Provider type
-		
+			// p already has provider.Provider type
+
 		})
 	}
 }

@@ -34,6 +34,7 @@ func (c *Config) Client() (netconf.Client, error) {
 	return newClient(c)
 }
 
+// newClient builds a NETCONF client from the provider configuration.
 func newClient(c *Config) (netconf.Client, error) {
 
 	client, err := netconf.NewClient(c.Username, c.Password, c.SSHKey, c.Host, c.Port)

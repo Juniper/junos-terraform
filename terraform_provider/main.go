@@ -24,10 +24,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
-func main() {
+var (
+	parseFlags = func(debug *bool) {
+		flag.BoolVar(debug, "debug", false, "set to true to run the provider with support for debuggers like delve")
+		flag.Parse()
+	}
+	serveProvider = providerserver.Serve
+	fatalLogger   = func(v ...interface{}) {
+		log.Fatal(v...)
+	}
+)
+
+// run parses runtime flags and starts the provider server.
+func run() error {
 	var debug bool
-	flag.BoolVar(&debug, "debug", false, "set to true to run the provider with support for debuggers like delve")
-	flag.Parse()
+	parseFlags(&debug)
 
 	ctx := context.Background()
 	opts := providerserver.ServeOpts{
@@ -35,8 +46,12 @@ func main() {
 		Debug:   debug,
 	}
 
-	err := providerserver.Serve(ctx, newProvider, opts)
-	if err != nil {
-		log.Fatal(err)
+	return serveProvider(ctx, newProvider, opts)
+}
+
+// main executes the provider process and exits on startup errors.
+func main() {
+	if err := run(); err != nil {
+		fatalLogger(err)
 	}
 }
