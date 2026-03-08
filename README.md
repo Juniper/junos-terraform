@@ -381,8 +381,7 @@ For first-time Ansible users: `roles_path` tells Ansible where custom roles live
 
 4. Create an inventory for your real devices
 
-# Generate host_vars and a host list from the example XML set
-
+Generate host_vars and a host list from the example XML set
 
 ```
 jtaf-xml2yaml \
@@ -390,8 +389,6 @@ jtaf-xml2yaml \
 	-j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json \
 	-d ansible-evpn-vxlan-deploy
 ```
-
-# Create ansible inventory file
 
 Create `ansible-evpn-vxlan-deploy/inventory.ini` and map each host to a reachable management IP/DNS name:
 
@@ -506,15 +503,3 @@ ansible-playbook -i inventory.ini site.yml
 - The confirm task should succeed, confirming the earlier `confirmed` commit.
 
 At this point you have completed render -> preview diff -> push -> plugin-level verification using the generated EVPN-VXLAN role.
-
-
----
-
-### Running Unit Tests
-
-Unit tests are created and stored under /junosterraform/unit_tests/
-
-Run from home /junos-terraform directory:
-```
-pytest -v
-```
