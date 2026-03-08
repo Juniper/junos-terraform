@@ -22,6 +22,21 @@ def render_template_and_write(input_template: str, output_file: str, context: di
     print(f"Updated {description}")
 
 
+def rewrite_import_prefixes(go_dir: str, old_prefix: str, new_prefix: str):
+    """Replace module import prefixes across copied Go files in place."""
+    for root, _, files in os.walk(go_dir):
+        for filename in files:
+            if not filename.endswith(".go"):
+                continue
+            full_path = os.path.join(root, filename)
+            with open(full_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            updated = content.replace(f'"{old_prefix}/', f'"{new_prefix}/')
+            if updated != content:
+                with open(full_path, "w", encoding="utf-8") as f:
+                    f.write(updated)
+
+
 # Main Method
 def main():
     # other arguments
@@ -101,6 +116,9 @@ def main():
         with open(output_path, "w") as f:
             f.write(rendered)
         print(f"Updated {output_name} with type junos-{args.type}")
+
+    # Step 8: Normalize import prefixes in copied Go files (including tests).
+    rewrite_import_prefixes(new_dir, "terraform_provider", f"terraform-provider-junos-{args.type}")
 
     # Step 7: Add trimmed_schema.json to new directory
     trimmed_schema_path = os.path.join(new_dir, "trimmed_schema.json")
