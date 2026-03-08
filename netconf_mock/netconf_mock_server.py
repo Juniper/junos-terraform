@@ -75,13 +75,17 @@ class DeviceState:
 
 
 class DeviceSSHServer(asyncssh.SSHServer):
-    def __init__(self, username: str, password: str, state: DeviceState):
+    def __init__(self, username: str, password: str, state: DeviceState, disable_auth: bool):
         self.username = username
         self.password = password
         self.state = state
+        self.disable_auth = disable_auth
 
     def begin_auth(self, username: str) -> bool:
         logger.info("device=%s begin_auth username=%s", self.state.name, username)
+        if self.disable_auth:
+            logger.info("device=%s auth disabled; accepting without credentials", self.state.name)
+            return False
         return True
 
     def password_auth_supported(self) -> bool:
@@ -470,7 +474,7 @@ async def _start_device_listeners(
 
         logger.info("binding device=%s host=%s port=%d", name, args.host, port)
         server = await asyncssh.create_server(
-            lambda s=state: DeviceSSHServer(args.username, args.password, s),
+            lambda s=state: DeviceSSHServer(args.username, args.password, s, args.disable_auth),
             args.host,
             port,
             server_host_keys=[host_key],
@@ -505,6 +509,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1", help="Bind address for all device listeners.")
     parser.add_argument("--username", default="ci-user", help="Accepted NETCONF username.")
     parser.add_argument("--password", default="ci-password", help="Accepted NETCONF password.")
+    parser.add_argument(
+        "--disable-auth",
+        action="store_true",
+        help="Disable SSH authentication checks for mock-only compatibility testing.",
+    )
     parser.add_argument(
         "--device",
         action="append",
