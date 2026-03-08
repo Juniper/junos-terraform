@@ -55,21 +55,29 @@ def load_state_dump(path: str) -> dict:
     return state_data
 
 
-def collect_state_metrics(state_data: dict) -> tuple[int, dict[str, str]]:
+def collect_state_metrics(state_data: dict) -> tuple[int, dict[str, str], dict[str, int]]:
     commit_count = 0
     running_cfg_by_device: dict[str, str] = {}
+    history_count_by_device: dict[str, int] = {}
 
     for device_name, device in state_data.items():
         history = device.get("history", [])
+        history_count_by_device[device_name] = len(history)
         commit_count += sum(1 for entry in history if entry.get("op") == "commit")
 
         running_groups = device.get("running_groups", {})
         running_cfg_by_device[device_name] = "\n".join(str(v) for v in running_groups.values())
 
-        if not history:
-            raise RuntimeError(f"device {device_name} has no RPC history")
+    return commit_count, running_cfg_by_device, history_count_by_device
 
-    return commit_count, running_cfg_by_device
+
+def assert_devices_have_rpc_history(
+    devices_to_check: list[str],
+    history_count_by_device: dict[str, int],
+) -> None:
+    missing = [name for name in devices_to_check if history_count_by_device.get(name, 0) == 0]
+    if missing:
+        raise RuntimeError(f"device(s) with no RPC history in selected scope: {', '.join(missing)}")
 
 
 def scope_running_config_by_group(
@@ -127,14 +135,16 @@ def assert_forbidden_strings(
 def main() -> int:
     args = parse_args()
     state_data = load_state_dump(args.state_dump)
-    commit_count, running_cfg_by_device = collect_state_metrics(state_data)
+    commit_count, running_cfg_by_device, history_count_by_device = collect_state_metrics(state_data)
+
+    devices_to_check = resolve_devices_to_check(args.only_device, running_cfg_by_device)
+    assert_devices_have_rpc_history(devices_to_check, history_count_by_device)
 
     if commit_count < args.require_min_commits:
         raise RuntimeError(
             f"expected at least {args.require_min_commits} commit ops, got {commit_count}"
         )
 
-    devices_to_check = resolve_devices_to_check(args.only_device, running_cfg_by_device)
     running_cfg_by_device = scope_running_config_by_group(
         state_data,
         devices_to_check,
