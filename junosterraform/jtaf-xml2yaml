@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 import argparse
+import copy
 import json
-import sys
-import re
 import os
 import yaml
 from xml.etree import ElementTree
 from typing import Any
+
+
+_OMIT = object()
 
 
 def prepare_tag(tag:str) -> str:
@@ -87,15 +89,71 @@ def elem_to_dict(element:ElementTree.Element,path:str,resources:Any)-> dict[str,
                     result[prepared_tag] = child.text     
     return result
 
-# def xml2yaml(xml_file:str, resources:dict[str,Any],output_dir:str, subdir:str|None=None)-> str:
-def xml2yaml(xml_file:str, resources:dict[str,Any],output_dir:str, subdir=None)-> str:
-    """Convert an XML configuration file to YAML format using the provided schema resources.
-    Output file name is derived from the XML file name by changing the extension to .yaml.
-    Args:
-        xml_file: Path to the XML configuration file
-        resources: Schema resource node to use for conversion
-        output_dir: Directory to save the converted YAML file"""
-        
+
+def intersect_values(left: Any, right: Any):
+    """Return shared structure/value between two objects.
+
+    Dicts are intersected recursively by key. Lists/scalars are shared only
+    when exactly equal.
+    """
+    if type(left) is not type(right):
+        return _OMIT
+
+    if isinstance(left, dict):
+        common = {}
+        for key in left.keys() & right.keys():
+            shared_value = intersect_values(left[key], right[key])
+            if shared_value is not _OMIT:
+                common[key] = shared_value
+        return common
+
+    if isinstance(left, list):
+        return copy.deepcopy(left) if left == right else _OMIT
+
+    return copy.deepcopy(left) if left == right else _OMIT
+
+
+def subtract_common(value: Any, common: Any):
+    """Return value with shared structure removed recursively."""
+    if common is _OMIT:
+        return copy.deepcopy(value)
+
+    if type(value) is not type(common):
+        return copy.deepcopy(value)
+
+    if isinstance(value, dict):
+        delta = {}
+        for key, item in value.items():
+            if key in common:
+                stripped = subtract_common(item, common[key])
+                if stripped is not _OMIT:
+                    delta[key] = stripped
+            else:
+                delta[key] = copy.deepcopy(item)
+        return delta if delta else _OMIT
+
+    if isinstance(value, list):
+        return _OMIT if value == common else copy.deepcopy(value)
+
+    return _OMIT if value == common else copy.deepcopy(value)
+
+
+def build_shared_payload(host_payloads: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build one shared dictionary from all host payload dictionaries."""
+    if not host_payloads:
+        return {}
+    shared = copy.deepcopy(host_payloads[0])
+    for payload in host_payloads[1:]:
+        shared = intersect_values(shared, payload)
+        if shared is _OMIT:
+            return {}
+    if isinstance(shared, dict):
+        return shared
+    return {}
+
+
+def parse_xml_to_payload(xml_file:str, resources:dict[str,Any]) -> tuple[str, dict[str, Any]]:
+    """Convert one XML config into hostname and payload dictionary."""
     with open(xml_file) as f:
         raw = f.read()
     root = ElementTree.fromstring(f"<root>{raw}</root>")
@@ -106,16 +164,35 @@ def xml2yaml(xml_file:str, resources:dict[str,Any],output_dir:str, subdir=None)-
     config = root.find(".//configuration")
     if config is None:
         raise ValueError(f"No <configuration> found in {xml_file}")
-    if subdir:
-        output_dir = os.path.join(output_dir, subdir)
     xml_dict = elem_to_dict(config,"",resources['root'])
-    yaml_output = yaml.dump(xml_dict, sort_keys=False)
-    yaml_file_name = hostname + ".yaml"
-    output_path = os.path.join(output_dir, yaml_file_name)
-    os.makedirs(output_dir, exist_ok=True)
+    return hostname, xml_dict
+
+
+def write_yaml_file(output_path: str, payload: dict[str, Any]) -> None:
+    """Write YAML payload to disk preserving key order."""
+    yaml_output = yaml.dump(payload, sort_keys=False)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
         f.write(yaml_output)
-    return hostname    
+
+
+def write_host_override(output_dir: str, hostname: str, host_payload: dict[str, Any], shared_payload: dict[str, Any]) -> None:
+    """Write host override YAML after removing shared values."""
+    delta_payload = subtract_common(host_payload, shared_payload)
+    if delta_payload is _OMIT:
+        delta_payload = {}
+    yaml_file_name = hostname + ".yaml"
+    output_path = os.path.join(output_dir, "host_vars", yaml_file_name)
+    write_yaml_file(output_path, {"jtaf_override": delta_payload})
+
+
+def write_group_shared(output_dir: str, shared_payload: dict[str, Any]) -> None:
+    """Write shared group vars defaults used by generated merge-aware role."""
+    output_path = os.path.join(output_dir, "group_vars", "all.yml")
+    write_yaml_file(output_path, {
+        "jtaf_shared": shared_payload,
+        "jtaf_list_merge": "replace",
+    })
 
 
 def main():
@@ -142,6 +219,11 @@ def main():
         required=True,
         help='Output directory for hosts file and host_vars/*.yaml.',
     )
+    parser.add_argument(
+        '--extract-shared-group-vars',
+        action='store_true',
+        help='Write shared values to group_vars/all.yml and keep host_vars as per-host deltas.',
+    )
 
     args = parser.parse_args()
 
@@ -159,11 +241,21 @@ def main():
         raise ValueError("No configuration node found in JSON schema")
 
     directory = args.directory
-    
-     # Generate YAML files from XML configs and hosts file
-    hostnames=[]
+
+    host_entries = []
     for xml_file in xml_files:
-        hostnames.append(xml2yaml(xml_file,schema, directory, "host_vars"))
+        host_entries.append(parse_xml_to_payload(xml_file, schema))
+
+    host_payloads = [payload for _hostname, payload in host_entries]
+    shared_payload = build_shared_payload(host_payloads) if args.extract_shared_group_vars else {}
+
+    hostnames=[]
+    for hostname, payload in host_entries:
+        hostnames.append(hostname)
+        write_host_override(directory, hostname, payload, shared_payload)
+
+    if args.extract_shared_group_vars:
+        write_group_shared(directory, shared_payload)
     
     with open(os.path.join(directory, "hosts"), "w") as f:
         f.write("[all]\n")

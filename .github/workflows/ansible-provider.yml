@@ -66,7 +66,8 @@ jobs:
         jtaf-xml2yaml \
           -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml \
           -j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json \
-          -d ci-evpn-vxlan-ansible
+          -d ci-evpn-vxlan-ansible \
+          --extract-shared-group-vars
 
     - name: Prepare generated role and CI playbook
       run: |
@@ -74,6 +75,9 @@ jobs:
 
         rm -rf ansible-provider-junos-vqfx-evpn-vxlan/host_vars
         cp -R ci-evpn-vxlan-ansible/host_vars ansible-provider-junos-vqfx-evpn-vxlan/
+
+        rm -rf ansible-provider-junos-vqfx-evpn-vxlan/group_vars
+        cp -R ci-evpn-vxlan-ansible/group_vars ansible-provider-junos-vqfx-evpn-vxlan/
 
         python .github/scripts/prepare_ansible_mock_inventory.py \
           --hosts-file ci-evpn-vxlan-ansible/hosts \

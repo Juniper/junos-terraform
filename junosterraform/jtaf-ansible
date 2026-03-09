@@ -63,15 +63,36 @@ def main():
     os.makedirs(tasks_path, exist_ok=True)
     os.makedirs(templates_path, exist_ok=True)
     os.makedirs(os.path.join(new_dir, "host_vars"), exist_ok=True)
+    os.makedirs(os.path.join(new_dir, "group_vars"), exist_ok=True)
     os.makedirs(os.path.join(new_dir, "configs"), exist_ok=True)
     
 
-    # write a minimal tasks/main.yml
-    tasks_main = f"""- name: Applying template for {role_name}
+    # write a merge-aware tasks/main.yml
+    tasks_main = """- name: Build merged JTAF vars for this host
+  set_fact:
+    jtaf_effective: >-
+      {{{{ (jtaf_shared | default({{}}))
+         | combine((jtaf_override | default(hostvars[inventory_hostname])),
+                   recursive=True,
+                   list_merge=(jtaf_list_merge | default('replace'))) }}}}
+
+- name: Applying template for {role_name}
   template: src=template.j2 dest={{{{ tmp_dir }}}}/{{{{ inventory_hostname }}}}.xml
-"""
+""".format(role_name=role_name)
     with open(os.path.join(tasks_path, "main.yml"), "w") as f:
         f.write(tasks_main)
+
+    # write group_vars defaults so users can share values once and keep host deltas minimal
+    group_vars_all = """# Shared configuration for all hosts consumed by generated JTAF templates.
+# Put common structured data here to avoid repeating it in each host_vars file.
+jtaf_shared: {}
+
+# Host var list merge behavior when combining jtaf_shared with host overrides.
+# Allowed: replace, keep, append, prepend, append_rp, prepend_rp
+jtaf_list_merge: replace
+"""
+    with open(os.path.join(new_dir, "group_vars", "all.yml"), "w") as f:
+        f.write(group_vars_all)
 
     # copy rendered main.j2 into the role templates as an example
     with open(os.path.join(templates_path, "template.j2"), "w") as f:

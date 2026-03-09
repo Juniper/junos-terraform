@@ -5,6 +5,7 @@ import subprocess
 import shutil
 import tempfile
 import unittest
+import yaml
 
 
 class TestWorkflow(unittest.TestCase):
@@ -194,6 +195,7 @@ def test_yang2ansible():
             *xml_args,
             "-d",
             "vqfx_ansible_files",
+            "--extract-shared-group-vars",
         ]  # noqa: E501
         proc = subprocess.run(
             cmd,
@@ -213,3 +215,40 @@ def test_yang2ansible():
         assert os.path.isdir(ansible_files_dir), (
             f"Expected ansible files dir was not created: {ansible_files_dir}"
         )
+
+        group_vars_file = os.path.join(ansible_files_dir, "group_vars", "all.yml")
+        assert os.path.exists(group_vars_file), (
+            f"Expected shared group vars file not found: {group_vars_file}"
+        )
+
+        with open(group_vars_file) as f:
+            group_vars = yaml.safe_load(f)
+
+        # This value is common across the EVPN-VXLAN sample set and should be extracted.
+        shared_device_count = (
+            group_vars.get("jtaf_shared", {})
+            .get("chassis", {})
+            .get("aggregated_devices", {})
+            .get("ethernet", {})
+            .get("device_count")
+        )
+        assert shared_device_count == "24", (
+            "Expected shared chassis.aggregated_devices.ethernet.device_count to be extracted"
+        )
+
+        host_var_files = glob(os.path.join(ansible_files_dir, "host_vars", "*.y*ml"))
+        assert host_var_files, "Expected host_vars files to be generated"
+
+        for host_var_file in host_var_files:
+            with open(host_var_file) as f:
+                host_vars = yaml.safe_load(f)
+            host_override = host_vars.get("jtaf_override", {})
+            host_device_count = (
+                host_override.get("chassis", {})
+                .get("aggregated_devices", {})
+                .get("ethernet", {})
+                .get("device_count")
+            )
+            assert host_device_count is None, (
+                "Shared chassis aggregated ethernet device_count should be removed from host override deltas"
+            )

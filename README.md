@@ -289,9 +289,15 @@ jtaf-yang2ansible -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/
 
 Notes:
 - If supplying multiple XML configs they must be for the same device type.
-- Output directory: ansible-provider-junos-<type>/ containing roles/<type>_role/ (tasks/templates), jtaf-playbook.yml (connection: local), host_vars/, configs/, trimmed_schema.json.
+- Output directory: ansible-provider-junos-<type>/ containing roles/<type>_role/ (tasks/templates), jtaf-playbook.yml (connection: local), host_vars/, group_vars/, configs/, trimmed_schema.json.
 - Run the generated playbook in check/diff mode to verify rendered configs without applying:
 	ansible-playbook -i "localhost," jtaf-playbook.yml --check --diff
+
+Merge behavior for shared + host-specific vars:
+- Put shared structured data in group_vars/all.yml under `jtaf_shared`.
+- Put host-specific data in host_vars/<host>.yaml under `jtaf_override`.
+- Generated role tasks merge `jtaf_shared` + `jtaf_override` recursively into `jtaf_effective` before rendering template.j2.
+- Default list behavior is `jtaf_list_merge: replace` (set in group_vars/all.yml). You can change it to `append_rp` or others if needed.
 
 ---
 
@@ -302,17 +308,22 @@ Convert one or more Junos XML configs into Ansible host_vars YAML and a simple h
 Usage:
 ```
 jtaf-xml2yaml -j <trimmed_schema.json> -x <config1.xml> [<config2.xml> ...] -d <output-dir>
+
+# Optional: extract shared data into group_vars/all.yml and keep host_vars as deltas
+jtaf-xml2yaml -j <trimmed_schema.json> -x <config1.xml> [<config2.xml> ...] -d <output-dir> --extract-shared-group-vars
 ```
 
 Example:
 ```
 jtaf-xml2yaml -j ansible-provider-junos-qfx/trimmed_schema.json \
 	-x examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml examples/evpn-vxlan-dc/dc1/dc1-leaf2.xml \
-  -d ansible-provider-junos-qfx
+  -d ansible-provider-junos-qfx \
+  --extract-shared-group-vars
 ```
 
 Output:
-- Creates host_vars/<hostname>.yaml for every XML file provided (hostname is file base name or system/host-name from XML).
+- Creates host_vars/<hostname>.yaml for every XML file provided (hostname is file base name or system/host-name from XML). Each file stores data under `jtaf_override`.
+- With `--extract-shared-group-vars`, also writes group_vars/all.yml with `jtaf_shared` containing structure common across all input hosts.
 - Writes a simple hosts file at <output-dir>/hosts listing all hostnames.
 
 This is useful to feed generated host_vars into the Ansible role/playbook created by jtaf-ansible/jtaf-yang2ansible.
