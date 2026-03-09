@@ -3,11 +3,20 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Read Terraform state JSON from stdin and print the serial value."
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
+    parse_args()
     state = json.load(sys.stdin)
     serial = state.get("serial")
     if serial is None:

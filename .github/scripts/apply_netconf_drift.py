@@ -13,33 +13,35 @@ MSG_SEP = "]]>]]>"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Apply an out-of-band NETCONF drift change to one mock device/group."
+    )
     parser.add_argument(
         "--devices-file",
         required=True,
-        help="Path to host:port mapping file",
+        help="Path to host:port mapping file (<host>:<port> per line).",
     )
     parser.add_argument(
         "--target-host",
         required=True,
-        help="Original device hostname from Terraform state",
+        help="Target device hostname as listed in devices-file.",
     )
     parser.add_argument(
         "--target-group",
         required=True,
-        help="Apply-group name to mutate",
+        help="Apply-group name to mutate.",
     )
     parser.add_argument(
         "--drift-ip",
         required=True,
-        help="Out-of-band IP address/CIDR value",
+        help="IPv4 CIDR value to inject as drift.",
     )
-    parser.add_argument("--username", required=True, help="NETCONF username")
-    parser.add_argument("--password", required=True, help="NETCONF password")
+    parser.add_argument("--username", required=True, help="NETCONF username for mock auth.")
+    parser.add_argument("--password", required=True, help="NETCONF password for mock auth.")
     parser.add_argument(
         "--connect-host",
         default="127.0.0.1",
-        help="Mock listener bind address",
+        help="Address to connect to mock listeners.",
     )
     return parser.parse_args()
 

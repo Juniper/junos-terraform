@@ -7,6 +7,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/goreleaser/goreleaser v1.26.2
 	github.com/hashicorp/terraform-plugin-framework v1.18.0
+	nemith.io/netconf v0.0.4
 	golang.org/x/crypto v0.48.0
 )
 

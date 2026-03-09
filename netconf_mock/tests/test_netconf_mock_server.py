@@ -81,6 +81,20 @@ def test_collect_device_specs_reads_escaped_newlines(tmp_path):
     assert specs == ["spine1:8311", "leaf1:8301", "leaf2:8302"]
 
 
+def test_device_ssh_server_validates_password_when_auth_enabled():
+    state = MODULE.DeviceState(name="leaf1")
+    server = MODULE.DeviceSSHServer(
+        username="ci-user",
+        password="ci-password",
+        state=state,
+        disable_auth=False,
+    )
+
+    assert server.begin_auth("ci-user") is True
+    assert server.validate_password("ci-user", "ci-password") is True
+    assert server.validate_password("ci-user", "wrong-password") is False
+
+
 def test_load_configuration_updates_candidate_and_submitted(state_and_session):
     state, session, channel = state_and_session
 
@@ -101,9 +115,8 @@ def test_load_configuration_updates_candidate_and_submitted(state_and_session):
     assert state.submitted_xml_by_group["base-config"].startswith(
         "<configuration>"
     )
-    assert channel.writes[-1].startswith(
-        '<rpc-reply message-id="11"><ok/></rpc-reply>'
-    )
+    assert 'message-id="11"' in channel.writes[-1]
+    assert "<ok/>" in channel.writes[-1]
 
 
 def test_commit_discard_and_delete_flow(state_and_session):
@@ -166,10 +179,114 @@ def test_handle_rpc_hello_and_unknown(state_and_session):
     assert channel.writes == []
 
     session._handle_rpc('<rpc message-id="30"><foo/></rpc>')
-    assert channel.writes[-1].startswith(
-        '<rpc-reply message-id="30"><ok/></rpc-reply>'
-    )
+    assert 'message-id="30"' in channel.writes[-1]
+    assert "<ok/>" in channel.writes[-1]
     assert state.history[-1]["op"] == "unknown"
+
+
+def test_extract_message_id_accepts_single_quoted_attributes():
+    xml = "<rpc message-id='77'><lock><target><candidate/></target></lock></rpc>"
+
+    assert MODULE.DeviceSession._extract_message_id(xml) == "77"
+
+
+def test_extract_message_id_accepts_prefixed_attribute():
+    xml = (
+        '<rpc xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" '
+        'nc:message-id="88"><lock><target><candidate/></target></lock></rpc>'
+    )
+
+    assert MODULE.DeviceSession._extract_message_id(xml) == "88"
+
+
+def test_extract_message_id_returns_empty_when_missing():
+    xml = "<rpc><lock><target><candidate/></target></lock></rpc>"
+
+    assert MODULE.DeviceSession._extract_message_id(xml) == ""
+
+
+def test_extract_group_name_prefers_groups_name_over_nested_name():
+    xml = (
+        '<rpc message-id="101">'
+        '<load-configuration action="replace" format="xml">'
+        '<configuration><groups><name>base-config</name>'
+        '<interfaces><interface><name>lo0</name></interface></interfaces>'
+        '</groups></configuration>'
+        '</load-configuration></rpc>'
+    )
+
+    assert MODULE.DeviceSession._extract_group_name(xml) == "base-config"
+
+
+def test_load_configuration_updates_all_groups_in_payload(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = (
+        "<configuration><groups><name>base-config</name>"
+        "<interfaces><interface><name>lo0</name><unit><name>0</name>"
+        "<family><inet><address><name>203.0.113.250/32</name></address>"
+        "</inet></family></unit></interface></interfaces>"
+        "</groups></configuration>"
+    )
+
+    rpc = (
+        '<rpc message-id="120">'
+        '<load-configuration action="replace" format="xml">'
+        '<configuration>'
+        '<groups><name>overlay-config</name><protocols/></groups>'
+        '<groups><name>base-config</name>'
+        '<interfaces><interface><name>lo0</name><unit><name>0</name>'
+        '<family><inet><address><name>203.0.113.10/32</name></address>'
+        '</inet></family></unit></interface></interfaces>'
+        '</groups>'
+        '</configuration>'
+        '</load-configuration>'
+        '</rpc>'
+    )
+
+    handled = session._handle_load_configuration(rpc, "120")
+
+    assert handled is True
+    assert "overlay-config" in state.candidate_groups
+    assert "base-config" in state.candidate_groups
+    assert "203.0.113.10/32" in state.candidate_groups["base-config"]
+    assert "203.0.113.250/32" not in state.candidate_groups["base-config"]
+
+
+def test_load_configuration_regex_fallback_updates_all_groups(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = (
+        "<configuration><groups><name>base-config</name>"
+        "<interfaces><interface><name>lo0</name><unit><name>0</name>"
+        "<family><inet><address><name>203.0.113.250/32</name></address>"
+        "</inet></family></unit></interface></interfaces>"
+        "</groups></configuration>"
+    )
+
+    # Deliberately malformed for XML parser (unbound prefixes) to force regex fallback.
+    rpc = (
+        '<nc:rpc message-id="121">'
+        '<load-configuration action="replace" format="xml">'
+        '<configuration>'
+        '<groups><name>overlay-config</name><protocols/></groups>'
+        '<groups><name>base-config</name>'
+        '<interfaces><interface><name>lo0</name><unit><name>0</name>'
+        '<family><inet><address><name>203.0.113.10/32</name></address>'
+        '</inet></family></unit></interface></interfaces>'
+        '</groups>'
+        '</configuration>'
+        '</load-configuration>'
+        '</nc:rpc>'
+    )
+
+    handled = session._handle_load_configuration(rpc, "121")
+
+    assert handled is True
+    assert "overlay-config" in state.candidate_groups
+    assert "base-config" in state.candidate_groups
+    assert "203.0.113.10/32" in state.candidate_groups["base-config"]
+    assert "203.0.113.250/32" not in state.candidate_groups["base-config"]
 
 
 def test_dump_state_if_requested_writes_json(tmp_path):

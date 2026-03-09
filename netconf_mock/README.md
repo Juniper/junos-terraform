@@ -29,6 +29,7 @@ python netconf_mock/netconf_mock_server.py \
   --host 127.0.0.1 \
   --username ci-user \
   --password ci-password \
+  --disable-auth \
   --device dc1-leaf1:8301 \
   --device dc1-leaf2:8302 \
   --log-level INFO
@@ -63,6 +64,7 @@ python netconf_mock/netconf_mock_server.py \
 - `--password`: SSH password required for auth (default: `ci-password`)
 - `--device`: `<device-name>:<port>` listener spec; may be repeated
 - `--devices-file`: file with one `<device-name>:<port>` per line
+- `--disable-auth`: disable SSH auth checks (useful for mock-only compatibility runs)
 - `--state-dump`: optional JSON file written on shutdown with device state/history
 - `--log-level`: logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)
 
