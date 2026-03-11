@@ -94,26 +94,19 @@ def main() -> None:
 # Merge order: global (all) -> device_type -> host
 # with optional _merge_directive meta-instructions for custom behavior.
 
-# Detect device type group membership from inventory
-- name: Detect host device type group
-  set_fact:
-    host_device_type: >-
-      {{{{ group_names
-           | select('match', '^device_')
-           | map('regex_replace', '^device_', '')
-           | first | default('unknown') }}}}
-
-# Merge variables: device-type group vars first, then host-specific overrides
+# Build the effective config from Ansible-resolved vars.
+# Ansible already applies precedence across group_vars/host_vars; filter out
+# runtime/meta keys that are not part of device configuration.
 - name: Merge variables from hierarchy
   set_fact:
     jtaf_effective: >-
       {{{{
-        (vars.get(host_device_type, {{}}) | default({{}}))
-        | combine(
-            (hostvars[inventory_hostname] | default({{}})),
-            recursive=True,
-            list_merge='replace'
-          )
+                vars
+                | dict2items
+                | rejectattr('key', 'match', '^(ansible_.*|inventory_.*|role_.*)$')
+                | rejectattr('key', 'in', ['group_names', 'groups', 'group_vars', 'hostvars'])
+                | rejectattr('key', 'in', ['omit', 'playbook_dir', 'tmp_dir', 'jtaf_effective'])
+                | items2dict
       }}}}
   tags: [merge_vars]
 

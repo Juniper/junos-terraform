@@ -66,8 +66,7 @@ jobs:
         jtaf-xml2yaml \
           -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml \
           -j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json \
-          -d ci-evpn-vxlan-ansible \
-          --extract-shared-group-vars
+          -d ci-evpn-vxlan-ansible
 
     - name: Prepare generated role and CI playbook
       run: |
@@ -95,14 +94,14 @@ jobs:
       run: |
         set -euo pipefail
 
-        python netconf_mock/netconf_mock_server.py \
+        nohup python netconf_mock/netconf_mock_server.py \
           --host 127.0.0.1 \
           --username ci-user \
           --password ci-password \
           --log-level INFO \
           --devices-file ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt \
           --state-dump netconf-mock-state.json \
-          > netconf-mock.log 2>&1 &
+          > netconf-mock.log 2>&1 < /dev/null &
         echo "$!" > .netconf_mock.pid
 
         all_ready=0
@@ -150,6 +149,11 @@ jobs:
         NETCONF_PASSWORD: ci-password
       run: |
         set -euo pipefail
+        if [ ! -f ../.netconf_mock.pid ] || ! kill -0 "$(cat ../.netconf_mock.pid)" 2>/dev/null; then
+          echo "NETCONF mock is not running before initial apply"
+          cat ../netconf-mock.log || true
+          exit 1
+        fi
         ansible-playbook \
           -i mock-inventory.ini \
           -e "ansible_python_interpreter=${pythonLocation}/bin/python" \
@@ -286,7 +290,6 @@ jobs:
           MOCK_PID="$(cat .netconf_mock.pid)"
           if kill -0 "$MOCK_PID" 2>/dev/null; then
             kill "$MOCK_PID"
-            wait "$MOCK_PID" || true
           fi
         fi
 

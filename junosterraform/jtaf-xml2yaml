@@ -345,7 +345,6 @@ def main() -> None:
         default=True,
         help='Auto-detect device types from XML config (enabled by default).',
     )
-
     args = parser.parse_args()
 
     trimmed_json_file = args.trimmed_json
@@ -388,7 +387,7 @@ def main() -> None:
         global_shared_payload = build_shared_payload(global_shared_payload)
     else:
         global_shared_payload = {}
-    
+
     # Write host vars as deltas from global shared
     hostnames = []
     device_groups: dict[str, list[str]] = {}

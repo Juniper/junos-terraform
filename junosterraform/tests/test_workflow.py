@@ -4,6 +4,7 @@ from glob import glob
 import subprocess
 import shutil
 import tempfile
+import re
 import unittest
 import yaml
 import pytest
@@ -190,7 +191,7 @@ def test_yang2ansible():
             role_dir, "trimmed_schema.json"
         )
 
-        # xml2yaml command (no legacy --extract-shared-group-vars flag)
+        # xml2yaml command mirrors the GitHub Action invocation.
         cmd = [
             xml2yaml_exe,
             "-j",
@@ -223,6 +224,39 @@ def test_yang2ansible():
         assert os.path.exists(group_vars_file), (
             f"Expected group vars file not found: {group_vars_file}"
         )
+
+        # New groups feature: inventory should include detected device-type groups.
+        hosts_file = os.path.join(ansible_files_dir, "hosts")
+        assert os.path.exists(hosts_file), f"Expected inventory not found: {hosts_file}"
+        with open(hosts_file) as f:
+            hosts_text = f.read()
+        assert "[all]" in hosts_text, "Expected [all] group in generated inventory"
+        detected_device_groups = re.findall(r"^\[device_([^\]]+)\]$", hosts_text, flags=re.MULTILINE)
+
+        for device_group in detected_device_groups:
+            device_group_vars_file = os.path.join(
+                ansible_files_dir,
+                "group_vars",
+                device_group,
+                "all.yml",
+            )
+            assert os.path.exists(device_group_vars_file), (
+                f"Expected device group vars file not found: {device_group_vars_file}"
+            )
+
+        # Generated role should use hierarchy merge flow and merge directive filter.
+        tasks_main = os.path.join(
+            role_dir,
+            "roles",
+            "vqfx-ansible-role_role",
+            "tasks",
+            "main.yml",
+        )
+        assert os.path.exists(tasks_main), f"Expected tasks file not found: {tasks_main}"
+        with open(tasks_main) as f:
+            tasks_text = f.read()
+        assert "Merge variables from hierarchy" in tasks_text
+        assert "jtaf_apply_merge_directives" in tasks_text
 
         host_var_files = glob(os.path.join(ansible_files_dir, "host_vars", "*.y*ml"))
         assert host_var_files, "Expected host_vars files to be generated"
