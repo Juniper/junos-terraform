@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 class FNode:
     """Represents a jtaf node in the configuration tree"""
     def __init__(self, name):
+        """Initialize a schema node with default container semantics."""
         self.name = name
         self.type = "container"
         self.children = []
@@ -34,6 +35,7 @@ class FNode:
         self.__dict__[a] = v
 
     def __getitem__(self, a):
+        """Get an attribute value via dictionary-like indexing."""
         return self.__dict__[a]
 
     def to_json_dict(self):
