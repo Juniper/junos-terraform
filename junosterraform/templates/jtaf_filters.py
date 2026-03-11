@@ -14,9 +14,14 @@ Merge directives:
   _merge_directive: "keep_parent"       # Use parent, ignore this override
 """
 
-from ansible.errors import AnsibleFilterError
 from copy import deepcopy
 from typing import Any, Dict, Optional
+
+try:
+    from ansible.errors import AnsibleFilterError
+except ImportError:
+    class AnsibleFilterError(Exception):
+        """Fallback error type when ansible is not installed."""
 
 
 class FilterModule:
