@@ -5,88 +5,131 @@ import json
 import os
 import yaml
 from xml.etree import ElementTree
-from typing import Any
+from typing import Any, Optional
 
 
 _OMIT = object()
 
 
-def prepare_tag(tag:str) -> str:
+def prepare_tag(tag: str) -> str:
     """Prepare XML tag to be used as YAML key by replacing '-' and '.' with '_'."""
     return tag.replace("-", "_").replace(".", "_")
 
-# def element_node(element:ElementTree.Element,path:str,resources:dict[str,Any]) -> dict[str,Any]|None:
-def element_node(element:ElementTree.Element,path:str,resources:dict[str,Any]):
-    """Return the resource node matching the given XML element and path.
-    Args:
-        element: XML element to match
-        path: path to match in the schema
-        resources: schema resource node to search
-    Returns:
-        The matching resource node or None if not found
+
+def detect_device_type(xml_dict: dict[str, Any]) -> Optional[str]:
+    """Detect device type from configuration (e.g., 'qfx', 'srx', 'mx').
+
+    Looks for device model or version hints in system/product-name or chassis.
     """
-    
-    if resources['name'] == element.tag and (resources.get("path") is None or (resources["path"]+'/'+element.tag)==path):
-        return {k: v for k, v in resources.items() if k != "children"}
-    try:
-        for elem in resources["children"]:
-                etype=element_node(element,path,elem)
-                if etype:
-                    return etype                  
-    except KeyError:
-        return None            
+    # Check system.product_name
+    if "system" in xml_dict and isinstance(xml_dict["system"], dict):
+        product_name = xml_dict["system"].get("product_name", "").lower()
+        if product_name:
+            # Extract device type from product name (e.g., "Juniper Networks QFX5100" -> "qfx")
+            for device_type in ["qfx", "srx", "mx", "ptx", "acx", "ex"]:
+                if device_type in product_name:
+                    return device_type
+
+    # Check chassis.product_name
+    if "chassis" in xml_dict and isinstance(xml_dict["chassis"], dict):
+        product_name = xml_dict["chassis"].get("product_name", "").lower()
+        if product_name:
+            for device_type in ["qfx", "srx", "mx", "ptx", "acx", "ex"]:
+                if device_type in product_name:
+                    return device_type
+
     return None
 
 
-def elem_to_dict(element:ElementTree.Element,path:str,resources:Any)-> dict[str, Any]:
-    """Convert an XML element and its children to a dictionary.
+def element_node(
+    element: ElementTree.Element,
+    path: str,
+    resources: dict[str, Any],
+):
+    """Return the resource node matching the given XML element and path.
+
     Args:
-        element: XML element to convert
-        path: current path of the element. Needed to uniquely identify the element in the schema
-        resources: schema resource node to use for type information
+        element: XML element to match.
+        path: Path to match in the schema.
+        resources: Schema resource node to search.
+
     Returns:
-        A dictionary representation of the XML element
+        The matching resource node or None if not found.
     """
-    
+
+    if resources["name"] == element.tag and (
+        resources.get("path") is None or (resources["path"] + "/" + element.tag) == path
+    ):
+        return {k: v for k, v in resources.items() if k != "children"}
+
+    try:
+        for elem in resources["children"]:
+            matched_type = element_node(element, path, elem)
+            if matched_type:
+                return matched_type
+    except KeyError:
+        return None
+
+    return None
+
+
+def elem_to_dict(
+    element: ElementTree.Element,
+    path: str,
+    resources: Any,
+) -> dict[str, Any]:
+    """Convert an XML element and its children to a dictionary.
+
+    Args:
+        element: XML element to convert.
+        path: Current path of the element. Needed to uniquely identify the
+            element in the schema.
+        resources: Schema resource node to use for type information.
+
+    Returns:
+        A dictionary representation of the XML element.
+    """
+
     result = {}
     for child in element:
-        prepared_tag=prepare_tag(child.tag)
-        prepared_path=child.tag            
-        if len(path)>0:
-            prepared_path=path+'/'+child.tag
-        elem_node=element_node(child,prepared_path,resources)    
-        elem_type=elem_node['type'] if elem_node else None
+        prepared_tag = prepare_tag(child.tag)
+        prepared_path = child.tag
+        if len(path) > 0:
+            prepared_path = path + "/" + child.tag
+        resource_node = element_node(child, prepared_path, resources)
+        elem_type = resource_node["type"] if resource_node else None
 
-        if elem_type == 'list':
+        if elem_type == "list":
             # If the element is of type list, always create a list
-            
             if not result.get(prepared_tag):
                 result[prepared_tag] = []
             if len(child) > 0:
-                result[prepared_tag].append(elem_to_dict(child,prepared_path,resources))
+                result[prepared_tag].append(
+                    elem_to_dict(child, prepared_path, resources)
+                )
             else:
                 result[prepared_tag].append(child.text)
-        elif elem_type == 'leaf-list':
+        elif elem_type == "leaf-list":
             # If the element is of type leaf-list, always create a list
-            result[prepared_tag] = child.text        
-        elif elem_type == 'container':
+            result[prepared_tag] = child.text
+        elif elem_type == "container":
             # If the element is of type container, always create a dict
             if len(child) > 0:
-                result[prepared_tag] = elem_to_dict(child,prepared_path,resources)
+                result[prepared_tag] = elem_to_dict(child, prepared_path, resources)
             else:
                 result[prepared_tag] = ""
         else:
             # For other types, decide based on children
             if len(child) > 0:
-                result[prepared_tag] = elem_to_dict(child,prepared_path,resources)
+                result[prepared_tag] = elem_to_dict(child, prepared_path, resources)
             else:
-                if elem_type=='leaf':
+                if elem_type == "leaf":
                     if not child.text:
                         result[prepared_tag] = True
                     else:
-                        result[prepared_tag] = child.text    
+                        result[prepared_tag] = child.text
                 else:
-                    result[prepared_tag] = child.text     
+                    result[prepared_tag] = child.text
     return result
 
 
@@ -152,20 +195,62 @@ def build_shared_payload(host_payloads: list[dict[str, Any]]) -> dict[str, Any]:
     return {}
 
 
-def parse_xml_to_payload(xml_file:str, resources:dict[str,Any]) -> tuple[str, dict[str, Any]]:
-    """Convert one XML config into hostname and payload dictionary."""
+def build_group_shared_payload(payloads: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build shared payload from a subset of hosts (e.g., all qfx devices)."""
+    return build_shared_payload(payloads)
+
+
+def extract_hierarchy_groups(
+    host_entries: list[tuple[str, dict[str, Any], Optional[str]]]
+) -> dict[str, list[dict[str, Any]]]:
+    """Extract groups organized by device type.
+
+    Args:
+        host_entries: List of (hostname, payload, device_type) tuples.
+
+    Returns:
+        Dict with structure:
+        {
+            "all": [all payloads],
+            "device_type:<type>": [payloads for that device type],
+        }
+    """
+    groups: dict[str, list[dict[str, Any]]] = {"all": []}
+
+    for _hostname, payload, device_type in host_entries:
+        groups["all"].append(payload)
+
+        if device_type:
+            group_key = f"device_type:{device_type}"
+            if group_key not in groups:
+                groups[group_key] = []
+            groups[group_key].append(payload)
+
+    return groups
+
+
+def parse_xml_to_payload(
+    xml_file: str,
+    resources: dict[str, Any],
+) -> tuple[str, dict[str, Any], Optional[str]]:
+    """Convert one XML config into hostname, payload, and device_type.
+
+    Returns:
+        Tuple of (hostname, xml_dict, device_type).
+    """
     with open(xml_file) as f:
         raw = f.read()
     root = ElementTree.fromstring(f"<root>{raw}</root>")
-    hostname = xml_file.split('.')[0]
+    hostname = xml_file.split(".")[0]
     hostname_elem = root.find(".//system/host-name")
     if hostname_elem is not None and hostname_elem.text:
-        hostname = hostname_elem.text  
+        hostname = hostname_elem.text
     config = root.find(".//configuration")
     if config is None:
         raise ValueError(f"No <configuration> found in {xml_file}")
-    xml_dict = elem_to_dict(config,"",resources['root'])
-    return hostname, xml_dict
+    xml_dict = elem_to_dict(config, "", resources["root"])
+
+    return hostname, xml_dict, detect_device_type(xml_dict)
 
 
 def write_yaml_file(output_path: str, payload: dict[str, Any]) -> None:
@@ -176,26 +261,61 @@ def write_yaml_file(output_path: str, payload: dict[str, Any]) -> None:
         f.write(yaml_output)
 
 
-def write_host_override(output_dir: str, hostname: str, host_payload: dict[str, Any], shared_payload: dict[str, Any]) -> None:
-    """Write host override YAML after removing shared values."""
+def write_host_vars_flat(
+    output_dir: str,
+    hostname: str,
+    host_payload: dict[str, Any],
+    shared_payload: dict[str, Any],
+) -> None:
+    """Write host vars as flattened delta (no jtaf_override container).
+
+    For hierarchical mode, we write only the differences from the group vars.
+    """
     delta_payload = subtract_common(host_payload, shared_payload)
     if delta_payload is _OMIT:
         delta_payload = {}
+
     yaml_file_name = hostname + ".yaml"
     output_path = os.path.join(output_dir, "host_vars", yaml_file_name)
-    write_yaml_file(output_path, {"jtaf_override": delta_payload})
+    write_yaml_file(output_path, delta_payload)
 
 
-def write_group_shared(output_dir: str, shared_payload: dict[str, Any]) -> None:
-    """Write shared group vars defaults used by generated merge-aware role."""
-    output_path = os.path.join(output_dir, "group_vars", "all.yml")
-    write_yaml_file(output_path, {
-        "jtaf_shared": shared_payload,
-        "jtaf_list_merge": "replace",
-    })
+def write_group_vars_flat(
+    output_dir: str,
+    group_name: str,
+    shared_payload: dict[str, Any],
+) -> None:
+    """Write group vars as flattened structure (no jtaf_shared container).
+
+    Args:
+        group_name: Base filename like 'all', 'spine', 'qfx', etc.
+    """
+    if not shared_payload:
+        return  # Don't create empty files
+
+    # For device type groups, write to group_vars/<device_type>/all.yml
+    if group_name.startswith("device_type:"):
+        device_type = group_name.split(":", 1)[1]
+        output_path = os.path.join(output_dir, "group_vars", device_type, "all.yml")
+    else:
+        output_path = os.path.join(output_dir, "group_vars", "all.yml")
+
+    write_yaml_file(output_path, shared_payload)
 
 
-def main():
+def main() -> None:
+    """Generate Ansible inventory and hierarchical host_vars YAML from XML configuration.
+
+    Parses command-line arguments for trimmed JSON schema and XML config files,
+    auto-detects device types from configuration, extracts shared configuration
+    into group_vars, writes per-host deltas to host_vars, and generates inventory.
+
+    Output directory structure:
+        hosts – Ansible inventory with [all] and [device_<type>] groups
+        group_vars/all.yml – Shared configuration for all hosts
+        group_vars/<type>/all.yml – Device-type specific shared configuration
+        host_vars/<hostname>.yaml – Per-host configuration deltas
+    """
     parser = argparse.ArgumentParser(
         description='Generate Ansible hosts and host_vars YAML from XML using trimmed schema.',
         exit_on_error=True,
@@ -220,15 +340,17 @@ def main():
         help='Output directory for hosts file and host_vars/*.yaml.',
     )
     parser.add_argument(
-        '--extract-shared-group-vars',
+        '--auto-detect-hierarchy',
         action='store_true',
-        help='Write shared values to group_vars/all.yml and keep host_vars as per-host deltas.',
+        default=True,
+        help='Auto-detect device types from XML config (enabled by default).',
     )
 
     args = parser.parse_args()
 
     trimmed_json_file = args.trimmed_json
     xml_files = args.xml_config
+
     # --- Load JSON schema ---
     with open(trimmed_json_file, 'r') as f:
         schema = json.load(f)
@@ -242,27 +364,55 @@ def main():
 
     directory = args.directory
 
+    # --- Parse all XML files ---
     host_entries = []
     for xml_file in xml_files:
-        host_entries.append(parse_xml_to_payload(xml_file, schema))
+        hostname, payload, device_type = parse_xml_to_payload(xml_file, schema)
+        host_entries.append((hostname, payload, device_type))
 
-    host_payloads = [payload for _hostname, payload in host_entries]
-    shared_payload = build_shared_payload(host_payloads) if args.extract_shared_group_vars else {}
+    # Generate hierarchical group_vars with device type detection
+    print("Generating hierarchical group_vars with device type detection...")
 
-    hostnames=[]
-    for hostname, payload in host_entries:
-        hostnames.append(hostname)
-        write_host_override(directory, hostname, payload, shared_payload)
+    # Extract groups by device_type and role
+    groups = extract_hierarchy_groups(host_entries)
 
-    if args.extract_shared_group_vars:
-        write_group_shared(directory, shared_payload)
+    # Build and write shared payloads for each group
+    for group_name, group_payloads in groups.items():
+        shared_payload = build_group_shared_payload(group_payloads)
+        write_group_vars_flat(directory, group_name, shared_payload)
+        print(f"  {group_name}: {len(group_payloads)} hosts, {len(shared_payload)} keys")
+
+    # Build the global shared payload for calculating host deltas
+    global_shared_payload = groups.get("all", [])
+    if global_shared_payload:
+        global_shared_payload = build_shared_payload(global_shared_payload)
+    else:
+        global_shared_payload = {}
     
+    # Write host vars as deltas from global shared
+    hostnames = []
+    device_groups: dict[str, list[str]] = {}
+
+    for hostname, payload, device_type in host_entries:
+        hostnames.append(hostname)
+        write_host_vars_flat(directory, hostname, payload, global_shared_payload)
+
+        if device_type:
+            if device_type not in device_groups:
+                device_groups[device_type] = []
+            device_groups[device_type].append(hostname)
+
+    # Generate inventory with groups
     with open(os.path.join(directory, "hosts"), "w") as f:
         f.write("[all]\n")
         for hostname in hostnames:
             f.write(f"{hostname}\n")
 
-    
+        # Device type groups
+        for device_type, hosts in sorted(device_groups.items()):
+            f.write(f"\n[device_{device_type}]\n")
+            for hostname in hosts:
+                f.write(f"{hostname}\n")
 
 
 if __name__ == "__main__":

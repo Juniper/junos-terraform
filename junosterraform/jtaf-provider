@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
-import xml.etree.ElementTree as ElementTree
-from copy import copy
-import json
 import argparse
-import sys
-from jinja2 import Template
+import json
 import os
 import shutil
-import distutils.dir_util
-import os
-from importlib.resources import files, as_file
+from importlib.resources import as_file, files
+
+from jinja2 import Template
+
 from junosterraform.jtaf_common import filter_json_using_xml, load_and_merge_xmls
 
- 
-def render_template_and_write(input_template: str, output_file: str, context: dict, description: str):
+
+def render_template_and_write(input_template: str, output_file: str, context: dict, description: str) -> None:
+    """Render Jinja2 template and write output to file.
+
+    Args:
+        input_template: Path to Jinja2 template file.
+        output_file: Path to output file to write rendered content.
+        context: Context dictionary to pass to template renderer.
+        description: Description of what is being rendered (for logging).
+    """
     with open(input_template) as f:
         tmpl = Template(f.read())
     rendered = tmpl.render(data=context).lstrip()
@@ -22,10 +27,10 @@ def render_template_and_write(input_template: str, output_file: str, context: di
     print(f"Updated {description}")
 
 
-def rewrite_import_prefixes(go_dir: str, old_prefix: str, new_prefix: str):
+def rewrite_import_prefixes(go_dir: str, old_prefix: str, new_prefix: str) -> None:
     """Replace module import prefixes across copied Go files in place."""
-    for root, _, files in os.walk(go_dir):
-        for filename in files:
+    for root, _, filenames in os.walk(go_dir):
+        for filename in filenames:
             if not filename.endswith(".go"):
                 continue
             full_path = os.path.join(root, filename)
@@ -37,8 +42,22 @@ def rewrite_import_prefixes(go_dir: str, old_prefix: str, new_prefix: str):
                     f.write(updated)
 
 
-# Main Method
-def main():
+def main() -> None:
+    """Generate a Terraform provider from JTAF JSON schema and XML configuration.
+
+    Parses command-line arguments for JSON schema (pyang output) and XML config files,
+    filters schema to match config XPaths, renders Jinja2 templates for Go code,
+    and generates a complete Terraform provider structure with normalized imports.
+
+    Output directory structure:
+        terraform-provider-junos-<type>/
+            provider.go (generated from template)
+            resource_config_provider.go (generated from schema)
+            config.go (generated from template)
+            go.mod (generated from template)
+            trimmed_schema.json
+            [other copied Go source files with rewritten imports]
+    """
     # other arguments
     parser = argparse.ArgumentParser(
         description='Generate a Terraform provider from JTAF JSON and XML config.',
@@ -66,7 +85,7 @@ def main():
     )
     args = parser.parse_args()
 
-    # Merge XML files if multiple are provided 
+    # Merge XML files if multiple are provided.
     xml_files = [file for group in args.xml_config for file in group]
     xml_config = xml_files[0] if len(xml_files) == 1 else load_and_merge_xmls(xml_files)
 
@@ -88,7 +107,6 @@ def main():
     new_dir = f"terraform-provider-junos-{args.type}"
 
     # Step 4: copy the template go files into place
-    distutils.dir_util.copy_tree(go_dir, new_dir)
     shutil.copytree(go_dir, new_dir, dirs_exist_ok=True)
     # if there is a terraform_provider executable left over from go testing, remove it
     tp_exe = f"{new_dir}/terraform_provider"
@@ -125,6 +143,6 @@ def main():
     with open(trimmed_schema_path, "w") as f:
         json.dump(resources, f, indent=2)
 
-# run main()
+
 if __name__ == "__main__":
     main()

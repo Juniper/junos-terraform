@@ -294,10 +294,10 @@ Notes:
 	ansible-playbook -i "localhost," jtaf-playbook.yml --check --diff
 
 Merge behavior for shared + host-specific vars:
-- Put shared structured data in group_vars/all.yml under `jtaf_shared`.
-- Put host-specific data in host_vars/<host>.yaml under `jtaf_override`.
-- Generated role tasks merge `jtaf_shared` + `jtaf_override` recursively into `jtaf_effective` before rendering template.j2.
-- Default list behavior is `jtaf_list_merge: replace` (set in group_vars/all.yml). You can change it to `append_rp` or others if needed.
+- Variables are organized hierarchically: global (group_vars/all.yml) → device-type group (group_vars/device_<type>/all.yml) → host-specific (host_vars/<host>.yaml).
+- Generated role tasks merge variables from this hierarchy using Ansible's `combine()` filter with `recursive=True` and `list_merge='replace'`.
+- Optional `_merge_directive` meta-instructions in YAML allow per-key control over merge behavior (e.g., `_merge_directive: append` for lists).
+- See [HIERARCHICAL_GROUPS_WITH_DIRECTIVES.md](./HIERARCHICAL_GROUPS_WITH_DIRECTIVES.md) for detailed documentation.
 
 ---
 
@@ -309,24 +309,24 @@ Usage:
 ```
 jtaf-xml2yaml -j <trimmed_schema.json> -x <config1.xml> [<config2.xml> ...] -d <output-dir>
 
-# Optional: extract shared data into group_vars/all.yml and keep host_vars as deltas
-jtaf-xml2yaml -j <trimmed_schema.json> -x <config1.xml> [<config2.xml> ...] -d <output-dir> --extract-shared-group-vars
+# With automatic device-type hierarchy detection
+jtaf-xml2yaml -j <trimmed_schema.json> -x <config1.xml> [<config2.xml> ...] -d <output-dir> --auto-detect-hierarchy
 ```
 
 Example:
 ```
 jtaf-xml2yaml -j ansible-provider-junos-qfx/trimmed_schema.json \
 	-x examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml examples/evpn-vxlan-dc/dc1/dc1-leaf2.xml \
-  -d ansible-provider-junos-qfx \
-  --extract-shared-group-vars
+  -d ansible-provider-junos-qfx
 ```
 
 Output:
-- Creates host_vars/<hostname>.yaml for every XML file provided (hostname is file base name or system/host-name from XML). Each file stores data under `jtaf_override`.
-- With `--extract-shared-group-vars`, also writes group_vars/all.yml with `jtaf_shared` containing structure common across all input hosts.
-- Writes a simple hosts file at <output-dir>/hosts listing all hostnames.
+- Creates host_vars/<hostname>.yaml for every XML file provided (hostname is file base name or system/host-name from XML). Each file contains the device configuration.
+- Creates group_vars/all.yml with global variables shared across all hosts.
+- With `--auto-detect-hierarchy`, also creates group_vars/device_<type>/all.yml for device-type-specific variables.
+- Writes a simple hosts file at <output-dir>/hosts listing all hostnames organized by device type.
 
-This is useful to feed generated host_vars into the Ansible role/playbook created by jtaf-ansible/jtaf-yang2ansible.
+This output feeds into the Ansible role/playbook created by jtaf-ansible/jtaf-yang2ansible.
 
 
 ---
