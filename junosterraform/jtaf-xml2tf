@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 import argparse
 import json
-from lxml import etree
-import sys
-import re
 import os
-from xml.etree import ElementTree
+import re
+import sys
+
+from lxml import etree
 
 missing_xpaths = set()
+
 
 def convert_to_hcl(value, indent=2):
     """
@@ -15,22 +16,48 @@ def convert_to_hcl(value, indent=2):
     """
     spaces = " " * indent
     if isinstance(value, dict):
-        return "{\n" + "\n".join([f'{spaces}{k} = {convert_to_hcl(v, indent + 2)}' for k, v in value.items()]) + f'\n{spaces[:-2]}}}'
-    elif isinstance(value, list):
-        return "[\n" + ",\n".join([spaces + convert_to_hcl(item, indent + 2) for item in value]) + f'\n{spaces[:-2]}]'
-    elif isinstance(value, bool):
+        dict_lines = [
+            f"{spaces}{key} = {convert_to_hcl(item, indent + 2)}"
+            for key, item in value.items()
+        ]
+        return "{\n" + "\n".join(dict_lines) + f"\n{spaces[:-2]}}}"
+    if isinstance(value, list):
+        list_lines = [spaces + convert_to_hcl(item, indent + 2) for item in value]
+        return "[\n" + ",\n".join(list_lines) + f"\n{spaces[:-2]}]"
+    if isinstance(value, bool):
         return "true" if value else "false"
-    elif isinstance(value, (int, float)):
+    if isinstance(value, (int, float)):
         return str(value)
-    else:
-        return f'"{value}"'
+    return f'"{value}"'
 
-# Replace hyphens and dots with underscores
-def normalize_tag(tag):
-    return tag.replace('-', '_').replace('.', '_') 
 
-# Using trimmed json, build mapping of path and path type
-def build_type_map(node, parent_path=""):
+def normalize_tag(tag: str) -> str:
+    """Normalize XML tag to valid Terraform identifier by replacing hyphens and dots.
+
+    Args:
+        tag: XML tag name to normalize (e.g., 'apply-groups', 'ge-0/0/0', 'config.group').
+
+    Returns:
+        Normalized tag with hyphens and dots replaced by underscores.
+    """
+    return tag.replace('-', '_').replace('.', '_')
+
+
+def build_type_map(node: dict, parent_path: str = "") -> dict:
+    """Build recursive mapping of element paths to their type information.
+
+    Walks through the schema tree and creates a flat dictionary mapping each
+    element's full path to its type (leaf, container, list, leaf-list, etc.)
+    and any type restrictions (leaf-type, patterns, enums, etc.).
+
+    Args:
+        node: Current schema node dict (containing 'name', 'type', optional 'children').
+        parent_path: Parent path accumulator (default empty string for root).
+
+    Returns:
+        Dictionary mapping normalized element paths to type info dicts.
+        Example: {'interfaces/interface/name': {'type': 'leaf', 'leaf-type': 'string'}}
+    """
     type_map = {}
 
     # Normalize node name
@@ -57,13 +84,14 @@ def build_type_map(node, parent_path=""):
 
     return type_map
 
+
 def parse_element(element, explicit_empty_tags, type_lookup, parent_path=""):
     """
     Recursively parse an XML element into a nested structure for HCL conversion.
     - Empty tags become `True`
     - Tags with only text return scalar value
     - Tags with children return list[dict] to enforce HCL consistency
-    """    
+    """
     tag_name = etree.QName(element.tag).localname
     has_text = element.text is not None and element.text.strip() != ""
     has_children = len(element) > 0
@@ -74,9 +102,18 @@ def parse_element(element, explicit_empty_tags, type_lookup, parent_path=""):
     if normalized_path not in type_lookup:
         if normalized_path not in missing_xpaths:
             missing_xpaths.add(normalized_path)
-            print(f"\t-- [WARN] XML config '{missing_xpaths}' not defined in YANG. Removing it from generating in this and subsequent .tf files\n\t\tTo enable configuration of this element, add it to a YANG augment file.\n\t\t - Regenerate the provider using jtaf-yang2go and include the cooresponding yang file using the -p option in addition to the existing YANG files.\n", file=sys.stderr)
+            print(
+                "\t-- [WARN] XML config "
+                f"'{missing_xpaths}' not defined in YANG. Removing it from generating "
+                "in this and subsequent .tf files\n"
+                "\t\tTo enable configuration of this element, add it to a YANG augment file.\n"
+                "\t\t - Regenerate the provider using jtaf-yang2go and include the "
+                "cooresponding yang file using the -p option in addition to the existing "
+                "YANG files.\n",
+                file=sys.stderr,
+            )
         return None
-        
+
     # Check if this element should be a leaf-list
     type_info = type_lookup.get(normalized_path, {})
     is_leaf_list = type_info.get("type") == "leaf-list"
@@ -128,11 +165,21 @@ def parse_element(element, explicit_empty_tags, type_lookup, parent_path=""):
 
     return [parsed]  # Always return a list of dict for elements with children
 
-def create_provider_block(device_type, include_provider_block=True):
+
+def create_provider_block(device_type: str, include_provider_block: bool = True) -> str:
+    """Generate Terraform provider block with required_providers declaration.
+
+    Creates a terraform block specifying the required provider and source for
+    the given device type.
+
+    Args:
+        device_type: Device type suffix (e.g., 'qfx', 'srx') for provider name.
+        include_provider_block: Whether to generate the block (default True).
+
+    Returns:
+        Terraform provider block string, or empty string if include_provider_block is False.
     """
-    Generates a single Terraform-style provider block for each hostname.
-    """    
-   # if include_provider_block is True then create a provider block for the device type
+    # if include_provider_block is True then create a provider block for the device type
     if include_provider_block:
         provider_block = f"""terraform {{
   required_providers {{
@@ -144,35 +191,53 @@ def create_provider_block(device_type, include_provider_block=True):
 """
         return provider_block
     return ""
-def edit_provider_block(device_type, provider_block):
-    """
-    Edits the provider block to include the hostnames, username, and password.
+
+
+def edit_provider_block(device_type: str, provider_block: str) -> str:
+    """Add or update a provider entry within an existing terraform provider block.
+
+    Idempotently adds a new device type to the required_providers section, or
+    returns the block unchanged if the device type is already present.
+
+    Args:
+        device_type: Device type suffix to add to required_providers.
+        provider_block: Existing terraform provider block string.
+
+    Returns:
+        Updated provider block with new device type added, or unchanged if already present.
     """
     block = provider_block
     # Parse the existing provider block to add new device type
-    
+
     # Check if the device type already exists
     if f'junos-{device_type}' in block:
         return block
-    
+
     # Extract the existing required_providers content
-    providers_match = re.search(r'required_providers\s*{\s*(.*?)\s*}\s*}(.*)?', block, re.DOTALL)
-    
+    providers_match = re.search(
+        r'required_providers\s*{\s*(.*?)\s*}\s*}(.*)?',
+        block,
+        re.DOTALL,
+    )
+
     if providers_match:
         existing_providers = providers_match.group(1).strip()
 
         # Capture any content after first closing brace of providers.tf
         after_block = providers_match.group(2).strip()[1:] if providers_match.group(2) else ""
-        
+
         # Add new provider entry
-        new_provider = "}\n\t" + f'junos-{device_type} = {{\n      source = "hashicorp/junos-{device_type}"\n    }}'
-        
+        new_provider = (
+            "}\n\t"
+            f'junos-{device_type} = {{\n      source = "hashicorp/junos-{device_type}"\n    }}'
+        )
+
         # Combine existing and new providers
         if existing_providers:
             updated_providers = existing_providers + '\n    ' + new_provider
         else:
             updated_providers = new_provider
-        
+
         # Reconstruct the provider block
         block = f"""terraform {{
   required_providers {{
@@ -184,9 +249,21 @@ def edit_provider_block(device_type, provider_block):
 
     return block
 
-def create_head_block(device_type, hostname, username, password):
-    """
-    Generates a single Terraform-style resource block combining all top-level elements.
+
+def create_head_block(device_type: str, hostname: str, username: str, password: str) -> str:
+    """Generate Terraform provider authentication block for a specific device.
+
+    Creates a provider block with connection details (host, port, credentials)
+    for a Junos device.
+
+    Args:
+        device_type: Device type suffix (e.g., 'qfx', 'srx').
+        hostname: Device hostname or IP address.
+        username: NETCONF/SSH username.
+        password: NETCONF/SSH password.
+
+    Returns:
+        Terraform provider block with authentication details.
     """
     provider_block = ""
 
@@ -201,16 +278,29 @@ provider "junos-{device_type}" {{
 """
     return provider_block
 
-# Generates a Terraform-style resource block for the given parsed data.
-def generate_hcl_resources(parsed_data, device_type, hostname, group_name, apply_group):
+
+def generate_hcl_resources(parsed_data: dict, device_type: str, hostname: str, group_name: str, apply_group: bool) -> str:
+    """Generate Terraform resource block for configuration data.
+
+    Converts parsed configuration dictionary into a HCL resource block
+    with provider alias and resource attributes.
+
+    Args:
+        parsed_data: Parsed configuration dictionary with keys and HCL-formatted values.
+        device_type: Device type suffix for resource and provider names.
+        hostname: Hostname for resource naming.
+        group_name: Configuration group name (e.g., 'base-config', group names).
+        apply_group: Whether this group should be applied (for commenting).
+
+    Returns:
+        Terraform resource block as formatted string.
     """
-    Generates a single Terraform-style resource block combining all top-level elements.
-    """
+    del apply_group
     resource_block = ""
 
     if group_name == "base-config":
         resource_block += f'resource "terraform-provider-junos-{device_type}" "{hostname}-base-config" {{\n'
-        resource_block += f'  resource_name = "base-config"\n'
+        resource_block += '  resource_name = "base-config"\n'
     else:
         resource_block += f'resource "terraform-provider-junos-{device_type}" "{hostname}-{group_name}" {{\n'
         resource_block += f'  resource_name = "{group_name}"\n'
@@ -224,10 +314,21 @@ def generate_hcl_resources(parsed_data, device_type, hostname, group_name, apply
     return resource_block
 
 
-def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
-    """
-    Parses an XML file and converts it to Terraform-style HCL resources.
-    Starts from <configuration> if under <rpc-reply> and removes <version> if present.
+def parse_xml_to_hcl(xml_file: str, device_type: str, hostname: str, type_lookup: dict) -> str:
+    """Parse XML configuration file and convert to Terraform HCL resource blocks.
+
+    Extracts <configuration>, groups, and apply-groups from XML; parses each
+    element recursively; and generates corresponding Terraform resource blocks.
+    Handles multiple group configurations and base-config resources separately.
+
+    Args:
+        xml_file: Path to XML configuration file.
+        device_type: Device type suffix for resource/provider names.
+        hostname: Hostname for resource naming.
+        type_lookup: Dictionary mapping normalized paths to type information.
+
+    Returns:
+        String containing one or more Terraform resource blocks (HCL format).
     """
     try:
         # Read the XML file content
@@ -248,7 +349,7 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
         if config_node is not None:
             # Replace root with configuration node
             root = config_node
-        
+
         groups = []
         apply_groups = []
 
@@ -273,7 +374,6 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
             root.remove(version_node)
 
         # Parse elements starting from the new root
-        parsed_data = {}
         resources = []
         # Build base resource from root-level config (now excluding groups and apply-groups)
         base_data = {}
@@ -284,7 +384,15 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
                 continue
             base_data[tag] = value
 
-        resources.append(generate_hcl_resources(base_data, device_type, hostname, group_name="base-config", apply_group=True))
+        resources.append(
+            generate_hcl_resources(
+                base_data,
+                device_type,
+                hostname,
+                group_name="base-config",
+                apply_group=True,
+            )
+        )
 
         for group_name, group_node in groups:
             group_data = {"groups": {}}
@@ -305,7 +413,13 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
                 if key == "name":
                     del group_data[key]
 
-            group_resource = generate_hcl_resources(group_data, device_type, hostname, group_name, apply_group=should_apply)
+            group_resource = generate_hcl_resources(
+                group_data,
+                device_type,
+                hostname,
+                group_name,
+                apply_group=should_apply,
+            )
             if not should_apply:
                 # Comment out if group not applied
                 group_resource = '\n'.join([f'# {line}' for line in group_resource.splitlines()])
@@ -317,7 +431,19 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
         print(f"Error parsing XML: {e}")
         return None
 
-def main():
+
+def main() -> None:
+    """Generate Terraform .tf resource files from XML configuration using JSON schema.
+
+    Parses command-line arguments for trimmed JSON schema (from jtaf-yang2go) and
+    XML config files, generates Terraform provider blocks and resource definitions,
+    writes outputs to a specified directory.
+
+    Output files:
+        providers.tf – Terraform provider configuration (created/updated idempotently)
+        <hostname>-base-config.tf – Base configuration resources
+        <hostname>-<group>.tf – Per-group configuration resources (optional)
+    """
     parser = argparse.ArgumentParser(
         description='Generate Terraform .tf resources from XML using trimmed schema.',
         exit_on_error=True,
@@ -348,7 +474,7 @@ def main():
         help='Output directory for generated providers.tf and .tf files.',
     )
 
-    ## Add optional options to take in username and password
+    # Add optional options to take in username and password.
     parser.add_argument('-u', '--username', help='Username to place in generated provider blocks.')
     parser.add_argument('-p', '--password', help='Password to place in generated provider blocks.')
     args = parser.parse_args()
@@ -377,21 +503,21 @@ def main():
 
     # Using the trimmed json schema, build map of path to its type
     type_lookup = build_type_map(config_node)
-    
+
     # --- Normalize schema lookup to match normalized XML paths ---
     normalized_type_lookup = {}
     for key, val in type_lookup.items():
         normalized_type_lookup[normalize_tag(key)] = val
     type_lookup = normalized_type_lookup
 
-    # Traverse xml to create HCL resources
-    # Create provider source block in providers.tf 
+    # Traverse xml to create HCL resources.
+    # Create provider source block in providers.tf.
     directory = args.directory
     provider_file = f"{directory}/providers.tf"
     if os.path.exists(provider_file):
         with open(provider_file, "r") as f:
             provider_block = f.read()
-        
+
         # Edit the provider block to include device type (idempotent)
         provider_block = edit_provider_block(device_type, provider_block)
 
@@ -417,7 +543,10 @@ def main():
                 with open(provider_file, "a") as f:
                     f.write("\n" + head_block)
             else:
-                print(f"\n  -> Skipping provider block for hostname '{hostname}' (already exists).\n")
+                print(
+                    f"\n  -> Skipping provider block for hostname '{hostname}' "
+                    "(already exists).\n"
+                )
 
         # Write per-device .tf file
         hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup)
@@ -427,6 +556,7 @@ def main():
             with open(filename, "w") as f:
                 f.write(hcl_output)
             print(f"   --->  DONE: Wrote output to {filename}\n")
+
 
 if __name__ == "__main__":
     main()

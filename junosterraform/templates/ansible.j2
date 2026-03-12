@@ -1,5 +1,6 @@
 {############# COMMON VARIABLES # STARTS ################}
 {%- set parent_list = data['root']['children'][0]['children']%}
+{%- set jtaf_root_var = 'jtaf_effective' -%}
 
 {############### COMMON VARIABLES # ENDS ####################}
 
@@ -17,7 +18,7 @@
 {% if indexvar -%}
 {%- set var1 = indexvar -%}
 {%- else -%}
-{%- set var1= path -%}
+{%- set var1 = jtaf_root_var + '.' + path -%}
 {%- endif -%}
 {%- set name_prepared = preparename(name) -%}
 {{- '\n'+' '*4*level}}{{'{%-'}} if {{ path2variable(var1 + '.' + name_prepared) }} is defined {{'%}'}}
@@ -46,7 +47,7 @@
 			{%- set pathvar=indexvar -%}
 		{# INDEXVAR ELSE #}
 		{%- else -%}
-			{%- set pathvar=path2variable(ele.path) -%}
+			{%- set pathvar = jtaf_root_var + '.' + path2variable(ele.path) -%}
 		{# INDEXVAR ENDIF #}
 		{%- endif -%}
 
