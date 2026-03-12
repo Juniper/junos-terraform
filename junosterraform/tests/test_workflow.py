@@ -236,6 +236,7 @@ def test_yang2ansible():
 
         for derived_group in derived_groups:
             group_vars_dir = derived_group
+            is_device_group = derived_group.startswith("device_")
             if derived_group.startswith("device_"):
                 group_vars_dir = derived_group.replace("device_", "", 1)
 
@@ -245,8 +246,15 @@ def test_yang2ansible():
                 group_vars_dir,
                 "all.yml",
             )
+
+            if is_device_group:
+                # device_<type> inventory groups are always emitted, but
+                # group_vars/<type>/all.yml is only created when conflicting
+                # keys spill over from group_vars/all.yml.
+                continue
+
             assert os.path.exists(device_group_vars_file), (
-                f"Expected device group vars file not found: {device_group_vars_file}"
+                f"Expected derived group vars file not found: {device_group_vars_file}"
             )
 
         # Generated role should use hierarchy merge flow and merge directive filter.

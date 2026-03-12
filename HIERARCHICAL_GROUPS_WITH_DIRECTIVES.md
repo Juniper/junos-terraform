@@ -9,7 +9,7 @@ This approach provides:
 1. **✅ No JTAF containers** - Variables are flat (no `jtaf_shared` or `jtaf_override` wrappers)
 2. **✅ Device-type hierarchy** - Variables organized by device type (QFX, SRX, MX, etc.)
 3. **✅ Replace as default** - Scalar values replace by default; lists can be customized per-key
-4. **✅ Automatic device detection** - Device type extracted from XML config 
+4. **✅ Role-type driven grouping** - Device type comes from `-t/--type` or trimmed schema path inference
 5. **✅ Merge directives** - Optional `_merge_directive` meta-instructions for per-key control
 6. **✅ Clean separation** - Global defaults, device-type overrides, host-specific deltas
 
@@ -20,11 +20,12 @@ This approach provides:
 ```bash
 cd /path/to/ansible-provider-junos-qfx
 
-# Generate YAML with automatic device type detection
+# Generate YAML with explicit role type
 jtaf-xml2yaml \
   -j trimmed_schema.json \
   -x dc1-spine1.xml dc1-spine2.xml dc1-leaf1.xml dc1-leaf2.xml \
-  -d .
+  -d . \
+  -t qfx
 ```
 
 ### 2. Generated Directory Structure
@@ -33,7 +34,7 @@ jtaf-xml2yaml \
 ansible-provider-junos-qfx/
 ├── group_vars/
 │   ├── all.yml                    # Global defaults (all hosts)
-│   └── device_qfx/
+│   └── qfx/
 │       └── all.yml               # QFX-specific defaults
 ├── host_vars/
 │   ├── dc1-spine1.yaml           # Spine1 device config (delta only)
@@ -54,7 +55,7 @@ Merge order in playbook (precedence from lowest to highest):
 ```
 group_vars/all.yml
         ↓
-group_vars/device_qfx/all.yml
+group_vars/qfx/all.yml
         ↓
 host_vars/dc1-spine1.yaml
         ↓
@@ -67,7 +68,7 @@ The merge order (precedence from lowest to highest) is:
 
 ```
 1. group_vars/all.yml              (global defaults - all hosts)
-2. group_vars/device_<type>/all.yml (e.g., device_qfx, device_srx)
+2. group_vars/<type>/all.yml       (e.g., qfx, srx)
 3. host_vars/<hostname>.yaml       (host-specific overrides - device delta)
 ```
 
@@ -103,7 +104,7 @@ syslog:
       port: 514
 ```
 
-### Example: group_vars/device_qfx/all.yml (Device Type Specific)
+### Example: group_vars/qfx/all.yml (Device Type Specific)
 
 QFX-specific defaults that override global values:
 
@@ -204,44 +205,17 @@ interfaces:
     address: 10.0.1.0/31
 ```
 
-## Device Type Detection
+## Device Type Selection
 
-Device type is automatically detected from the XML configuration and used to:
-1. Create `group_vars/device_<type>/all.yml` group
-2. Assign host to appropriate inventory group
-3. Enable device-type-specific defaults in the playbook
+`jtaf-xml2yaml` resolves the active role type in this order:
+1. `-t/--type` when provided
+2. Inference from `ansible-provider-junos-<type>/trimmed_schema.json` parent path
+3. Fallback structural grouping if neither source is available
 
-### Supported Device Types
-
-Detected from `system.product_name` or `chassis.product_name`:
-
-- `qfx` - QFX series (data center switches)
-- `srx` - SRX series (security appliances)  
-- `mx` - MX series (core routers)
-- `ptx` - PTX series (packet transport)
-- `acx` - ACX series (access routers)
-- `ex` - EX series (ethernet switches)
-
-**Examples:**
-- `Juniper Networks QFX5100-96S` → device type: `qfx`
-- `SRX1500` → device type: `srx`
-- `MX480` → device type: `mx`
-
-**Implementation:** `junosterraform/jtaf-xml2yaml` → `detect_device_type()` function
-
-### Customizing Device Detection
-
-Edit `detect_device_type()` in `junosterraform/jtaf-xml2yaml` to add custom logic:
-
-```python
-def detect_device_type(xml_dict: dict[str, Any]) -> Optional[str]:
-    """Detect device type from XML config."""
-    if "system" in xml_dict and isinstance(xml_dict["system"], dict):
-        product_name = xml_dict["system"].get("product_name", "").lower()
-        if "custom_device" in product_name:
-            return "custom"
-    return None
-```
+Role type is used to:
+1. Write type-specific overrides under `group_vars/<type>/all.yml`
+2. Populate inventory group `[device_<type>]`
+3. Keep multi-run merge behavior deterministic across roles
 
 ## Inventory Generation
 
@@ -387,7 +361,7 @@ config:
 ```bash
 jtaf-xml2yaml --help
 
-  -j, --json-schema JSON_FILE
+  -j, --trimmed_json JSON_FILE
         Path to trimmed_schema.json (required)
 
   -x, --xml-config FILE [FILE ...]
@@ -396,9 +370,20 @@ jtaf-xml2yaml --help
   -d, --directory DIR
         Output directory for host_vars, group_vars, and hosts (required)
 
+    -t, --type TYPE
+      Role type used during jtaf-yang2ansible generation (recommended)
+
+    --hosts-file PATH
+      Optional inventory path; defaults to <directory>/hosts
+
+    --group-vars-dir PATH
+      Optional group_vars path; defaults to <directory>/group_vars
+
+    --host-vars-dir PATH
+      Optional host_vars path; defaults to <directory>/host_vars
+
   --auto-detect-hierarchy
-        Automatically detect device types from XML and create device-type groups
-        (enabled by default)
+      Legacy compatibility flag (currently enabled by default)
 ```
 
 ### Examples
@@ -409,15 +394,14 @@ jtaf-yang2ansible -p ~/yang/common ~/yang/junos-qfx/conf/*.yang \
   -x config1.xml config2.xml -t qfx
 
 # Generate host_vars and group_vars from XML configs
-jtaf-xml2yaml -j trimmed_schema.json -x *.xml -d .
+jtaf-xml2yaml -j trimmed_schema.json -x *.xml -d . -t qfx
 
-# Generate with explicit device detection
-jtaf-xml2yaml -j trimmed_schema.json -x dc1-*.xml -d dc1_vars --auto-detect-hierarchy
+# Generate into a separate playbook workspace
+jtaf-xml2yaml -j trimmed_schema.json -x dc1-*.xml -d ansible-provider-junos-qfx -t qfx \
+  --hosts-file deploy/inventory.ini --group-vars-dir deploy/group_vars --host-vars-dir deploy/host_vars
 ```
 
 ## Workflow Example: Multi-Datacenter EVPN/VXLAN
-
-See [HIERARCHICAL_GROUPS_EXAMPLE.md](./examples/HIERARCHICAL_GROUPS_EXAMPLE.md) for a complete working example using the EVPN/VXLAN sample data.
 
 Quick reference:
 
