@@ -231,13 +231,18 @@ def test_yang2ansible():
         with open(hosts_file) as f:
             hosts_text = f.read()
         assert "[all]" in hosts_text, "Expected [all] group in generated inventory"
-        detected_device_groups = re.findall(r"^\[device_([^\]]+)\]$", hosts_text, flags=re.MULTILINE)
+        derived_groups = re.findall(r"^\[([^\]]+)\]$", hosts_text, flags=re.MULTILINE)
+        derived_groups = [group for group in derived_groups if group != "all"]
 
-        for device_group in detected_device_groups:
+        for derived_group in derived_groups:
+            group_vars_dir = derived_group
+            if derived_group.startswith("device_"):
+                group_vars_dir = derived_group.replace("device_", "", 1)
+
             device_group_vars_file = os.path.join(
                 ansible_files_dir,
                 "group_vars",
-                device_group,
+                group_vars_dir,
                 "all.yml",
             )
             assert os.path.exists(device_group_vars_file), (

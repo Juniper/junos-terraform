@@ -3,6 +3,7 @@ import argparse
 import copy
 import json
 import os
+import re
 import yaml
 from xml.etree import ElementTree
 from typing import Any, Optional
@@ -200,10 +201,50 @@ def build_group_shared_payload(payloads: list[dict[str, Any]]) -> dict[str, Any]
     return build_shared_payload(payloads)
 
 
+def _collect_paths(value: Any, prefix: str = "") -> set[str]:
+    """Collect structural dotted paths present in payload for signature grouping."""
+    paths: set[str] = set()
+
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            next_prefix = f"{prefix}.{key}" if prefix else key
+            paths.add(next_prefix)
+            paths |= _collect_paths(nested, next_prefix)
+    elif isinstance(value, list):
+        list_prefix = f"{prefix}[]" if prefix else "[]"
+        paths.add(list_prefix)
+        for item in value:
+            if isinstance(item, (dict, list)):
+                paths |= _collect_paths(item, list_prefix)
+
+    return paths
+
+
+def payload_signature(payload: dict[str, Any]) -> tuple[str, ...]:
+    """Build deterministic structural signature from filtered payload paths."""
+    return tuple(sorted(_collect_paths(payload)))
+
+
+def detect_role_label(hostname: str) -> Optional[str]:
+    """Detect a role label from hostname conventions (leaf/spine/borderleaf)."""
+    lowered = hostname.lower()
+    for role in ["borderleaf", "leaf", "spine", "gateway", "rr"]:
+        if re.search(rf"(^|[-_]){role}(\d+)?($|[-_])", lowered):
+            return role
+    return None
+
+
+def sanitize_group_name(name: str) -> str:
+    """Normalize group names for inventory and filesystem safety."""
+    sanitized = re.sub(r"[^a-zA-Z0-9_]+", "_", name.strip().lower()).strip("_")
+    return sanitized or "common"
+
+
 def extract_hierarchy_groups(
-    host_entries: list[tuple[str, dict[str, Any], Optional[str]]]
+    host_entries: list[tuple[str, dict[str, Any], Optional[str]]],
+    role_type: Optional[str] = None,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Extract groups organized by device type.
+    """Extract groups organized by structural commonality.
 
     Args:
         host_entries: List of (hostname, payload, device_type) tuples.
@@ -212,19 +253,63 @@ def extract_hierarchy_groups(
         Dict with structure:
         {
             "all": [all payloads],
-            "device_type:<type>": [payloads for that device type],
+            "group:<name>": [payloads for each commonality group],
         }
     """
     groups: dict[str, list[dict[str, Any]]] = {"all": []}
+    if role_type:
+        device_type = sanitize_group_name(role_type)
+        for _hostname, payload, _device_type in host_entries:
+            groups["all"].append(payload)
+        groups[f"device_type:{device_type}"] = list(groups["all"])
+        return groups
 
-    for _hostname, payload, device_type in host_entries:
+    normalized_entries = []
+    for hostname, payload, device_type in host_entries:
         groups["all"].append(payload)
+        role_label = detect_role_label(hostname)
+        label = role_label
+        normalized_entries.append(
+            {
+                "hostname": hostname,
+                "payload": payload,
+                "label": label,
+                "signature": payload_signature(payload),
+            }
+        )
 
-        if device_type:
-            group_key = f"device_type:{device_type}"
-            if group_key not in groups:
-                groups[group_key] = []
-            groups[group_key].append(payload)
+    signature_groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for entry in normalized_entries:
+        signature_groups.setdefault(entry["signature"], []).append(entry)
+
+    used_names: set[str] = set()
+    for index, (_signature, entries) in enumerate(signature_groups.items(), start=1):
+        if len(entries) < 2:
+            continue
+
+        labels = {entry["label"] for entry in entries}
+        labels.discard(None)
+
+        if labels and len(labels) == 1 and all(entry["label"] in labels for entry in entries):
+            base_name = sanitize_group_name(next(iter(labels)))
+        else:
+            common_top_keys = set(entries[0]["payload"].keys())
+            for entry in entries[1:]:
+                common_top_keys &= set(entry["payload"].keys())
+            if common_top_keys:
+                key_hint = "_".join(sorted(common_top_keys)[:2])
+                base_name = sanitize_group_name(f"common_{key_hint}")
+            else:
+                base_name = f"signature_{index}"
+
+        candidate = base_name
+        suffix = 1
+        while candidate in used_names or candidate == "all":
+            suffix += 1
+            candidate = f"{base_name}_{suffix}"
+        used_names.add(candidate)
+
+        groups[f"group:{candidate}"] = [entry["payload"] for entry in entries]
 
     return groups
 
@@ -261,8 +346,62 @@ def write_yaml_file(output_path: str, payload: dict[str, Any]) -> None:
         f.write(yaml_output)
 
 
+def load_yaml_file(input_path: str) -> dict[str, Any]:
+    """Load a YAML mapping file and return an empty dict when missing/empty."""
+    if not os.path.exists(input_path):
+        return {}
+    with open(input_path, "r") as f:
+        data = yaml.safe_load(f) or {}
+    return data if isinstance(data, dict) else {}
+
+
+def merge_all_first_writer_wins(
+    group_vars_root: str,
+    incoming_shared: dict[str, Any],
+) -> dict[str, Any]:
+    """Merge top-level shared values into all.yml and return conflicting keys.
+
+    Existing keys in all.yml win. Conflicting incoming keys are returned so
+    caller can place them into device-specific override files.
+    """
+    all_file = os.path.join(group_vars_root, "all.yml")
+    existing_all = load_yaml_file(all_file)
+    merged_all = copy.deepcopy(existing_all)
+    conflicts: dict[str, Any] = {}
+
+    for key, value in incoming_shared.items():
+        if key not in merged_all:
+            merged_all[key] = copy.deepcopy(value)
+            continue
+        if merged_all[key] != value:
+            conflicts[key] = copy.deepcopy(value)
+
+    write_yaml_file(all_file, merged_all)
+    return conflicts
+
+
+def merge_device_override(
+    group_vars_root: str,
+    device_type: str,
+    override_payload: dict[str, Any],
+) -> None:
+    """Merge conflicting top-level keys into group_vars/<device_type>/all.yml."""
+    if not override_payload:
+        return
+
+    override_file = os.path.join(group_vars_root, device_type, "all.yml")
+    existing_override = load_yaml_file(override_file)
+    merged_override = copy.deepcopy(existing_override)
+
+    # Device-specific conflicts should override previous values for this type.
+    for key, value in override_payload.items():
+        merged_override[key] = copy.deepcopy(value)
+
+    write_yaml_file(override_file, merged_override)
+
+
 def write_host_vars_flat(
-    output_dir: str,
+    host_vars_root: str,
     hostname: str,
     host_payload: dict[str, Any],
     shared_payload: dict[str, Any],
@@ -276,12 +415,12 @@ def write_host_vars_flat(
         delta_payload = {}
 
     yaml_file_name = hostname + ".yaml"
-    output_path = os.path.join(output_dir, "host_vars", yaml_file_name)
+    output_path = os.path.join(host_vars_root, yaml_file_name)
     write_yaml_file(output_path, delta_payload)
 
 
 def write_group_vars_flat(
-    output_dir: str,
+    group_vars_root: str,
     group_name: str,
     shared_payload: dict[str, Any],
 ) -> None:
@@ -293,14 +432,150 @@ def write_group_vars_flat(
     if not shared_payload:
         return  # Don't create empty files
 
-    # For device type groups, write to group_vars/<device_type>/all.yml
-    if group_name.startswith("device_type:"):
+    # For derived groups, write to group_vars/<group>/all.yml.
+    if group_name.startswith("group:"):
+        group = group_name.split(":", 1)[1]
+        output_path = os.path.join(group_vars_root, group, "all.yml")
+    elif group_name.startswith("device_type:"):
+        # Backward-compatible path support for previously generated names.
         device_type = group_name.split(":", 1)[1]
-        output_path = os.path.join(output_dir, "group_vars", device_type, "all.yml")
+        output_path = os.path.join(group_vars_root, device_type, "all.yml")
     else:
-        output_path = os.path.join(output_dir, "group_vars", "all.yml")
+        output_path = os.path.join(group_vars_root, "all.yml")
 
     write_yaml_file(output_path, shared_payload)
+
+
+def load_schema(trimmed_json_file: str) -> dict[str, Any]:
+    """Load and validate trimmed schema content."""
+    with open(trimmed_json_file, 'r') as f:
+        schema = json.load(f)
+
+    has_configuration = any(
+        child.get("name") == "configuration"
+        for child in schema.get("root", {}).get("children", [])
+    )
+    if not has_configuration:
+        raise ValueError("No configuration node found in JSON schema")
+    return schema
+
+
+def parse_host_entries(
+    xml_files: list[str],
+    schema: dict[str, Any],
+) -> list[tuple[str, dict[str, Any], Optional[str]]]:
+    """Parse XML input files into normalized host entry tuples."""
+    host_entries = []
+    for xml_file in xml_files:
+        host_entries.append(parse_xml_to_payload(xml_file, schema))
+    return host_entries
+
+
+def infer_role_type_from_trimmed_json(trimmed_json_file: str) -> Optional[str]:
+    """Infer role type from generated role path when possible.
+
+    Expected generated role directory format:
+        ansible-provider-junos-<type>/trimmed_schema.json
+    """
+    parent_dir = os.path.basename(os.path.dirname(os.path.abspath(trimmed_json_file)))
+    prefix = "ansible-provider-junos-"
+    if parent_dir.startswith(prefix):
+        inferred = parent_dir[len(prefix):]
+        return inferred if inferred else None
+    return None
+
+
+def build_inventory_groups(
+    host_entries: list[tuple[str, dict[str, Any], Optional[str]]],
+    groups: dict[str, list[dict[str, Any]]],
+) -> dict[str, list[str]]:
+    """Build inventory group memberships for generated commonality groups."""
+    signature_to_hosts: dict[tuple[str, ...], list[tuple[str, dict[str, Any]]]] = {}
+    for hostname, payload, _device_type in host_entries:
+        signature_to_hosts.setdefault(payload_signature(payload), []).append((hostname, payload))
+
+    inventory_groups: dict[str, list[str]] = {}
+    for group_name, payloads in groups.items():
+        if group_name.startswith("group:"):
+            inventory_group_name = group_name.split(":", 1)[1]
+        elif group_name.startswith("device_type:"):
+            inventory_group_name = f"device_{group_name.split(':', 1)[1]}"
+        else:
+            continue
+
+        payload_ids = {id(payload) for payload in payloads}
+        members: list[str] = []
+        for entries in signature_to_hosts.values():
+            for hostname, payload in entries:
+                if id(payload) in payload_ids:
+                    members.append(hostname)
+
+        if members:
+            inventory_groups[inventory_group_name] = sorted(set(members))
+
+    return inventory_groups
+
+
+def _load_existing_inventory(inventory_path: str) -> dict[str, list[str]]:
+    """Load existing INI-like inventory groups from hosts file if present."""
+    if not os.path.exists(inventory_path):
+        return {}
+
+    groups: dict[str, list[str]] = {}
+    current_group: Optional[str] = None
+
+    with open(inventory_path, "r") as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped.startswith("[") and stripped.endswith("]"):
+                current_group = stripped[1:-1]
+                groups.setdefault(current_group, [])
+                continue
+            if current_group:
+                host = stripped.split()[0]
+                if host:
+                    groups[current_group].append(host)
+
+    return groups
+
+
+def _merge_hosts(existing: list[str], new_hosts: list[str]) -> list[str]:
+    """Merge host lists preserving first-seen order without duplicates."""
+    merged = []
+    seen: set[str] = set()
+    for host in existing + new_hosts:
+        if host not in seen:
+            seen.add(host)
+            merged.append(host)
+    return merged
+
+
+def write_inventory(
+    hosts_file: str,
+    hostnames: list[str],
+    inventory_groups: dict[str, list[str]],
+) -> None:
+    """Write or update hosts inventory including derived groups."""
+    existing_groups = _load_existing_inventory(hosts_file)
+
+    merged_groups = dict(existing_groups)
+    merged_groups["all"] = _merge_hosts(existing_groups.get("all", []), hostnames)
+
+    for group_name, hosts in inventory_groups.items():
+        merged_groups[group_name] = _merge_hosts(existing_groups.get(group_name, []), hosts)
+
+    with open(hosts_file, "w") as f:
+        f.write("[all]\n")
+        for hostname in merged_groups.get("all", []):
+            f.write(f"{hostname}\n")
+
+        other_groups = [g for g in merged_groups.keys() if g != "all"]
+        for group_name in other_groups:
+            f.write(f"\n[{group_name}]\n")
+            for hostname in merged_groups[group_name]:
+                f.write(f"{hostname}\n")
 
 
 def main() -> None:
@@ -340,6 +615,27 @@ def main() -> None:
         help='Output directory for hosts file and host_vars/*.yaml.',
     )
     parser.add_argument(
+        '--hosts-file',
+        default=None,
+        help='Optional path to inventory hosts file. Defaults to <directory>/hosts.',
+    )
+    parser.add_argument(
+        '--host-vars-dir',
+        default=None,
+        help='Optional host_vars directory. Defaults to <directory>/host_vars.',
+    )
+    parser.add_argument(
+        '--group-vars-dir',
+        default=None,
+        help='Optional group_vars directory. Defaults to <directory>/group_vars.',
+    )
+    parser.add_argument(
+        '-t',
+        '--type',
+        default=None,
+        help='Role type used during jtaf-yang2ansible generation. Overrides path inference.',
+    )
+    parser.add_argument(
         '--auto-detect-hierarchy',
         action='store_true',
         default=True,
@@ -347,71 +643,63 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    trimmed_json_file = args.trimmed_json
-    xml_files = args.xml_config
-
-    # --- Load JSON schema ---
-    with open(trimmed_json_file, 'r') as f:
-        schema = json.load(f)
-    config_node = None
-    for child in schema["root"]["children"]:
-        if child["name"] == "configuration":
-            config_node = child
-            break
-    if not config_node:
-        raise ValueError("No configuration node found in JSON schema")
-
+    schema = load_schema(args.trimmed_json)
     directory = args.directory
+    hosts_file = args.hosts_file or os.path.join(directory, "hosts")
+    host_vars_dir = args.host_vars_dir or os.path.join(directory, "host_vars")
+    group_vars_dir = args.group_vars_dir or os.path.join(directory, "group_vars")
 
-    # --- Parse all XML files ---
-    host_entries = []
-    for xml_file in xml_files:
-        hostname, payload, device_type = parse_xml_to_payload(xml_file, schema)
-        host_entries.append((hostname, payload, device_type))
+    os.makedirs(os.path.dirname(hosts_file) or ".", exist_ok=True)
+    os.makedirs(host_vars_dir, exist_ok=True)
+    os.makedirs(group_vars_dir, exist_ok=True)
+    host_entries = parse_host_entries(args.xml_config, schema)
 
-    # Generate hierarchical group_vars with device type detection
-    print("Generating hierarchical group_vars with device type detection...")
+    # Generate hierarchical group_vars based on structural commonality.
+    print("Generating hierarchical group_vars with structural commonality detection...")
 
-    # Extract groups by device_type and role
-    groups = extract_hierarchy_groups(host_entries)
+    resolved_role_type = args.type or infer_role_type_from_trimmed_json(args.trimmed_json)
 
-    # Build and write shared payloads for each group
+    # Extract groups using role type when available; otherwise fallback to structural groups.
+    groups = extract_hierarchy_groups(host_entries, role_type=resolved_role_type)
+
+    # Build per-group shared payloads once so we can apply cross-run merge policy.
+    shared_payloads: dict[str, dict[str, Any]] = {}
     for group_name, group_payloads in groups.items():
         shared_payload = build_group_shared_payload(group_payloads)
-        write_group_vars_flat(directory, group_name, shared_payload)
+        shared_payloads[group_name] = shared_payload
         print(f"  {group_name}: {len(group_payloads)} hosts, {len(shared_payload)} keys")
 
-    # Build the global shared payload for calculating host deltas
-    global_shared_payload = groups.get("all", [])
-    if global_shared_payload:
-        global_shared_payload = build_shared_payload(global_shared_payload)
-    else:
-        global_shared_payload = {}
+    # Always merge top-level shared values into all.yml with first-writer-wins.
+    all_shared_payload = shared_payloads.get("all", {})
+    conflict_payload: dict[str, Any] = merge_all_first_writer_wins(
+        group_vars_dir,
+        all_shared_payload,
+    )
 
-    # Write host vars as deltas from global shared
+    # Conflicts from all.yml are written under device type override for this run.
+    device_group_names = [
+        name for name in shared_payloads.keys() if name.startswith("device_type:")
+    ]
+    if device_group_names:
+        active_device_type = device_group_names[0].split(":", 1)[1]
+        merge_device_override(group_vars_dir, active_device_type, conflict_payload)
+
+    # Write any additional derived groups (non-all/non-device_type) as before.
+    for group_name, shared_payload in shared_payloads.items():
+        if group_name == "all" or group_name.startswith("device_type:"):
+            continue
+        write_group_vars_flat(group_vars_dir, group_name, shared_payload)
+
+    # Build the global shared payload for calculating host deltas.
+    global_shared_payload = all_shared_payload if all_shared_payload else {}
+
     hostnames = []
-    device_groups: dict[str, list[str]] = {}
-
-    for hostname, payload, device_type in host_entries:
+    for hostname, payload, _device_type in host_entries:
         hostnames.append(hostname)
-        write_host_vars_flat(directory, hostname, payload, global_shared_payload)
+        write_host_vars_flat(host_vars_dir, hostname, payload, global_shared_payload)
 
-        if device_type:
-            if device_type not in device_groups:
-                device_groups[device_type] = []
-            device_groups[device_type].append(hostname)
-
-    # Generate inventory with groups
-    with open(os.path.join(directory, "hosts"), "w") as f:
-        f.write("[all]\n")
-        for hostname in hostnames:
-            f.write(f"{hostname}\n")
-
-        # Device type groups
-        for device_type, hosts in sorted(device_groups.items()):
-            f.write(f"\n[device_{device_type}]\n")
-            for hostname in hosts:
-                f.write(f"{hostname}\n")
+    inventory_groups = build_inventory_groups(host_entries, groups)
+    write_inventory(hosts_file, hostnames, inventory_groups)
 
 
 if __name__ == "__main__":

@@ -9,8 +9,22 @@ on:
 jobs:
   build-and-apply:
     runs-on: ubuntu-latest
+    env:
+      WORK_DIR: .ci-work-${{ matrix.python-version }}
+      ROLE_DIR: .ci-work-${{ matrix.python-version }}/ansible-provider-junos-vqfx-evpn-vxlan
+      YAML_DIR: .ci-work-${{ matrix.python-version }}/ci-evpn-vxlan-ansible
+      PID_FILE: .netconf_mock.${{ matrix.python-version }}.pid
+      MOCK_LOG: netconf-mock-${{ matrix.python-version }}.log
+      MOCK_STATE: netconf-mock-state-${{ matrix.python-version }}.json
+      ANSIBLE_INITIAL_LOG: ansible-initial-${{ matrix.python-version }}.log
+      ANSIBLE_RERUN_LOG: ansible-rerun-${{ matrix.python-version }}.log
+      ANSIBLE_MUTATED_LOG: ansible-mutated-${{ matrix.python-version }}.log
+      ANSIBLE_RECONCILE_LOG: ansible-reconcile-${{ matrix.python-version }}.log
+      ANSIBLE_NEGATIVE_LOG: ansible-negative-${{ matrix.python-version }}.log
+      ANSIBLE_DEBUG_LOG: ansible-debug-${{ matrix.python-version }}.log
     strategy:
       fail-fast: false
+      max-parallel: ${{ github.actor == 'nektos/act' && 1 || 2 }}
       matrix:
         python-version: ["3.10", "3.x"]
 
@@ -42,73 +56,104 @@ jobs:
 
     - name: Generate Ansible provider role with jtaf-yang2ansible
       run: |
-        rm -rf ansible-provider-junos-vqfx-evpn-vxlan
+        set -euo pipefail
+        mkdir -p "$WORK_DIR"
+        rm -rf "$ROLE_DIR"
+        rm -rf "$WORK_DIR"/ansible-provider-junos-*
 
-        jtaf-yang2ansible \
-          -p examples/yang/18.2/18.2R3/common \
-          examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang \
-          -x \
-          examples/evpn-vxlan-dc/dc1/dc1-borderleaf1.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-borderleaf2.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-leaf2.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-leaf3.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-spine1.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-spine2.xml \
-          examples/evpn-vxlan-dc/dc2/dc2-spine1.xml \
-          examples/evpn-vxlan-dc/dc2/dc2-spine2.xml \
-          -t vqfx-evpn-vxlan
+        (
+          cd "$WORK_DIR"
+          jtaf-yang2ansible \
+            -p ../examples/yang/18.2/18.2R3/common \
+            ../examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang \
+            -x \
+            ../examples/evpn-vxlan-dc/dc1/dc1-borderleaf1.xml \
+            ../examples/evpn-vxlan-dc/dc1/dc1-borderleaf2.xml \
+            ../examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml \
+            ../examples/evpn-vxlan-dc/dc1/dc1-leaf2.xml \
+            ../examples/evpn-vxlan-dc/dc1/dc1-leaf3.xml \
+            ../examples/evpn-vxlan-dc/dc1/dc1-spine1.xml \
+            ../examples/evpn-vxlan-dc/dc1/dc1-spine2.xml \
+            ../examples/evpn-vxlan-dc/dc2/dc2-spine1.xml \
+            ../examples/evpn-vxlan-dc/dc2/dc2-spine2.xml \
+            -t vqfx-evpn-vxlan
+        )
+
+        # Resolve output robustly in case the generator emits a different
+        # ansible-provider-junos-* directory name for this matrix leg.
+        GENERATED_ROLE_DIR="$(find "$WORK_DIR" -maxdepth 3 -type f -name trimmed_schema.json -path '*/ansible-provider-junos-*/trimmed_schema.json' | head -n 1 | sed 's#/trimmed_schema.json$##')"
+        if [ -z "$GENERATED_ROLE_DIR" ]; then
+          echo "Unable to locate generated role output with trimmed_schema.json"
+          find "$WORK_DIR" -maxdepth 3 -type d -name 'ansible-provider-junos-*' -print || true
+          exit 1
+        fi
+
+        if [ "$GENERATED_ROLE_DIR" != "$ROLE_DIR" ]; then
+          mkdir -p "$WORK_DIR"
+          rm -rf "$ROLE_DIR"
+          mv "$GENERATED_ROLE_DIR" "$ROLE_DIR"
+        fi
 
     - name: Generate host YAML with jtaf-xml2yaml
       run: |
-        rm -rf ci-evpn-vxlan-ansible
+        set -euo pipefail
+        rm -rf "$YAML_DIR"
+
+        if [ ! -f "$ROLE_DIR/trimmed_schema.json" ]; then
+          echo "Expected schema not found at $ROLE_DIR/trimmed_schema.json"
+          find "$WORK_DIR" -maxdepth 4 -name trimmed_schema.json -print || true
+          ls -la "$WORK_DIR" || true
+          exit 1
+        fi
 
         jtaf-xml2yaml \
           -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml \
-          -j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json \
-          -d ci-evpn-vxlan-ansible
+          -j "$ROLE_DIR"/trimmed_schema.json \
+          -d "$YAML_DIR" \
+          -t vqfx-evpn-vxlan
 
     - name: Prepare generated role and CI playbook
       run: |
         set -euo pipefail
 
-        rm -rf ansible-provider-junos-vqfx-evpn-vxlan/host_vars
-        cp -R ci-evpn-vxlan-ansible/host_vars ansible-provider-junos-vqfx-evpn-vxlan/
+        rm -rf "$ROLE_DIR"/host_vars
+        cp -R "$YAML_DIR"/host_vars "$ROLE_DIR"/
 
-        rm -rf ansible-provider-junos-vqfx-evpn-vxlan/group_vars
-        cp -R ci-evpn-vxlan-ansible/group_vars ansible-provider-junos-vqfx-evpn-vxlan/
+        rm -rf "$ROLE_DIR"/group_vars
+        cp -R "$YAML_DIR"/group_vars "$ROLE_DIR"/
 
         python .github/scripts/prepare_ansible_mock_inventory.py \
-          --hosts-file ci-evpn-vxlan-ansible/hosts \
-          --inventory-file ansible-provider-junos-vqfx-evpn-vxlan/mock-inventory.ini \
-          --devices-file ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt \
+          --hosts-file "$YAML_DIR"/hosts \
+          --inventory-file "$ROLE_DIR"/mock-inventory.ini \
+          --devices-file "$ROLE_DIR"/mock-devices.txt \
           --bind-host 127.0.0.1 \
           --base-port 8301
 
         python .github/scripts/ansible_workflow/render_ci_netconf_playbook.py \
-          --roles-root ansible-provider-junos-vqfx-evpn-vxlan/roles \
+          --roles-root "$ROLE_DIR"/roles \
           --template-path .github/ansible/ci-netconf-playbook.yml.j2 \
-          --output-path ansible-provider-junos-vqfx-evpn-vxlan/ci-netconf-playbook.yml
+          --output-path "$ROLE_DIR"/ci-netconf-playbook.yml
 
     - name: Start NETCONF mock and wait for listeners
       run: |
         set -euo pipefail
+        mkdir -p "$WORK_DIR"
 
         nohup python netconf_mock/netconf_mock_server.py \
           --host 127.0.0.1 \
           --username ci-user \
           --password ci-password \
           --log-level INFO \
-          --devices-file ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt \
-          --state-dump netconf-mock-state.json \
-          > netconf-mock.log 2>&1 < /dev/null &
-        echo "$!" > .netconf_mock.pid
+          --devices-file "$ROLE_DIR"/mock-devices.txt \
+          --state-dump "$WORK_DIR/$MOCK_STATE" \
+          > "$WORK_DIR/$MOCK_LOG" 2>&1 < /dev/null &
+        echo "$!" > "$WORK_DIR/$PID_FILE"
 
         all_ready=0
         for _ in $(seq 1 30); do
-          if ! kill -0 "$(cat .netconf_mock.pid)" 2>/dev/null; then
+          if ! kill -0 "$(cat "$WORK_DIR/$PID_FILE")" 2>/dev/null; then
             echo "NETCONF mock exited during startup"
-            cat netconf-mock.log || true
+            cat "$WORK_DIR/$MOCK_LOG" || true
             exit 1
           fi
 
@@ -121,7 +166,7 @@ jobs:
               all_ready=0
               break
             fi
-          done < ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt
+          done < "$ROLE_DIR"/mock-devices.txt
 
           if [ "$all_ready" -eq 1 ]; then
             break
@@ -131,43 +176,43 @@ jobs:
 
         if [ "$all_ready" -ne 1 ]; then
           echo "NETCONF mock listeners were not ready in time"
-          cat netconf-mock.log || true
+          cat "$WORK_DIR/$MOCK_LOG" || true
           exit 1
         fi
 
     - name: Initial Ansible apply via generated role and Junos plugin
-      working-directory: ansible-provider-junos-vqfx-evpn-vxlan
+      working-directory: ${{ env.ROLE_DIR }}
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
         ANSIBLE_DEBUG: "0"
         ANSIBLE_DISPLAY_TRACEBACK: "error"
         ANSIBLE_KEEP_REMOTE_FILES: "0"
-        ANSIBLE_LOG_PATH: "../ansible-debug.log"
+        ANSIBLE_LOG_PATH: "../${{ env.ANSIBLE_DEBUG_LOG }}"
         PYTHONFAULTHANDLER: "1"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
       run: |
         set -euo pipefail
-        if [ ! -f ../.netconf_mock.pid ] || ! kill -0 "$(cat ../.netconf_mock.pid)" 2>/dev/null; then
+        if [ ! -f "../$PID_FILE" ] || ! kill -0 "$(cat "../$PID_FILE")" 2>/dev/null; then
           echo "NETCONF mock is not running before initial apply"
-          cat ../netconf-mock.log || true
+          cat "../$MOCK_LOG" || true
           exit 1
         fi
         ansible-playbook \
           -i mock-inventory.ini \
           -e "ansible_python_interpreter=${pythonLocation}/bin/python" \
-          ci-netconf-playbook.yml | tee ../ansible-initial.log
+          ci-netconf-playbook.yml | tee "../$ANSIBLE_INITIAL_LOG"
 
     - name: Second apply should be safe (imperative rerun)
-      working-directory: ansible-provider-junos-vqfx-evpn-vxlan
+      working-directory: ${{ env.ROLE_DIR }}
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
         ANSIBLE_DEBUG: "0"
         ANSIBLE_DISPLAY_TRACEBACK: "error"
         ANSIBLE_KEEP_REMOTE_FILES: "0"
-        ANSIBLE_LOG_PATH: "../ansible-debug.log"
+        ANSIBLE_LOG_PATH: "../${{ env.ANSIBLE_DEBUG_LOG }}"
         PYTHONFAULTHANDLER: "1"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
@@ -176,45 +221,45 @@ jobs:
         ansible-playbook \
           -i mock-inventory.ini \
           -e "ansible_python_interpreter=${pythonLocation}/bin/python" \
-          ci-netconf-playbook.yml | tee ../ansible-rerun.log
+          ci-netconf-playbook.yml | tee "../$ANSIBLE_RERUN_LOG"
 
     - name: Mutate generated YAML and apply updated intent
-      working-directory: ansible-provider-junos-vqfx-evpn-vxlan
+      working-directory: ${{ env.ROLE_DIR }}
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
         ANSIBLE_DEBUG: "0"
         ANSIBLE_DISPLAY_TRACEBACK: "error"
         ANSIBLE_KEEP_REMOTE_FILES: "0"
-        ANSIBLE_LOG_PATH: "../ansible-debug.log"
+        ANSIBLE_LOG_PATH: "../${{ env.ANSIBLE_DEBUG_LOG }}"
         PYTHONFAULTHANDLER: "1"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
       run: |
         set -euo pipefail
-        python ../.github/scripts/mutate_first_yaml_ipv4_cidr.py \
+        python ../../.github/scripts/mutate_first_yaml_ipv4_cidr.py \
           --directory host_vars \
           --replacement 203.0.113.10/32
         ansible-playbook \
           -i mock-inventory.ini \
           -e "ansible_python_interpreter=${pythonLocation}/bin/python" \
-          ci-netconf-playbook.yml | tee ../ansible-mutated.log
+          ci-netconf-playbook.yml | tee "../$ANSIBLE_MUTATED_LOG"
 
     - name: Simulate out-of-band NETCONF drift
       id: drift_target
       run: |
         set -euo pipefail
-        target_host="$(ls -1 ansible-provider-junos-vqfx-evpn-vxlan/host_vars/*.y*ml 2>/dev/null | sort | head -n 1 | xargs -r -n1 basename | sed -E 's/\.(yaml|yml)$//')"
+        target_host="$(ls -1 "$ROLE_DIR"/host_vars/*.y*ml 2>/dev/null | sort | head -n 1 | xargs -r -n1 basename | sed -E 's/\.(yaml|yml)$//')"
         if [ -z "$target_host" ]; then
           echo "failed to derive target host from host_vars"
           exit 1
         fi
-        if ! grep -q "^${target_host}:" ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt; then
+        if ! grep -q "^${target_host}:" "$ROLE_DIR"/mock-devices.txt; then
           echo "derived drift target host '${target_host}' is missing from mock-devices mapping"
           exit 1
         fi
         target_group="$(python .github/scripts/ansible_workflow/derive_target_group.py \
-          --config-xml "ansible-provider-junos-vqfx-evpn-vxlan/configs/${target_host}.xml")"
+          --config-xml "$ROLE_DIR/configs/${target_host}.xml")"
         if [ -z "$target_group" ]; then
           echo "failed to derive drift target group"
           exit 1
@@ -223,7 +268,7 @@ jobs:
         echo "group=$target_group" >> "$GITHUB_OUTPUT"
 
         python .github/scripts/apply_netconf_drift.py \
-          --devices-file ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt \
+          --devices-file "$ROLE_DIR"/mock-devices.txt \
           --target-host "$target_host" \
           --target-group "$target_group" \
           --drift-ip 203.0.113.250/32 \
@@ -232,14 +277,14 @@ jobs:
           --connect-host 127.0.0.1
 
     - name: Re-apply playbook to reconcile out-of-band drift
-      working-directory: ansible-provider-junos-vqfx-evpn-vxlan
+      working-directory: ${{ env.ROLE_DIR }}
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
         ANSIBLE_DEBUG: "0"
         ANSIBLE_DISPLAY_TRACEBACK: "error"
         ANSIBLE_KEEP_REMOTE_FILES: "0"
-        ANSIBLE_LOG_PATH: "../ansible-debug.log"
+        ANSIBLE_LOG_PATH: "../${{ env.ANSIBLE_DEBUG_LOG }}"
         PYTHONFAULTHANDLER: "1"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: ci-password
@@ -248,18 +293,18 @@ jobs:
         ansible-playbook \
           -i mock-inventory.ini \
           -e "ansible_python_interpreter=${pythonLocation}/bin/python" \
-          ci-netconf-playbook.yml | tee ../ansible-reconcile.log
+          ci-netconf-playbook.yml | tee "../$ANSIBLE_RECONCILE_LOG"
 
     - name: Negative test apply with bad credentials
       id: negative_apply
-      working-directory: ansible-provider-junos-vqfx-evpn-vxlan
+      working-directory: ${{ env.ROLE_DIR }}
       env:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         ANSIBLE_DEPRECATION_WARNINGS: "False"
         ANSIBLE_DEBUG: "0"
         ANSIBLE_DISPLAY_TRACEBACK: "error"
         ANSIBLE_KEEP_REMOTE_FILES: "0"
-        ANSIBLE_LOG_PATH: "../ansible-debug.log"
+        ANSIBLE_LOG_PATH: "../${{ env.ANSIBLE_DEBUG_LOG }}"
         PYTHONFAULTHANDLER: "1"
         NETCONF_USERNAME: ci-user
         NETCONF_PASSWORD: wrong-password
@@ -270,7 +315,7 @@ jobs:
           -i mock-inventory.ini \
           -e "ansible_python_interpreter=${pythonLocation}/bin/python" \
           ci-netconf-playbook.yml \
-          > ../ansible-negative.log 2>&1
+          > "../$ANSIBLE_NEGATIVE_LOG" 2>&1
         rc=$?
         set -e
         echo "exitcode=$rc" >> "$GITHUB_OUTPUT"
@@ -279,15 +324,15 @@ jobs:
       run: |
         if [ "${{ steps.negative_apply.outputs.exitcode }}" = "0" ]; then
           echo "Expected ansible apply to fail with wrong credentials, but it succeeded"
-          cat ansible-negative.log
+          cat "$ANSIBLE_NEGATIVE_LOG"
           exit 1
         fi
 
     - name: Stop NETCONF mock
       if: always()
       run: |
-        if [ -f .netconf_mock.pid ]; then
-          MOCK_PID="$(cat .netconf_mock.pid)"
+        if [ -f "$WORK_DIR/$PID_FILE" ]; then
+          MOCK_PID="$(cat "$WORK_DIR/$PID_FILE")"
           if kill -0 "$MOCK_PID" 2>/dev/null; then
             kill "$MOCK_PID"
           fi
@@ -296,9 +341,9 @@ jobs:
     - name: Validate NETCONF state transitions
       run: |
         set -euo pipefail
-        test -f netconf-mock-state.json
+        test -f "$WORK_DIR/$MOCK_STATE"
         python .github/scripts/assert_netconf_mock_state.py \
-          --state-dump netconf-mock-state.json \
+          --state-dump "$WORK_DIR/$MOCK_STATE" \
           --require-min-commits 1 \
           --only-device "${{ steps.drift_target.outputs.host }}" \
           --only-group "${{ steps.drift_target.outputs.group }}" \
@@ -311,11 +356,11 @@ jobs:
       with:
         name: ansible-netconf-integration-logs-${{ matrix.python-version }}
         path: |
-          netconf-mock.log
-          netconf-mock-state.json
-          ansible-initial.log
-          ansible-rerun.log
-          ansible-mutated.log
-          ansible-reconcile.log
-          ansible-negative.log
-          ansible-debug.log
+          ${{ env.WORK_DIR }}/${{ env.MOCK_LOG }}
+          ${{ env.WORK_DIR }}/${{ env.MOCK_STATE }}
+          ${{ env.WORK_DIR }}/${{ env.ANSIBLE_INITIAL_LOG }}
+          ${{ env.WORK_DIR }}/${{ env.ANSIBLE_RERUN_LOG }}
+          ${{ env.WORK_DIR }}/${{ env.ANSIBLE_MUTATED_LOG }}
+          ${{ env.WORK_DIR }}/${{ env.ANSIBLE_RECONCILE_LOG }}
+          ${{ env.WORK_DIR }}/${{ env.ANSIBLE_NEGATIVE_LOG }}
+          ${{ env.WORK_DIR }}/${{ env.ANSIBLE_DEBUG_LOG }}
