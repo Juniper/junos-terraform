@@ -324,6 +324,16 @@ This is useful to feed generated host_vars into the Ansible role/playbook create
 
 1. Install Ansible dependencies on your control node
 
+Note that Ansible must be installed in the virtual environment (venv). Additionally, the following system packages and Python modules are required:
+
+```bash
+sudo dnf install ansible -y
+sudo dnf install python3-pip -y
+/usr/bin/python3 -m pip install ncclient
+/usr/bin/python3 -m pip install junos-eznc
+/usr/bin/python3 -m pip install jxmlease
+```
+
 ```bash
 python -m pip install --upgrade pip
 python -m pip install -r .github/requirements/ansible-test-requirements.txt
