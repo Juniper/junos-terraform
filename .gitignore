@@ -11,3 +11,5 @@
 /testbed/
 __pycache__/
 /dist/
+/terraform-provider-junos-vqfx-evpn-vxlan/
+/.venv/

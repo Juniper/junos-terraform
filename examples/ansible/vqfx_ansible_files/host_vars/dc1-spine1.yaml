@@ -30,10 +30,9 @@ system:
           max_connections: '30'
       notification:
         allow_clients:
-          address:
-          - 0.0.0.0/0
+          address: 0.0.0.0/0
     netconf:
-      ssh: {}
+      ssh: ''
     rest:
       http:
         port: '3000'
@@ -60,13 +59,11 @@ system:
     - name: juniper
       license_type:
       - name: juniper
-        deployment_scope:
-        - commercial
+        deployment_scope: commercial
     - name: chef
       license_type:
       - name: juniper
-        deployment_scope:
-        - commercial
+        deployment_scope: commercial
 chassis:
   aggregated_devices:
     ethernet:
@@ -146,17 +143,15 @@ snmp:
 forwarding_options:
   storm_control_profiles:
   - name: default
-    all: {}
+    all: ''
 routing_options:
   static:
     route:
     - name: 0.0.0.0/0
-      next_hop:
-      - 100.123.0.1
+      next_hop: 100.123.0.1
   router_id: 10.30.100.3
   forwarding_table:
-    export:
-    - PFE-LB
+    export: PFE-LB
     ecmp_fast_reroute: true
 protocols:
   bgp:
@@ -166,22 +161,19 @@ protocols:
       local_address: 10.30.100.3
       family:
         evpn:
-          signaling: {}
+          signaling: ''
       cluster: 10.30.100.3
       local_as:
         as_number: '65200'
-      multipath: {}
-      allow:
-      - 10.30.100.0/24
+      multipath: ''
+      allow: 10.30.100.0/24
       neighbor:
       - name: 10.30.100.4
     - name: IPCLOS_eBGP
       type: external
       mtu_discovery: true
-      import:
-      - IPCLOS_BGP_IMP
-      export:
-      - IPCLOS_BGP_EXP
+      import: IPCLOS_BGP_IMP
+      export: IPCLOS_BGP_EXP
       vpn_apply_export: true
       local_as:
         as_number: '65501'
@@ -218,9 +210,7 @@ policy_options:
     term:
     - name: loopback
       from:
-        protocol:
-        - direct
-        - bgp
+        protocol: bgp
       then:
         community:
         - add: true
@@ -233,9 +223,7 @@ policy_options:
     term:
     - name: loopback
       from:
-        protocol:
-        - bgp
-        - direct
+        protocol: direct
       then:
         accept: true
     - name: default
@@ -247,5 +235,4 @@ policy_options:
         per_packet: true
   community:
   - name: dc1-spine1
-    members:
-    - '65501:1'
+    members: '65501:1'

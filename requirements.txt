@@ -3,3 +3,4 @@ jinja2>=3.1
 click>=8.0
 pytest>=7.0
 lxml>=4.9
+pyaml>=25.7.0
