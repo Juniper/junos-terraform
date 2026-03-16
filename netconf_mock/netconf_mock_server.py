@@ -60,10 +60,12 @@ class DeviceState:
     history: list[dict[str, str]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
+        """Initialize candidate configuration from running state."""
         # Candidate starts as a copy of running, similar to Junos candidate model.
         self.candidate_groups = copy.deepcopy(self.running_groups)
 
     def snapshot(self) -> dict:
+        """Return a serializable point-in-time view of device state."""
         return {
             "name": self.name,
             "running_groups": self.running_groups,
@@ -76,12 +78,14 @@ class DeviceState:
 
 class DeviceSSHServer(asyncssh.SSHServer):
     def __init__(self, username: str, password: str, state: DeviceState, disable_auth: bool):
+        """Store auth settings and bound device state for one SSH server."""
         self.username = username
         self.password = password
         self.state = state
         self.disable_auth = disable_auth
 
     def begin_auth(self, username: str) -> bool:
+        """Tell asyncssh whether password authentication should proceed."""
         logger.info("device=%s begin_auth username=%s", self.state.name, username)
         if self.disable_auth:
             logger.info("device=%s auth disabled; accepting without credentials", self.state.name)
@@ -89,15 +93,18 @@ class DeviceSSHServer(asyncssh.SSHServer):
         return True
 
     def password_auth_supported(self) -> bool:
+        """Advertise password-auth support to the SSH client."""
         logger.info("device=%s password_auth_supported=true", self.state.name)
         return True
 
     def validate_password(self, username: str, password: str) -> bool:
+        """Validate credentials against configured static username/password."""
         accepted = username == self.username and password == self.password
         logger.info("device=%s validate_password username=%s accepted=%s", self.state.name, username, accepted)
         return accepted
 
     def session_requested(self) -> asyncssh.SSHServerSession:
+        """Create a per-connection NETCONF session bound to this device."""
         logger.info("device=%s session_requested", self.state.name)
         return DeviceSession(self.state)
 
@@ -105,26 +112,32 @@ class DeviceSSHServer(asyncssh.SSHServer):
 class DeviceSession(asyncssh.SSHServerSession):
     @staticmethod
     def _local_name(tag: str) -> str:
+        """Return XML local tag name without namespace prefix."""
         return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
     def __init__(self, state: DeviceState):
+        """Initialize session buffers and attach target device state."""
         self._chan: asyncssh.SSHServerChannel | None = None
         self._buf = ""
         self._state = state
 
     def connection_made(self, chan: asyncssh.SSHServerChannel) -> None:
+        """Capture the opened SSH channel for outbound NETCONF frames."""
         self._chan = chan
         logger.debug("session opened device=%s", self._state.name)
 
     def subsystem_requested(self, subsystem: str) -> bool:
+        """Allow only the NETCONF subsystem."""
         logger.info("device=%s subsystem_requested subsystem=%s", self._state.name, subsystem)
         return subsystem == "netconf"
 
     def session_started(self) -> None:
+        """Send initial NETCONF <hello> once subsystem starts."""
         logger.debug("session started device=%s", self._state.name)
         self._send_frame(HELLO)
 
     def data_received(self, data: str, datatype: int | None = None) -> None:
+        """Buffer framed NETCONF payloads and dispatch each complete RPC."""
         del datatype
         self._buf += data
         while MSG_SEP in self._buf:
@@ -134,12 +147,14 @@ class DeviceSession(asyncssh.SSHServerSession):
                 self._handle_rpc(req)
 
     def _send_frame(self, payload: str) -> None:
+        """Write one NETCONF message followed by end-of-message separator."""
         if self._chan is not None:
             logger.debug("device=%s tx frame=%s", self._state.name, payload[:300])
             self._chan.write(payload + MSG_SEP + "\n")
 
     @staticmethod
     def _extract_message_id(xml_text: str) -> str:
+        """Extract NETCONF message-id via XML parse, then regex fallback."""
         # Prefer XML parsing so attribute quoting/formatting differences do not break matching.
         try:
             root = ET.fromstring(xml_text)
@@ -159,6 +174,7 @@ class DeviceSession(asyncssh.SSHServerSession):
 
     @staticmethod
     def _extract_group_name(xml_text: str) -> str:
+        """Extract configuration group name from XML payload."""
         # Prefer XML parsing and only consider <configuration><groups><name>.
         try:
             root = ET.fromstring(xml_text)
@@ -177,11 +193,13 @@ class DeviceSession(asyncssh.SSHServerSession):
 
     @staticmethod
     def _extract_configuration(xml_text: str) -> str:
+        """Extract the first <configuration>...</configuration> fragment."""
         m = re.search(r"(<configuration>.*?</configuration>)", xml_text, flags=re.DOTALL)
         return m.group(1) if m else ""
 
     @staticmethod
     def _parse_xml(xml_text: str) -> ET.Element | None:
+        """Parse XML text to ElementTree root, returning None on parse errors."""
         try:
             return ET.fromstring(xml_text)
         except ET.ParseError:
@@ -189,6 +207,7 @@ class DeviceSession(asyncssh.SSHServerSession):
 
     @staticmethod
     def _find_first_configuration(root: ET.Element) -> ET.Element | None:
+        """Find first element named configuration in a parsed RPC tree."""
         for elem in root.iter():
             if DeviceSession._local_name(elem.tag) == "configuration":
                 return elem
@@ -196,6 +215,7 @@ class DeviceSession(asyncssh.SSHServerSession):
 
     @staticmethod
     def _extract_group_name_from_groups_elem(groups_elem: ET.Element) -> str:
+        """Extract <name> value from a <groups> element."""
         for child in list(groups_elem):
             if DeviceSession._local_name(child.tag) == "name" and child.text:
                 return child.text.strip()
@@ -203,6 +223,7 @@ class DeviceSession(asyncssh.SSHServerSession):
 
     @staticmethod
     def _extract_groups_configurations_regex(xml_text: str) -> dict[str, str]:
+        """Regex fallback to extract each groups block keyed by group name."""
         groups_by_name: dict[str, str] = {}
         for group_block in re.findall(r"(<groups>.*?</groups>)", xml_text, flags=re.DOTALL):
             name_match = re.search(r"<name>\s*([^<]+?)\s*</name>", group_block)
@@ -270,16 +291,19 @@ class DeviceSession(asyncssh.SSHServerSession):
         return DeviceSession._extract_groups_configurations_regex(xml_text)
 
     def _ok_reply(self, message_id: str) -> str:
+        """Build a minimal NETCONF <ok/> rpc-reply for a message id."""
         return (
             '<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" '
             f'message-id="{message_id}"><ok/></rpc-reply>'
         )
 
     def _append_history(self, op: str, detail: str) -> None:
+        """Append an operation record to the per-device history list."""
         self._state.history.append({"op": op, "detail": detail})
         logger.debug("device=%s op=%s detail=%s", self._state.name, op, detail)
 
     def _handle_load_configuration(self, xml_text: str, message_id: str) -> bool:
+        """Apply load-configuration payload to candidate state when present."""
         if "<load-configuration" not in xml_text:
             return False
 
@@ -306,6 +330,7 @@ class DeviceSession(asyncssh.SSHServerSession):
         return True
 
     def _handle_edit_delete(self, xml_text: str, message_id: str) -> bool:
+        """Handle edit-config delete operations against candidate groups."""
         if "<edit-config>" not in xml_text or 'operation="delete"' not in xml_text:
             return False
 
@@ -317,6 +342,7 @@ class DeviceSession(asyncssh.SSHServerSession):
         return True
 
     def _handle_discard_changes(self, xml_text: str, message_id: str) -> bool:
+        """Reset candidate configuration back to current running state."""
         if "<discard-changes" not in xml_text:
             return False
 
@@ -326,6 +352,7 @@ class DeviceSession(asyncssh.SSHServerSession):
         return True
 
     def _handle_commit(self, xml_text: str, message_id: str) -> bool:
+        """Promote candidate configuration to running configuration."""
         if "<commit" not in xml_text:
             return False
 
@@ -335,6 +362,7 @@ class DeviceSession(asyncssh.SSHServerSession):
         return True
 
     def _handle_get_configuration(self, xml_text: str, message_id: str) -> bool:
+        """Return running config for requested group, or a minimal fallback."""
         if "<get-configuration>" not in xml_text:
             return False
 
@@ -356,6 +384,7 @@ class DeviceSession(asyncssh.SSHServerSession):
         return True
 
     def _handle_lock_unlock(self, xml_text: str, message_id: str) -> bool:
+        """Acknowledge lock/unlock RPCs with an OK reply."""
         if "<lock>" not in xml_text and "<unlock>" not in xml_text:
             return False
 
@@ -363,6 +392,7 @@ class DeviceSession(asyncssh.SSHServerSession):
         return True
 
     def _handle_rpc(self, xml_text: str) -> None:
+        """Route a NETCONF RPC to known handlers or default OK behavior."""
         message_id = self._extract_message_id(xml_text)
         self._state.rpc_log.append(xml_text)
         logger.debug(
@@ -402,6 +432,7 @@ class DeviceSession(asyncssh.SSHServerSession):
 
 
 async def run_server(args: argparse.Namespace) -> None:
+    """Run multi-device NETCONF listeners until shutdown signal is received."""
     stop_event = asyncio.Event()
     _install_loop_exception_handler()
     _install_signal_handlers(stop_event)
@@ -422,9 +453,11 @@ async def run_server(args: argparse.Namespace) -> None:
 
 
 def _install_loop_exception_handler() -> None:
+    """Install verbose asyncio loop exception logging."""
     loop = asyncio.get_running_loop()
 
     def _loop_exception_handler(_loop: asyncio.AbstractEventLoop, context: dict) -> None:
+        """Log uncaught event-loop exceptions with traceback context."""
         msg = context.get("message", "asyncio loop exception")
         exc = context.get("exception")
         logger.error("%s", msg)
@@ -437,9 +470,11 @@ def _install_loop_exception_handler() -> None:
 
 
 def _install_signal_handlers(stop_event: asyncio.Event) -> None:
+    """Install SIGINT/SIGTERM handlers that trigger graceful shutdown."""
     loop = asyncio.get_running_loop()
 
     def _shutdown() -> None:
+        """Signal coroutine shutdown by setting the shared stop event."""
         logger.info("shutdown signal received")
         stop_event.set()
 
@@ -448,6 +483,7 @@ def _install_signal_handlers(stop_event: asyncio.Event) -> None:
 
 
 def _collect_device_specs(args: argparse.Namespace) -> list[str]:
+    """Collect device specs from repeated args and optional file input."""
     device_specs = list(args.device)
     if not args.devices_file:
         return device_specs
@@ -469,6 +505,7 @@ async def _start_device_listeners(
     host_key: asyncssh.SSHKey,
     device_specs: list[str],
 ) -> tuple[list[asyncssh.SSHAcceptor], dict[str, DeviceState]]:
+    """Create and bind one asyncssh server per device specification."""
     servers: list[asyncssh.SSHAcceptor] = []
     device_states: dict[str, DeviceState] = {}
 
@@ -492,12 +529,14 @@ async def _start_device_listeners(
 
 
 async def _close_servers(servers: list[asyncssh.SSHAcceptor]) -> None:
+    """Close all asyncssh server listeners and await completion."""
     for server in servers:
         server.close()
         await server.wait_closed()
 
 
 def _dump_state_if_requested(state_dump: str, device_states: dict[str, DeviceState]) -> None:
+    """Write JSON state snapshot if a dump path is configured."""
     if not state_dump:
         return
 
@@ -509,6 +548,7 @@ def _dump_state_if_requested(state_dump: str, device_states: dict[str, DeviceSta
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse and validate command-line arguments for the mock server."""
     parser = argparse.ArgumentParser(
         description="Run a stateful NETCONF-over-SSH mock server for integration tests."
     )
@@ -548,6 +588,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """CLI entry point for running the stateful NETCONF mock service."""
     args = parse_args()
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper(), logging.INFO),

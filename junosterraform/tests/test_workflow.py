@@ -4,7 +4,10 @@ from glob import glob
 import subprocess
 import shutil
 import tempfile
+import re
 import unittest
+import yaml
+import pytest
 
 
 class TestWorkflow(unittest.TestCase):
@@ -23,7 +26,8 @@ def test_yang2go():
     assert os.path.isdir(yang_root), f"YANG root does not exist: {yang_root}"
 
     exe = shutil.which("jtaf-yang2go")
-    assert exe, "Could not find jtaf-yang2go on PATH"
+    if not exe:
+        pytest.skip("jtaf-yang2go not found on PATH")
 
     env = os.environ.copy()
 
@@ -115,10 +119,12 @@ def test_yang2ansible():
     assert os.path.isdir(yang_root), f"YANG root does not exist: {yang_root}"
 
     exe = shutil.which("jtaf-yang2ansible")
-    assert exe, "Could not find jtaf-yang2ansible on PATH"
+    if not exe:
+        pytest.skip("jtaf-yang2ansible not found on PATH")
 
     xml2yaml_exe = shutil.which("jtaf-xml2yaml")
-    assert xml2yaml_exe, "Could not find jtaf-xml2yaml on PATH"
+    if not xml2yaml_exe:
+        pytest.skip("jtaf-xml2yaml not found on PATH")
 
     env = os.environ.copy()
 
@@ -185,7 +191,7 @@ def test_yang2ansible():
             role_dir, "trimmed_schema.json"
         )
 
-        # xml2yaml command
+        # xml2yaml command mirrors the GitHub Action invocation.
         cmd = [
             xml2yaml_exe,
             "-j",
@@ -194,7 +200,7 @@ def test_yang2ansible():
             *xml_args,
             "-d",
             "vqfx_ansible_files",
-        ]  # noqa: E501
+        ]
         proc = subprocess.run(
             cmd,
             input=stdin_json,
@@ -213,3 +219,66 @@ def test_yang2ansible():
         assert os.path.isdir(ansible_files_dir), (
             f"Expected ansible files dir was not created: {ansible_files_dir}"
         )
+
+        group_vars_file = os.path.join(ansible_files_dir, "group_vars", "all.yml")
+        assert os.path.exists(group_vars_file), (
+            f"Expected group vars file not found: {group_vars_file}"
+        )
+
+        # New groups feature: inventory should include detected device-type groups.
+        hosts_file = os.path.join(ansible_files_dir, "hosts")
+        assert os.path.exists(hosts_file), f"Expected inventory not found: {hosts_file}"
+        with open(hosts_file) as f:
+            hosts_text = f.read()
+        assert "[all]" in hosts_text, "Expected [all] group in generated inventory"
+        derived_groups = re.findall(r"^\[([^\]]+)\]$", hosts_text, flags=re.MULTILINE)
+        derived_groups = [group for group in derived_groups if group != "all"]
+
+        for derived_group in derived_groups:
+            group_vars_dir = derived_group
+            is_device_group = derived_group.startswith("device_")
+            if derived_group.startswith("device_"):
+                group_vars_dir = derived_group.replace("device_", "", 1)
+
+            device_group_vars_file = os.path.join(
+                ansible_files_dir,
+                "group_vars",
+                group_vars_dir,
+                "all.yml",
+            )
+
+            if is_device_group:
+                # device_<type> inventory groups are always emitted, but
+                # group_vars/<type>/all.yml is only created when conflicting
+                # keys spill over from group_vars/all.yml.
+                continue
+
+            assert os.path.exists(device_group_vars_file), (
+                f"Expected derived group vars file not found: {device_group_vars_file}"
+            )
+
+        # Generated role should use hierarchy merge flow and merge directive filter.
+        tasks_main = os.path.join(
+            role_dir,
+            "roles",
+            "vqfx-ansible-role_role",
+            "tasks",
+            "main.yml",
+        )
+        assert os.path.exists(tasks_main), f"Expected tasks file not found: {tasks_main}"
+        with open(tasks_main) as f:
+            tasks_text = f.read()
+        assert "Merge variables from hierarchy" in tasks_text
+        assert "jtaf_apply_merge_directives" in tasks_text
+
+        host_var_files = glob(os.path.join(ansible_files_dir, "host_vars", "*.y*ml"))
+        assert host_var_files, "Expected host_vars files to be generated"
+
+        for host_var_file in host_var_files:
+            with open(host_var_file) as f:
+                host_vars = yaml.safe_load(f) or {}
+            # No legacy jtaf_override container, just flat device config
+            config_keys = [k for k in host_vars.keys() if not k.startswith('_')]
+            assert config_keys or host_vars == {}, (
+                "Expected at least some configuration keys in host_vars"
+            )

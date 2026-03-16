@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: ${{ github.actor == 'nektos/act' && 1 || 2 }}
       matrix:
         python-version: ["3.10", "3.x"]
 
@@ -75,6 +76,9 @@ jobs:
         rm -rf ansible-provider-junos-vqfx-evpn-vxlan/host_vars
         cp -R ci-evpn-vxlan-ansible/host_vars ansible-provider-junos-vqfx-evpn-vxlan/
 
+        rm -rf ansible-provider-junos-vqfx-evpn-vxlan/group_vars
+        cp -R ci-evpn-vxlan-ansible/group_vars ansible-provider-junos-vqfx-evpn-vxlan/
+
         python .github/scripts/prepare_ansible_mock_inventory.py \
           --hosts-file ci-evpn-vxlan-ansible/hosts \
           --inventory-file ansible-provider-junos-vqfx-evpn-vxlan/mock-inventory.ini \
@@ -91,14 +95,14 @@ jobs:
       run: |
         set -euo pipefail
 
-        python netconf_mock/netconf_mock_server.py \
+        nohup python netconf_mock/netconf_mock_server.py \
           --host 127.0.0.1 \
           --username ci-user \
           --password ci-password \
           --log-level INFO \
           --devices-file ansible-provider-junos-vqfx-evpn-vxlan/mock-devices.txt \
           --state-dump netconf-mock-state.json \
-          > netconf-mock.log 2>&1 &
+          > netconf-mock.log 2>&1 < /dev/null &
         echo "$!" > .netconf_mock.pid
 
         all_ready=0
@@ -146,6 +150,11 @@ jobs:
         NETCONF_PASSWORD: ci-password
       run: |
         set -euo pipefail
+        if [ ! -f ../.netconf_mock.pid ] || ! kill -0 "$(cat ../.netconf_mock.pid)" 2>/dev/null; then
+          echo "NETCONF mock is not running before initial apply"
+          cat ../netconf-mock.log || true
+          exit 1
+        fi
         ansible-playbook \
           -i mock-inventory.ini \
           -e "ansible_python_interpreter=${pythonLocation}/bin/python" \
@@ -282,7 +291,6 @@ jobs:
           MOCK_PID="$(cat .netconf_mock.pid)"
           if kill -0 "$MOCK_PID" 2>/dev/null; then
             kill "$MOCK_PID"
-            wait "$MOCK_PID" || true
           fi
         fi
 

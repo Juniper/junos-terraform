@@ -13,6 +13,7 @@ def get_xpaths(root: ElementTree.Element) -> dict[str, bool]:
     """
     # defined a recursive function to walk the xml and populate result[]
     def recurse_children(node: ElementTree.Element, result: dict[str, bool] = {}, path: list[str] = []) -> dict[str, bool]:
+        """Recursively walk XML children and collect slash-separated paths."""
         for child in node:
             path.append(child.tag)
             recurse_children(child, result, path)
