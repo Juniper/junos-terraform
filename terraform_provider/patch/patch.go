@@ -3,12 +3,12 @@ package patch
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 )
 
 // CreateDiffPatch builds the Junos NETCONF <configuration> XML body from the
-// diff map. The output is wrapped in the correct Junos configuration group so
-// it targets the same group used by Create and Delete.
+// diff map, targeting base configuration paths directly.
 //
 // The nc:operation attributes written here reference the xmlns:nc declaration
 // that sendNetconfPatch places on the enclosing <config> element — no
@@ -17,31 +17,25 @@ import (
 // Example output for a single Replace:
 //
 //	<configuration>
-//	  <groups>
-//	    <name>MY_GROUP</name>
-//	    <interfaces>
-//	      <interface>
-//	        <name>ge-0/0/0</name>
-//	        <unit>
-//	          <name>0</name>
-//	          <description nc:operation="replace">new-desc</description>
-//	        </unit>
-//	      </interface>
-//	    </interfaces>
-//	  </groups>
+//	  <interfaces>
+//	    <interface>
+//	      <name>ge-0/0/0</name>
+//	      <unit>
+//	        <name>0</name>
+//	        <description nc:operation="replace">new-desc</description>
+//	      </unit>
+//	    </interface>
+//	  </interfaces>
 //	</configuration>
 func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error) {
+	_ = groupName
 	// Root of the output tree
 	root := &Node{Tag: "configuration"}
 
-	// Junos configuration group wrapper
-	groups := &Node{Tag: "groups", Parent: root}
-	root.Children = append(root.Children, groups)
-
-	groupNameNode := &Node{Tag: "name", Text: groupName, Parent: groups}
-	groups.Children = append(groups.Children, groupNameNode)
-
-	for path, change := range diffMap {
+	ordered := orderedChanges(diffMap)
+	for _, entry := range ordered {
+		path := entry.path
+		change := entry.change
 		segments := splitPathRespectingQuotes(path)
 		if len(segments) == 0 {
 			continue
@@ -52,6 +46,12 @@ func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error
 		if segments[0] == "configuration" {
 			segments = segments[1:]
 		}
+		if len(segments) > 0 {
+			firstTag, _, _ := parseSegment(segments[0])
+			if firstTag == "groups" {
+				segments = segments[1:]
+			}
+		}
 		if len(segments) == 0 {
 			continue
 		}
@@ -61,8 +61,8 @@ func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error
 		parentSegments := segments[:len(segments)-1]
 		leafSegment := segments[len(segments)-1]
 
-		// Walk/create the parent node tree under <groups>
-		parent := ensurePath(groups, parentSegments)
+		// Walk/create the parent node tree under <configuration>
+		parent := ensurePath(root, parentSegments)
 
 		// Strip any key predicate from the leaf tag — keys are sibling elements,
 		// not part of the tag name itself in XML.
@@ -89,6 +89,65 @@ func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error
 	}
 
 	return marshalNodeTree(root)
+}
+
+type orderedChange struct {
+	path   string
+	change Change
+}
+
+func orderedChanges(diffMap map[string]Change) []orderedChange {
+	result := make([]orderedChange, 0, len(diffMap))
+	for path, change := range diffMap {
+		result = append(result, orderedChange{path: path, change: change})
+	}
+
+	sort.SliceStable(result, func(i, j int) bool {
+		a := result[i]
+		b := result[j]
+
+		pa := opPriority(a.change.Op)
+		pb := opPriority(b.change.Op)
+		if pa != pb {
+			return pa < pb
+		}
+
+		da := pathDepth(a.path)
+		db := pathDepth(b.path)
+		if a.change.Op == Delete {
+			if da != db {
+				return da > db
+			}
+		} else {
+			if da != db {
+				return da < db
+			}
+		}
+
+		return a.path < b.path
+	})
+
+	return result
+}
+
+func opPriority(op ChangeType) int {
+	switch op {
+	case Delete:
+		return 0
+	case Replace:
+		return 1
+	case Create:
+		return 2
+	default:
+		return 3
+	}
+}
+
+func pathDepth(path string) int {
+	if path == "" {
+		return 0
+	}
+	return len(splitPathRespectingQuotes(path))
 }
 
 // marshalNodeTree serializes a *Node tree to indented XML bytes.

@@ -50,6 +50,14 @@ const applyGroupXML = `<load-configuration action="merge" format="xml">
 
 const discardChanges = `<discard-changes/>`
 
+const patchEditConfigStr = `<edit-config>
+	<target><candidate/></target>
+	<default-operation>none</default-operation>
+	<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+%s
+	</config>
+</edit-config>`
+
 // defaultPort is the NETCONF-over-SSH default.
 const defaultPort = 830
 
@@ -255,6 +263,26 @@ func sortApplyGroupsList() {
 	}
 	sort.Strings(filteredGroups)
 	applyGroupsList = filteredGroups
+}
+
+// SendUpdate applies a prepared XML diff payload and optionally commits it.
+func (g *GoNCClient) SendUpdate(id string, diff string, commit bool) error {
+	g.Lock.Lock()
+	defer g.Lock.Unlock()
+	_ = id
+
+	patchPayload := fmt.Sprintf(patchEditConfigStr, diff)
+	if _, err := g.execute(context.Background(), patchPayload); err != nil {
+		return err
+	}
+
+	if commit {
+		if _, err := g.execute(context.Background(), commitStr); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // sendRawConfig loads raw XML config and optionally commits it.

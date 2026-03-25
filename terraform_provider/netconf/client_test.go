@@ -50,6 +50,24 @@ func TestDeleteConfigCallsExpectedOperations(t *testing.T) {
 	}
 }
 
+// TestSendUpdateBaseConfigPayload verifies patch updates do not require group name tags.
+func TestSendUpdateBaseConfigPayload(t *testing.T) {
+	calls := []string{}
+	client := newMockClient(&calls, "<ok/>", nil)
+
+	diff := `<configuration><system><host-name nc:operation="replace">leaf1</host-name></system></configuration>`
+	if err := client.SendUpdate("base-config", diff, false); err != nil {
+		t.Fatalf("SendUpdate returned error: %v", err)
+	}
+
+	if len(calls) != 1 {
+		t.Fatalf("expected single edit-config operation, got %d", len(calls))
+	}
+	if !strings.Contains(calls[0], "<edit-config>") || !strings.Contains(calls[0], "<default-operation>none</default-operation>") {
+		t.Fatalf("expected patch edit-config envelope, got %q", calls[0])
+	}
+}
+
 // TestSendTransactionWithIDReplacesGroup verifies ID-based transactions use update flow.
 func TestSendTransactionWithIDReplacesGroup(t *testing.T) {
 	calls := []string{}

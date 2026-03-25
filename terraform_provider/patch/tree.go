@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"io"
 )
 
 // BuildTree parses XML bytes into a *Node tree using a streaming token decoder.
@@ -17,8 +18,10 @@ func BuildTree(xmlBytes []byte) (*Node, error) {
 	for {
 		tok, err := decoder.Token()
 		if err != nil {
-			// io.EOF is the normal end — any other error is real
-			break
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("failed parsing XML token stream: %w", err)
 		}
 
 		switch t := tok.(type) {

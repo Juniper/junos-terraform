@@ -1,7 +1,7 @@
 package patch
 
 import (
-    "encoding/json"
+	"encoding/json"
 	"strings"
 )
 
@@ -13,6 +13,7 @@ const (
 	KindContainer NodeKind = iota
 	KindList
 	KindLeaf
+	KindLeafList
 )
 
 type LeafBase uint8
@@ -29,16 +30,16 @@ const (
 
 // Raw JSON node
 type SchemaNode struct {
-	Name     string       `json:"name"`
-	Type     string       `json:"type"`      // container | list | leaf
-	Path     string       `json:"path"`      // often parent path
-	Key      string       `json:"key"`       // list key
-	LeafType string       `json:"leaf-type"` // leaf-only: string, union, etc.
+	Name     string `json:"name"`
+	Type     string `json:"type"`      // container | list | leaf
+	Path     string `json:"path"`      // often parent path
+	Key      string `json:"key"`       // list key
+	LeafType string `json:"leaf-type"` // leaf-only: string, union, etc.
 
-    Children []SchemaNode `json:"children"` 
-    // Union branches (when leaf-type == "union")
+	Children []SchemaNode `json:"children"`
+	// Union branches (when leaf-type == "union")
 	Types []UnionType `json:"types"`
-    // Constraints (sometimes on leaves, sometimes inside union branches)
+	// Constraints (sometimes on leaves, sometimes inside union branches)
 	Lengths  []LenRange  `json:"lengths"`
 	Ranges   []NumRange  `json:"ranges"`
 	Patterns []string    `json:"patterns"`
@@ -46,11 +47,11 @@ type SchemaNode struct {
 }
 
 type UnionType struct {
-	Type     string     `json:"type"`
-	Path     string     `json:"path"`
-	Patterns []string   `json:"patterns"`
-	Ranges   []NumRange `json:"ranges"`
-	Lengths  []LenRange `json:"lengths"`
+	Type     string      `json:"type"`
+	Path     string      `json:"path"`
+	Patterns []string    `json:"patterns"`
+	Ranges   []NumRange  `json:"ranges"`
+	Lengths  []LenRange  `json:"lengths"`
 	Enums    []EnumValue `json:"enums"`
 }
 
@@ -68,14 +69,14 @@ type LenRange struct {
 
 type EnumValue struct {
 	Name  string `json:"name"`
-	Value any `json:"value"`
+	Value any    `json:"value"`
 }
 
 type NodeInfo struct {
-	Path   string
-	Name   string
-	Kind   NodeKind
-	Parent string
+	Path     string
+	Name     string
+	Kind     NodeKind
+	Parent   string
 	Children []string
 	// Lists
 	ListKey     string
@@ -85,12 +86,12 @@ type NodeInfo struct {
 }
 
 type LeafInfo struct {
-	Base LeafBase
-	Union []UnionBranch
+	Base     LeafBase
+	Union    []UnionBranch
 	Patterns []string
 	Ranges   []NumRange
 	Lengths  []LenRange
-	Enums map[string]struct{} // canonical set of enum names (if present)
+	Enums    map[string]struct{} // canonical set of enum names (if present)
 }
 
 type UnionBranch struct {
@@ -165,6 +166,8 @@ func UnmarshalTrimmedSchemaIndex(trimmedSchemaJSON string) (map[string]*NodeInfo
 			info.Kind = KindList
 		case "leaf":
 			info.Kind = KindLeaf
+		case "leaf-list":
+			info.Kind = KindLeafList
 		default:
 			// unknown: treat like container-ish to keep traversal working
 			info.Kind = KindContainer
@@ -179,7 +182,7 @@ func UnmarshalTrimmedSchemaIndex(trimmedSchemaJSON string) (map[string]*NodeInfo
 		}
 
 		// Leaf metadata
-		if info.Kind == KindLeaf {
+		if info.Kind == KindLeaf || info.Kind == KindLeafList {
 			compileLeafInfo(&info.Leaf, n)
 		}
 
@@ -230,7 +233,7 @@ func canonicalFullPath(n SchemaNode, parentFull string) string {
 	p := normalizePath(n.Path)
 
 	switch n.Type {
-	case "leaf":
+	case "leaf", "leaf-list":
 		// leaf full path should be parent-path + leaf name
 		if p != "" {
 			return joinPath(p, n.Name)

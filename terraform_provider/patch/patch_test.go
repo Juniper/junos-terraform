@@ -1,7 +1,8 @@
 package patch
 
 import (
-  "testing"
+	"os"
+	"testing"
 )
 
 var TrimmedSchemaJSON = `{
@@ -2256,12 +2257,13 @@ var TrimmedSchemaJSON = `{
 var idx map[string]*NodeInfo
 
 func TestMain(m *testing.M) {
-	// setup 
+	// setup
 	var err error
 	idx, err = UnmarshalTrimmedSchemaIndex(TrimmedSchemaJSON)
 	if err != nil {
 		panic(err)
 	}
+	os.Exit(m.Run())
 }
 
 func TestCreateDiffPatch_ReplaceHostName_DeleteThenCreate(t *testing.T) {
@@ -2269,29 +2271,25 @@ func TestCreateDiffPatch_ReplaceHostName_DeleteThenCreate(t *testing.T) {
 
 	editLeaf := map[string]Change{
 		`configuration/groups[name="base-config"]/system/host-name`: {
-			Op:   "replace",
-			OldV: "dc1-leaf1",
-			NewV: "dc1-leaf1-test",
+			Op:     Replace,
+			OldVal: "dc1-leaf1",
+			NewVal: "dc1-leaf1-test",
 		},
 	}
 
-	correctDiff := `<?xml version="1.0" encoding="UTF-8"?>
-<configuration>
-  <groups>
-    <name>base-config</name>
-    <system>
-      <host-name operation="delete"></host-name>
-      <host-name operation="create">dc1-leaf1-test</host-name>
-    </system>
-  </groups>
-</configuration>`
+	correctDiff := `<configuration>
+  <system>
+    <host-name nc:operation="replace">dc1-leaf1-test</host-name>
+  </system>
+</configuration>
+`
 
 	diff, err := CreateDiffPatch(editLeaf, name)
 	if err != nil {
 		t.Fatalf("CreateDiffPatch returned error: %v", err)
 	}
 
-	if diff != correctDiff {
-		t.Fatalf("diff mismatch\n--- got ---\n%s\n--- want ---\n%s\n", diff, correctDiff)
+	if string(diff) != correctDiff {
+		t.Fatalf("diff mismatch\n--- got ---\n%s\n--- want ---\n%s\n", string(diff), correctDiff)
 	}
 }

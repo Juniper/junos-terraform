@@ -1,6 +1,9 @@
 package patch
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // junosListKeys contains the YANG list key element names common in Junos.
 // "name" covers ~95% of cases (interfaces, units, BGP groups, policies, etc.).
@@ -9,6 +12,101 @@ var junosListKeys = map[string]bool{
 	"name": true,
 	"id":   true,
 	"type": true,
+}
+
+// LeafMapWithSchema flattens an XML tree using schema-derived list keys and
+// node kinds from trimmed_schema metadata.
+//
+// Behavior:
+//   - list identity is derived from schema list key (not hardcoded key names)
+//   - leaf-list entries are represented as distinct set elements by appending
+//     [value=<text>] to the path segment, enabling add/remove diff semantics
+//   - key leaf children are excluded from emitted leaves
+func LeafMapWithSchema(root *Node, idx map[string]*NodeInfo) map[string]string {
+	result := make(map[string]string)
+	leafMapRecurseWithSchema(root, "", result, idx)
+	return result
+}
+
+func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]string, idx map[string]*NodeInfo) {
+	schemaPath := outputPathToSchemaPath(parentPath)
+	segment := buildSegmentWithSchema(node, schemaPath, idx)
+
+	currentPath := segment
+	if parentPath != "" {
+		currentPath = parentPath + "/" + segment
+	}
+
+	if len(node.Children) == 0 {
+		if node.Text == "" {
+			return
+		}
+
+		leafSchemaPath := outputPathToSchemaPath(currentPath)
+		if info, ok := idx[leafSchemaPath]; ok && info.Kind == KindLeafList {
+			currentPath = currentPath + fmt.Sprintf("[value=%s]", node.Text)
+		}
+
+		result[currentPath] = node.Text
+		return
+	}
+
+	for _, child := range node.Children {
+		if isKeyChildWithSchema(child, node, currentPath, idx) {
+			continue
+		}
+		leafMapRecurseWithSchema(child, currentPath, result, idx)
+	}
+}
+
+func buildSegmentWithSchema(node *Node, parentSchemaPath string, idx map[string]*NodeInfo) string {
+	currentSchemaPath := joinPath(parentSchemaPath, node.Tag)
+	if info, ok := idx[currentSchemaPath]; ok && info.Kind == KindList && info.ListKey != "" {
+		for _, child := range node.Children {
+			if child.Tag == info.ListKey && child.Text != "" {
+				return fmt.Sprintf("%s[%s=%s]", node.Tag, info.ListKey, child.Text)
+			}
+		}
+	}
+
+	return buildSegment(node)
+}
+
+func isKeyChildWithSchema(child, parent *Node, parentOutputPath string, idx map[string]*NodeInfo) bool {
+	parentSchemaPath := outputPathToSchemaPath(parentOutputPath)
+	if info, ok := idx[parentSchemaPath]; ok && info.Kind == KindList && info.ListKey != "" {
+		return child.Tag == info.ListKey && child.Text != ""
+	}
+
+	return false
+}
+
+func outputPathToSchemaPath(p string) string {
+	if p == "" {
+		return ""
+	}
+
+	segs := splitPathRespectingQuotes(p)
+	out := make([]string, 0, len(segs))
+	for i, seg := range segs {
+		tag, _, _ := parseSegment(seg)
+
+		if i == 0 && tag == "configuration" {
+			continue
+		}
+		if len(out) == 0 && tag == "groups" {
+			continue
+		}
+		if len(out) == 0 && tag == "name" {
+			continue
+		}
+
+		if tag != "" {
+			out = append(out, tag)
+		}
+	}
+
+	return strings.Join(out, "/")
 }
 
 // LeafMap flattens a *Node tree into a map of XPath-style paths to leaf text
