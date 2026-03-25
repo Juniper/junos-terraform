@@ -142,6 +142,21 @@ func (g *GoNCClient) DeleteConfig(applyGroup string, commit bool) (string, error
 	return output, nil
 }
 
+func sendNetconfPatch(host string, patchXML []byte) error {
+	payload := fmt.Sprintf(
+		`<edit-config>
+  <target><candidate/></target>
+  <default-operation>none</default-operation>
+  <config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+%s
+  </config>
+</edit-config>`,
+		string(patchXML),
+	)
+
+	return sendNetconf(host, payload)
+}
+
 // SendCommit is a wrapper for driver.SendRaw()
 func (g *GoNCClient) SendCommit() error {
 	g.Lock.Lock()
