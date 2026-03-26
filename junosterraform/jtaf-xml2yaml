@@ -336,6 +336,12 @@ def main():
         help='One or more Junos XML config files to convert into host_vars YAML.',
     )
     parser.add_argument(
+        '-t',
+        '--type',
+        required=True,
+        help='Device type used in generated provider/resource names.',
+    )
+    parser.add_argument(
         '-d',
         '--directory',
         required=True,
