@@ -26,27 +26,18 @@ def get_xpaths(root: ElementTree.Element) -> dict[str, bool]:
 
 
 def unique_xpaths(paths: dict[str, bool]) -> list[str]:
-    """Extract unique XPath strings, filtering and normalizing existing paths.
-
-    Removes 'groups/name' entirely and strips 'groups/' prefix from other paths.
+    """Extract unique XPath strings while preserving input path semantics.
 
     Args:
         paths: Dictionary with XPath strings as keys.
 
     Returns:
-        List of unique, normalized XPath strings.
+        List of unique XPath strings.
     """
     path_dict = {}
     result = []
 
     for path in paths:
-        if path == "groups/name":
-            # Skip the groups/name path entirely
-            continue
-        elif path.startswith("groups"):
-            # Remove the "groups/" prefix from other paths
-            path = path[len("groups/"):]
-
         # Only add non-empty paths
         if path:
             path_dict[path] = path
