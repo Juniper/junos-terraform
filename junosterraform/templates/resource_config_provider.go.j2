@@ -63,7 +63,7 @@ import (
 	"context"
 	"encoding/xml"
 	"strings"
-	"terraform_provider/patch"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -678,14 +678,8 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	schemaIdx, err := patch.UnmarshalTrimmedSchemaIndex(TrimmedSchemaJSON)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse trimmed schema index", err.Error())
-		return
-	}
-
-	planMap := patch.LeafMapWithSchema(planTree, schemaIdx)
-	stateMap := patch.LeafMapWithSchema(stateTree, schemaIdx)
+	planMap := patch.LeafMap(planTree)
+	stateMap := patch.LeafMap(stateTree)
 	diffMap := patch.ComputeDiff(stateMap, planMap)
 
 	if len(diffMap) == 0 {
