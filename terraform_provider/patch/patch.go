@@ -166,12 +166,16 @@ func encodeNode(buf *bytes.Buffer, n *Node, depth int) error {
 
 	// Standard XML attributes
 	for k, v := range n.Attrs {
-		buf.WriteString(fmt.Sprintf(` %s="%s"`, k, xmlEscape(v)))
+		if _, err := fmt.Fprintf(buf, ` %s="%s"`, k, xmlEscape(v)); err != nil {
+			return err
+		}
 	}
 
 	// nc:operation attribute — references xmlns:nc on the <config> ancestor
 	if n.Operation != "" {
-		buf.WriteString(fmt.Sprintf(` nc:operation="%s"`, n.Operation))
+		if _, err := fmt.Fprintf(buf, ` nc:operation="%s"`, n.Operation); err != nil {
+			return err
+		}
 	}
 
 	// Self-closing for delete and empty nodes
