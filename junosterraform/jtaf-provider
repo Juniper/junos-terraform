@@ -37,6 +37,25 @@ def rewrite_import_prefixes(go_dir: str, old_prefix: str, new_prefix: str):
                     f.write(updated)
 
 
+def ensure_go_module_name(go_mod_path: str, module_name: str):
+    """Ensure go.mod has the expected module directive."""
+    with open(go_mod_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    updated = False
+    for i, line in enumerate(lines):
+        if line.startswith("module "):
+            expected = f"module {module_name}\n"
+            if line != expected:
+                lines[i] = expected
+                updated = True
+            break
+
+    if updated:
+        with open(go_mod_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+
+
 # Main Method
 def main():
     # other arguments
@@ -80,7 +99,9 @@ def main():
     with open(f"{templates_dir}/resource_config_provider.go.j2") as f:
         jinja2_source = f.read()
     tmpl = Template(jinja2_source)
-    resource_config_provider_go = tmpl.render(data=resources).lstrip()
+    render_context = dict(resources)
+    render_context["device_type"] = args.type
+    resource_config_provider_go = tmpl.render(data=render_context).lstrip()
 
     # Step 3: Prepare new output directory based on type
     with as_file(files('terraform_provider').joinpath('__init__.py')) as init_py:
@@ -117,8 +138,12 @@ def main():
             f.write(rendered)
         print(f"Updated {output_name} with type junos-{args.type}")
 
+    expected_module = f"terraform-provider-junos-{args.type}"
+    go_mod_path = os.path.join(new_dir, "go.mod")
+    ensure_go_module_name(go_mod_path, expected_module)
+
     # Step 8: Normalize import prefixes in copied Go files (including tests).
-    rewrite_import_prefixes(new_dir, "terraform_provider", f"terraform-provider-junos-{args.type}")
+    rewrite_import_prefixes(new_dir, "terraform_provider", expected_module)
 
     # Step 7: Add trimmed_schema.json to new directory
     trimmed_schema_path = os.path.join(new_dir, "trimmed_schema.json")
