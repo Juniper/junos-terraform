@@ -59,10 +59,10 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/xml"
 	"strings"
+	"terraform-provider-junos-{{data.device_type}}/patch"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -579,132 +579,61 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
 
 // Update implements resource.Resource.
 func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	
 	var plan Groups_Model
-	var state Groups_Model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	// Check for errors
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	buildConfigFromModel := func(m Groups_Model) xml_Configuration {
-		var cfg xml_Configuration
-		cfg.Groups.Name = m.ResourceName.ValueStringPointer()
-
-		{% for parent in parent_list %}
-		var var_{{parent.name|replace("-", "_")}} []{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
-		if m.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.IsNull() {
-			var_{{parent.name|replace("-", "_")}} = []{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}
-		} else {
-			resp.Diagnostics.Append(m.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}, false)...)
-			if resp.Diagnostics.HasError() {
-				return cfg
-			}
-		}
-		cfg.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} = make([]xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}, len(var_{{parent.name|replace("-", "_")}}))
-
-		for i_{{parent.name|replace("-", "_")}}, v_{{parent.name|replace("-", "_")}} := range var_{{parent.name|replace("-", "_")}} {
-			{%- for child in parent['children']%}
-			{%- if (child['type'] == 'leaf') %}
-			cfg.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueStringPointer()
-			{%- endif %}
-			{%- if (child['type'] == 'leaf-list') %}
+	var config xml_Configuration
+	config.Groups.Name = plan.ResourceName.ValueStringPointer()
+    
+	{% for parent in parent_list %}
+    var var_{{parent.name|replace("-", "_")}} []{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
+    if plan.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.IsNull() {
+        var_{{parent.name|replace("-", "_")}} = []{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}
+    }else {
+        resp.Diagnostics.Append(plan.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}, false)...)
+        if resp.Diagnostics.HasError() {
+            return
+        }
+    }
+    config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} = make([]xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}, len(var_{{parent.name|replace("-", "_")}}))
+    
+    for i_{{parent.name|replace("-", "_")}}, v_{{parent.name|replace("-", "_")}} := range var_{{parent.name|replace("-", "_")}} {
+        {%- for child in parent['children']%}
+        {%- if (child['type'] == 'leaf') %}
+        config.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueStringPointer()
+        {%- endif %}
+		{%- if (child['type'] == 'leaf-list') %}
 			var var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} []string
 			resp.Diagnostics.Append(v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}, false)...)
-			if resp.Diagnostics.HasError() {
-				return cfg
-			}
 			for _, v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} := range var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} {
-				cfg.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = append(cfg.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}, &v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
+				config.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = append(config.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}, &v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
 			}
-			{%- endif %}
-			{%- if child['type'] == 'container' or child['type']== 'list'%}
-			var var_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")}} []{{get_full_parent_name(child, "_", 'True')}}_{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
-			resp.Diagnostics.Append(v_{{parent.name|replace("-", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")}}, false)...)
-			if resp.Diagnostics.HasError() {
-				return cfg
-			}
-			{{-create_method_macro(child)|replace('config.Groups', 'cfg.Groups')}}
-			{%- endif %}
-			{%- endfor %}
-		}
-		{% endfor %}
-
-		return cfg
-	}
-
-	planConfig := buildConfigFromModel(plan)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	stateConfig := buildConfigFromModel(state)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	marshalConfig := func(c xml_Configuration) ([]byte, error) {
-		var buf bytes.Buffer
-		buf.WriteString(xml.Header)
-		enc := xml.NewEncoder(&buf)
-		enc.Indent("", "  ")
-		if err := enc.Encode(c); err != nil {
-			return nil, err
-		}
-		if err := enc.Flush(); err != nil {
-			return nil, err
-		}
-		return buf.Bytes(), nil
-	}
-
-	planXML, err := marshalConfig(planConfig)
+		{%- endif %}
+        {%- if child['type'] == 'container' or child['type']== 'list'%}
+        var var_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")}} []{{get_full_parent_name(child, "_", 'True')}}_{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
+        resp.Diagnostics.Append(v_{{parent.name|replace("-", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")}}, false)...)
+        if resp.Diagnostics.HasError() {
+            return
+        }
+		{{-create_method_macro(child)}}
+        {%- endif %}
+        {%- endfor %}
+    }
+	{% endfor %}
+	err := r.client.SendTransaction(plan.ResourceName.ValueString(), config, false)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal plan config", err.Error())
+		resp.Diagnostics.AddError("Failed while Sending", err.Error())
 		return
 	}
-	stateXML, err := marshalConfig(stateConfig)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal state config", err.Error())
-		return
-	}
-
-	planTree, err := patch.BuildTree(planXML)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse plan XML", err.Error())
-		return
-	}
-	stateTree, err := patch.BuildTree(stateXML)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse state XML", err.Error())
-		return
-	}
-
-	planMap := patch.LeafMap(planTree)
-	stateMap := patch.LeafMap(stateTree)
-	diffMap := patch.ComputeDiff(stateMap, planMap)
-
-	if len(diffMap) == 0 {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-		return
-	}
-
-	patchXML, err := patch.CreateDiffPatch(diffMap, plan.ResourceName.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to build NETCONF patch", err.Error())
-		return
-	}
-
-	err = r.client.SendUpdate(plan.ResourceName.ValueString(), string(patchXML), false)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed while sending diff patch", err.Error())
-		return
-	}
-
 	commit_err := r.client.SendCommit()
 	if commit_err != nil {
 		resp.Diagnostics.AddError("Failed while committing apply-group", commit_err.Error())
 		return
 	}
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 {################## UPDATE METHOD # ENDS ################}

@@ -1,4 +1,12 @@
+import os
+import shutil
+
 from setuptools import setup
+
+
+build_lib_dir = os.path.join(os.path.dirname(__file__), "build", "lib")
+if os.path.isdir(build_lib_dir):
+    shutil.rmtree(build_lib_dir)
 
 setup(
     name='junosterraform',
@@ -21,6 +29,7 @@ setup(
         "terraform_provider": [
             "*",
             "netconf/*",
+            "patch/*",
             "go-netconf/*",
             "go-netconf/drivers/driver/*",
             "go-netconf/drivers/junos/*",
