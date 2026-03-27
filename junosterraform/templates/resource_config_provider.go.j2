@@ -625,7 +625,7 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
 			if resp.Diagnostics.HasError() {
 				return cfg
 			}
-			{{-create_method_macro(child)|replace('config.Groups', 'cfg.Groups')}}
+			{{-create_method_macro(child)|replace('config.Groups', 'cfg.Groups')|replace('return', 'return cfg')}}
 			{%- endif %}
 			{%- endfor %}
 		}
