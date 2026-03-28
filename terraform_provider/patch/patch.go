@@ -82,7 +82,7 @@ func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error
 			leaf.Text = change.NewVal
 		case Delete:
 			leaf.Operation = "delete"
-			// No text content needed for delete — element will be self-closing
+			leaf.Text = change.OldVal
 		}
 
 		parent.Children = append(parent.Children, leaf)

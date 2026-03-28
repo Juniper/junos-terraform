@@ -269,6 +269,180 @@ class DeviceSession(asyncssh.SSHServerSession):
             return groups_by_name
         return DeviceSession._extract_groups_configurations_regex(xml_text)
 
+    @staticmethod
+    def _extract_operation(elem: ET.Element) -> str:
+        for attr_name, attr_value in elem.attrib.items():
+            if DeviceSession._local_name(attr_name) == "operation":
+                return attr_value
+        return ""
+
+    @staticmethod
+    def _find_child(parent: ET.Element, local_name: str) -> ET.Element | None:
+        for child in list(parent):
+            if DeviceSession._local_name(child.tag) == local_name:
+                return child
+        return None
+
+    @staticmethod
+    def _extract_match_keys(elem: ET.Element) -> dict[str, str]:
+        keys: dict[str, str] = {}
+        for child in list(elem):
+            if DeviceSession._extract_operation(child):
+                continue
+            if list(child):
+                continue
+            if child.text is None:
+                continue
+            local_name = DeviceSession._local_name(child.tag)
+            if local_name == "name":
+                keys[local_name] = child.text.strip()
+        return keys
+
+    @staticmethod
+    def _find_matching_patch_target(
+        parent: ET.Element,
+        patch_elem: ET.Element,
+        operation: str,
+    ) -> ET.Element | None:
+        local_name = DeviceSession._local_name(patch_elem.tag)
+        candidates = [
+            child
+            for child in list(parent)
+            if DeviceSession._local_name(child.tag) == local_name
+        ]
+        if not candidates:
+            return None
+
+        match_keys = DeviceSession._extract_match_keys(patch_elem)
+        if match_keys:
+            for candidate in candidates:
+                matches = True
+                for key_name, key_text in match_keys.items():
+                    key_elem = DeviceSession._find_child(candidate, key_name)
+                    if key_elem is None or (key_elem.text or "").strip() != key_text:
+                        matches = False
+                        break
+                if matches:
+                    return candidate
+            return None
+
+        if not list(patch_elem):
+            patch_text = (patch_elem.text or "").strip()
+            for candidate in candidates:
+                if (candidate.text or "").strip() == patch_text:
+                    return candidate
+
+            # Leaf-list create operations should append a new sibling when no
+            # existing leaf matches the requested value.
+            if operation == "create":
+                return None
+
+        if len(candidates) == 1:
+            return candidates[0]
+
+        return None
+
+    def _resolve_patch_group_name(self) -> str:
+        known_groups = set(self._state.candidate_groups)
+        known_groups.update(self._state.running_groups)
+        known_groups.update(self._state.submitted_xml_by_group)
+
+        if "base-config" in known_groups:
+            return "base-config"
+        if len(known_groups) == 1:
+            return next(iter(known_groups))
+        if known_groups:
+            return sorted(known_groups)[0]
+        return "base-config"
+
+    def _load_group_configuration_root(self, group_name: str) -> ET.Element:
+        raw_config = (
+            self._state.candidate_groups.get(group_name)
+            or self._state.running_groups.get(group_name)
+            or self._state.submitted_xml_by_group.get(group_name)
+            or ""
+        )
+        if raw_config:
+            parsed = self._parse_xml(raw_config)
+            if parsed is not None:
+                return parsed
+
+        configuration = ET.Element("configuration")
+        groups_elem = ET.SubElement(configuration, "groups")
+        name_elem = ET.SubElement(groups_elem, "name")
+        name_elem.text = group_name
+        return configuration
+
+    def _ensure_groups_elem(self, configuration: ET.Element, group_name: str) -> ET.Element:
+        groups_elem = self._find_child(configuration, "groups")
+        if groups_elem is None:
+            groups_elem = ET.SubElement(configuration, "groups")
+
+        name_elem = self._find_child(groups_elem, "name")
+        if name_elem is None:
+            name_elem = ET.Element("name")
+            groups_elem.insert(0, name_elem)
+        if not (name_elem.text or "").strip():
+            name_elem.text = group_name
+        return groups_elem
+
+    def _apply_patch_element(self, parent: ET.Element, patch_elem: ET.Element) -> None:
+        operation = self._extract_operation(patch_elem)
+        target = self._find_matching_patch_target(parent, patch_elem, operation)
+
+        if operation == "delete":
+            if target is not None:
+                parent.remove(target)
+            return
+
+        if target is None:
+            target = ET.SubElement(parent, self._local_name(patch_elem.tag))
+
+        children = list(patch_elem)
+        if not children:
+            target.text = patch_elem.text
+            return
+
+        for child in children:
+            self._apply_patch_element(target, child)
+
+    def _handle_edit_patch(self, xml_text: str, message_id: str) -> bool:
+        if "<edit-config>" not in xml_text or "<load-configuration" in xml_text:
+            return False
+
+        root = self._parse_xml(xml_text)
+        if root is None:
+            return False
+
+        config_elem = None
+        for elem in root.iter():
+            if self._local_name(elem.tag) == "config":
+                config_elem = elem
+                break
+        if config_elem is None:
+            return False
+
+        patch_configuration = self._find_first_configuration(config_elem)
+        if patch_configuration is None:
+            return False
+
+        if not any(self._extract_operation(elem) for elem in patch_configuration.iter()):
+            return False
+
+        group_name = self._resolve_patch_group_name()
+        configuration = self._load_group_configuration_root(group_name)
+        groups_elem = self._ensure_groups_elem(configuration, group_name)
+
+        for child in list(patch_configuration):
+            self._apply_patch_element(groups_elem, child)
+
+        updated_config = ET.tostring(configuration, encoding="unicode")
+        self._state.candidate_groups[group_name] = updated_config
+        self._state.submitted_xml_by_group[group_name] = updated_config
+        self._append_history("edit-config-patch", f"group={group_name}")
+        self._send_frame(self._ok_reply(message_id))
+        return True
+
     def _ok_reply(self, message_id: str) -> str:
         return (
             '<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" '
@@ -386,6 +560,7 @@ class DeviceSession(asyncssh.SSHServerSession):
 
         handlers = (
             self._handle_load_configuration,
+            self._handle_edit_patch,
             self._handle_edit_delete,
             self._handle_discard_changes,
             self._handle_commit,

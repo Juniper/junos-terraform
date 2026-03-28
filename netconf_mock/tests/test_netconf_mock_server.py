@@ -38,6 +38,10 @@ def state_and_session():
     return state, session, channel
 
 
+def base_group_xml(body: str) -> str:
+    return f"<configuration><groups><name>base-config</name>{body}</groups></configuration>"
+
+
 def test_parse_args_accepts_repeated_devices(monkeypatch):
     monkeypatch.setattr(
         sys,
@@ -117,6 +121,232 @@ def test_load_configuration_updates_candidate_and_submitted(state_and_session):
     )
     assert 'message-id="11"' in channel.writes[-1]
     assert "<ok/>" in channel.writes[-1]
+
+
+def test_edit_patch_replace_updates_existing_group(state_and_session):
+    state, session, channel = state_and_session
+
+    state.candidate_groups["base-config"] = (
+        "<configuration><groups><name>base-config</name>"
+        "<system><host-name>leaf1</host-name></system>"
+        "</groups></configuration>"
+    )
+
+    rpc = (
+        '<rpc message-id="11">'
+        "<edit-config><target><candidate/></target>"
+        '<default-operation>none</default-operation>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><system><host-name nc:operation="replace">leaf2</host-name>'
+        "</system></configuration></config></edit-config>"
+        "</rpc>"
+    )
+
+    handled = session._handle_edit_patch(rpc, "11")
+
+    assert handled is True
+    assert "leaf2" in state.candidate_groups["base-config"]
+    assert "leaf1" not in state.candidate_groups["base-config"]
+    assert state.history[-1]["op"] == "edit-config-patch"
+    assert 'message-id="11"' in channel.writes[-1]
+
+
+def test_edit_patch_create_initializes_default_group(state_and_session):
+    state, session, _channel = state_and_session
+
+    rpc = (
+        '<rpc message-id="15">'
+        "<edit-config><target><candidate/></target>"
+        '<default-operation>none</default-operation>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><system><host-name nc:operation="create">leaf1</host-name>'
+        "</system></configuration></config></edit-config>"
+        "</rpc>"
+    )
+
+    handled = session._handle_edit_patch(rpc, "15")
+
+    assert handled is True
+    assert "base-config" in state.candidate_groups
+    assert "<name>base-config</name>" in state.candidate_groups["base-config"]
+    assert "leaf1" in state.candidate_groups["base-config"]
+
+
+def test_handle_rpc_routes_patch_delete_before_group_delete(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = (
+        "<configuration><groups><name>base-config</name><system>"
+        "<services><ssh/></services></system></groups></configuration>"
+    )
+
+    rpc = (
+        '<rpc message-id="16">'
+        "<edit-config><target><candidate/></target>"
+        '<default-operation>none</default-operation>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><system><services nc:operation="delete"/></system></configuration>'
+        "</config></edit-config></rpc>"
+    )
+
+    session._handle_rpc(rpc)
+
+    assert "<services>" not in state.candidate_groups["base-config"]
+    assert state.history[-1]["op"] == "edit-config-patch"
+
+
+def test_edit_patch_create_keyed_list_entry_appends_new_interface(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<interfaces><interface><name>xe-0/0/0</name>"
+        "<description>uplink-0</description></interface></interfaces>"
+    )
+
+    rpc = (
+        '<rpc message-id="17">'
+        "<edit-config><target><candidate/></target>"
+        '<default-operation>none</default-operation>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><interfaces><interface nc:operation="create">'
+        '<name>xe-0/0/1</name><description>uplink-1</description>'
+        "</interface></interfaces></configuration></config></edit-config></rpc>"
+    )
+
+    assert session._handle_edit_patch(rpc, "17") is True
+    updated = state.candidate_groups["base-config"]
+    assert updated.count("<interface>") == 2
+    assert "xe-0/0/1" in updated
+    assert "uplink-1" in updated
+
+
+def test_edit_patch_replace_leaf_in_keyed_nested_path(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<interfaces><interface><name>lo0</name><unit><name>0</name>"
+        "<family><inet><address><name>203.0.113.1/32</name>"
+        "<description>old-desc</description></address></inet></family>"
+        "</unit></interface></interfaces>"
+    )
+
+    rpc = (
+        '<rpc message-id="18">'
+        "<edit-config><target><candidate/></target>"
+        '<default-operation>none</default-operation>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><interfaces><interface><name>lo0</name><unit><name>0</name>'
+        '<family><inet><address><name>203.0.113.1/32</name>'
+        '<description nc:operation="replace">new-desc</description>'
+        "</address></inet></family></unit></interface></interfaces></configuration>"
+        "</config></edit-config></rpc>"
+    )
+
+    assert session._handle_edit_patch(rpc, "18") is True
+    updated = state.candidate_groups["base-config"]
+    assert "new-desc" in updated
+    assert "old-desc" not in updated
+
+
+def test_edit_patch_delete_keyed_list_entry_removes_matching_interface(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<interfaces>"
+        "<interface><name>xe-0/0/0</name><description>keep</description></interface>"
+        "<interface><name>xe-0/0/1</name><description>delete-me</description></interface>"
+        "</interfaces>"
+    )
+
+    rpc = (
+        '<rpc message-id="19">'
+        "<edit-config><target><candidate/></target>"
+        '<default-operation>none</default-operation>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><interfaces><interface nc:operation="delete">'
+        "<name>xe-0/0/1</name></interface></interfaces></configuration>"
+        "</config></edit-config></rpc>"
+    )
+
+    assert session._handle_edit_patch(rpc, "19") is True
+    updated = state.candidate_groups["base-config"]
+    assert "xe-0/0/1" not in updated
+    assert "delete-me" not in updated
+    assert "xe-0/0/0" in updated
+
+
+def test_edit_patch_create_leaf_list_appends_new_value(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<system><domain-search>example.com</domain-search></system>"
+    )
+
+    rpc = (
+        '<rpc message-id="20">'
+        "<edit-config><target><candidate/></target>"
+        '<default-operation>none</default-operation>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><system><domain-search nc:operation="create">lab.example</domain-search>'
+        "</system></configuration></config></edit-config></rpc>"
+    )
+
+    assert session._handle_edit_patch(rpc, "20") is True
+    updated = state.candidate_groups["base-config"]
+    assert updated.count("<domain-search>") == 2
+    assert "example.com" in updated
+    assert "lab.example" in updated
+
+
+def test_edit_patch_delete_leaf_list_value_removes_only_matching_value(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<system><domain-search>example.com</domain-search>"
+        "<domain-search>lab.example</domain-search></system>"
+    )
+
+    rpc = (
+        '<rpc message-id="21">'
+        "<edit-config><target><candidate/></target>"
+        '<default-operation>none</default-operation>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><system><domain-search nc:operation="delete">lab.example</domain-search>'
+        "</system></configuration></config></edit-config></rpc>"
+    )
+
+    assert session._handle_edit_patch(rpc, "21") is True
+    updated = state.candidate_groups["base-config"]
+    assert "lab.example" not in updated
+    assert "example.com" in updated
+    assert updated.count("<domain-search>") == 1
+
+
+def test_edit_patch_mixed_operations_updates_configuration_consistently(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<system><host-name>leaf1</host-name><services><ssh/></services></system>"
+    )
+
+    rpc = (
+        '<rpc message-id="22">'
+        "<edit-config><target><candidate/></target>"
+        '<default-operation>none</default-operation>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><system>'
+        '<host-name nc:operation="replace">leaf2</host-name>'
+        '<services nc:operation="delete"/>'
+        '<domain-name nc:operation="create">example.net</domain-name>'
+        "</system></configuration></config></edit-config></rpc>"
+    )
+
+    assert session._handle_edit_patch(rpc, "22") is True
+    updated = state.candidate_groups["base-config"]
+    assert "leaf2" in updated
+    assert "leaf1" not in updated
+    assert "<services>" not in updated
+    assert "example.net" in updated
 
 
 def test_commit_discard_and_delete_flow(state_and_session):

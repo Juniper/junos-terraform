@@ -2293,3 +2293,30 @@ func TestCreateDiffPatch_ReplaceHostName_DeleteThenCreate(t *testing.T) {
 		t.Fatalf("diff mismatch\n--- got ---\n%s\n--- want ---\n%s\n", string(diff), correctDiff)
 	}
 }
+
+func TestCreateDiffPatch_DeleteLeafListValueIncludesOldValue(t *testing.T) {
+	name := "base-config"
+
+	editLeaf := map[string]Change{
+		`configuration/groups[name="base-config"]/system/name-server[value="203.0.113.10"]`: {
+			Op:     Delete,
+			OldVal: "203.0.113.10",
+		},
+	}
+
+	correctDiff := `<configuration>
+  <system>
+    <name-server nc:operation="delete">203.0.113.10</name-server>
+  </system>
+</configuration>
+`
+
+	diff, err := CreateDiffPatch(editLeaf, name)
+	if err != nil {
+		t.Fatalf("CreateDiffPatch returned error: %v", err)
+	}
+
+	if string(diff) != correctDiff {
+		t.Fatalf("diff mismatch\n--- got ---\n%s\n--- want ---\n%s\n", string(diff), correctDiff)
+	}
+}

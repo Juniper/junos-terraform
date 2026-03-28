@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	netconf "nemith.io/netconf"
 )
 
 // newMockClient creates a client with an injected RPC executor for deterministic tests.
@@ -65,6 +66,26 @@ func TestSendUpdateBaseConfigPayload(t *testing.T) {
 	}
 	if !strings.Contains(calls[0], "<edit-config>") || !strings.Contains(calls[0], "<default-operation>none</default-operation>") {
 		t.Fatalf("expected patch edit-config envelope, got %q", calls[0])
+	}
+}
+
+// TestNetconfRPCSerializationUsesInnerXML verifies raw operations are embedded
+// directly in <rpc> without wrapper elements like <Operation> or <RawXML>.
+func TestNetconfRPCSerializationUsesInnerXML(t *testing.T) {
+	rpcBytes, err := xml.Marshal(&netconf.RPC{
+		MessageID: "1",
+		Operation: []byte("<edit-config><target><candidate/></target></edit-config>"),
+	})
+	if err != nil {
+		t.Fatalf("xml.Marshal() returned error: %v", err)
+	}
+
+	rpcXML := string(rpcBytes)
+	if !strings.Contains(rpcXML, "<edit-config>") {
+		t.Fatalf("expected edit-config payload in rpc, got %q", rpcXML)
+	}
+	if strings.Contains(rpcXML, "<Operation>") || strings.Contains(rpcXML, "<RawXML>") {
+		t.Fatalf("expected raw payload without wrapper element, got %q", rpcXML)
 	}
 }
 

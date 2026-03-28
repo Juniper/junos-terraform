@@ -108,7 +108,7 @@ func (g *GoNCClient) execute(ctx context.Context, operation string) (string, err
 		Data    string   `xml:",innerxml"`
 	}{}
 
-	if err := session.Exec(ctx, netconf.RawXML(operation), &reply); err != nil {
+	if err := session.Exec(ctx, []byte(operation), &reply); err != nil {
 		return "", err
 	}
 
