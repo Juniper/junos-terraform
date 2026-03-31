@@ -543,35 +543,37 @@ class DeviceSession(asyncssh.SSHServerSession):
         for child in children:
             self._apply_patch_element(target, child, child_name_counts)
 
-    def _handle_edit_patch(self, xml_text: str, message_id: str) -> bool:
+    def _extract_patch_configuration(self, xml_text: str) -> ET.Element | None:
         if "<edit-config>" not in xml_text or "<load-configuration" in xml_text:
-            return False
+            return None
 
         root = self._parse_xml(xml_text)
         if root is None:
-            return False
+            return None
 
-        config_elem = None
-        for elem in root.iter():
-            if self._local_name(elem.tag) == "config":
-                config_elem = elem
-                break
+        config_elem = next(
+            (elem for elem in root.iter() if self._local_name(elem.tag) == "config"),
+            None,
+        )
         if config_elem is None:
-            return False
+            return None
 
         patch_configuration = self._find_first_configuration(config_elem)
         if patch_configuration is None:
-            return False
+            return None
 
         if not any(self._extract_operation(elem) for elem in patch_configuration.iter()):
-            return False
+            return None
 
         if self._is_group_delete_rpc(patch_configuration):
-            return False
+            return None
 
+        return patch_configuration
+
+    def _apply_patch_configuration(self, patch_configuration: ET.Element) -> str | None:
         patch_children = self._iter_patch_children(patch_configuration)
         if not patch_children:
-            return False
+            return None
 
         group_name = self._resolve_patch_group_name()
         configuration = self._load_group_configuration_root(group_name)
@@ -583,6 +585,17 @@ class DeviceSession(asyncssh.SSHServerSession):
         updated_config = ET.tostring(configuration, encoding="unicode")
         self._state.candidate_groups[group_name] = updated_config
         self._state.submitted_xml_by_group[group_name] = updated_config
+        return group_name
+
+    def _handle_edit_patch(self, xml_text: str, message_id: str) -> bool:
+        patch_configuration = self._extract_patch_configuration(xml_text)
+        if patch_configuration is None:
+            return False
+
+        group_name = self._apply_patch_configuration(patch_configuration)
+        if group_name is None:
+            return False
+
         self._append_history("edit-config-patch", f"group={group_name}")
         self._send_frame(self._ok_reply(message_id))
         return True
