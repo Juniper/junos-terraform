@@ -173,6 +173,29 @@ func TestUpdateRawConfigMissingName(t *testing.T) {
 	}
 }
 
+// TestUpdateRawConfigIgnoresMissingDelete verifies initial group creation tolerates missing-group deletes.
+func TestUpdateRawConfigIgnoresMissingDelete(t *testing.T) {
+	calls := []string{}
+	client := &GoNCClient{
+		Lock: sync.RWMutex{},
+		exec: func(_ context.Context, op string) (string, error) {
+			calls = append(calls, op)
+			if strings.Contains(op, "operation=\"delete\"") {
+				return "", errors.New("multiple netconf errors: netconf error: application data-missing: statement not found")
+			}
+			return "<ok/>", nil
+		},
+	}
+
+	_, err := client.updateRawConfig("group", "<configuration><groups><name>group</name></groups></configuration>", false)
+	if err != nil {
+		t.Fatalf("expected missing delete to be ignored, got: %v", err)
+	}
+	if len(calls) != 2 {
+		t.Fatalf("expected delete then load calls, got %d", len(calls))
+	}
+}
+
 // TestSendRawConfigCommitFlow verifies raw config load followed by commit.
 func TestSendRawConfigCommitFlow(t *testing.T) {
 	calls := []string{}
@@ -430,6 +453,23 @@ func TestDeleteConfigBranches(t *testing.T) {
 		_, err := client.DeleteConfig("grp", true)
 		if err == nil {
 			t.Fatalf("expected commit error")
+		}
+	})
+
+	t.Run("missing group delete", func(t *testing.T) {
+		client := &GoNCClient{
+			Lock: sync.RWMutex{},
+			exec: func(_ context.Context, _ string) (string, error) {
+				return "", errors.New("netconf error: application data-missing: statement not found")
+			},
+		}
+
+		reply, err := client.DeleteConfig("grp", false)
+		if err != nil {
+			t.Fatalf("expected missing-group delete to be ignored, got: %v", err)
+		}
+		if reply != "<ok/>" {
+			t.Fatalf("expected synthetic ok reply, got %q", reply)
 		}
 	})
 }

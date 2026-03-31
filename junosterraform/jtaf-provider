@@ -7,7 +7,6 @@ import sys
 from jinja2 import Template
 import os
 import shutil
-import distutils.dir_util
 import os
 from importlib.resources import files, as_file
 from junosterraform.jtaf_common import filter_json_using_xml, load_and_merge_xmls
@@ -109,8 +108,9 @@ def main():
     new_dir = f"terraform-provider-junos-{args.type}"
 
     # Step 4: copy the template go files into place
-    distutils.dir_util.copy_tree(go_dir, new_dir)
-    shutil.copytree(go_dir, new_dir, dirs_exist_ok=True)
+    if os.path.exists(new_dir):
+        shutil.rmtree(new_dir)
+    shutil.copytree(go_dir, new_dir)
     # if there is a terraform_provider executable left over from go testing, remove it
     tp_exe = f"{new_dir}/terraform_provider"
     if os.path.exists(tp_exe):

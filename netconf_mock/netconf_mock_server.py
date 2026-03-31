@@ -299,48 +299,101 @@ class DeviceSession(asyncssh.SSHServerSession):
         return keys
 
     @staticmethod
+    def _matching_children(parent: ET.Element, patch_elem: ET.Element) -> list[ET.Element]:
+        local_name = DeviceSession._local_name(patch_elem.tag)
+        return [
+            child
+            for child in list(parent)
+            if DeviceSession._local_name(child.tag) == local_name
+        ]
+
+    @staticmethod
+    def _find_candidate_by_keys(
+        candidates: list[ET.Element],
+        match_keys: dict[str, str],
+    ) -> ET.Element | None:
+        for candidate in candidates:
+            matches = True
+            for key_name, key_text in match_keys.items():
+                key_elem = DeviceSession._find_child(candidate, key_name)
+                if key_elem is None or (key_elem.text or "").strip() != key_text:
+                    matches = False
+                    break
+            if matches:
+                return candidate
+        return None
+
+    @staticmethod
+    def _find_leaf_value_candidate(
+        candidates: list[ET.Element],
+        patch_elem: ET.Element,
+        operation: str,
+    ) -> ET.Element | None:
+        patch_text = (patch_elem.text or "").strip()
+        for candidate in candidates:
+            if (candidate.text or "").strip() == patch_text:
+                return candidate
+
+        # Leaf-list create operations should append a new sibling when no
+        # existing leaf matches the requested value.
+        if operation == "create":
+            return None
+
+        if len(candidates) == 1:
+            return candidates[0]
+        return None
+
+    @staticmethod
     def _find_matching_patch_target(
         parent: ET.Element,
         patch_elem: ET.Element,
         operation: str,
     ) -> ET.Element | None:
-        local_name = DeviceSession._local_name(patch_elem.tag)
-        candidates = [
-            child
-            for child in list(parent)
-            if DeviceSession._local_name(child.tag) == local_name
-        ]
+        candidates = DeviceSession._matching_children(parent, patch_elem)
         if not candidates:
             return None
 
         match_keys = DeviceSession._extract_match_keys(patch_elem)
         if match_keys:
-            for candidate in candidates:
-                matches = True
-                for key_name, key_text in match_keys.items():
-                    key_elem = DeviceSession._find_child(candidate, key_name)
-                    if key_elem is None or (key_elem.text or "").strip() != key_text:
-                        matches = False
-                        break
-                if matches:
-                    return candidate
-            return None
+            return DeviceSession._find_candidate_by_keys(candidates, match_keys)
 
         if not list(patch_elem):
-            patch_text = (patch_elem.text or "").strip()
-            for candidate in candidates:
-                if (candidate.text or "").strip() == patch_text:
-                    return candidate
-
-            # Leaf-list create operations should append a new sibling when no
-            # existing leaf matches the requested value.
-            if operation == "create":
-                return None
+            return DeviceSession._find_leaf_value_candidate(candidates, patch_elem, operation)
 
         if len(candidates) == 1:
             return candidates[0]
 
         return None
+
+    @staticmethod
+    def _extract_load_configuration_action(xml_text: str) -> str:
+        root = DeviceSession._parse_xml(xml_text)
+        if root is not None:
+            for elem in root.iter():
+                if DeviceSession._local_name(elem.tag) != "load-configuration":
+                    continue
+                return (elem.attrib.get("action") or "").strip().lower()
+
+        m = re.search(r'<load-configuration[^>]*\baction="([^"]+)"', xml_text)
+        return m.group(1).strip().lower() if m else ""
+
+    def _merge_group_configuration(self, group_name: str, incoming_config: str) -> str:
+        existing_root = self._load_group_configuration_root(group_name)
+        incoming_root = self._parse_xml(incoming_config)
+        if incoming_root is None:
+            return incoming_config
+
+        existing_groups = self._ensure_groups_elem(existing_root, group_name)
+        incoming_groups = self._find_child(incoming_root, "groups")
+        if incoming_groups is None:
+            return incoming_config
+
+        for child in list(incoming_groups):
+            if self._local_name(child.tag) == "name":
+                continue
+            self._apply_patch_element(existing_groups, child)
+
+        return ET.tostring(existing_root, encoding="unicode")
 
     def _resolve_patch_group_name(self) -> str:
         known_groups = set(self._state.candidate_groups)
@@ -457,25 +510,33 @@ class DeviceSession(asyncssh.SSHServerSession):
         if "<load-configuration" not in xml_text:
             return False
 
+        action = self._extract_load_configuration_action(xml_text)
         groups_cfg = self._extract_groups_configurations(xml_text)
         if not groups_cfg:
             groups_cfg = self._extract_groups_from_configuration_set(xml_text)
         if groups_cfg:
             for group_name, cfg in groups_cfg.items():
+                if action == "merge":
+                    cfg = self._merge_group_configuration(group_name, cfg)
                 self._state.candidate_groups[group_name] = cfg
                 self._state.submitted_xml_by_group[group_name] = cfg
             self._append_history(
                 "load-configuration",
-                f"groups={','.join(sorted(groups_cfg.keys()))}",
+                f"action={action or 'replace'} groups={','.join(sorted(groups_cfg.keys()))}",
             )
         else:
             # Fallback for malformed/minimal payloads.
             group_name = self._extract_group_name(xml_text)
             cfg = self._extract_configuration(xml_text)
             if group_name and cfg:
+                if action == "merge":
+                    cfg = self._merge_group_configuration(group_name, cfg)
                 self._state.candidate_groups[group_name] = cfg
                 self._state.submitted_xml_by_group[group_name] = cfg
-                self._append_history("load-configuration", f"group={group_name}")
+                self._append_history(
+                    "load-configuration",
+                    f"action={action or 'replace'} group={group_name}",
+                )
         self._send_frame(self._ok_reply(message_id))
         return True
 

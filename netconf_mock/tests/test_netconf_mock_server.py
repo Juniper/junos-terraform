@@ -519,6 +519,36 @@ def test_load_configuration_regex_fallback_updates_all_groups(state_and_session)
     assert "203.0.113.250/32" not in state.candidate_groups["base-config"]
 
 
+def test_load_configuration_merge_preserves_existing_group_content(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<interfaces><interface><name>lo0</name><unit><name>0</name>"
+        "<family><inet><address><name>198.51.100.10/32</name></address></inet></family>"
+        "</unit></interface></interfaces>"
+        "<system><host-name>leaf1</host-name></system>"
+    )
+
+    rpc = (
+        '<rpc message-id="122">'
+        '<load-configuration action="merge" format="xml">'
+        '<configuration><groups><name>base-config</name>'
+        '<interfaces><interface><name>lo0</name><unit><name>0</name>'
+        '<family><inet><address><name>203.0.113.250/32</name></address></inet></family>'
+        '</unit></interface></interfaces>'
+        '</groups></configuration>'
+        '</load-configuration></rpc>'
+    )
+
+    handled = session._handle_load_configuration(rpc, "122")
+
+    assert handled is True
+    updated = state.candidate_groups["base-config"]
+    assert "198.51.100.10/32" in updated
+    assert "203.0.113.250/32" in updated
+    assert "<host-name>leaf1</host-name>" in updated
+
+
 def test_dump_state_if_requested_writes_json(tmp_path):
     out_file = tmp_path / "state.json"
     state = MODULE.DeviceState(name="leaf1")

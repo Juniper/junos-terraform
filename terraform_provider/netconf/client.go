@@ -65,6 +65,22 @@ type configuration struct {
 	ApplyGroup []string `xml:"apply-groups"`
 }
 
+func debugRPC(label string, payload string) {
+	if os.Getenv("JUNOS_TF_DEBUG_RPC") == "" {
+		return
+	}
+	fmt.Printf("\n=== %s ===\n%s\n", label, payload)
+}
+
+func isMissingDeleteError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errText := strings.ToLower(err.Error())
+	return strings.Contains(errText, "data-missing") && strings.Contains(errText, "statement not found")
+}
+
 type operationExecutor func(ctx context.Context, operation string) (string, error)
 
 // GoNCClient implements the provider-facing NETCONF client API on top of nemith/netconf.
@@ -112,6 +128,9 @@ func (g *GoNCClient) execute(ctx context.Context, operation string) (string, err
 		return "", err
 	}
 
+	debugRPC("rpc request", operation)
+	debugRPC("rpc reply", reply.Data)
+
 	return reply.Data, nil
 }
 
@@ -123,7 +142,9 @@ func (g *GoNCClient) updateRawConfig(applyGroup string, netconfCall string, comm
 	ctx := context.Background()
 	deleteString := fmt.Sprintf(deleteStr, applyGroup, applyGroup)
 	if _, err := g.execute(ctx, deleteString); err != nil {
-		return "", err
+		if !isMissingDeleteError(err) {
+			return "", err
+		}
 	}
 
 	nameStart := strings.Index(netconfCall, "<name>")
@@ -158,7 +179,10 @@ func (g *GoNCClient) DeleteConfig(applyGroup string, commit bool) (string, error
 	deleteString := fmt.Sprintf(deleteStr, applyGroup, applyGroup)
 	reply, err := g.execute(ctx, deleteString)
 	if err != nil {
-		return "", err
+		if !isMissingDeleteError(err) {
+			return "", err
+		}
+		reply = "<ok/>"
 	}
 
 	if commit {

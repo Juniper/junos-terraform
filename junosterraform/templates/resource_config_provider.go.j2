@@ -396,6 +396,7 @@ func (r *resource_Apply_Groups) Create(ctx context.Context, req resource.CreateR
     }
     config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} = make([]xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}, len(var_{{parent.name|replace("-", "_")}}))
    
+	{%- if parent['children'] | length > 0 %}
     for i_{{parent.name|replace("-", "_")}}, v_{{parent.name|replace("-", "_")}} := range var_{{parent.name|replace("-", "_")}} {
         {%- for child in parent['children']%}
         {%- if (child['type'] == 'leaf') %}
@@ -418,6 +419,7 @@ func (r *resource_Apply_Groups) Create(ctx context.Context, req resource.CreateR
         {%- endif %}
         {%- endfor %}
     }
+	{%- endif %}
 	{% endfor %}
 	err := r.client.SendTransaction(plan.ResourceName.ValueString(), config, false)
 	if err != nil {
@@ -520,6 +522,7 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
     {{parent.name|replace("-", "_")}}_List := make([]{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model,
         len(config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}))
 
+	{%- if parent['children'] | length > 0 %}
     for i_{{parent.name|replace("-", "_")}}, v_{{parent.name|replace("-", "_")}} := range config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} {
         var {{parent.name|replace("-", "_")}}_model {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
 
@@ -556,6 +559,12 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
 
         {{parent.name|replace("-", "_")}}_List[i_{{parent.name|replace("-", "_")}}] = {{parent.name|replace("-", "_")}}_model
     }
+	{%- else %}
+	for i_{{parent.name|replace("-", "_")}} := range config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} {
+		var {{parent.name|replace("-", "_")}}_model {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
+		{{parent.name|replace("-", "_")}}_List[i_{{parent.name|replace("-", "_")}}] = {{parent.name|replace("-", "_")}}_model
+	}
+	{%- endif %}
 
     // Write parent list as Null when empty
     if len({{parent.name|replace("-", "_")}}_List) == 0 {
@@ -581,9 +590,7 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
 // Update implements resource.Resource.
 func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan Groups_Model
-	var state Groups_Model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -604,6 +611,7 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
 		}
 		cfg.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} = make([]xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}, len(var_{{parent.name|replace("-", "_")}}))
 
+		{%- if parent['children'] | length > 0 %}
 		for i_{{parent.name|replace("-", "_")}}, v_{{parent.name|replace("-", "_")}} := range var_{{parent.name|replace("-", "_")}} {
 			{%- for child in parent['children']%}
 			{%- if (child['type'] == 'leaf') %}
@@ -629,6 +637,7 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
 			{%- endif %}
 			{%- endfor %}
 		}
+		{%- endif %}
 		{% endfor %}
 
 		return cfg
@@ -638,8 +647,11 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	stateConfig := buildConfigFromModel(state)
-	if resp.Diagnostics.HasError() {
+
+	var stateConfig xml_Configuration
+	err := r.client.MarshalGroup(plan.ResourceName.ValueString(), &stateConfig)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed while reading current apply-group", err.Error())
 		return
 	}
 
@@ -700,7 +712,8 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	err = r.client.SendUpdate(plan.ResourceName.ValueString(), string(patchXML), false)
+	patchPayload := wrapGroupPatch(plan.ResourceName.ValueString(), string(patchXML))
+	err = r.client.SendUpdate(plan.ResourceName.ValueString(), patchPayload, false)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed while sending diff patch", err.Error())
 		return
@@ -709,6 +722,39 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
 	if commit_err != nil {
 		resp.Diagnostics.AddError("Failed while committing apply-group", commit_err.Error())
 		return
+	}
+
+	var verifiedConfig xml_Configuration
+	err = r.client.MarshalGroup(plan.ResourceName.ValueString(), &verifiedConfig)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed while reading patched apply-group", err.Error())
+		return
+	}
+
+	verifiedXML, err := marshalConfig(verifiedConfig)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to marshal verified config", err.Error())
+		return
+	}
+	verifiedTree, err := patch.BuildTree(verifiedXML)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to parse verified XML", err.Error())
+		return
+	}
+
+	verifiedMap := patch.LeafMapWithSchema(verifiedTree, idx)
+	remainingDiff := patch.ComputeDiff(verifiedMap, planMap)
+	if len(remainingDiff) > 0 {
+		err = r.client.SendTransaction(plan.ResourceName.ValueString(), planConfig, false)
+		if err != nil {
+			resp.Diagnostics.AddError("Patch had no effect and fallback update failed", err.Error())
+			return
+		}
+		commit_err = r.client.SendCommit()
+		if commit_err != nil {
+			resp.Diagnostics.AddError("Fallback update commit failed", commit_err.Error())
+			return
+		}
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -738,5 +784,14 @@ func (r *resource_Apply_Groups) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+func wrapGroupPatch(groupName string, patchXML string) string {
+	if strings.Contains(patchXML, "<groups>") || groupName == "" {
+		return patchXML
+	}
+
+	inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(patchXML), "<configuration>"), "</configuration>"))
+	return "<configuration><groups><name>" + groupName + "</name>" + inner + "</groups></configuration>"
 }
 {################## DELETE METHOD # ENDS ################}
