@@ -55,6 +55,7 @@ class DeviceState:
     name: str
     running_groups: dict[str, str] = field(default_factory=dict)
     candidate_groups: dict[str, str] = field(default_factory=dict)
+    deleted_candidate_groups: set[str] = field(default_factory=set)
     submitted_xml_by_group: dict[str, str] = field(default_factory=dict)
     rpc_log: list[str] = field(default_factory=list)
     history: list[dict[str, str]] = field(default_factory=list)
@@ -68,6 +69,7 @@ class DeviceState:
             "name": self.name,
             "running_groups": self.running_groups,
             "candidate_groups": self.candidate_groups,
+            "deleted_candidate_groups": sorted(self.deleted_candidate_groups),
             "submitted_xml_by_group": self.submitted_xml_by_group,
             "rpc_log": self.rpc_log,
             "history": self.history,
@@ -328,6 +330,7 @@ class DeviceSession(asyncssh.SSHServerSession):
         candidates: list[ET.Element],
         patch_elem: ET.Element,
         operation: str,
+        sibling_count: int,
     ) -> ET.Element | None:
         patch_text = (patch_elem.text or "").strip()
         for candidate in candidates:
@@ -339,6 +342,13 @@ class DeviceSession(asyncssh.SSHServerSession):
         if operation == "create":
             return None
 
+        # Merge payloads can contain repeated simple siblings such as
+        # <protocol>bgp</protocol><protocol>direct</protocol>. Treat these as
+        # leaf-list entries and append distinct values instead of overwriting
+        # the first matching tag.
+        if sibling_count > 1:
+            return None
+
         if len(candidates) == 1:
             return candidates[0]
         return None
@@ -348,6 +358,7 @@ class DeviceSession(asyncssh.SSHServerSession):
         parent: ET.Element,
         patch_elem: ET.Element,
         operation: str,
+        sibling_count: int = 1,
     ) -> ET.Element | None:
         candidates = DeviceSession._matching_children(parent, patch_elem)
         if not candidates:
@@ -358,7 +369,12 @@ class DeviceSession(asyncssh.SSHServerSession):
             return DeviceSession._find_candidate_by_keys(candidates, match_keys)
 
         if not list(patch_elem):
-            return DeviceSession._find_leaf_value_candidate(candidates, patch_elem, operation)
+            return DeviceSession._find_leaf_value_candidate(
+                candidates,
+                patch_elem,
+                operation,
+                sibling_count,
+            )
 
         if len(candidates) == 1:
             return candidates[0]
@@ -426,6 +442,13 @@ class DeviceSession(asyncssh.SSHServerSession):
         return "base-config"
 
     def _load_group_configuration_root(self, group_name: str) -> ET.Element:
+        if group_name in self._state.deleted_candidate_groups:
+            configuration = ET.Element("configuration")
+            groups_elem = ET.SubElement(configuration, "groups")
+            name_elem = ET.SubElement(groups_elem, "name")
+            name_elem.text = group_name
+            return configuration
+
         raw_config = (
             self._state.candidate_groups.get(group_name)
             or self._state.running_groups.get(group_name)
@@ -456,9 +479,44 @@ class DeviceSession(asyncssh.SSHServerSession):
             name_elem.text = group_name
         return groups_elem
 
-    def _apply_patch_element(self, parent: ET.Element, patch_elem: ET.Element) -> None:
+    def _iter_patch_children(self, patch_configuration: ET.Element) -> list[ET.Element]:
+        patch_children: list[ET.Element] = []
+        for child in list(patch_configuration):
+            if self._local_name(child.tag) != "groups":
+                patch_children.append(child)
+                continue
+
+            for groups_child in list(child):
+                if self._local_name(groups_child.tag) == "name":
+                    continue
+                patch_children.append(groups_child)
+
+        return patch_children
+
+    def _is_group_delete_rpc(self, patch_configuration: ET.Element) -> bool:
+        children = list(patch_configuration)
+        if not children:
+            return False
+
+        has_group_delete = any(
+            self._local_name(child.tag) == "groups" and self._extract_operation(child) == "delete"
+            for child in children
+        )
+        if not has_group_delete:
+            return False
+
+        return all(self._local_name(child.tag) in {"groups", "apply-groups"} for child in children)
+
+    def _apply_patch_element(
+        self,
+        parent: ET.Element,
+        patch_elem: ET.Element,
+        sibling_name_counts: dict[str, int] | None = None,
+    ) -> None:
         operation = self._extract_operation(patch_elem)
-        target = self._find_matching_patch_target(parent, patch_elem, operation)
+        local_name = self._local_name(patch_elem.tag)
+        sibling_count = 1 if sibling_name_counts is None else sibling_name_counts.get(local_name, 1)
+        target = self._find_matching_patch_target(parent, patch_elem, operation, sibling_count)
 
         if operation == "delete":
             if target is not None:
@@ -466,7 +524,7 @@ class DeviceSession(asyncssh.SSHServerSession):
             return
 
         if target is None:
-            target = ET.SubElement(parent, self._local_name(patch_elem.tag))
+            target = ET.SubElement(parent, local_name)
 
         children = list(patch_elem)
         if not children:
@@ -477,8 +535,13 @@ class DeviceSession(asyncssh.SSHServerSession):
             parent.remove(target)
             return
 
+        child_name_counts: dict[str, int] = {}
         for child in children:
-            self._apply_patch_element(target, child)
+            child_local_name = self._local_name(child.tag)
+            child_name_counts[child_local_name] = child_name_counts.get(child_local_name, 0) + 1
+
+        for child in children:
+            self._apply_patch_element(target, child, child_name_counts)
 
     def _handle_edit_patch(self, xml_text: str, message_id: str) -> bool:
         if "<edit-config>" not in xml_text or "<load-configuration" in xml_text:
@@ -503,11 +566,18 @@ class DeviceSession(asyncssh.SSHServerSession):
         if not any(self._extract_operation(elem) for elem in patch_configuration.iter()):
             return False
 
+        if self._is_group_delete_rpc(patch_configuration):
+            return False
+
+        patch_children = self._iter_patch_children(patch_configuration)
+        if not patch_children:
+            return False
+
         group_name = self._resolve_patch_group_name()
         configuration = self._load_group_configuration_root(group_name)
         groups_elem = self._ensure_groups_elem(configuration, group_name)
 
-        for child in list(patch_configuration):
+        for child in patch_children:
             self._apply_patch_element(groups_elem, child)
 
         updated_config = ET.tostring(configuration, encoding="unicode")
@@ -540,6 +610,7 @@ class DeviceSession(asyncssh.SSHServerSession):
                 if action == "merge":
                     cfg = self._merge_group_configuration(group_name, cfg)
                 self._state.candidate_groups[group_name] = cfg
+                self._state.deleted_candidate_groups.discard(group_name)
                 self._state.submitted_xml_by_group[group_name] = cfg
             self._append_history(
                 "load-configuration",
@@ -553,6 +624,7 @@ class DeviceSession(asyncssh.SSHServerSession):
                 if action == "merge":
                     cfg = self._merge_group_configuration(group_name, cfg)
                 self._state.candidate_groups[group_name] = cfg
+                self._state.deleted_candidate_groups.discard(group_name)
                 self._state.submitted_xml_by_group[group_name] = cfg
                 self._append_history(
                     "load-configuration",
@@ -568,6 +640,8 @@ class DeviceSession(asyncssh.SSHServerSession):
         group_name = self._extract_group_name(xml_text)
         if group_name:
             self._state.candidate_groups.pop(group_name, None)
+            self._state.deleted_candidate_groups.add(group_name)
+            self._state.submitted_xml_by_group.pop(group_name, None)
             self._append_history("edit-config-delete", f"group={group_name}")
         self._send_frame(self._ok_reply(message_id))
         return True
@@ -577,6 +651,7 @@ class DeviceSession(asyncssh.SSHServerSession):
             return False
 
         self._state.candidate_groups = copy.deepcopy(self._state.running_groups)
+        self._state.deleted_candidate_groups.clear()
         self._append_history("discard-changes", "candidate reset from running")
         self._send_frame(self._ok_reply(message_id))
         return True
@@ -586,6 +661,9 @@ class DeviceSession(asyncssh.SSHServerSession):
             return False
 
         self._state.running_groups = copy.deepcopy(self._state.candidate_groups)
+        for group_name in self._state.deleted_candidate_groups:
+            self._state.running_groups.pop(group_name, None)
+        self._state.deleted_candidate_groups.clear()
         self._append_history("commit", f"groups={len(self._state.running_groups)}")
         self._send_frame(self._ok_reply(message_id))
         return True

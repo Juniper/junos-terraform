@@ -94,6 +94,26 @@ func TestLeafMapWithSchema_UsesSchemaListKey(t *testing.T) {
 	}
 }
 
+func TestLeafMapWithSchema_KeyOnlyListEmitsKeyLeaf(t *testing.T) {
+	idx := mustIdx(t)
+	xmlStr := `<configuration>
+  <groups>
+    <name>g1</name>
+    <foo>
+      <item>
+        <address>10.0.0.1</address>
+      </item>
+    </foo>
+  </groups>
+</configuration>`
+
+	m := LeafMapWithSchema(mustTree(t, xmlStr), idx)
+	path := `configuration/groups[name=g1]/foo/item[address=10.0.0.1]/address`
+	if got := m[path]; got != "10.0.0.1" {
+		t.Fatalf("expected %s => 10.0.0.1, got %q", path, got)
+	}
+}
+
 func TestLeafMapWithSchema_LeafListSetDiff(t *testing.T) {
 	idx := mustIdx(t)
 	stateXML := `<configuration>

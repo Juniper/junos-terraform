@@ -172,6 +172,32 @@ def test_edit_patch_create_initializes_default_group(state_and_session):
     assert "leaf1" in state.candidate_groups["base-config"]
 
 
+def test_edit_patch_group_wrapped_payload_updates_existing_group(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<system><host-name>leaf1</host-name></system>"
+    )
+
+    rpc = (
+        '<rpc message-id="15a">'
+        "<edit-config><target><candidate/></target>"
+        '<default-operation>none</default-operation>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><groups><name>base-config</name>'
+        '<system><host-name nc:operation="replace">leaf2</host-name></system>'
+        "</groups></configuration></config></edit-config></rpc>"
+    )
+
+    handled = session._handle_edit_patch(rpc, "15a")
+
+    assert handled is True
+    updated = state.candidate_groups["base-config"]
+    assert updated.count("<groups>") == 1
+    assert "leaf2" in updated
+    assert "leaf1" not in updated
+
+
 def test_handle_rpc_routes_patch_delete_before_group_delete(state_and_session):
     state, session, _channel = state_and_session
 
@@ -577,6 +603,95 @@ def test_load_configuration_merge_preserves_existing_group_content(state_and_ses
     assert "198.51.100.10/32" in updated
     assert "203.0.113.250/32" in updated
     assert "<host-name>leaf1</host-name>" in updated
+
+
+def test_load_configuration_merge_preserves_repeated_leaf_list_values(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<policy-options><policy-statement><name>IPCLOS_BGP_IMP</name>"
+        "<term><name>loopback</name><from><protocol>direct</protocol></from></term>"
+        "</policy-statement></policy-options>"
+    )
+
+    rpc = (
+        '<rpc message-id="123">'
+        '<load-configuration action="merge" format="xml">'
+        '<configuration><groups><name>base-config</name>'
+        '<policy-options><policy-statement><name>IPCLOS_BGP_IMP</name>'
+        '<term><name>loopback</name><from>'
+        '<protocol>bgp</protocol><protocol>direct</protocol>'
+        '</from></term></policy-statement></policy-options>'
+        '</groups></configuration>'
+        '</load-configuration></rpc>'
+    )
+
+    handled = session._handle_load_configuration(rpc, "123")
+
+    assert handled is True
+    updated = state.candidate_groups["base-config"]
+    assert updated.count("<protocol>") == 2
+    assert "<protocol>bgp</protocol>" in updated
+    assert "<protocol>direct</protocol>" in updated
+
+
+def test_delete_then_merge_rebuilds_group_from_empty_candidate(state_and_session):
+    state, session, _channel = state_and_session
+
+    existing = base_group_xml(
+        "<interfaces><interface><name>lo0</name><unit><name>0</name>"
+        "<family><inet>"
+        "<address><name>10.30.100.3/32</name></address>"
+        "<address><name>203.0.113.250/32</name></address>"
+        "</inet></family></unit></interface></interfaces>"
+    )
+    state.running_groups["base-config"] = existing
+    state.candidate_groups["base-config"] = existing
+    state.submitted_xml_by_group["base-config"] = existing
+
+    delete_rpc = (
+        '<rpc message-id="124">'
+        '<edit-config><target><candidate/></target><config><configuration>'
+        '<groups operation="delete"><name>base-config</name></groups>'
+        '</configuration></config></edit-config></rpc>'
+    )
+    merge_rpc = (
+        '<rpc message-id="125">'
+        '<load-configuration action="merge" format="xml">'
+        '<configuration><groups><name>base-config</name>'
+        '<interfaces><interface><name>lo0</name><unit><name>0</name>'
+        '<family><inet><address><name>10.30.100.3/32</name></address>'
+        '</inet></family></unit></interface></interfaces>'
+        '</groups></configuration>'
+        '</load-configuration></rpc>'
+    )
+
+    assert session._handle_edit_delete(delete_rpc, "124") is True
+    assert session._handle_load_configuration(merge_rpc, "125") is True
+    updated = state.candidate_groups["base-config"]
+    assert "10.30.100.3/32" in updated
+    assert "203.0.113.250/32" not in updated
+
+
+def test_handle_rpc_routes_group_delete_to_edit_delete(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<system><host-name>leaf1</host-name></system>"
+    )
+
+    rpc = (
+        '<rpc message-id="126">'
+        '<edit-config><target><candidate/></target><config><configuration>'
+        '<groups operation="delete"><name>base-config</name></groups>'
+        '<apply-groups operation="delete">base-config</apply-groups>'
+        '</configuration></config></edit-config></rpc>'
+    )
+
+    session._handle_rpc(rpc)
+
+    assert "base-config" not in state.candidate_groups
+    assert state.history[-1]["op"] == "edit-config-delete"
 
 
 def test_dump_state_if_requested_writes_json(tmp_path):

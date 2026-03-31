@@ -51,12 +51,41 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 		return
 	}
 
+	if keyPath, keyValue, ok := keyOnlyListLeaf(node, currentPath, idx); ok {
+		result[keyPath] = keyValue
+		return
+	}
+
 	for _, child := range node.Children {
 		if isKeyChildWithSchema(child, node, currentPath, idx) {
 			continue
 		}
 		leafMapRecurseWithSchema(child, currentPath, result, idx)
 	}
+}
+
+func keyOnlyListLeaf(node *Node, currentPath string, idx map[string]*NodeInfo) (string, string, bool) {
+	schemaPath := outputPathToSchemaPath(currentPath)
+	info, ok := idx[schemaPath]
+	if !ok || info.Kind != KindList || info.ListKey == "" {
+		return "", "", false
+	}
+
+	var keyValue string
+	nonKeyChildren := 0
+	for _, child := range node.Children {
+		if child.Tag == info.ListKey && child.Text != "" {
+			keyValue = child.Text
+			continue
+		}
+		nonKeyChildren++
+	}
+
+	if keyValue == "" || nonKeyChildren != 0 {
+		return "", "", false
+	}
+
+	return currentPath + "/" + info.ListKey, keyValue, true
 }
 
 func buildSegmentWithSchema(node *Node, parentSchemaPath string, idx map[string]*NodeInfo) string {
