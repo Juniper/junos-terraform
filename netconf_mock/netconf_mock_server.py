@@ -366,6 +366,23 @@ class DeviceSession(asyncssh.SSHServerSession):
         return None
 
     @staticmethod
+    def _deletes_matched_keyed_entry(patch_elem: ET.Element) -> bool:
+        match_keys = DeviceSession._extract_match_keys(patch_elem)
+        if not match_keys:
+            return False
+
+        for child in list(patch_elem):
+            if DeviceSession._extract_operation(child) != "delete":
+                continue
+            local_name = DeviceSession._local_name(child.tag)
+            if local_name not in match_keys:
+                continue
+            if (child.text or "").strip() == match_keys[local_name]:
+                return True
+
+        return False
+
+    @staticmethod
     def _extract_load_configuration_action(xml_text: str) -> str:
         root = DeviceSession._parse_xml(xml_text)
         if root is not None:
@@ -454,6 +471,10 @@ class DeviceSession(asyncssh.SSHServerSession):
         children = list(patch_elem)
         if not children:
             target.text = patch_elem.text
+            return
+
+        if target is not None and self._deletes_matched_keyed_entry(patch_elem):
+            parent.remove(target)
             return
 
         for child in children:

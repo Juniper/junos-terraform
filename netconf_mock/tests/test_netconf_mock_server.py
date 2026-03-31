@@ -248,6 +248,36 @@ def test_edit_patch_replace_leaf_in_keyed_nested_path(state_and_session):
     assert "old-desc" not in updated
 
 
+def test_edit_patch_delete_keyed_nested_list_entry_removes_whole_address(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<interfaces><interface><name>lo0</name><unit><name>0</name>"
+        "<family><inet>"
+        "<address><name>198.51.100.10/32</name></address>"
+        "<address><name>203.0.113.250/32</name></address>"
+        "</inet></family></unit></interface></interfaces>"
+    )
+
+    rpc = (
+        '<rpc message-id="18a">'
+        "<edit-config><target><candidate/></target>"
+        '<default-operation>none</default-operation>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><interfaces><interface><name>lo0</name><unit><name>0</name>'
+        '<family><inet><address><name>203.0.113.250/32</name>'
+        '<name nc:operation="delete">203.0.113.250/32</name>'
+        "</address></inet></family></unit></interface></interfaces></configuration>"
+        "</config></edit-config></rpc>"
+    )
+
+    assert session._handle_edit_patch(rpc, "18a") is True
+    updated = state.candidate_groups["base-config"]
+    assert "198.51.100.10/32" in updated
+    assert "203.0.113.250/32" not in updated
+    assert updated.count("<address>") == 1
+
+
 def test_edit_patch_delete_keyed_list_entry_removes_matching_interface(state_and_session):
     state, session, _channel = state_and_session
 
