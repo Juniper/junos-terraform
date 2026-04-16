@@ -1,5 +1,8 @@
 {############# COMMON VARIABLES # STARTS ################}
-{%- set parent_list = data['root']['children'][0]['children']%}
+{%- set parent_list = data['root']['children'][0]['children']
+	| rejectattr('name', 'equalto', 'groups')
+	| rejectattr('name', 'equalto', 'apply-groups')
+	| list %}
 
 {############### COMMON VARIABLES # ENDS ####################}
 
@@ -62,9 +65,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/xml"
-	"strings"
+	"fmt"
+	"os"
 	"terraform-provider-junos-{{data.device_type}}/patch"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -109,13 +114,9 @@ type xml_{{get_full_parent_name(ele, "_", 'True')}}_{{ele.name|capitalize|replac
 
 type xml_Configuration struct {
 	XMLName xml.Name `xml:"configuration"`
-	Groups struct {
-		XMLName xml.Name `xml:"groups"`
-		Name    *string   `xml:"name"`
-		{%- for parent in parent_list %}
-		{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} []xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} `xml:"{{parent.name}},omitempty"`
-		{%- endfor %}
-	}
+	{%- for parent in parent_list %}
+	{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} []xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} `xml:"{{parent.name}},omitempty"`
+	{%- endfor %}
 }
 {%- for parent in parent_list %}
 type xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} struct {
@@ -182,14 +183,14 @@ func (o {{get_full_parent_name(parent, "_", 'True')}}_{{parent.name|capitalize|r
 	    {%- if (child['type'] == 'leaf') %}
 	    "{{child.name|replace("-", "_")|replace(".", "_")}}": schema.StringAttribute{
 		    Optional: true,
-		    MarkdownDescription: "xpath is `config.Groups.{{child.name|capitalize}}.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}`",
+		    MarkdownDescription: "xpath is `config.{{child.name|capitalize}}.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}`",
 	    },
 	    {%- endif %}
 		{%- if (child['type'] == 'leaf-list') %}
 		"{{child.name|replace("-", "_")|replace(".", "_")}}": schema.ListAttribute{
 			ElementType:         types.StringType,
 			Optional:            true,
-			MarkdownDescription: "xpath is `config.Groups.{{child.name|capitalize}}.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}`",
+			MarkdownDescription: "xpath is `config.{{child.name|capitalize}}.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}`",
 		},
 		{%- endif %}
 	    {%- if child['type'] == 'list' or child['type'] == 'container' %}
@@ -210,25 +211,26 @@ func (o {{get_full_parent_name(parent, "_", 'True')}}_{{parent.name|capitalize|r
 {%- endif %}
 {%- endmacro %}
 
-// Collecting objects from the .tf file
-type Groups_Model struct {
+// Collecting objects from the .tf file.
+type ConfigResourceModel struct {
 	ResourceName	types.String `tfsdk:"resource_name"`
 	{%- for parent in parent_list %}
 	{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} types.List `tfsdk:"{{parent.name|replace("-", "_")}}"`
 	{%- endfor %}
 }
-func (o Groups_Model) AttrTypes() map[string]attr.Type {
+func (o ConfigResourceModel) AttrTypes() map[string]attr.Type {
 	return map[string]attr.Type {
+		"resource_name": 	types.StringType,
 		{%- for parent in parent_list %}
 		"{{parent.name|replace("-", "_")}}": 	types.ListType{ElemType: types.ObjectType{AttrTypes: {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}.AttrTypes()}},
 		{%- endfor %}
 	}
 }
-func (o Groups_Model) Attributes() map[string]schema.Attribute {
+func (o ConfigResourceModel) Attributes() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"resource_name": schema.StringAttribute {
 			Required: true,
-			MarkdownDescription: "xpath is `config.Groups.resource_name`",
+			MarkdownDescription: "xpath is `config.resource_name`",
 		},
 		{%- for parent in parent_list %}
 		"{{parent.name|replace("-", "_")}}": schema.ListNestedAttribute{
@@ -277,14 +279,14 @@ func (o {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model) At
 		{%- if (child['type'] == 'leaf') %}
 		"{{child.name|replace("-", "_")}}": schema.StringAttribute{
 			Optional: true,
-			MarkdownDescription: "xpath is `config.Groups.{{parent.name|capitalize}}.{{child.name|capitalize}}`",
+			MarkdownDescription: "xpath is `config.{{parent.name|capitalize}}.{{child.name|capitalize}}`",
 		},
 		{%- endif %}
 		{%- if (child['type'] == 'leaf-list') %}
 		"{{child.name|replace("-", "_")|replace(".", "_")}}": schema.ListAttribute{
 			ElementType:         types.StringType,
 			Optional:            true,
-			MarkdownDescription: "xpath is `config.Groups.{{child.name|capitalize}}.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}`",
+			MarkdownDescription: "xpath is `config.{{child.name|capitalize}}.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}`",
 		},
 		{%- endif %}
 		{%- if (child['type'] == 'list') or (child['type'] == 'container') %}
@@ -305,23 +307,23 @@ func (o {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model) At
 {################ STRUCT FROM TF # ENDS ###############}
 
 {################ SCHEMA DEFINITION # STARTS ###########}
-// Collects the data for the crud work
-type resource_Apply_Groups struct {
+// Collects the data for the CRUD work.
+type configResource struct {
 	client ProviderConfig
 }
 
-func (r *resource_Apply_Groups) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
+func (r *configResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 	r.client = req.ProviderData.(ProviderConfig)
 }
 // Metadata implements resource.Resource.
-func (r *resource_Apply_Groups) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *configResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = "terraform-provider-" + req.ProviderTypeName
 }
 // Schema implements resource.Resource.
-func (r *resource_Apply_Groups) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *configResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"resource_name": schema.StringAttribute{
@@ -339,24 +341,186 @@ func (r *resource_Apply_Groups) Schema(_ context.Context, req resource.SchemaReq
 		},
 	}
 }
+
+{%- macro model_to_config_macro(ele) %}
+	    cfg.{{get_parent_list_with_iterator(ele)}}.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} = make([]xml_{{get_full_parent_name(ele, "_", "True")}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}, len(var_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}))
+		{# Below condition is added to skip for loop for nodes which have empty children #}
+		{%- if ele['children'] | length > 0%}
+		for i_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}, v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}} := range var_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}} {
+			{%- for child in ele['children']%}
+			{%- if (child['type'] == 'leaf') %}
+			cfg.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueStringPointer()
+			{%- endif %}
+			{%- if (child['type'] == 'leaf-list') %}
+			var var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} []string
+			diags.Append(v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}, false)...)
+			if diags.HasError() {
+				return cfg
+			}
+			for _, v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} := range var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} {
+				cfg.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = append(cfg.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}, &v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
+			}
+			{%- endif %}
+			{%- if child['type'] == 'list' or child['type'] == 'container'%}
+			var var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} []{{get_full_parent_name(child, "_", 'True')}}_{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
+			diags.Append(v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}, false)...)
+			if diags.HasError() {
+				return cfg
+			}
+				{{-model_to_config_macro(child)}}
+			{%- endif %}
+			{%- endfor %}
+		}
+		{%- endif %}
+{%- endmacro %}
+
+func modelToConfig(ctx context.Context, model ConfigResourceModel, diags *diag.Diagnostics) xml_Configuration {
+	var cfg xml_Configuration
+
+	{% for parent in parent_list %}
+	var var_{{parent.name|replace("-", "_")}} []{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
+	if model.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.IsNull() {
+		var_{{parent.name|replace("-", "_")}} = []{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}
+	} else {
+		diags.Append(model.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}, false)...)
+		if diags.HasError() {
+			return cfg
+		}
+	}
+	cfg.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} = make([]xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}, len(var_{{parent.name|replace("-", "_")}}))
+
+	{%- if parent['children'] | length > 0 %}
+	for i_{{parent.name|replace("-", "_")}}, v_{{parent.name|replace("-", "_")}} := range var_{{parent.name|replace("-", "_")}} {
+		{%- for child in parent['children']%}
+		{%- if (child['type'] == 'leaf') %}
+		cfg.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueStringPointer()
+		{%- endif %}
+		{%- if (child['type'] == 'leaf-list') %}
+		var var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} []string
+		diags.Append(v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}, false)...)
+		if diags.HasError() {
+			return cfg
+		}
+		for _, v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} := range var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} {
+			cfg.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = append(cfg.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}, &v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
+		}
+		{%- endif %}
+		{%- if child['type'] == 'container' or child['type']== 'list'%}
+		var var_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")}} []{{get_full_parent_name(child, "_", 'True')}}_{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
+		diags.Append(v_{{parent.name|replace("-", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")}}, false)...)
+		if diags.HasError() {
+			return cfg
+		}
+		{{-model_to_config_macro(child)}}
+		{%- endif %}
+		{%- endfor %}
+	}
+	{%- endif %}
+	{% endfor %}
+
+	return cfg
+}
+
+func marshalConfigXML(config xml_Configuration) ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteString(xml.Header)
+	enc := xml.NewEncoder(&buf)
+	enc.Indent("", "  ")
+	if err := enc.Encode(config); err != nil {
+		return nil, err
+	}
+	if err := enc.Flush(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func alignConfigToReference(ctx context.Context, config xml_Configuration, reference ConfigResourceModel, diags *diag.Diagnostics) (xml_Configuration, error) {
+	referenceConfig := modelToConfig(ctx, reference, diags)
+	if diags.HasError() {
+		return xml_Configuration{}, nil
+	}
+
+	currentXML, err := marshalConfigXML(config)
+	if err != nil {
+		return xml_Configuration{}, err
+	}
+	referenceXML, err := marshalConfigXML(referenceConfig)
+	if err != nil {
+		return xml_Configuration{}, err
+	}
+
+	idx, err := patch.UnmarshalTrimmedSchemaIndex(TrimmedSchemaJSON)
+	if err != nil {
+		return xml_Configuration{}, err
+	}
+
+	alignedXML, err := patch.AlignXMLOrderToReference(currentXML, referenceXML, idx)
+	if err != nil {
+		return xml_Configuration{}, err
+	}
+
+	var aligned xml_Configuration
+	if err := xml.Unmarshal(alignedXML, &aligned); err != nil {
+		return xml_Configuration{}, err
+	}
+
+	return aligned, nil
+}
+
+func (r *configResource) readStateFromDevice(ctx context.Context, reference ConfigResourceModel, diags *diag.Diagnostics) (ConfigResourceModel, bool) {
+	var config xml_Configuration
+	if err := r.client.MarshalConfig(&config); err != nil {
+		diags.AddError("Failed to read configuration", err.Error())
+		return ConfigResourceModel{}, false
+	}
+
+	alignedConfig, err := alignConfigToReference(ctx, config, reference, diags)
+	if err != nil {
+		diags.AddError("Failed to align configuration order", err.Error())
+		return ConfigResourceModel{}, false
+	}
+	if diags.HasError() {
+		return ConfigResourceModel{}, false
+	}
+
+	return mergeReadStateWithReference(ctx, configToModel(ctx, alignedConfig), reference), true
+}
+
+func mergeReadStateWithReference(ctx context.Context, observed ConfigResourceModel, reference ConfigResourceModel) ConfigResourceModel {
+	// resource_name is Terraform-only (not in device XML), always preserve from plan.
+	observed.ResourceName = reference.ResourceName
+
+	// For each top-level list attribute, if device readback returned null but the
+	// plan had a value, preserve the plan value.  This handles containers whose
+	// XML structs are empty (no modeled children) so the Go XML unmarshaler
+	// returns nil and configToModel maps them to types.ListNull.
+	{%- for parent in parent_list %}
+	if observed.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.IsNull() && !reference.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.IsNull() {
+		observed.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} = reference.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}
+	}
+	{%- endfor %}
+
+	return observed
+}
 {###################### SCHEMA DEFINITION # ENDS ###############}
 
 {####################### CREATE METHOD # STARTS ################}
 
 {%- macro create_method_macro(ele) %}
-	    config.Groups.{{get_parent_list_with_iterator(ele)}}.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} = make([]xml_{{get_full_parent_name(ele, "_", "True")}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}, len(var_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}))
+	    config.{{get_parent_list_with_iterator(ele)}}.{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}} = make([]xml_{{get_full_parent_name(ele, "_", "True")}}_{{ele.name|capitalize|replace("-", "_")|replace(".", "_")}}, len(var_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}))
         {# Below condition is added to skip for loop for nodes which have empty children #}
 		{%- if ele['children'] | length > 0%}
 		for i_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}}, v_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}} := range var_{{get_full_parent_name(ele, "_")}}_{{ele.name|replace("-", "_")|replace(".", "_")}} {
             {%- for child in ele['children']%}
             {%- if (child['type'] == 'leaf') %}
-            config.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueStringPointer()
+            config.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueStringPointer()
             {%- endif %}
 			{%- if (child['type'] == 'leaf-list') %}
 			var var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} []string
 			resp.Diagnostics.Append(v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}, false)...)
 			for _, v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} := range var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} {
-				config.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = append(config.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}, &v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
+				config.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = append(config.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}, &v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
 			}
 			{%- endif %}
             {%- if child['type'] == 'list' or child['type'] == 'container'%}
@@ -373,65 +537,33 @@ func (r *resource_Apply_Groups) Schema(_ context.Context, req resource.SchemaReq
 {%- endmacro %}
 
 // Create implements resource.Resource.
-func (r *resource_Apply_Groups) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *configResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	
-	var plan Groups_Model
+	var plan ConfigResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	// Check for errors
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	var config xml_Configuration
-	config.Groups.Name = plan.ResourceName.ValueStringPointer()
-    
-	{% for parent in parent_list %}
-    var var_{{parent.name|replace("-", "_")}} []{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
-    if plan.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.IsNull() {
-        var_{{parent.name|replace("-", "_")}} = []{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}
-    }else {
-        resp.Diagnostics.Append(plan.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}, false)...)
-        if resp.Diagnostics.HasError() {
-            return
-        }
-    }
-    config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} = make([]xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}, len(var_{{parent.name|replace("-", "_")}}))
-   
-	{%- if parent['children'] | length > 0 %}
-    for i_{{parent.name|replace("-", "_")}}, v_{{parent.name|replace("-", "_")}} := range var_{{parent.name|replace("-", "_")}} {
-        {%- for child in parent['children']%}
-        {%- if (child['type'] == 'leaf') %}
-        config.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueStringPointer()
-        {%- endif %}
-		{%- if (child['type'] == 'leaf-list') %}
-			var var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} []string
-			resp.Diagnostics.Append(v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}, false)...)
-			for _, v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} := range var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} {
-				config.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = append(config.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}, &v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
-			}
-		{%- endif %}
-        {%- if child['type'] == 'container' or child['type']== 'list'%}
-        var var_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")}} []{{get_full_parent_name(child, "_", 'True')}}_{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
-        resp.Diagnostics.Append(v_{{parent.name|replace("-", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")}}, false)...)
-        if resp.Diagnostics.HasError() {
-            return
-        }
-		{{-create_method_macro(child)}}
-        {%- endif %}
-        {%- endfor %}
-    }
-	{%- endif %}
-	{% endfor %}
-	err := r.client.SendTransaction(plan.ResourceName.ValueString(), config, false)
+	config := modelToConfig(ctx, plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	err := r.client.SendDirectTransaction(config, false)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed while adding group", err.Error())
+		resp.Diagnostics.AddError("Failed while applying configuration", err.Error())
 		return
 	}
 	commit_err := r.client.SendCommit()
 	if commit_err != nil {
-		resp.Diagnostics.AddError("Failed while committing apply-group", commit_err.Error())
+		resp.Diagnostics.AddError("Failed while committing configuration", commit_err.Error())
 		return
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	state, ok := r.readStateFromDevice(ctx, plan, &resp.Diagnostics)
+	if !ok {
+		return
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 {#################### CREATE METHOD # ENDS ################}
 
@@ -498,20 +630,8 @@ func (r *resource_Apply_Groups) Create(ctx context.Context, req resource.CreateR
         {{get_full_parent_name(ele, "_")}}_List[i_{{get_full_parent_name(ele, "_")}}] = {{get_full_parent_name(ele, "_")}}_model
 {%- endmacro %}
 
-func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-    
-    var state Groups_Model
-    resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-    if resp.Diagnostics.HasError() {
-        return
-    }
-
-    var config xml_Configuration
-    err := r.client.MarshalGroup(state.ResourceName.ValueString(), &config)
-    if err != nil {
-        resp.Diagnostics.AddError("Failed to read group", err.Error())
-        return
-    }
+func configToModel(ctx context.Context, config xml_Configuration) ConfigResourceModel {
+	var state ConfigResourceModel
 
     {%- for parent in parent_list %}
     // Initialize {{parent.name}} as Null; only materialize when we have elements
@@ -520,10 +640,10 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
 
     // Build list from device
     {{parent.name|replace("-", "_")}}_List := make([]{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model,
-        len(config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}))
+        len(config.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}))
 
 	{%- if parent['children'] | length > 0 %}
-    for i_{{parent.name|replace("-", "_")}}, v_{{parent.name|replace("-", "_")}} := range config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} {
+    for i_{{parent.name|replace("-", "_")}}, v_{{parent.name|replace("-", "_")}} := range config.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} {
         var {{parent.name|replace("-", "_")}}_model {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
 
         {%- for child in parent['children'] %}
@@ -560,7 +680,7 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
         {{parent.name|replace("-", "_")}}_List[i_{{parent.name|replace("-", "_")}}] = {{parent.name|replace("-", "_")}}_model
     }
 	{%- else %}
-	for i_{{parent.name|replace("-", "_")}} := range config.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} {
+	for i_{{parent.name|replace("-", "_")}} := range config.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} {
 		var {{parent.name|replace("-", "_")}}_model {{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
 		{{parent.name|replace("-", "_")}}_List[i_{{parent.name|replace("-", "_")}}] = {{parent.name|replace("-", "_")}}_model
 	}
@@ -579,8 +699,22 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
     }
     {%- endfor %}
 
-    // Persist final state once after all parents processed
-    resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+    return state
+}
+
+func (r *configResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var priorState ConfigResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &priorState)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	state, ok := r.readStateFromDevice(ctx, priorState, &resp.Diagnostics)
+	if !ok {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 {############ READ METHOD # ENDS ################}
@@ -588,93 +722,31 @@ func (r *resource_Apply_Groups) Read(ctx context.Context, req resource.ReadReque
 {################ UPDATE METHOD # STARTS #############}
 
 // Update implements resource.Resource.
-func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan Groups_Model
+func (r *configResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan ConfigResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	buildConfigFromModel := func(m Groups_Model) xml_Configuration {
-		var cfg xml_Configuration
-		cfg.Groups.Name = m.ResourceName.ValueStringPointer()
-
-		{% for parent in parent_list %}
-		var var_{{parent.name|replace("-", "_")}} []{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
-		if m.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.IsNull() {
-			var_{{parent.name|replace("-", "_")}} = []{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model{}
-		} else {
-			resp.Diagnostics.Append(m.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}, false)...)
-			if resp.Diagnostics.HasError() {
-				return cfg
-			}
-		}
-		cfg.Groups.{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}} = make([]xml_{{parent.name|capitalize|replace("-", "_")|replace(".", "_")}}, len(var_{{parent.name|replace("-", "_")}}))
-
-		{%- if parent['children'] | length > 0 %}
-		for i_{{parent.name|replace("-", "_")}}, v_{{parent.name|replace("-", "_")}} := range var_{{parent.name|replace("-", "_")}} {
-			{%- for child in parent['children']%}
-			{%- if (child['type'] == 'leaf') %}
-			cfg.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ValueStringPointer()
-			{%- endif %}
-			{%- if (child['type'] == 'leaf-list') %}
-			var var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} []string
-			resp.Diagnostics.Append(v_{{get_full_parent_name(child, "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}}, false)...)
-			if resp.Diagnostics.HasError() {
-				return cfg
-			}
-			for _, v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} := range var_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}} {
-				cfg.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}} = append(cfg.Groups.{{get_parent_list_with_iterator(child)}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}, &v_{{get_full_parent_name(child, "_")}}_{{child.name|replace("-", "_")|replace(".", "_")}})
-			}
-			{%- endif %}
-			{%- if child['type'] == 'container' or child['type']== 'list'%}
-			var var_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")}} []{{get_full_parent_name(child, "_", 'True')}}_{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}_Model
-			resp.Diagnostics.Append(v_{{parent.name|replace("-", "_")}}.{{child.name|capitalize|replace("-", "_")|replace(".", "_")}}.ElementsAs(ctx, &var_{{parent.name|replace("-", "_")}}_{{child.name|replace("-", "_")}}, false)...)
-			if resp.Diagnostics.HasError() {
-				return cfg
-			}
-			{{-create_method_macro(child)|replace('config.Groups', 'cfg.Groups')|replace('return', 'return cfg')}}
-			{%- endif %}
-			{%- endfor %}
-		}
-		{%- endif %}
-		{% endfor %}
-
-		return cfg
-	}
-
-	planConfig := buildConfigFromModel(plan)
+	planConfig := modelToConfig(ctx, plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	var stateConfig xml_Configuration
-	err := r.client.MarshalGroup(plan.ResourceName.ValueString(), &stateConfig)
+	err := r.client.MarshalConfig(&stateConfig)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed while reading current apply-group", err.Error())
+		resp.Diagnostics.AddError("Failed while reading current configuration", err.Error())
 		return
 	}
 
-	marshalConfig := func(c xml_Configuration) ([]byte, error) {
-		var buf bytes.Buffer
-		buf.WriteString(xml.Header)
-		enc := xml.NewEncoder(&buf)
-		enc.Indent("", "  ")
-		if err := enc.Encode(c); err != nil {
-			return nil, err
-		}
-		if err := enc.Flush(); err != nil {
-			return nil, err
-		}
-		return buf.Bytes(), nil
-	}
-
-	planXML, err := marshalConfig(planConfig)
+	planXML, err := marshalConfigXML(planConfig)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to marshal plan config", err.Error())
 		return
 	}
-	stateXML, err := marshalConfig(stateConfig)
+	stateXML, err := marshalConfigXML(stateConfig)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to marshal state config", err.Error())
 		return
@@ -702,7 +774,11 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
 	diffMap := patch.ComputeDiff(stateMap, planMap)
 
 	if len(diffMap) == 0 {
-		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		state, ok := r.readStateFromDevice(ctx, plan, &resp.Diagnostics)
+		if !ok {
+			return
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 		return
 	}
 
@@ -712,26 +788,27 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	patchPayload := wrapGroupPatch(plan.ResourceName.ValueString(), string(patchXML))
-	err = r.client.SendUpdate(plan.ResourceName.ValueString(), patchPayload, false)
+	patchPayload := string(patchXML)
+	debugPatchUpdate(plan.ResourceName.ValueString(), planXML, stateXML, diffMap, patchPayload)
+	err = r.client.SendUpdate("", patchPayload, false)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed while sending diff patch", err.Error())
 		return
 	}
 	commit_err := r.client.SendCommit()
 	if commit_err != nil {
-		resp.Diagnostics.AddError("Failed while committing apply-group", commit_err.Error())
+		resp.Diagnostics.AddError("Failed while committing configuration", commit_err.Error())
 		return
 	}
 
 	var verifiedConfig xml_Configuration
-	err = r.client.MarshalGroup(plan.ResourceName.ValueString(), &verifiedConfig)
+	err = r.client.MarshalConfig(&verifiedConfig)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed while reading patched apply-group", err.Error())
+		resp.Diagnostics.AddError("Failed while reading patched configuration", err.Error())
 		return
 	}
 
-	verifiedXML, err := marshalConfig(verifiedConfig)
+	verifiedXML, err := marshalConfigXML(verifiedConfig)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to marshal verified config", err.Error())
 		return
@@ -745,7 +822,7 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
 	verifiedMap := patch.LeafMapWithSchema(verifiedTree, idx)
 	remainingDiff := patch.ComputeDiff(verifiedMap, planMap)
 	if len(remainingDiff) > 0 {
-		err = r.client.SendTransaction(plan.ResourceName.ValueString(), planConfig, false)
+		err = r.client.SendDirectTransaction(planConfig, false)
 		if err != nil {
 			resp.Diagnostics.AddError("Patch had no effect and fallback update failed", err.Error())
 			return
@@ -756,42 +833,95 @@ func (r *resource_Apply_Groups) Update(ctx context.Context, req resource.UpdateR
 			return
 		}
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	state, ok := r.readStateFromDevice(ctx, plan, &resp.Diagnostics)
+	if !ok {
+		return
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 {################## UPDATE METHOD # ENDS ################}
 
 {################## DELETE METHOD # STARTS ################}
 // Delete implements resource.Resource.
-func (r *resource_Apply_Groups) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state Groups_Model
+func (r *configResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state ConfigResourceModel
 	d := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(d...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	_, err := r.client.DeleteConfig(state.ResourceName.ValueString(), false)
+	stateConfig := modelToConfig(ctx, state, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	stateXML, err := marshalConfigXML(stateConfig)
 	if err != nil {
-		if strings.Contains(err.Error(), "ound") {
-			return
-		}
+		resp.Diagnostics.AddError("Failed to marshal current configuration", err.Error())
+		return
+	}
+
+	emptyXML, err := marshalConfigXML(xml_Configuration{})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to marshal empty configuration", err.Error())
+		return
+	}
+
+	idx, err := patch.UnmarshalTrimmedSchemaIndex(TrimmedSchemaJSON)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed while parsing trimmed schema", err.Error())
+		return
+	}
+
+	stateTree, err := patch.BuildTree(stateXML)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to parse current XML", err.Error())
+		return
+	}
+	emptyTree, err := patch.BuildTree(emptyXML)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to parse empty XML", err.Error())
+		return
+	}
+
+	stateMap := patch.LeafMapWithSchema(stateTree, idx)
+	emptyMap := patch.LeafMapWithSchema(emptyTree, idx)
+	diffMap := patch.ComputeDiff(stateMap, emptyMap)
+	if len(diffMap) == 0 {
+		return
+	}
+
+	patchXML, err := patch.CreateDiffPatch(diffMap, state.ResourceName.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build delete patch", err.Error())
+		return
+	}
+
+	err = r.client.SendUpdate("", string(patchXML), false)
+	if err != nil {
 		resp.Diagnostics.AddError("Failed while deleting configuration", err.Error())
 		return
 	}
     commit_err := r.client.SendCommit()
 	if commit_err != nil {
-		resp.Diagnostics.AddError("Failed while committing apply-group", commit_err.Error())
+		resp.Diagnostics.AddError("Failed while committing configuration", commit_err.Error())
 		return
 	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func wrapGroupPatch(groupName string, patchXML string) string {
-	if strings.Contains(patchXML, "<groups>") || groupName == "" {
-		return patchXML
+func debugPatchUpdate(resourceName string, planXML []byte, stateXML []byte, diffMap map[string]patch.Change, patchPayload string) {
+	if os.Getenv("JUNOS_TF_DEBUG_PATCH") == "" {
+		return
 	}
 
-	inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(patchXML), "<configuration>"), "</configuration>"))
-	return "<configuration><groups><name>" + groupName + "</name>" + inner + "</groups></configuration>"
+	fmt.Printf("\n=== terraform diff patch debug: %s ===\n", resourceName)
+	fmt.Printf("--- state xml ---\n%s\n", string(stateXML))
+	fmt.Printf("--- plan xml ---\n%s\n", string(planXML))
+	fmt.Printf("--- diff map ---\n")
+	for _, entry := range patch.DebugSortedChanges(diffMap) {
+		fmt.Printf("%v | %s | old=%q | new=%q\n", entry.Op, entry.Path, entry.OldVal, entry.NewVal)
+	}
+	fmt.Printf("--- patch payload ---\n%s\n", patchPayload)
 }
 {################## DELETE METHOD # ENDS ################}

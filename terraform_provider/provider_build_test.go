@@ -23,8 +23,14 @@ func (f *fakeNetconfClient) SendCommit() error { return nil }
 // MarshalGroup implements netconf.Client for unit tests.
 func (f *fakeNetconfClient) MarshalGroup(string, interface{}) error { return nil }
 
+// MarshalConfig implements netconf.Client for unit tests.
+func (f *fakeNetconfClient) MarshalConfig(interface{}) error { return nil }
+
 // SendTransaction implements netconf.Client for unit tests.
 func (f *fakeNetconfClient) SendTransaction(string, interface{}, bool) error { return nil }
+
+// SendDirectTransaction implements netconf.Client for unit tests.
+func (f *fakeNetconfClient) SendDirectTransaction(interface{}, bool) error { return nil }
 
 // SendUpdate implements netconf.Client for unit tests.
 func (f *fakeNetconfClient) SendUpdate(string, string, bool) error { return nil }

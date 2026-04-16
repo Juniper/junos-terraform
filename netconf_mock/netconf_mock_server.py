@@ -183,6 +183,21 @@ class DeviceSession(asyncssh.SSHServerSession):
         return m.group(1) if m else ""
 
     @staticmethod
+    def _extract_direct_configuration(xml_text: str) -> str:
+        root = DeviceSession._parse_xml(xml_text)
+        if root is None:
+            return ""
+
+        config_elem = DeviceSession._find_first_configuration(root)
+        if config_elem is None:
+            return ""
+
+        if any(DeviceSession._local_name(child.tag) == "groups" for child in list(config_elem)):
+            return ""
+
+        return ET.tostring(config_elem, encoding="unicode")
+
+    @staticmethod
     def _parse_xml(xml_text: str) -> ET.Element | None:
         try:
             return ET.fromstring(xml_text)
@@ -466,6 +481,39 @@ class DeviceSession(asyncssh.SSHServerSession):
         name_elem.text = group_name
         return configuration
 
+    def _wrap_direct_configuration(self, group_name: str, config_xml: str) -> str:
+        parsed = self._parse_xml(config_xml)
+        if parsed is None:
+            return config_xml
+
+        configuration = ET.Element("configuration")
+        groups_elem = ET.SubElement(configuration, "groups")
+        name_elem = ET.SubElement(groups_elem, "name")
+        name_elem.text = group_name
+
+        for child in list(parsed):
+            groups_elem.append(copy.deepcopy(child))
+
+        return ET.tostring(configuration, encoding="unicode")
+
+    def _full_configuration_for_group(self, group_name: str) -> str:
+        raw_config = self._state.running_groups.get(group_name) or ""
+        parsed = self._parse_xml(raw_config)
+        if parsed is None:
+            return "<configuration/>"
+
+        groups_elem = self._find_child(parsed, "groups")
+        if groups_elem is None:
+            return ET.tostring(parsed, encoding="unicode")
+
+        configuration = ET.Element("configuration")
+        for child in list(groups_elem):
+            if self._local_name(child.tag) == "name":
+                continue
+            configuration.append(copy.deepcopy(child))
+
+        return ET.tostring(configuration, encoding="unicode")
+
     def _ensure_groups_elem(self, configuration: ET.Element, group_name: str) -> ET.Element:
         groups_elem = self._find_child(configuration, "groups")
         if groups_elem is None:
@@ -633,6 +681,10 @@ class DeviceSession(asyncssh.SSHServerSession):
             # Fallback for malformed/minimal payloads.
             group_name = self._extract_group_name(xml_text)
             cfg = self._extract_configuration(xml_text)
+            direct_cfg = self._extract_direct_configuration(xml_text)
+            if direct_cfg:
+                group_name = self._resolve_patch_group_name()
+                cfg = self._wrap_direct_configuration(group_name, direct_cfg)
             if group_name and cfg:
                 if action == "merge":
                     cfg = self._merge_group_configuration(group_name, cfg)
@@ -688,6 +740,8 @@ class DeviceSession(asyncssh.SSHServerSession):
         group_name = self._extract_group_name(xml_text)
         if group_name and group_name in self._state.running_groups:
             cfg = self._state.running_groups[group_name]
+        elif not group_name:
+            cfg = self._full_configuration_for_group(self._resolve_patch_group_name())
         else:
             cfg = (
                 "<configuration><groups>"

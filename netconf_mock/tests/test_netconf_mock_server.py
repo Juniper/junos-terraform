@@ -42,6 +42,10 @@ def base_group_xml(body: str) -> str:
     return f"<configuration><groups><name>base-config</name>{body}</groups></configuration>"
 
 
+def direct_config_xml(body: str) -> str:
+    return f"<configuration>{body}</configuration>"
+
+
 def test_parse_args_accepts_repeated_devices(monkeypatch):
     monkeypatch.setattr(
         sys,
@@ -458,6 +462,24 @@ def test_get_configuration_returns_group_or_fallback(state_and_session):
     assert "<name>does-not-exist</name>" in channel.writes[-1]
 
 
+def test_get_configuration_without_group_returns_direct_base_config(state_and_session):
+    state, session, channel = state_and_session
+
+    state.running_groups["base-config"] = base_group_xml(
+        "<system><host-name>leaf1</host-name></system>"
+    )
+
+    rpc = (
+        '<rpc message-id="23"><get-configuration><configuration/>'
+        '</get-configuration></rpc>'
+    )
+
+    assert session._handle_get_configuration(rpc, "23") is True
+    reply = channel.writes[-1]
+    assert "<system><host-name>leaf1</host-name></system>" in reply
+    assert "<groups>" not in reply
+
+
 def test_handle_rpc_hello_and_unknown(state_and_session):
     state, session, channel = state_and_session
 
@@ -633,6 +655,46 @@ def test_load_configuration_merge_preserves_repeated_leaf_list_values(state_and_
     assert updated.count("<protocol>") == 2
     assert "<protocol>bgp</protocol>" in updated
     assert "<protocol>direct</protocol>" in updated
+
+
+def test_load_configuration_replace_accepts_direct_configuration(state_and_session):
+    state, session, _channel = state_and_session
+
+    rpc = (
+        '<rpc message-id="123a">'
+        '<load-configuration action="replace" format="xml">'
+        f'{direct_config_xml("<system><host-name>leaf1</host-name></system>")}'
+        '</load-configuration></rpc>'
+    )
+
+    handled = session._handle_load_configuration(rpc, "123a")
+
+    assert handled is True
+    updated = state.candidate_groups["base-config"]
+    assert "<name>base-config</name>" in updated
+    assert "<host-name>leaf1</host-name>" in updated
+
+
+def test_load_configuration_merge_accepts_direct_configuration(state_and_session):
+    state, session, _channel = state_and_session
+
+    state.candidate_groups["base-config"] = base_group_xml(
+        "<system><services><ssh/></services></system>"
+    )
+
+    rpc = (
+        '<rpc message-id="123b">'
+        '<load-configuration action="merge" format="xml">'
+        f'{direct_config_xml("<system><host-name>leaf1</host-name></system>")}'
+        '</load-configuration></rpc>'
+    )
+
+    handled = session._handle_load_configuration(rpc, "123b")
+
+    assert handled is True
+    updated = state.candidate_groups["base-config"]
+    assert "<services><ssh /></services>" in updated or "<services><ssh/></services>" in updated
+    assert "<host-name>leaf1</host-name>" in updated
 
 
 def test_delete_then_merge_rebuilds_group_from_empty_candidate(state_and_session):

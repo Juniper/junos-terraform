@@ -31,3 +31,24 @@ func ComputeDiff(stateMap, planMap map[string]string) map[string]Change {
 
 	return diff
 }
+
+type DebugChange struct {
+	Path   string
+	Op     ChangeType
+	OldVal string
+	NewVal string
+}
+
+func DebugSortedChanges(diffMap map[string]Change) []DebugChange {
+	ordered := orderedChanges(diffMap)
+	result := make([]DebugChange, 0, len(ordered))
+	for _, entry := range ordered {
+		result = append(result, DebugChange{
+			Path:   entry.path,
+			Op:     entry.change.Op,
+			OldVal: entry.change.OldVal,
+			NewVal: entry.change.NewVal,
+		})
+	}
+	return result
+}

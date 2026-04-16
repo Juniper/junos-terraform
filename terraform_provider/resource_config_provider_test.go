@@ -7,18 +7,18 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-func isStubApplyGroupsResource(t *testing.T, r *resource_Apply_Groups) bool {
+func isStubConfigResource(t *testing.T, r *configResource) bool {
 	t.Helper()
 	schemaResp := &resource.SchemaResponse{}
 	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
 	return len(schemaResp.Schema.Attributes) == 0
 }
 
-// TestResourceApplyGroupsStubMethods verifies stub CRUD methods remain no-op.
-func TestResourceApplyGroupsStubMethods(t *testing.T) {
-	r := &resource_Apply_Groups{}
-	if !isStubApplyGroupsResource(t, r) {
-		t.Skip("generated apply-groups resource requires framework-populated requests")
+// TestConfigResourceStubMethods verifies stub CRUD methods remain no-op.
+func TestConfigResourceStubMethods(t *testing.T) {
+	r := &configResource{}
+	if !isStubConfigResource(t, r) {
+		t.Skip("generated config resource requires framework-populated requests")
 	}
 
 	ctx := context.Background()
@@ -48,9 +48,9 @@ func TestResourceApplyGroupsStubMethods(t *testing.T) {
 	}
 }
 
-// TestResourceApplyGroupsMetadataAndSchema verifies current stub metadata and schema.
-func TestResourceApplyGroupsMetadataAndSchema(t *testing.T) {
-	r := &resource_Apply_Groups{}
+// TestConfigResourceMetadataAndSchema verifies current stub metadata and schema.
+func TestConfigResourceMetadataAndSchema(t *testing.T) {
+	r := &configResource{}
 	ctx := context.Background()
 
 	metadataResp := &resource.MetadataResponse{}
@@ -61,7 +61,7 @@ func TestResourceApplyGroupsMetadataAndSchema(t *testing.T) {
 
 	schemaResp := &resource.SchemaResponse{}
 	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
-	if isStubApplyGroupsResource(t, r) && len(schemaResp.Schema.Attributes) != 0 {
+	if isStubConfigResource(t, r) && len(schemaResp.Schema.Attributes) != 0 {
 		t.Fatalf("expected empty schema attributes for stub resource")
 	}
 }

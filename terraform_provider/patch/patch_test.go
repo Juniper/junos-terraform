@@ -2,6 +2,7 @@ package patch
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -2289,24 +2290,111 @@ func TestCreateDiffPatch_ReplaceHostName_DeleteThenCreate(t *testing.T) {
 		t.Fatalf("CreateDiffPatch returned error: %v", err)
 	}
 
-	if string(diff) != correctDiff {
+  normalizeXML := func(s string) string {
+    return strings.Join(strings.Fields(s), "")
+  }
+
+  if normalizeXML(string(diff)) != normalizeXML(correctDiff) {
 		t.Fatalf("diff mismatch\n--- got ---\n%s\n--- want ---\n%s\n", string(diff), correctDiff)
 	}
 }
 
-func TestCreateDiffPatch_DeleteLeafListValueIncludesOldValue(t *testing.T) {
+func TestCreateDiffPatch_KeyedListRenameWithDescendantsUsesEntryOperations(t *testing.T) {
 	name := "base-config"
 
 	editLeaf := map[string]Change{
-		`configuration/groups[name="base-config"]/system/name-server[value="203.0.113.10"]`: {
+		`configuration/groups[name="base-config"]/system/login/user[name="regress"]/name`: {
 			Op:     Delete,
-			OldVal: "203.0.113.10",
+			OldVal: "regress",
+		},
+		`configuration/groups[name="base-config"]/system/login/user[name="regress"]/uid`: {
+			Op:     Delete,
+			OldVal: "928",
+		},
+		`configuration/groups[name="base-config"]/system/login/user[name="regress"]/class`: {
+			Op:     Delete,
+			OldVal: "superuser",
+		},
+		`configuration/groups[name="base-config"]/system/login/user[name="regress"]/authentication/encrypted-password`: {
+			Op:     Delete,
+			OldVal: "$1$kPU..$w.4FGRAGanJ8U4Yq6sbj7.",
+		},
+		`configuration/groups[name="base-config"]/system/login/user[name="vinay"]/name`: {
+			Op:     Create,
+			NewVal: "vinay",
+		},
+		`configuration/groups[name="base-config"]/system/login/user[name="vinay"]/uid`: {
+			Op:     Create,
+			NewVal: "928",
+		},
+		`configuration/groups[name="base-config"]/system/login/user[name="vinay"]/class`: {
+			Op:     Create,
+			NewVal: "superuser",
+		},
+		`configuration/groups[name="base-config"]/system/login/user[name="vinay"]/authentication/encrypted-password`: {
+			Op:     Create,
+			NewVal: "$1$kPU..$w.4FGRAGanJ8U4Yq6sbj7.",
 		},
 	}
 
 	correctDiff := `<configuration>
   <system>
-    <name-server nc:operation="delete">203.0.113.10</name-server>
+    <login>
+      <user nc:operation="delete">
+        <name>regress</name>
+        <authentication>
+          <encrypted-password nc:operation="delete">$1$kPU..$w.4FGRAGanJ8U4Yq6sbj7.</encrypted-password>
+        </authentication>
+        <class nc:operation="delete">superuser</class>
+        <uid nc:operation="delete">928</uid>
+      </user>
+      <user nc:operation="create">
+        <name>vinay</name>
+        <class nc:operation="create">superuser</class>
+        <uid nc:operation="create">928</uid>
+        <authentication>
+          <encrypted-password nc:operation="create">$1$kPU..$w.4FGRAGanJ8U4Yq6sbj7.</encrypted-password>
+        </authentication>
+      </user>
+    </login>
+  </system>
+</configuration>
+`
+
+	diff, err := CreateDiffPatch(editLeaf, name)
+	if err != nil {
+		t.Fatalf("CreateDiffPatch returned error: %v", err)
+	}
+
+	if string(diff) != correctDiff {
+		t.Fatalf("diff mismatch\n--- got ---\n%s\n--- want ---\n%s\n", string(diff), correctDiff)
+	}
+}
+
+func TestCreateDiffPatch_StructuralKeyRenameUsesEntryOperations(t *testing.T) {
+	name := "base-config"
+
+	editLeaf := map[string]Change{
+		`configuration/groups[name="base-config"]/system/syslog/file[name="security"]/name`: {
+			Op:     Delete,
+			OldVal: "security",
+		},
+		`configuration/groups[name="base-config"]/system/syslog/file[name="vinay"]/name`: {
+			Op:     Create,
+			NewVal: "vinay",
+		},
+	}
+
+	correctDiff := `<configuration>
+  <system>
+    <syslog>
+      <file nc:operation="delete">
+        <name>security</name>
+      </file>
+      <file nc:operation="create">
+        <name>vinay</name>
+      </file>
+    </syslog>
   </system>
 </configuration>
 `

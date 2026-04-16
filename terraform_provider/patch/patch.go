@@ -64,6 +64,10 @@ func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error
 		// Walk/create the parent node tree under <configuration>
 		parent := ensurePath(root, parentSegments)
 
+		if applyKeyedListEntryOperation(parent, parentSegments, leafSegment, change) {
+			continue
+		}
+
 		// Strip any key predicate from the leaf tag — keys are sibling elements,
 		// not part of the tag name itself in XML.
 		leafTag, _, _ := parseSegment(leafSegment)
@@ -89,6 +93,39 @@ func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error
 	}
 
 	return marshalNodeTree(root)
+}
+
+func applyKeyedListEntryOperation(parent *Node, parentSegments []string, leafSegment string, change Change) bool {
+	if len(parentSegments) == 0 {
+		return false
+	}
+
+	_, parentKeyName, parentKeyValue := parseSegment(parentSegments[len(parentSegments)-1])
+	leafTag, _, _ := parseSegment(leafSegment)
+	if parentKeyName == "" || leafTag != parentKeyName {
+		return false
+	}
+
+	keyValue := change.NewVal
+	if change.Op == Delete {
+		keyValue = change.OldVal
+	}
+	if keyValue == "" || keyValue != parentKeyValue {
+		return false
+	}
+
+	switch change.Op {
+	case Create:
+		parent.Operation = "create"
+	case Replace:
+		parent.Operation = "replace"
+	case Delete:
+		parent.Operation = "delete"
+	default:
+		return false
+	}
+
+	return true
 }
 
 type orderedChange struct {

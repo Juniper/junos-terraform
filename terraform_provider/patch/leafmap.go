@@ -51,7 +51,7 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 		return
 	}
 
-	if keyPath, keyValue, ok := keyOnlyListLeaf(node, currentPath, idx); ok {
+	if keyPath, keyValue, ok := structuralKeyedListLeaf(node, currentPath, idx); ok {
 		result[keyPath] = keyValue
 		return
 	}
@@ -64,28 +64,57 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 	}
 }
 
-func keyOnlyListLeaf(node *Node, currentPath string, idx map[string]*NodeInfo) (string, string, bool) {
+func structuralKeyedListLeaf(node *Node, currentPath string, idx map[string]*NodeInfo) (string, string, bool) {
 	schemaPath := outputPathToSchemaPath(currentPath)
 	info, ok := idx[schemaPath]
 	if !ok || info.Kind != KindList || info.ListKey == "" {
 		return "", "", false
 	}
 
-	var keyValue string
-	nonKeyChildren := 0
-	for _, child := range node.Children {
-		if child.Tag == info.ListKey && child.Text != "" {
-			keyValue = child.Text
-			continue
-		}
-		nonKeyChildren++
-	}
-
-	if keyValue == "" || nonKeyChildren != 0 {
+	keyValue := keyedListValue(node, info.ListKey)
+	if keyValue == "" || subtreeHasMaterialLeaves(node, currentPath, idx) {
 		return "", "", false
 	}
 
 	return currentPath + "/" + info.ListKey, keyValue, true
+}
+
+func keyedListValue(node *Node, keyName string) string {
+	for _, child := range node.Children {
+		if child.Tag == keyName && child.Text != "" {
+			return child.Text
+		}
+	}
+
+	return ""
+}
+
+func subtreeHasMaterialLeaves(node *Node, currentPath string, idx map[string]*NodeInfo) bool {
+	for _, child := range node.Children {
+		if isKeyChildWithSchema(child, node, currentPath, idx) {
+			continue
+		}
+
+		schemaPath := outputPathToSchemaPath(currentPath)
+		segment := buildSegmentWithSchema(child, schemaPath, idx)
+		childPath := segment
+		if currentPath != "" {
+			childPath = currentPath + "/" + segment
+		}
+
+		if len(child.Children) == 0 {
+			if child.Text != "" {
+				return true
+			}
+			continue
+		}
+
+		if subtreeHasMaterialLeaves(child, childPath, idx) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func buildSegmentWithSchema(node *Node, parentSchemaPath string, idx map[string]*NodeInfo) string {

@@ -50,6 +50,82 @@ const testTrimmedSchema = `{
   }
 }`
 
+const testStructuralKeyTrimmedSchema = `{
+	"path": "",
+	"root": {
+		"children": [
+			{
+				"name": "configuration",
+				"type": "container",
+				"path": "",
+				"children": [
+					{
+						"name": "system",
+						"type": "container",
+						"path": "",
+						"children": [
+							{
+								"name": "syslog",
+								"type": "container",
+								"path": "system",
+								"children": [
+									{
+										"name": "file",
+										"type": "list",
+										"path": "system/syslog",
+										"key": "name",
+										"children": [
+											{
+												"name": "name",
+												"type": "leaf",
+												"path": "system/syslog/file",
+												"leaf-type": "string"
+											},
+											{
+												"name": "contents",
+												"type": "list",
+												"path": "system/syslog/file",
+												"key": "name",
+												"children": [
+													{
+														"name": "name",
+														"type": "leaf",
+														"path": "system/syslog/file/contents",
+														"leaf-type": "string"
+													},
+													{
+														"name": "any",
+														"type": "leaf",
+														"path": "system/syslog/file/contents",
+														"leaf-type": "empty"
+													}
+												]
+											},
+											{
+												"name": "archive",
+												"type": "container",
+												"path": "system/syslog/file",
+												"children": [
+													{
+														"name": "world-readable",
+														"type": "leaf",
+														"path": "system/syslog/file/archive",
+														"leaf-type": "empty"
+													}
+												]
+											}
+										]
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		]
+	}
+}`
+
 func mustTree(t *testing.T, xmlStr string) *Node {
 	t.Helper()
 	tree, err := BuildTree([]byte(xmlStr))
@@ -61,7 +137,12 @@ func mustTree(t *testing.T, xmlStr string) *Node {
 
 func mustIdx(t *testing.T) map[string]*NodeInfo {
 	t.Helper()
-	idx, err := UnmarshalTrimmedSchemaIndex(testTrimmedSchema)
+	return mustIdxFromSchema(t, testTrimmedSchema)
+}
+
+func mustIdxFromSchema(t *testing.T, schema string) map[string]*NodeInfo {
+	t.Helper()
+	idx, err := UnmarshalTrimmedSchemaIndex(schema)
 	if err != nil {
 		t.Fatalf("UnmarshalTrimmedSchemaIndex error: %v", err)
 	}
@@ -195,5 +276,94 @@ func TestComputeDiff_ListKeyRename_ShowsDeleteAndCreate(t *testing.T) {
 	}
 	if diff[`configuration/groups[name=g1]/foo/item[address=10.0.0.2]/value`].Op != Create {
 		t.Fatalf("expected create for new key path")
+	}
+}
+
+func TestLeafMapWithSchema_StructuralKeyedListEmitsKeyLeaf(t *testing.T) {
+	idx := mustIdxFromSchema(t, testStructuralKeyTrimmedSchema)
+	xmlStr := `<configuration>
+	<groups>
+		<name>g1</name>
+		<system>
+			<syslog>
+				<file>
+					<name>security</name>
+					<contents>
+						<name>interactive-commands</name>
+						<any/>
+					</contents>
+					<archive>
+						<world-readable/>
+					</archive>
+				</file>
+			</syslog>
+		</system>
+	</groups>
+</configuration>`
+
+	m := LeafMapWithSchema(mustTree(t, xmlStr), idx)
+	path := `configuration/groups[name=g1]/system/syslog/file[name=security]/name`
+	if got := m[path]; got != "security" {
+		t.Fatalf("expected %s => security, got %q", path, got)
+	}
+
+	nestedPath := `configuration/groups[name=g1]/system/syslog/file[name=security]/contents[name=interactive-commands]/name`
+	if _, exists := m[nestedPath]; exists {
+		t.Fatalf("did not expect nested structural key entry %s in leaf map", nestedPath)
+	}
+}
+
+func TestComputeDiff_StructuralListKeyRename_ShowsDeleteAndCreate(t *testing.T) {
+	idx := mustIdxFromSchema(t, testStructuralKeyTrimmedSchema)
+	stateXML := `<configuration>
+	<groups>
+		<name>g1</name>
+		<system>
+			<syslog>
+				<file>
+					<name>security</name>
+					<contents>
+						<name>interactive-commands</name>
+						<any/>
+					</contents>
+					<archive>
+						<world-readable/>
+					</archive>
+				</file>
+			</syslog>
+		</system>
+	</groups>
+</configuration>`
+	planXML := `<configuration>
+	<groups>
+		<name>g1</name>
+		<system>
+			<syslog>
+				<file>
+					<name>vinay</name>
+					<contents>
+						<name>interactive-commands</name>
+						<any/>
+					</contents>
+					<archive>
+						<world-readable/>
+					</archive>
+				</file>
+			</syslog>
+		</system>
+	</groups>
+</configuration>`
+
+	stateMap := LeafMapWithSchema(mustTree(t, stateXML), idx)
+	planMap := LeafMapWithSchema(mustTree(t, planXML), idx)
+	diff := ComputeDiff(stateMap, planMap)
+
+	deletePath := `configuration/groups[name=g1]/system/syslog/file[name=security]/name`
+	createPath := `configuration/groups[name=g1]/system/syslog/file[name=vinay]/name`
+	if ch, ok := diff[deletePath]; !ok || ch.Op != Delete {
+		t.Fatalf("expected delete for %s", deletePath)
+	}
+	if ch, ok := diff[createPath]; !ok || ch.Op != Create {
+		t.Fatalf("expected create for %s", createPath)
 	}
 }
