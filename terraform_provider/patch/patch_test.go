@@ -2290,11 +2290,11 @@ func TestCreateDiffPatch_ReplaceHostName_DeleteThenCreate(t *testing.T) {
 		t.Fatalf("CreateDiffPatch returned error: %v", err)
 	}
 
-  normalizeXML := func(s string) string {
-    return strings.Join(strings.Fields(s), "")
-  }
+	normalizeXML := func(s string) string {
+		return strings.Join(strings.Fields(s), "")
+	}
 
-  if normalizeXML(string(diff)) != normalizeXML(correctDiff) {
+	if normalizeXML(string(diff)) != normalizeXML(correctDiff) {
 		t.Fatalf("diff mismatch\n--- got ---\n%s\n--- want ---\n%s\n", string(diff), correctDiff)
 	}
 }

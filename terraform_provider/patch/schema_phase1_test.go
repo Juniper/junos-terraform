@@ -169,9 +169,10 @@ func TestLeafMapWithSchema_UsesSchemaListKey(t *testing.T) {
 		t.Fatalf("expected %s => alpha, got %q", path, got)
 	}
 
+	// Key leaf is now also emitted (needed for new/removed entry detection)
 	keyLeafPath := `configuration/groups[name=g1]/foo/item[address=10.0.0.1]/address`
-	if _, exists := m[keyLeafPath]; exists {
-		t.Fatalf("did not expect key leaf entry %s in leaf map", keyLeafPath)
+	if got := m[keyLeafPath]; got != "10.0.0.1" {
+		t.Fatalf("expected key leaf %s => 10.0.0.1, got %q", keyLeafPath, got)
 	}
 }
 
@@ -307,9 +308,10 @@ func TestLeafMapWithSchema_StructuralKeyedListEmitsKeyLeaf(t *testing.T) {
 		t.Fatalf("expected %s => security, got %q", path, got)
 	}
 
+	// Nested key is now also emitted (contents has material children)
 	nestedPath := `configuration/groups[name=g1]/system/syslog/file[name=security]/contents[name=interactive-commands]/name`
-	if _, exists := m[nestedPath]; exists {
-		t.Fatalf("did not expect nested structural key entry %s in leaf map", nestedPath)
+	if got := m[nestedPath]; got != "interactive-commands" {
+		t.Fatalf("expected nested key %s => interactive-commands, got %q", nestedPath, got)
 	}
 }
 

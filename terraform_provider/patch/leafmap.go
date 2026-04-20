@@ -38,13 +38,21 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 	}
 
 	if len(node.Children) == 0 {
-		if node.Text == "" {
-			return
-		}
-
+		// Skip empty containers/lists — they have no leaf content to diff.
+		// Only emit actual leaves (YANG "empty" type like <any/>, <notice/>
+		// or regular text leaves).
 		leafSchemaPath := outputPathToSchemaPath(currentPath)
-		if info, ok := idx[leafSchemaPath]; ok && info.Kind == KindLeafList {
-			currentPath = currentPath + fmt.Sprintf("[value=%s]", node.Text)
+		if info, ok := idx[leafSchemaPath]; ok {
+			if info.Kind == KindContainer || info.Kind == KindList {
+				return
+			}
+			if info.Kind == KindLeafList {
+				currentPath = currentPath + fmt.Sprintf("[value=%s]", node.Text)
+			}
+		} else if node.Text == "" {
+			// Element not in schema and has no text — likely an empty
+			// container or unrecognised element; skip it.
+			return
 		}
 
 		result[currentPath] = node.Text
@@ -56,10 +64,10 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 		return
 	}
 
+	// Process ALL children including key children.  Key leaves must appear
+	// in the leaf map so ComputeDiff can detect new/removed list entries
+	// (where the key leaf is the diff signal for entry-level operations).
 	for _, child := range node.Children {
-		if isKeyChildWithSchema(child, node, currentPath, idx) {
-			continue
-		}
 		leafMapRecurseWithSchema(child, currentPath, result, idx)
 	}
 }
@@ -102,11 +110,17 @@ func subtreeHasMaterialLeaves(node *Node, currentPath string, idx map[string]*No
 			childPath = currentPath + "/" + segment
 		}
 
+		// A non-key child that is a list entry is material even if its only
+		// descendant is its own key — nested list entries are real content.
+		childSchemaPath := outputPathToSchemaPath(childPath)
+		if info, ok := idx[childSchemaPath]; ok && info.Kind == KindList {
+			return true
+		}
+
 		if len(child.Children) == 0 {
-			if child.Text != "" {
-				return true
-			}
-			continue
+			// Even empty elements (YANG type "empty") represent material
+			// config knobs; their presence prevents key-only early return.
+			return true
 		}
 
 		if subtreeHasMaterialLeaves(child, childPath, idx) {
