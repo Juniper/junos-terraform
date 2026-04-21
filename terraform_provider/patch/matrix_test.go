@@ -204,11 +204,6 @@ func matrixIdx(t *testing.T) map[string]*NodeInfo {
 	return mustIdxFromSchema(t, matrixSchema)
 }
 
-// normalizeXML strips all leading/trailing whitespace from each line and joins.
-func normalizeXML(s string) string {
-	return strings.Join(strings.Fields(s), "")
-}
-
 // ---------------------------------------------------------------------------
 // 2.1 Leaf Operations
 // ---------------------------------------------------------------------------
