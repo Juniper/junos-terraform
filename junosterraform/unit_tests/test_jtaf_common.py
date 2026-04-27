@@ -53,8 +53,8 @@ class TestGetXpaths(unittest.TestCase):
 class TestUniqueXpaths(unittest.TestCase):
     """Tests for unique_xpaths function."""
 
-    def test_unique_xpaths_filters_groups_name(self):
-        """Test that 'groups/name' is filtered out."""
+    def test_unique_xpaths_preserves_groups_name(self):
+        """Test that 'groups/name' is preserved."""
         paths = {
             'groups/name': True,
             'interfaces': True,
@@ -62,12 +62,12 @@ class TestUniqueXpaths(unittest.TestCase):
         }
         result = jtaf_common.unique_xpaths(paths)
 
-        self.assertNotIn('groups/name', result)
+        self.assertIn('groups/name', result)
         self.assertIn('interfaces', result)
         self.assertIn('system', result)
 
-    def test_unique_xpaths_removes_groups_prefix(self):
-        """Test that 'groups/' prefix is removed from paths."""
+    def test_unique_xpaths_preserves_groups_prefix(self):
+        """Test that 'groups/' prefix is preserved on paths."""
         paths = {
             'groups/interfaces': True,
             'groups/system': True,
@@ -75,8 +75,8 @@ class TestUniqueXpaths(unittest.TestCase):
         }
         result = jtaf_common.unique_xpaths(paths)
 
-        self.assertIn('interfaces', result)
-        self.assertIn('system', result)
+        self.assertIn('groups/interfaces', result)
+        self.assertIn('groups/system', result)
         self.assertIn('vlans', result)
 
     def test_unique_xpaths_empty(self):

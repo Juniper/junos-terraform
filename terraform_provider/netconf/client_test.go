@@ -50,6 +50,43 @@ func TestDeleteConfigCallsExpectedOperations(t *testing.T) {
 	}
 }
 
+// TestSendUpdateBaseConfigPayload verifies patch updates do not require group name tags.
+func TestSendUpdateBaseConfigPayload(t *testing.T) {
+	calls := []string{}
+	client := newMockClient(&calls, "<ok/>", nil)
+
+	diff := `<configuration><system><host-name nc:operation="replace">leaf1</host-name></system></configuration>`
+	if err := client.SendUpdate("base-config", diff, false); err != nil {
+		t.Fatalf("SendUpdate returned error: %v", err)
+	}
+
+	if len(calls) != 1 {
+		t.Fatalf("expected single edit-config operation, got %d", len(calls))
+	}
+	if !strings.Contains(calls[0], "<edit-config>") || !strings.Contains(calls[0], "<default-operation>none</default-operation>") {
+		t.Fatalf("expected patch edit-config envelope, got %q", calls[0])
+	}
+}
+
+// TestMarshalRPCRequestUsesInnerXML verifies patch requests are wrapped in
+// <rpc> while the operation body remains raw XML, not wrapper fields.
+func TestMarshalRPCRequestUsesInnerXML(t *testing.T) {
+	rpcXML, err := marshalRPCRequest("<edit-config><target><candidate/></target></edit-config>", "1")
+	if err != nil {
+		t.Fatalf("marshalRPCRequest() returned error: %v", err)
+	}
+
+	if !strings.Contains(rpcXML, `<rpc xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="1">`) {
+		t.Fatalf("expected rpc envelope, got %q", rpcXML)
+	}
+	if !strings.Contains(rpcXML, "<edit-config>") {
+		t.Fatalf("expected edit-config payload in rpc, got %q", rpcXML)
+	}
+	if strings.Contains(rpcXML, "<Operation>") || strings.Contains(rpcXML, "<RawXML>") {
+		t.Fatalf("expected raw payload without wrapper element, got %q", rpcXML)
+	}
+}
+
 // TestSendTransactionWithIDReplacesGroup verifies ID-based transactions use update flow.
 func TestSendTransactionWithIDReplacesGroup(t *testing.T) {
 	calls := []string{}
@@ -131,6 +168,29 @@ func TestUpdateRawConfigMissingName(t *testing.T) {
 	_, err := client.updateRawConfig("group", "<configuration></configuration>", false)
 	if err == nil || !strings.Contains(err.Error(), "failed to extract") {
 		t.Fatalf("expected extract error, got: %v", err)
+	}
+}
+
+// TestUpdateRawConfigIgnoresMissingDelete verifies initial group creation tolerates missing-group deletes.
+func TestUpdateRawConfigIgnoresMissingDelete(t *testing.T) {
+	calls := []string{}
+	client := &GoNCClient{
+		Lock: sync.RWMutex{},
+		exec: func(_ context.Context, op string) (string, error) {
+			calls = append(calls, op)
+			if strings.Contains(op, "operation=\"delete\"") {
+				return "", errors.New("multiple netconf errors: netconf error: application data-missing: statement not found")
+			}
+			return "<ok/>", nil
+		},
+	}
+
+	_, err := client.updateRawConfig("group", "<configuration><groups><name>group</name></groups></configuration>", false)
+	if err != nil {
+		t.Fatalf("expected missing delete to be ignored, got: %v", err)
+	}
+	if len(calls) != 2 {
+		t.Fatalf("expected delete then load calls, got %d", len(calls))
 	}
 }
 
@@ -391,6 +451,23 @@ func TestDeleteConfigBranches(t *testing.T) {
 		_, err := client.DeleteConfig("grp", true)
 		if err == nil {
 			t.Fatalf("expected commit error")
+		}
+	})
+
+	t.Run("missing group delete", func(t *testing.T) {
+		client := &GoNCClient{
+			Lock: sync.RWMutex{},
+			exec: func(_ context.Context, _ string) (string, error) {
+				return "", errors.New("netconf error: application data-missing: statement not found")
+			},
+		}
+
+		reply, err := client.DeleteConfig("grp", false)
+		if err != nil {
+			t.Fatalf("expected missing-group delete to be ignored, got: %v", err)
+		}
+		if reply != "<ok/>" {
+			t.Fatalf("expected synthetic ok reply, got %q", reply)
 		}
 	})
 }

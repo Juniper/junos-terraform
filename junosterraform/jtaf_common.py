@@ -26,27 +26,18 @@ def get_xpaths(root: ElementTree.Element) -> dict[str, bool]:
 
 
 def unique_xpaths(paths: dict[str, bool]) -> list[str]:
-    """Extract unique XPath strings, filtering and normalizing existing paths.
-
-    Removes 'groups/name' entirely and strips 'groups/' prefix from other paths.
+    """Extract unique XPath strings while preserving input path semantics.
 
     Args:
         paths: Dictionary with XPath strings as keys.
 
     Returns:
-        List of unique, normalized XPath strings.
+        List of unique XPath strings.
     """
     path_dict = {}
     result = []
 
     for path in paths:
-        if path == "groups/name":
-            # Skip the groups/name path entirely
-            continue
-        elif path.startswith("groups"):
-            # Remove the "groups/" prefix from other paths
-            path = path[len("groups/"):]
-
         # Only add non-empty paths
         if path:
             path_dict[path] = path
@@ -370,3 +361,37 @@ def load_and_merge_xmls(xml_file_list: list[str]) -> ElementTree.Element:
             merged_config.append(child)
 
     return merged_config
+
+
+# Using trimmed json, build mapping of path and path type
+def build_type_map(node, parent_path=""):
+    type_map = {}
+
+    # Normalize node name
+    node_name = normalize_tag(node["name"])
+    path = f"{parent_path}/{node_name}" if parent_path else node_name
+
+    # Strip leading 'root/configuration' to match XML traversal
+    for prefix in ["root/configuration/", "configuration/"]:
+        if path.startswith(prefix):
+            path = path[len(prefix):]
+
+    # Store type info
+    node_info = {"type": node.get("type")}
+    if "leaf-type" in node:
+        node_info["leaf-type"] = node["leaf-type"]
+    if "types" in node:
+        node_info["types"] = node["types"]
+
+    type_map[path] = node_info
+
+    # Recurse into children
+    for child in node.get("children", []):
+        type_map.update(build_type_map(child, path))
+
+    return type_map
+
+
+def normalize_tag(tag: str) -> str:
+    """Prepare XML tag to be used as YAML key by replacing '-' and '.' with '_'."""
+    return tag.replace("-", "_").replace(".", "_")

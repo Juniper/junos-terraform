@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -43,6 +44,12 @@ const getGroupXMLStr = `<get-configuration>
 </get-configuration>
 `
 
+const getConfigXMLStr = `<get-configuration>
+	<configuration>
+	</configuration>
+</get-configuration>
+`
+
 const applyGroupXML = `<load-configuration action="merge" format="xml">
 	%s
 </load-configuration>
@@ -50,11 +57,49 @@ const applyGroupXML = `<load-configuration action="merge" format="xml">
 
 const discardChanges = `<discard-changes/>`
 
+const patchEditConfigStr = `<edit-config>
+	<target><candidate/></target>
+	<default-operation>none</default-operation>
+	<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+%s
+	</config>
+</edit-config>`
+
 // defaultPort is the NETCONF-over-SSH default.
 const defaultPort = 830
 
 type configuration struct {
 	ApplyGroup []string `xml:"apply-groups"`
+}
+
+func debugRPC(label string, payload string) {
+	if os.Getenv("JUNOS_TF_DEBUG_RPC") == "" {
+		return
+	}
+	fmt.Printf("\n=== %s ===\n%s\n", label, payload)
+}
+
+func marshalRPCRequest(operation string, messageID string) (string, error) {
+	rpc := netconf.NewRPC([]byte(operation))
+	if messageID != "" {
+		rpc.MessageID = messageID
+	}
+
+	rpcXML, err := xml.Marshal(rpc)
+	if err != nil {
+		return "", err
+	}
+
+	return string(rpcXML), nil
+}
+
+func isMissingDeleteError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errText := strings.ToLower(err.Error())
+	return strings.Contains(errText, "data-missing") && strings.Contains(errText, "statement not found")
 }
 
 type operationExecutor func(ctx context.Context, operation string) (string, error)
@@ -95,13 +140,34 @@ func (g *GoNCClient) execute(ctx context.Context, operation string) (string, err
 		_ = session.Close(context.Background())
 	}()
 
+	rpc := session.Prepare(netconf.NewRPC([]byte(operation)))
+	rpcXML, err := xml.Marshal(rpc)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal rpc request: %w", err)
+	}
+	debugRPC("rpc request", string(rpcXML))
+
+	msg, err := session.Do(ctx, rpc)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = msg.Close()
+	}()
+
+	rawReply, err := io.ReadAll(msg)
+	if err != nil {
+		return "", fmt.Errorf("failed to read rpc-reply: %w", err)
+	}
+	debugRPC("rpc reply", string(rawReply))
+
 	reply := struct {
 		XMLName xml.Name `xml:"rpc-reply"`
 		Data    string   `xml:",innerxml"`
 	}{}
 
-	if err := session.Exec(ctx, netconf.RawXML(operation), &reply); err != nil {
-		return "", err
+	if err := xml.Unmarshal(rawReply, &reply); err != nil {
+		return "", fmt.Errorf("failed to decode rpc-reply: %w", err)
 	}
 
 	return reply.Data, nil
@@ -115,7 +181,9 @@ func (g *GoNCClient) updateRawConfig(applyGroup string, netconfCall string, comm
 	ctx := context.Background()
 	deleteString := fmt.Sprintf(deleteStr, applyGroup, applyGroup)
 	if _, err := g.execute(ctx, deleteString); err != nil {
-		return "", err
+		if !isMissingDeleteError(err) {
+			return "", err
+		}
 	}
 
 	nameStart := strings.Index(netconfCall, "<name>")
@@ -150,7 +218,10 @@ func (g *GoNCClient) DeleteConfig(applyGroup string, commit bool) (string, error
 	deleteString := fmt.Sprintf(deleteStr, applyGroup, applyGroup)
 	reply, err := g.execute(ctx, deleteString)
 	if err != nil {
-		return "", err
+		if !isMissingDeleteError(err) {
+			return "", err
+		}
+		reply = "<ok/>"
 	}
 
 	if commit {
@@ -167,9 +238,21 @@ func (g *GoNCClient) SendCommit() error {
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
 
-	sortApplyGroupsList()
-	if err := g.sendApplyGroupsLocked(context.Background()); err != nil {
-		return err
+	hasApplyGroups := false
+	applyGroupsMutex.Lock()
+	for _, group := range applyGroupsList {
+		if group != "" {
+			hasApplyGroups = true
+			break
+		}
+	}
+	applyGroupsMutex.Unlock()
+
+	if hasApplyGroups {
+		sortApplyGroupsList()
+		if err := g.sendApplyGroupsLocked(context.Background()); err != nil {
+			return err
+		}
 	}
 
 	if _, err := g.execute(context.Background(), commitStr); err != nil {
@@ -212,6 +295,19 @@ func (g *GoNCClient) MarshalGroup(id string, obj interface{}) error {
 	return nil
 }
 
+// MarshalConfig fetches the full configuration and unmarshals XML into obj.
+func (g *GoNCClient) MarshalConfig(obj interface{}) error {
+	reply, err := g.readRawConfig()
+	if err != nil {
+		return err
+	}
+
+	if err = xml.Unmarshal([]byte(reply), &obj); err != nil {
+		return err
+	}
+	return nil
+}
+
 var applyGroupsList []string
 var applyGroupsMutex sync.Mutex
 
@@ -230,6 +326,19 @@ func (g *GoNCClient) SendTransaction(id string, obj interface{}, commit bool) er
 	}
 
 	if _, err = g.sendRawConfig(string(cfg), commit); err != nil {
+		return err
+	}
+	return nil
+}
+
+// SendDirectTransaction loads raw XML config directly without apply-groups wrapping.
+func (g *GoNCClient) SendDirectTransaction(obj interface{}, commit bool) error {
+	cfg, err := xml.Marshal(obj)
+	if err != nil {
+		return err
+	}
+
+	if _, err = g.sendDirectRawConfig(string(cfg), commit); err != nil {
 		return err
 	}
 	return nil
@@ -255,6 +364,26 @@ func sortApplyGroupsList() {
 	}
 	sort.Strings(filteredGroups)
 	applyGroupsList = filteredGroups
+}
+
+// SendUpdate applies a prepared XML diff payload and optionally commits it.
+func (g *GoNCClient) SendUpdate(id string, diff string, commit bool) error {
+	g.Lock.Lock()
+	defer g.Lock.Unlock()
+	_ = id
+
+	patchPayload := fmt.Sprintf(patchEditConfigStr, diff)
+	if _, err := g.execute(context.Background(), patchPayload); err != nil {
+		return err
+	}
+
+	if commit {
+		if _, err := g.execute(context.Background(), commitStr); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // sendRawConfig loads raw XML config and optionally commits it.
@@ -284,12 +413,39 @@ func (g *GoNCClient) sendRawConfig(netconfCall string, commit bool) (string, err
 	return reply, nil
 }
 
+// sendDirectRawConfig loads raw XML configuration without group bookkeeping.
+func (g *GoNCClient) sendDirectRawConfig(netconfCall string, commit bool) (string, error) {
+	g.Lock.Lock()
+	defer g.Lock.Unlock()
+
+	reply, err := g.execute(context.Background(), fmt.Sprintf(groupStrXML, netconfCall))
+	if err != nil {
+		return "", err
+	}
+
+	if commit {
+		if _, err = g.execute(context.Background(), commitStr); err != nil {
+			return "", err
+		}
+	}
+
+	return reply, nil
+}
+
 // readRawGroup fetches a single apply-group configuration payload.
 func (g *GoNCClient) readRawGroup(applyGroup string) (string, error) {
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
 
 	return g.execute(context.Background(), fmt.Sprintf(getGroupXMLStr, applyGroup))
+}
+
+// readRawConfig fetches the full configuration payload.
+func (g *GoNCClient) readRawConfig() (string, error) {
+	g.Lock.Lock()
+	defer g.Lock.Unlock()
+
+	return g.execute(context.Background(), getConfigXMLStr)
 }
 
 // publicKeyFile parses an SSH private key file into an auth method.

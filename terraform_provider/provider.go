@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 
+	"terraform_provider/netconf"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"terraform_provider/netconf"
 )
 
 var _ provider.Provider = new(Provider)
@@ -90,7 +91,7 @@ func (p Provider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *
 // Resources implements provider.Provider.
 func (p Provider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		func() resource.Resource { return new(resource_Apply_Groups) },
+		func() resource.Resource { return new(configResource) },
 	}
 }
 

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import argparse
 import json
+from copy import deepcopy
 from lxml import etree
 import sys
 import re
 import os
 from xml.etree import ElementTree
+from junosterraform.jtaf_common import build_type_map, normalize_tag
 
 missing_xpaths = set()
 
@@ -24,38 +26,6 @@ def convert_to_hcl(value, indent=2):
         return str(value)
     else:
         return f'"{value}"'
-
-# Replace hyphens and dots with underscores
-def normalize_tag(tag):
-    return tag.replace('-', '_').replace('.', '_') 
-
-# Using trimmed json, build mapping of path and path type
-def build_type_map(node, parent_path=""):
-    type_map = {}
-
-    # Normalize node name
-    node_name = normalize_tag(node["name"])
-    path = f"{parent_path}/{node_name}" if parent_path else node_name
-
-    # Strip leading 'root/configuration' to match XML traversal
-    for prefix in ["root/configuration/", "configuration/"]:
-        if path.startswith(prefix):
-            path = path[len(prefix):]
-
-    # Store type info
-    node_info = {"type": node.get("type")}
-    if "leaf-type" in node:
-        node_info["leaf-type"] = node["leaf-type"]
-    if "types" in node:
-        node_info["types"] = node["types"]
-
-    type_map[path] = node_info
-
-    # Recurse into children
-    for child in node.get("children", []):
-        type_map.update(build_type_map(child, path))
-
-    return type_map
 
 def parse_element(element, explicit_empty_tags, type_lookup, parent_path=""):
     """
@@ -91,6 +61,12 @@ def parse_element(element, explicit_empty_tags, type_lookup, parent_path=""):
     # Case: <name>ge-0/0/3</name> → "ge-0/0/3"
     if element.text and element.text.strip() and len(element) == 0:
         text_value = element.text.strip()
+        # Junos uses literal \n in XML text for newlines (e.g. login
+        # banners).  HCL interprets \n in double-quoted strings as a real
+        # newline.  Devices strip trailing newlines, so remove them here
+        # to prevent Terraform state-drift after apply.
+        while text_value.endswith("\\n"):
+            text_value = text_value[:-2]
         if is_leaf_list:
             try:
                 return [int(text_value)]
@@ -201,19 +177,82 @@ provider "junos-{device_type}" {{
 """
     return provider_block
 
+def _merge_named_object_lists(base_list, overlay_list):
+    merged = [deepcopy(item) for item in base_list]
+    index_by_key = {}
+
+    for index, item in enumerate(merged):
+        if not isinstance(item, dict):
+            return merged + [deepcopy(item) for item in overlay_list]
+        key = item.get("name")
+        if key is None:
+            return merged + [deepcopy(item) for item in overlay_list]
+        index_by_key[key] = index
+
+    for item in overlay_list:
+        if not isinstance(item, dict):
+            merged.append(deepcopy(item))
+            continue
+        key = item.get("name")
+        if key is None:
+            merged.append(deepcopy(item))
+            continue
+        if key in index_by_key:
+            merged[index_by_key[key]] = merge_parsed_values(merged[index_by_key[key]], item)
+        else:
+            index_by_key[key] = len(merged)
+            merged.append(deepcopy(item))
+
+    return merged
+
+
+def merge_parsed_values(base_value, overlay_value):
+    if base_value is None:
+        return deepcopy(overlay_value)
+    if overlay_value is None:
+        return deepcopy(base_value)
+
+    if isinstance(base_value, dict) and isinstance(overlay_value, dict):
+        merged = deepcopy(base_value)
+        for key, value in overlay_value.items():
+            if key in merged:
+                merged[key] = merge_parsed_values(merged[key], value)
+            else:
+                merged[key] = deepcopy(value)
+        return merged
+
+    if isinstance(base_value, list) and isinstance(overlay_value, list):
+        if (
+            len(base_value) == 1
+            and len(overlay_value) == 1
+            and isinstance(base_value[0], dict)
+            and isinstance(overlay_value[0], dict)
+            and "name" not in base_value[0]
+            and "name" not in overlay_value[0]
+        ):
+            return [merge_parsed_values(base_value[0], overlay_value[0])]
+
+        if all(isinstance(item, dict) and item.get("name") is not None for item in base_value + overlay_value):
+            return _merge_named_object_lists(base_value, overlay_value)
+
+        merged = [deepcopy(item) for item in base_value]
+        for item in overlay_value:
+            if item not in merged:
+                merged.append(deepcopy(item))
+        return merged
+
+    return deepcopy(overlay_value)
+
+
 # Generates a Terraform-style resource block for the given parsed data.
-def generate_hcl_resources(parsed_data, device_type, hostname, group_name, apply_group):
+def generate_hcl_resources(parsed_data, device_type, hostname):
     """
-    Generates a single Terraform-style resource block combining all top-level elements.
+    Generates a single Terraform-style resource block targeting the device base configuration.
     """
     resource_block = ""
 
-    if group_name == "base-config":
-        resource_block += f'resource "terraform-provider-junos-{device_type}" "{hostname}-base-config" {{\n'
-        resource_block += f'  resource_name = "base-config"\n'
-    else:
-        resource_block += f'resource "terraform-provider-junos-{device_type}" "{hostname}-{group_name}" {{\n'
-        resource_block += f'  resource_name = "{group_name}"\n'
+    resource_block += f'resource "terraform-provider-junos-{device_type}" "{hostname}-base-config" {{\n'
+    resource_block += '  resource_name = "base-config"\n'
     resource_block += f'  provider = junos-{device_type}.{hostname.replace("-", "_")}\n'
 
     for key, value in parsed_data.items():
@@ -249,7 +288,7 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
             # Replace root with configuration node
             root = config_node
         
-        groups = []
+        groups = {}
         apply_groups = []
 
         # Extract and remove <apply-groups>
@@ -264,7 +303,7 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
             group_name_elem = group.find('./name')
             if group_name_elem is not None:
                 group_name = group_name_elem.text.strip()
-                groups.append((group_name, group))
+                groups[group_name] = group
             root.remove(group)
 
         # Remove any <version> tag directly under root
@@ -273,9 +312,8 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
             root.remove(version_node)
 
         # Parse elements starting from the new root
-        parsed_data = {}
         resources = []
-        # Build base resource from root-level config (now excluding groups and apply-groups)
+        # Build base resource from root-level config and flatten any applied groups into it.
         base_data = {}
         for elem in root:
             tag = normalize_tag(elem.tag)
@@ -284,32 +322,28 @@ def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
                 continue
             base_data[tag] = value
 
-        resources.append(generate_hcl_resources(base_data, device_type, hostname, group_name="base-config", apply_group=True))
+        applied_group_data = {}
+        for group_name in apply_groups:
+            if group_name == "base-config":
+                continue
+            group_node = groups.get(group_name)
+            if group_node is None:
+                continue
 
-        for group_name, group_node in groups:
-            group_data = {"groups": {}}
-
+            group_data = {}
             for elem in group_node:
                 tag = normalize_tag(elem.tag)
+                if tag == "name":
+                    continue
                 value = parse_element(elem, explicit_empty_tags, type_lookup)
                 if value is None:
                     continue
-                group_data["groups"][tag] = value
+                group_data[tag] = value
 
-            # Determine if group should be applied
-            should_apply = group_name in apply_groups and group_name != "base-config"
+            applied_group_data = merge_parsed_values(applied_group_data, group_data)
 
-            # Trim group_data to remove groups top level and name from each group
-            group_data = group_data["groups"]
-            for key in list(group_data.keys()):
-                if key == "name":
-                    del group_data[key]
-
-            group_resource = generate_hcl_resources(group_data, device_type, hostname, group_name, apply_group=should_apply)
-            if not should_apply:
-                # Comment out if group not applied
-                group_resource = '\n'.join([f'# {line}' for line in group_resource.splitlines()])
-            resources.append(group_resource)
+        final_data = merge_parsed_values(applied_group_data, base_data)
+        resources.append(generate_hcl_resources(final_data, device_type, hostname))
 
         return "\n".join(resources)
 
