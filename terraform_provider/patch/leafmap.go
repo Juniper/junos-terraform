@@ -79,6 +79,13 @@ func structuralKeyedListLeaf(node *Node, currentPath string, idx map[string]*Nod
 		return "", "", false
 	}
 
+	// Compound keys (e.g. "choice-ident choice-value community-name") have
+	// non-key structural children that must be preserved in the leaf map;
+	// the structural shortcut cannot be used.
+	if strings.Contains(info.ListKey, " ") {
+		return "", "", false
+	}
+
 	keyValue := keyedListValue(node, info.ListKey)
 	if keyValue == "" || subtreeHasMaterialLeaves(node, currentPath, idx) {
 		return "", "", false
@@ -88,9 +95,11 @@ func structuralKeyedListLeaf(node *Node, currentPath string, idx map[string]*Nod
 }
 
 func keyedListValue(node *Node, keyName string) string {
-	for _, child := range node.Children {
-		if child.Tag == keyName && child.Text != "" {
-			return child.Text
+	for _, keyPart := range strings.Fields(keyName) {
+		for _, child := range node.Children {
+			if child.Tag == keyPart && child.Text != "" {
+				return child.Text
+			}
 		}
 	}
 
@@ -134,9 +143,12 @@ func subtreeHasMaterialLeaves(node *Node, currentPath string, idx map[string]*No
 func buildSegmentWithSchema(node *Node, parentSchemaPath string, idx map[string]*NodeInfo) string {
 	currentSchemaPath := joinPath(parentSchemaPath, node.Tag)
 	if info, ok := idx[currentSchemaPath]; ok && info.Kind == KindList && info.ListKey != "" {
-		for _, child := range node.Children {
-			if child.Tag == info.ListKey && child.Text != "" {
-				return fmt.Sprintf("%s[%s=%s]", node.Tag, info.ListKey, child.Text)
+		// Handle compound keys (space-separated) — try each part.
+		for _, keyPart := range strings.Fields(info.ListKey) {
+			for _, child := range node.Children {
+				if child.Tag == keyPart && child.Text != "" {
+					return fmt.Sprintf("%s[%s=%s]", node.Tag, keyPart, child.Text)
+				}
 			}
 		}
 	}
@@ -147,7 +159,11 @@ func buildSegmentWithSchema(node *Node, parentSchemaPath string, idx map[string]
 func isKeyChildWithSchema(child, parent *Node, parentOutputPath string, idx map[string]*NodeInfo) bool {
 	parentSchemaPath := outputPathToSchemaPath(parentOutputPath)
 	if info, ok := idx[parentSchemaPath]; ok && info.Kind == KindList && info.ListKey != "" {
-		return child.Tag == info.ListKey && child.Text != ""
+		for _, keyPart := range strings.Fields(info.ListKey) {
+			if child.Tag == keyPart {
+				return true
+			}
+		}
 	}
 
 	return false

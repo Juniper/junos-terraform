@@ -59,7 +59,7 @@ const discardChanges = `<discard-changes/>`
 
 const patchEditConfigStr = `<edit-config>
 	<target><candidate/></target>
-	<default-operation>none</default-operation>
+	<default-operation>merge</default-operation>
 	<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
 %s
 	</config>
