@@ -63,7 +63,7 @@ func TestSendUpdateBaseConfigPayload(t *testing.T) {
 	if len(calls) != 1 {
 		t.Fatalf("expected single edit-config operation, got %d", len(calls))
 	}
-	if !strings.Contains(calls[0], "<edit-config>") || !strings.Contains(calls[0], "<default-operation>none</default-operation>") {
+	if !strings.Contains(calls[0], "<edit-config>") || !strings.Contains(calls[0], "<default-operation>merge</default-operation>") {
 		t.Fatalf("expected patch edit-config envelope, got %q", calls[0])
 	}
 }

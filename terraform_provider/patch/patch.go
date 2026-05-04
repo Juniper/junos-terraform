@@ -32,7 +32,20 @@ func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error
 	// Root of the output tree
 	root := &Node{Tag: "configuration"}
 
+	type pendingLeaf struct {
+		parent  *Node
+		tag     string
+		keyName string
+		change  Change
+	}
+
 	ordered := orderedChanges(diffMap)
+
+	// Two-pass strategy:
+	// Pass 1 — process key-entry operations and collect pending leaf ops.
+	// This ensures parent nodes get nc:operation="delete" BEFORE we decide
+	// whether a child leaf needs its own operation attribute.
+	var pending []pendingLeaf
 	for _, entry := range ordered {
 		path := entry.path
 		change := entry.change
@@ -41,8 +54,6 @@ func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error
 			continue
 		}
 
-		// If the marshalConfig output includes "configuration" as the root
-		// element in the path, strip it — our output tree already has that root.
 		if segments[0] == "configuration" {
 			segments = segments[1:]
 		}
@@ -56,40 +67,56 @@ func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error
 			continue
 		}
 
-		// All segments except the last build the parent hierarchy.
-		// The last segment is the leaf that carries the nc:operation.
 		parentSegments := segments[:len(segments)-1]
 		leafSegment := segments[len(segments)-1]
 
-		// Walk/create the parent node tree under <configuration>
 		parent := ensurePath(root, parentSegments)
 
 		if applyKeyedListEntryOperation(parent, parentSegments, leafSegment, change) {
 			continue
 		}
 
-		// Strip any key predicate from the leaf tag — keys are sibling elements,
-		// not part of the tag name itself in XML.
-		leafTag, _, _ := parseSegment(leafSegment)
+		leafTag, keyName, _ := parseSegment(leafSegment)
+		pending = append(pending, pendingLeaf{
+			parent: parent, tag: leafTag, keyName: keyName, change: change,
+		})
+	}
 
+	// Pass 2 — create leaf nodes, inheriting context from pass-1 parent ops.
+	for _, p := range pending {
 		leaf := &Node{
-			Tag:    leafTag,
-			Parent: parent,
+			Tag:    p.tag,
+			Parent: p.parent,
 		}
 
-		switch change.Op {
+		switch p.change.Op {
 		case Create:
 			leaf.Operation = "create"
-			leaf.Text = change.NewVal
+			leaf.Text = p.change.NewVal
 		case Replace:
 			leaf.Operation = "replace"
-			leaf.Text = change.NewVal
+			leaf.Text = p.change.NewVal
 		case Delete:
-			leaf.Operation = "delete"
-			leaf.Text = change.OldVal
+			// Leaf-list entries (paths with [value=xxx]) need the old value
+			// so Junos knows which instance to remove.
+			// Scalar leaves must NOT include text — Junos rejects
+			// <leaf nc:operation="delete">value</leaf> for scalar leaves.
+			if p.keyName == "value" {
+				leaf.Text = p.change.OldVal
+			}
+			// If the parent already has nc:operation="delete" (set by
+			// applyKeyedListEntryOperation in pass 1), this leaf is just
+			// a structural sibling — do NOT add an operation.  This is
+			// critical for Junos compound-key lists where choice-ident
+			// elements (e.g. <add/>) must appear WITHOUT an operation.
+			if p.parent.Operation == "delete" {
+				// structural child — no operation
+			} else {
+				leaf.Operation = "delete"
+			}
 		}
 
-		parent.Children = append(parent.Children, leaf)
+		p.parent.Children = append(p.parent.Children, leaf)
 	}
 
 	return marshalNodeTree(root)

@@ -2343,18 +2343,18 @@ func TestCreateDiffPatch_KeyedListRenameWithDescendantsUsesEntryOperations(t *te
       <user nc:operation="delete">
         <name>regress</name>
         <authentication>
-          <encrypted-password nc:operation="delete">$1$kPU..$w.4FGRAGanJ8U4Yq6sbj7.</encrypted-password>
+          <encrypted-password nc:operation="delete"/>
         </authentication>
-        <class nc:operation="delete">superuser</class>
-        <uid nc:operation="delete">928</uid>
+        <class/>
+        <uid/>
       </user>
       <user nc:operation="create">
         <name>vinay</name>
-        <class nc:operation="create">superuser</class>
-        <uid nc:operation="create">928</uid>
         <authentication>
           <encrypted-password nc:operation="create">$1$kPU..$w.4FGRAGanJ8U4Yq6sbj7.</encrypted-password>
         </authentication>
+        <class nc:operation="create">superuser</class>
+        <uid nc:operation="create">928</uid>
       </user>
     </login>
   </system>
@@ -2406,5 +2406,88 @@ func TestCreateDiffPatch_StructuralKeyRenameUsesEntryOperations(t *testing.T) {
 
 	if string(diff) != correctDiff {
 		t.Fatalf("diff mismatch\n--- got ---\n%s\n--- want ---\n%s\n", string(diff), correctDiff)
+	}
+}
+
+func TestCreateDiffPatch_CompoundKeyDeleteIncludesChoiceSibling(t *testing.T) {
+	// community under then/community is a list with compound key
+	// "choice-ident choice-value community-name". Junos requires the
+	// choice-ident element (<add/>) to be present in deletes.
+	name := "base-config"
+
+	editLeaf := map[string]Change{
+		`configuration/groups[name="base-config"]/policy-options/policy-statement[name="PS1"]/term[name="T1"]/then/community[community-name=OC-STD]/add`: {
+			Op:     Delete,
+			OldVal: "",
+		},
+		`configuration/groups[name="base-config"]/policy-options/policy-statement[name="PS1"]/term[name="T1"]/then/community[community-name=OC-STD]/community-name`: {
+			Op:     Delete,
+			OldVal: "OC-STD",
+		},
+	}
+
+	diff, err := CreateDiffPatch(editLeaf, name)
+	if err != nil {
+		t.Fatalf("CreateDiffPatch returned error: %v", err)
+	}
+
+	got := string(diff)
+
+	// The <community> parent must have the delete operation (promoted from key).
+	if !strings.Contains(got, `<community nc:operation="delete">`) {
+		t.Fatalf("expected parent-level delete on <community>, got:\n%s", got)
+	}
+	// The <add/> sibling must be present WITHOUT an operation (stripped by
+	// stripRedundantChildOps since parent is delete).
+	if !strings.Contains(got, `<add/>`) {
+		t.Fatalf("expected <add/> choice-ident sibling, got:\n%s", got)
+	}
+	// The <community-name> key must be present as a structural identifier.
+	if !strings.Contains(got, `<community-name>OC-STD</community-name>`) {
+		t.Fatalf("expected <community-name>OC-STD</community-name> key child, got:\n%s", got)
+	}
+
+	t.Logf("compound-key delete output:\n%s", got)
+}
+
+func TestLeafMapWithSchema_CompoundKeyEmitsAllChildren(t *testing.T) {
+	// Verify LeafMapWithSchema emits both the key leaf and the empty
+	// choice-ident leaf for compound-key list entries.
+	tree := &Node{Tag: "configuration", Children: []*Node{
+		{Tag: "policy-options", Children: []*Node{
+			{Tag: "policy-statement", Children: []*Node{
+				{Tag: "name", Text: "PS1"},
+				{Tag: "term", Children: []*Node{
+					{Tag: "name", Text: "T1"},
+					{Tag: "then", Children: []*Node{
+						{Tag: "community", Children: []*Node{
+							{Tag: "add"},
+							{Tag: "community-name", Text: "OC-STD"},
+						}},
+					}},
+				}},
+			}},
+		}},
+	}}
+
+	lm := LeafMapWithSchema(tree, idx)
+
+	// community-name should appear with a keyed parent segment
+	var foundKey, foundAdd bool
+	for path, val := range lm {
+		t.Logf("  %s = %q", path, val)
+		if strings.Contains(path, "community[community-name=OC-STD]/community-name") {
+			foundKey = true
+		}
+		if strings.Contains(path, "community[community-name=OC-STD]/add") {
+			foundAdd = true
+		}
+	}
+
+	if !foundKey {
+		t.Fatal("expected leaf map entry for community-name under keyed community")
+	}
+	if !foundAdd {
+		t.Fatal("expected leaf map entry for add (choice-ident) under keyed community")
 	}
 }
