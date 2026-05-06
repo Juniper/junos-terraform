@@ -30,11 +30,12 @@ const (
 
 // Raw JSON node
 type SchemaNode struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`      // container | list | leaf
-	Path     string `json:"path"`      // often parent path
-	Key      string `json:"key"`       // list key
-	LeafType string `json:"leaf-type"` // leaf-only: string, union, etc.
+	Name      string `json:"name"`
+	Type      string `json:"type"`       // container | list | leaf
+	Path      string `json:"path"`       // often parent path
+	Key       string `json:"key"`        // list key
+	LeafType  string `json:"leaf-type"`  // leaf-only: string, union, etc.
+	OrderedBy string `json:"ordered-by"` // "user" for ordered leaf-lists/lists
 
 	Children []SchemaNode `json:"children"`
 	// Union branches (when leaf-type == "union")
@@ -81,6 +82,8 @@ type NodeInfo struct {
 	// Lists
 	ListKey     string
 	ListKeyPath string
+	// Ordered-by user (meaningful ordering)
+	OrderedByUser bool
 	// Leaves
 	Leaf LeafInfo
 }
@@ -179,6 +182,11 @@ func UnmarshalTrimmedSchemaIndex(trimmedSchemaJSON string) (map[string]*NodeInfo
 			if n.Key != "" {
 				info.ListKeyPath = joinPath(full, n.Key)
 			}
+		}
+
+		// Ordered-by user
+		if n.OrderedBy == "user" {
+			info.OrderedByUser = true
 		}
 
 		// Leaf metadata
