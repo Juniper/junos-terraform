@@ -1,86 +1,16 @@
-forwarding_options:
-  storm_control_profiles:
-  - all: ''
-    name: default
-system:
-  extensions:
-    providers:
-    - license_type:
-      - deployment_scope:
-        - commercial
-        name: juniper
-      name: juniper
-    - license_type:
-      - deployment_scope:
-        - commercial
-        name: juniper
-      name: chef
-  syslog:
-    file:
-    - contents:
-      - notice: true
-        name: any
-      name: messages
-protocols:
-  bgp:
-    group:
-    - multipath: ''
-      name: EVPN_iBGP
-      type: internal
-      allow:
-      - 10.30.100.0/24
-      family:
-        evpn:
-          signaling: ''
-      local_as:
-        as_number: '65200'
-    - bfd_liveness_detection:
-        minimum_interval: '1000'
-        multiplier: '3'
-      multipath:
-        multiple_as: true
-      export:
-      - IPCLOS_BGP_EXP
-      mtu_discovery: true
-      import:
-      - IPCLOS_BGP_IMP
-      name: IPCLOS_eBGP
-      type: external
-      vpn_apply_export: true
-  igmp_snooping:
-    vlan:
-    - name: default
-routing_options:
-  forwarding_table:
-    export:
-    - PFE-LB
-    ecmp_fast_reroute: true
 interfaces:
   interface:
-  - name: xe-0/0/0
-    unit:
+  - unit:
     - name: '0'
-    description: '*** to dc1-borderleaf1 ***'
+    name: xe-0/0/0
   - name: xe-0/0/1
-    unit:
-    - name: '0'
-    description: '*** to dc1-borderleaf2 ***'
   - name: xe-0/0/2
-    unit:
-    - name: '0'
-    description: '*** to dc1-leaf1 ***'
   - name: xe-0/0/3
-    unit:
-    - name: '0'
-    description: '*** to dc1-leaf2 ***'
   - name: xe-0/0/4
-    unit:
-    - name: '0'
-    description: '*** to dc1-leaf3 ***'
   - name: em0
     unit:
-    - name: '0'
-      description: '*** management ***'
+    - description: '*** management ***'
+      name: '0'
   - name: em1
     unit:
     - description: '*** to pfe ***'
@@ -91,19 +21,44 @@ interfaces:
       name: '0'
   - name: lo0
     unit:
-    - name: '0'
-      description: '*** loopback ***'
+    - description: '*** loopback ***'
+      name: '0'
+protocols:
+  bgp:
+    group:
+    - name: EVPN_iBGP
+      multipath: ''
+      type: internal
+      family:
+        evpn:
+          signaling: ''
+    - vpn_apply_export: true
+      import:
+      - IPCLOS_BGP_IMP
+      name: IPCLOS_eBGP
+      multipath:
+        multiple_as: true
+      type: external
+      bfd_liveness_detection:
+        multiplier: '3'
+        minimum_interval: '1000'
+      export:
+      - IPCLOS_BGP_EXP
+      mtu_discovery: true
+  igmp_snooping:
+    vlan:
+    - name: default
 policy_options:
   policy_statement:
   - name: IPCLOS_BGP_EXP
     term:
     - name: loopback
+      then:
+        accept: true
       from:
         protocol:
         - direct
         - bgp
-      then:
-        accept: true
     - name: default
       then:
         reject: true
@@ -123,5 +78,33 @@ policy_options:
     then:
       load_balance:
         per_packet: true
+forwarding_options:
+  storm_control_profiles:
+  - all: ''
+    name: default
+routing_options:
+  forwarding_table:
+    ecmp_fast_reroute: true
+    export:
+    - PFE-LB
+system:
+  extensions:
+    providers:
+    - license_type:
+      - deployment_scope:
+        - commercial
+        name: juniper
+      name: juniper
+    - license_type:
+      - deployment_scope:
+        - commercial
+        name: juniper
+      name: chef
+  syslog:
+    file:
+    - contents:
+      - notice: true
+        name: any
+      name: messages
 version: 18.1R3-S5.3
 _merge_directive: merge_recursive

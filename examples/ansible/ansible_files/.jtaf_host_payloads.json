@@ -6250,5 +6250,2371 @@
       }
     },
     "version": "18.1R3-S5.3"
+  },
+  "dc2-firewall1": {
+    "chassis": {
+      "aggregated_devices": {
+        "ethernet": {
+          "device_count": "24"
+        }
+      }
+    },
+    "interfaces": {
+      "interface": [
+        {
+          "name": "ge-0/0/0",
+          "unit": [
+            {
+              "description": "*** to dc2-spine1 vlan 1 ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.95.1.2/30"
+                    }
+                  ]
+                }
+              },
+              "name": "1",
+              "vlan_id": "1"
+            }
+          ],
+          "vlan_tagging": true
+        },
+        {
+          "name": "ge-0/0/1",
+          "unit": [
+            {
+              "description": "*** to dc2-spine2 vlan 1 ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.93.1.2/30"
+                    }
+                  ]
+                }
+              },
+              "name": "1",
+              "vlan_id": "1"
+            }
+          ],
+          "vlan_tagging": true
+        },
+        {
+          "name": "fxp0",
+          "unit": [
+            {
+              "description": "*** management ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "100.123.26.3/16"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            }
+          ]
+        }
+      ]
+    },
+    "policy_options": {
+      "policy_statement": [
+        {
+          "name": "ospf-default",
+          "term": [
+            {
+              "from": {
+                "route_filter": [
+                  {
+                    "accept": true,
+                    "address": "0.0.0.0/0",
+                    "exact": true
+                  }
+                ]
+              },
+              "name": "1"
+            }
+          ]
+        }
+      ]
+    },
+    "protocols": {
+      "lldp": {
+        "interface": [
+          {
+            "name": "all"
+          }
+        ]
+      }
+    },
+    "routing_instances": {
+      "instance": [
+        {
+          "instance_type": "virtual-router",
+          "interface": [
+            {
+              "name": "ge-0/0/0.1"
+            },
+            {
+              "name": "ge-0/0/1.1"
+            }
+          ],
+          "name": "fabric",
+          "protocols": {
+            "ospf": {
+              "area": [
+                {
+                  "interface": [
+                    {
+                      "name": "ge-0/0/0.1"
+                    },
+                    {
+                      "name": "ge-0/0/1.1"
+                    }
+                  ],
+                  "name": "0.0.0.0"
+                }
+              ],
+              "export": [
+                "ospf-default"
+              ]
+            }
+          },
+          "routing_options": {
+            "static": {
+              "route": [
+                {
+                  "discard": true,
+                  "name": "0.0.0.0/0"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "routing_options": {
+      "static": {
+        "route": [
+          {
+            "name": "0.0.0.0/0",
+            "next_hop": [
+              "100.123.0.1"
+            ]
+          }
+        ]
+      }
+    },
+    "security": {
+      "log": {
+        "mode": "stream",
+        "report": ""
+      },
+      "policies": {
+        "policy": [
+          {
+            "from_zone_name": "trust",
+            "policy": [
+              {
+                "match": {
+                  "application": [
+                    "any"
+                  ],
+                  "destination_address": [
+                    "any"
+                  ],
+                  "source_address": [
+                    "any"
+                  ]
+                },
+                "name": "default-permit",
+                "then": {
+                  "permit": ""
+                }
+              }
+            ],
+            "to_zone_name": "trust"
+          },
+          {
+            "from_zone_name": "trust",
+            "policy": [
+              {
+                "match": {
+                  "application": [
+                    "any"
+                  ],
+                  "destination_address": [
+                    "any"
+                  ],
+                  "source_address": [
+                    "any"
+                  ]
+                },
+                "name": "default-permit",
+                "then": {
+                  "permit": ""
+                }
+              }
+            ],
+            "to_zone_name": "untrust"
+          }
+        ]
+      },
+      "screen": {
+        "ids_option": [
+          {
+            "icmp": {
+              "ping_death": true
+            },
+            "ip": {
+              "source_route_option": true,
+              "tear_drop": true
+            },
+            "name": "untrust-screen",
+            "tcp": {
+              "land": true,
+              "syn_flood": {
+                "alarm_threshold": "1024",
+                "attack_threshold": "200",
+                "destination_threshold": "2048",
+                "source_threshold": "1024",
+                "timeout": "20",
+                "undocumented": {
+                  "queue_size": "2000"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "zones": {
+        "security_zone": [
+          {
+            "host_inbound_traffic": {
+              "protocols": [
+                {
+                  "name": "all"
+                }
+              ],
+              "system_services": [
+                {
+                  "name": "all"
+                }
+              ]
+            },
+            "name": "trust",
+            "tcp_rst": true
+          },
+          {
+            "name": "untrust",
+            "screen": "untrust-screen"
+          },
+          {
+            "host_inbound_traffic": {
+              "protocols": [
+                {
+                  "name": "all"
+                }
+              ],
+              "system_services": [
+                {
+                  "name": "all"
+                }
+              ]
+            },
+            "interfaces": [
+              {
+                "name": "ge-0/0/0.1"
+              },
+              {
+                "name": "ge-0/0/1.1"
+              }
+            ],
+            "name": "VRF_10001"
+          }
+        ]
+      }
+    },
+    "snmp": {
+      "community": [
+        {
+          "authorization": "read-only",
+          "name": "public"
+        }
+      ],
+      "contact": "aburston@juniper.net",
+      "location": "JCL Labs"
+    },
+    "system": {
+      "host_name": "dc2-firewall1",
+      "license": {
+        "autoupdate": {
+          "url": [
+            {
+              "name": "https://ae1.juniper.net/junos/key_retrieval"
+            }
+          ]
+        }
+      },
+      "login": {
+        "message": "***********************************************************************\\nThis system is restricted to __________, authorized users for legitimate\\nbusiness purposes only. All activity on the system will be logged and\\nis subject to monitoring. Unauthorized access, use or modification\\nof computers, data therein or data in transit to or from the computers\\nis a violation of state and federal laws. Unauthorized activity will\\nbe reported to the law enforcement for investigation and possible\\nprosecution. __________ reserves the right to investigate, refer for\\nprosecution and pursue monetary damages in civil actions in the event\\nof unauthorized access.\\n***********************************************************************\\n",
+        "user": [
+          {
+            "authentication": {
+              "encrypted_password": "$1$a31gJmWG$h9ohikT1ajySf/tVH.gmv1"
+            },
+            "class": "super-user",
+            "name": "jcluser",
+            "uid": "2000"
+          }
+        ]
+      },
+      "root_authentication": {
+        "encrypted_password": "$1$DbZ1Q3pj$s48cZytjsmSJRUJAf4LdM."
+      },
+      "services": {
+        "extension_service": {
+          "notification": {
+            "allow_clients": {
+              "address": [
+                "0.0.0.0/0"
+              ]
+            }
+          },
+          "request_response": {
+            "grpc": {
+              "max_connections": "30",
+              "undocumented": {
+                "skip_authentication": null
+              }
+            }
+          }
+        },
+        "netconf": {
+          "ssh": ""
+        },
+        "rest": {
+          "enable_explorer": true,
+          "http": {
+            "port": "3000"
+          }
+        },
+        "ssh": {
+          "root_login": "allow"
+        }
+      },
+      "syslog": {
+        "file": [
+          {
+            "contents": [
+              {
+                "any": true,
+                "name": "any"
+              },
+              {
+                "info": true,
+                "name": "authorization"
+              }
+            ],
+            "name": "messages"
+          },
+          {
+            "contents": [
+              {
+                "any": true,
+                "name": "interactive-commands"
+              }
+            ],
+            "name": "interactive-commands"
+          }
+        ],
+        "user": [
+          {
+            "contents": [
+              {
+                "emergency": true,
+                "name": "any"
+              }
+            ],
+            "name": "*"
+          }
+        ]
+      }
+    },
+    "version": "18.2R3.4"
+  },
+  "dc2-firewall2": {
+    "chassis": {
+      "aggregated_devices": {
+        "ethernet": {
+          "device_count": "24"
+        }
+      }
+    },
+    "interfaces": {
+      "interface": [
+        {
+          "name": "ge-0/0/0",
+          "unit": [
+            {
+              "description": "*** to dc2-spine1 vlan 1 ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.94.1.2/30"
+                    }
+                  ]
+                }
+              },
+              "name": "1",
+              "vlan_id": "1"
+            }
+          ],
+          "vlan_tagging": true
+        },
+        {
+          "name": "ge-0/0/1",
+          "unit": [
+            {
+              "description": "*** to dc2-spine2 vlan 1 ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.92.1.2/30"
+                    }
+                  ]
+                }
+              },
+              "name": "1",
+              "vlan_id": "1"
+            }
+          ],
+          "vlan_tagging": true
+        },
+        {
+          "name": "fxp0",
+          "unit": [
+            {
+              "description": "*** management ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "100.123.26.4/16"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            }
+          ]
+        }
+      ]
+    },
+    "policy_options": {
+      "policy_statement": [
+        {
+          "name": "ospf-default",
+          "term": [
+            {
+              "from": {
+                "route_filter": [
+                  {
+                    "accept": true,
+                    "address": "0.0.0.0/0",
+                    "exact": true
+                  }
+                ]
+              },
+              "name": "1"
+            }
+          ]
+        }
+      ]
+    },
+    "protocols": {
+      "lldp": {
+        "interface": [
+          {
+            "name": "all"
+          }
+        ]
+      }
+    },
+    "routing_instances": {
+      "instance": [
+        {
+          "instance_type": "virtual-router",
+          "interface": [
+            {
+              "name": "ge-0/0/0.1"
+            },
+            {
+              "name": "ge-0/0/1.1"
+            }
+          ],
+          "name": "fabric",
+          "protocols": {
+            "ospf": {
+              "area": [
+                {
+                  "interface": [
+                    {
+                      "name": "ge-0/0/0.1"
+                    },
+                    {
+                      "name": "ge-0/0/1.1"
+                    }
+                  ],
+                  "name": "0.0.0.0"
+                }
+              ],
+              "export": [
+                "ospf-default"
+              ]
+            }
+          },
+          "routing_options": {
+            "static": {
+              "route": [
+                {
+                  "discard": true,
+                  "name": "0.0.0.0/0"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "routing_options": {
+      "static": {
+        "route": [
+          {
+            "name": "0.0.0.0/0",
+            "next_hop": [
+              "100.123.0.1"
+            ]
+          }
+        ]
+      }
+    },
+    "security": {
+      "log": {
+        "mode": "stream",
+        "report": ""
+      },
+      "policies": {
+        "policy": [
+          {
+            "from_zone_name": "trust",
+            "policy": [
+              {
+                "match": {
+                  "application": [
+                    "any"
+                  ],
+                  "destination_address": [
+                    "any"
+                  ],
+                  "source_address": [
+                    "any"
+                  ]
+                },
+                "name": "default-permit",
+                "then": {
+                  "permit": ""
+                }
+              }
+            ],
+            "to_zone_name": "trust"
+          },
+          {
+            "from_zone_name": "trust",
+            "policy": [
+              {
+                "match": {
+                  "application": [
+                    "any"
+                  ],
+                  "destination_address": [
+                    "any"
+                  ],
+                  "source_address": [
+                    "any"
+                  ]
+                },
+                "name": "default-permit",
+                "then": {
+                  "permit": ""
+                }
+              }
+            ],
+            "to_zone_name": "untrust"
+          }
+        ]
+      },
+      "screen": {
+        "ids_option": [
+          {
+            "icmp": {
+              "ping_death": true
+            },
+            "ip": {
+              "source_route_option": true,
+              "tear_drop": true
+            },
+            "name": "untrust-screen",
+            "tcp": {
+              "land": true,
+              "syn_flood": {
+                "alarm_threshold": "1024",
+                "attack_threshold": "200",
+                "destination_threshold": "2048",
+                "source_threshold": "1024",
+                "timeout": "20",
+                "undocumented": {
+                  "queue_size": "2000"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "zones": {
+        "security_zone": [
+          {
+            "host_inbound_traffic": {
+              "protocols": [
+                {
+                  "name": "all"
+                }
+              ],
+              "system_services": [
+                {
+                  "name": "all"
+                }
+              ]
+            },
+            "name": "trust",
+            "tcp_rst": true
+          },
+          {
+            "name": "untrust",
+            "screen": "untrust-screen"
+          },
+          {
+            "host_inbound_traffic": {
+              "protocols": [
+                {
+                  "name": "all"
+                }
+              ],
+              "system_services": [
+                {
+                  "name": "all"
+                }
+              ]
+            },
+            "interfaces": [
+              {
+                "name": "ge-0/0/0.1"
+              },
+              {
+                "name": "ge-0/0/1.1"
+              }
+            ],
+            "name": "VRF_10001"
+          }
+        ]
+      }
+    },
+    "snmp": {
+      "community": [
+        {
+          "authorization": "read-only",
+          "name": "public"
+        }
+      ],
+      "contact": "aburston@juniper.net",
+      "location": "JCL Labs"
+    },
+    "system": {
+      "host_name": "dc2-firewall2",
+      "license": {
+        "autoupdate": {
+          "url": [
+            {
+              "name": "https://ae1.juniper.net/junos/key_retrieval"
+            }
+          ]
+        }
+      },
+      "login": {
+        "message": "***********************************************************************\\nThis system is restricted to __________, authorized users for legitimate\\nbusiness purposes only. All activity on the system will be logged and\\nis subject to monitoring. Unauthorized access, use or modification\\nof computers, data therein or data in transit to or from the computers\\nis a violation of state and federal laws. Unauthorized activity will\\nbe reported to the law enforcement for investigation and possible\\nprosecution. __________ reserves the right to investigate, refer for\\nprosecution and pursue monetary damages in civil actions in the event\\nof unauthorized access.\\n***********************************************************************\\n",
+        "user": [
+          {
+            "authentication": {
+              "encrypted_password": "$1$a31gJmWG$h9ohikT1ajySf/tVH.gmv1"
+            },
+            "class": "super-user",
+            "name": "jcluser",
+            "uid": "2000"
+          }
+        ]
+      },
+      "root_authentication": {
+        "encrypted_password": "$1$DbZ1Q3pj$s48cZytjsmSJRUJAf4LdM."
+      },
+      "services": {
+        "extension_service": {
+          "notification": {
+            "allow_clients": {
+              "address": [
+                "0.0.0.0/0"
+              ]
+            }
+          },
+          "request_response": {
+            "grpc": {
+              "max_connections": "30",
+              "undocumented": {
+                "skip_authentication": null
+              }
+            }
+          }
+        },
+        "netconf": {
+          "ssh": ""
+        },
+        "rest": {
+          "enable_explorer": true,
+          "http": {
+            "port": "3000"
+          }
+        },
+        "ssh": {
+          "root_login": "allow"
+        }
+      },
+      "syslog": {
+        "file": [
+          {
+            "contents": [
+              {
+                "any": true,
+                "name": "any"
+              },
+              {
+                "info": true,
+                "name": "authorization"
+              }
+            ],
+            "name": "messages"
+          },
+          {
+            "contents": [
+              {
+                "any": true,
+                "name": "interactive-commands"
+              }
+            ],
+            "name": "interactive-commands"
+          }
+        ],
+        "user": [
+          {
+            "contents": [
+              {
+                "emergency": true,
+                "name": "any"
+              }
+            ],
+            "name": "*"
+          }
+        ]
+      }
+    },
+    "version": "18.2R3.4"
+  },
+  "dc2-spine1": {
+    "chassis": {
+      "aggregated_devices": {
+        "ethernet": {
+          "device_count": "24"
+        }
+      }
+    },
+    "forwarding_options": {
+      "storm_control_profiles": [
+        {
+          "all": "",
+          "name": "default"
+        }
+      ]
+    },
+    "interfaces": {
+      "interface": [
+        {
+          "description": "*** to wan-pe2 ***",
+          "name": "xe-0/0/0",
+          "unit": [
+            {
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.32.2.1/30"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "name": "xe-0/0/1",
+          "unit": [
+            {
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.95.1.1/30"
+                    }
+                  ]
+                }
+              },
+              "name": "1",
+              "vlan_id": "1"
+            }
+          ],
+          "vlan_tagging": true
+        },
+        {
+          "name": "xe-0/0/2",
+          "unit": [
+            {
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.94.1.1/30"
+                    }
+                  ]
+                }
+              },
+              "name": "1",
+              "vlan_id": "1"
+            }
+          ],
+          "vlan_tagging": true
+        },
+        {
+          "ether_options": {
+            "ieee_802_3ad": {
+              "bundle": "ae0"
+            }
+          },
+          "name": "xe-0/0/3"
+        },
+        {
+          "ether_options": {
+            "ieee_802_3ad": {
+              "bundle": "ae1"
+            }
+          },
+          "name": "xe-0/0/4"
+        },
+        {
+          "description": "*** to dc2-spine2 ***",
+          "name": "xe-0/0/5",
+          "unit": [
+            {
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.30.189.1/30"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "aggregated_ether_options": {
+            "lacp": {
+              "active": true,
+              "periodic": "fast",
+              "system_id": "00:00:00:01:01:00"
+            }
+          },
+          "esi": {
+            "all_active": true,
+            "identifier": "00:00:00:00:00:00:00:01:01:00"
+          },
+          "name": "ae0",
+          "unit": [
+            {
+              "family": {
+                "ethernet_switching": {
+                  "vlan": {
+                    "members": [
+                      "1002"
+                    ]
+                  }
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "aggregated_ether_options": {
+            "lacp": {
+              "active": true,
+              "periodic": "fast",
+              "system_id": "00:00:00:01:02:00"
+            }
+          },
+          "esi": {
+            "all_active": true,
+            "identifier": "00:00:00:00:00:00:00:01:02:00"
+          },
+          "name": "ae1",
+          "unit": [
+            {
+              "family": {
+                "ethernet_switching": {
+                  "vlan": {
+                    "members": [
+                      "1002"
+                    ]
+                  }
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "name": "em0",
+          "unit": [
+            {
+              "description": "*** management ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "100.123.24.8/16"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "name": "em1",
+          "unit": [
+            {
+              "description": "*** to pfe ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "169.254.0.2/24"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "name": "irb",
+          "unit": [
+            {
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.1.2.1/24"
+                    }
+                  ]
+                }
+              },
+              "mac": "02:0a:01:02:01:18",
+              "name": "1002"
+            }
+          ]
+        },
+        {
+          "name": "lo0",
+          "unit": [
+            {
+              "description": "*** loopback ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.30.100.8/32"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            },
+            {
+              "description": "Loopback for VXLAN control packets for VRF_10001",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.40.101.1/32"
+                    }
+                  ]
+                }
+              },
+              "name": "10001"
+            }
+          ]
+        }
+      ]
+    },
+    "policy_options": {
+      "community": [
+        {
+          "members": [
+            "65520:1"
+          ],
+          "name": "dc2-spine1"
+        }
+      ],
+      "policy_statement": [
+        {
+          "name": "EVPN_T5_EXPORT",
+          "term": [
+            {
+              "from": {
+                "protocol": [
+                  "direct"
+                ]
+              },
+              "name": "fm_direct",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "from": {
+                "protocol": [
+                  "static"
+                ]
+              },
+              "name": "fm_static",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "from": {
+                "protocol": [
+                  "evpn",
+                  "ospf"
+                ],
+                "route_filter": [
+                  {
+                    "address": "0.0.0.0/0",
+                    "exact": true
+                  }
+                ]
+              },
+              "name": "fm_v4_default",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "from": {
+                "protocol": [
+                  "evpn"
+                ],
+                "route_filter": [
+                  {
+                    "address": "0.0.0.0/0",
+                    "prefix_length_range": "/32-/32"
+                  }
+                ]
+              },
+              "name": "fm_v4_host",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "from": {
+                "protocol": [
+                  "evpn"
+                ],
+                "route_filter": [
+                  {
+                    "address": "0::0/0",
+                    "prefix_length_range": "/128-/128"
+                  }
+                ]
+              },
+              "name": "fm_v6_host",
+              "then": {
+                "accept": true
+              }
+            }
+          ]
+        },
+        {
+          "name": "IPCLOS_BGP_EXP",
+          "term": [
+            {
+              "from": {
+                "protocol": [
+                  "direct",
+                  "bgp"
+                ]
+              },
+              "name": "loopback",
+              "then": {
+                "accept": true,
+                "community": [
+                  {
+                    "add": true,
+                    "community_name": "dc2-spine1"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "default",
+              "then": {
+                "reject": true
+              }
+            }
+          ]
+        },
+        {
+          "name": "IPCLOS_BGP_IMP",
+          "term": [
+            {
+              "from": {
+                "protocol": [
+                  "bgp",
+                  "direct"
+                ]
+              },
+              "name": "loopback",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "name": "default",
+              "then": {
+                "reject": true
+              }
+            }
+          ]
+        },
+        {
+          "name": "PFE-LB",
+          "then": {
+            "load_balance": {
+              "per_packet": true
+            }
+          }
+        },
+        {
+          "name": "to-ospf",
+          "term": [
+            {
+              "from": {
+                "protocol": [
+                  "evpn"
+                ],
+                "route_filter": [
+                  {
+                    "address": "10.1.2.0/24",
+                    "orlonger": true
+                  }
+                ]
+              },
+              "name": "10",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "name": "100",
+              "then": {
+                "reject": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "protocols": {
+      "bgp": {
+        "group": [
+          {
+            "family": {
+              "evpn": {
+                "signaling": {
+                  "delay_route_advertisements": {
+                    "minimum_delay": {
+                      "routing_uptime": "480"
+                    }
+                  }
+                }
+              }
+            },
+            "local_address": "10.30.100.8",
+            "local_as": {
+              "as_number": "65201"
+            },
+            "multihop": {
+              "no_nexthop_change": true
+            },
+            "multipath": {
+              "multiple_as": true
+            },
+            "name": "WAN_OVERLAY_eBGP",
+            "neighbor": [
+              {
+                "description": "DCI EBGP peering to 10.30.100.1",
+                "name": "10.30.100.1",
+                "peer_as": "65200"
+              },
+              {
+                "description": "DCI EBGP peering to 10.30.100.2",
+                "name": "10.30.100.2",
+                "peer_as": "65200"
+              }
+            ],
+            "type": "external"
+          },
+          {
+            "cluster": "10.30.100.8",
+            "family": {
+              "evpn": {
+                "signaling": ""
+              }
+            },
+            "local_address": "10.30.100.8",
+            "local_as": {
+              "as_number": "65201"
+            },
+            "multipath": "",
+            "name": "EVPN_iBGP",
+            "neighbor": [
+              {
+                "name": "10.30.100.9"
+              }
+            ],
+            "type": "internal"
+          },
+          {
+            "bfd_liveness_detection": {
+              "minimum_interval": "1000",
+              "multiplier": "3"
+            },
+            "export": [
+              "IPCLOS_BGP_EXP"
+            ],
+            "import": [
+              "IPCLOS_BGP_IMP"
+            ],
+            "local_as": {
+              "as_number": "65520"
+            },
+            "mtu_discovery": true,
+            "multipath": {
+              "multiple_as": true
+            },
+            "name": "IPCLOS_eBGP",
+            "neighbor": [
+              {
+                "description": "EBGP peering to 10.30.189.2",
+                "name": "10.30.189.2",
+                "peer_as": "65521"
+              },
+              {
+                "description": "EBGP peering to 10.32.2.2",
+                "name": "10.32.2.2",
+                "peer_as": "65401"
+              }
+            ],
+            "type": "external",
+            "vpn_apply_export": true
+          }
+        ]
+      },
+      "evpn": {
+        "default_gateway": "do-not-advertise",
+        "encapsulation": "vxlan",
+        "extended_vni_list": [
+          "all"
+        ],
+        "multicast_mode": "ingress-replication",
+        "no_core_isolation": true
+      },
+      "igmp_snooping": {
+        "vlan": [
+          {
+            "name": "default"
+          }
+        ]
+      },
+      "lldp": {
+        "interface": [
+          {
+            "name": "all"
+          }
+        ]
+      }
+    },
+    "routing_instances": {
+      "instance": [
+        {
+          "instance_type": "vrf",
+          "interface": [
+            {
+              "name": "xe-0/0/1.1"
+            },
+            {
+              "name": "xe-0/0/2.1"
+            },
+            {
+              "name": "irb.1002"
+            },
+            {
+              "name": "lo0.10001"
+            }
+          ],
+          "name": "VRF_10001",
+          "protocols": {
+            "evpn": {
+              "ip_prefix_routes": {
+                "advertise": "direct-nexthop",
+                "encapsulation": "vxlan",
+                "export": [
+                  "EVPN_T5_EXPORT"
+                ],
+                "vni": "10001"
+              }
+            },
+            "ospf": {
+              "area": [
+                {
+                  "interface": [
+                    {
+                      "metric": "100",
+                      "name": "xe-0/0/1.1"
+                    },
+                    {
+                      "metric": "200",
+                      "name": "xe-0/0/2.1"
+                    }
+                  ],
+                  "name": "0.0.0.0"
+                }
+              ],
+              "export": [
+                "to-ospf"
+              ]
+            }
+          },
+          "route_distinguisher": {
+            "rd_type": "10.40.101.1:10001"
+          },
+          "routing_options": {
+            "auto_export": ""
+          },
+          "vrf_table_label": "",
+          "vrf_target": {
+            "community": "target:1:10001"
+          }
+        }
+      ]
+    },
+    "routing_options": {
+      "forwarding_table": {
+        "chained_composite_next_hop": {
+          "ingress": {
+            "evpn": true
+          }
+        },
+        "ecmp_fast_reroute": true,
+        "export": [
+          "PFE-LB"
+        ]
+      },
+      "router_id": "10.30.100.8",
+      "static": {
+        "route": [
+          {
+            "name": "0.0.0.0/0",
+            "next_hop": [
+              "100.123.0.1"
+            ]
+          }
+        ]
+      }
+    },
+    "snmp": {
+      "community": [
+        {
+          "authorization": "read-only",
+          "name": "public"
+        }
+      ],
+      "contact": "aburston@juniper.net",
+      "location": "JCL Labs"
+    },
+    "switch_options": {
+      "route_distinguisher": {
+        "rd_type": "10.30.100.8:9999"
+      },
+      "vrf_target": {
+        "auto": "",
+        "community": "target:9999:9999"
+      },
+      "vtep_source_interface": {
+        "interface_name": "lo0.0"
+      }
+    },
+    "system": {
+      "extensions": {
+        "providers": [
+          {
+            "license_type": [
+              {
+                "deployment_scope": [
+                  "commercial"
+                ],
+                "name": "juniper"
+              }
+            ],
+            "name": "juniper"
+          },
+          {
+            "license_type": [
+              {
+                "deployment_scope": [
+                  "commercial"
+                ],
+                "name": "juniper"
+              }
+            ],
+            "name": "chef"
+          }
+        ]
+      },
+      "host_name": "dc2-spine1",
+      "login": {
+        "message": "***********************************************************************\\nThis system is restricted to __________, authorized users for legitimate\\nbusiness purposes only. All activity on the system will be logged and\\nis subject to monitoring. Unauthorized access, use or modification\\nof computers, data therein or data in transit to or from the computers\\nis a violation of state and federal laws. Unauthorized activity will\\nbe reported to the law enforcement for investigation and possible\\nprosecution. __________ reserves the right to investigate, refer for\\nprosecution and pursue monetary damages in civil actions in the event\\nof unauthorized access.\\n***********************************************************************\\n",
+        "user": [
+          {
+            "authentication": {
+              "encrypted_password": "$1$a31gJmWG$h9ohikT1ajySf/tVH.gmv1"
+            },
+            "class": "super-user",
+            "name": "jcluser",
+            "uid": "2000"
+          }
+        ]
+      },
+      "root_authentication": {
+        "encrypted_password": "$1$DbZ1Q3pj$s48cZytjsmSJRUJAf4LdM."
+      },
+      "services": {
+        "extension_service": {
+          "notification": {
+            "allow_clients": {
+              "address": [
+                "0.0.0.0/0"
+              ]
+            }
+          },
+          "request_response": {
+            "grpc": {
+              "max_connections": "30",
+              "undocumented": {
+                "skip_authentication": null
+              }
+            }
+          }
+        },
+        "netconf": {
+          "ssh": ""
+        },
+        "rest": {
+          "enable_explorer": true,
+          "http": {
+            "port": "3000"
+          }
+        },
+        "ssh": {
+          "root_login": "allow"
+        }
+      },
+      "syslog": {
+        "file": [
+          {
+            "contents": [
+              {
+                "name": "any",
+                "notice": true
+              },
+              {
+                "info": true,
+                "name": "authorization"
+              }
+            ],
+            "name": "messages"
+          },
+          {
+            "contents": [
+              {
+                "any": true,
+                "name": "interactive-commands"
+              }
+            ],
+            "name": "interactive-commands"
+          }
+        ],
+        "user": [
+          {
+            "contents": [
+              {
+                "emergency": true,
+                "name": "any"
+              }
+            ],
+            "name": "*"
+          }
+        ]
+      }
+    },
+    "version": "18.1R3-S5.3",
+    "vlans": {
+      "vlan": [
+        {
+          "l3_interface": "irb.1002",
+          "name": "vlan_1002",
+          "vlan_id": "1002",
+          "vxlan": {
+            "vni": "1002"
+          }
+        }
+      ]
+    }
+  },
+  "dc2-spine2": {
+    "chassis": {
+      "aggregated_devices": {
+        "ethernet": {
+          "device_count": "24"
+        }
+      }
+    },
+    "forwarding_options": {
+      "storm_control_profiles": [
+        {
+          "all": "",
+          "name": "default"
+        }
+      ]
+    },
+    "interfaces": {
+      "interface": [
+        {
+          "description": "*** to wan-pe2 ***",
+          "name": "xe-0/0/0",
+          "unit": [
+            {
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.32.12.1/30"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "name": "xe-0/0/1",
+          "unit": [
+            {
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.93.1.1/30"
+                    }
+                  ]
+                }
+              },
+              "name": "1",
+              "vlan_id": "1"
+            }
+          ],
+          "vlan_tagging": true
+        },
+        {
+          "name": "xe-0/0/2",
+          "unit": [
+            {
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.92.1.1/30"
+                    }
+                  ]
+                }
+              },
+              "name": "1",
+              "vlan_id": "1"
+            }
+          ],
+          "vlan_tagging": true
+        },
+        {
+          "ether_options": {
+            "ieee_802_3ad": {
+              "bundle": "ae0"
+            }
+          },
+          "name": "xe-0/0/3"
+        },
+        {
+          "ether_options": {
+            "ieee_802_3ad": {
+              "bundle": "ae1"
+            }
+          },
+          "name": "xe-0/0/4"
+        },
+        {
+          "description": "*** to dc2-spine1 ***",
+          "name": "xe-0/0/5",
+          "unit": [
+            {
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.30.189.2/30"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "aggregated_ether_options": {
+            "lacp": {
+              "active": true,
+              "periodic": "fast",
+              "system_id": "00:00:00:01:01:00"
+            }
+          },
+          "esi": {
+            "all_active": true,
+            "identifier": "00:00:00:00:00:00:00:01:01:00"
+          },
+          "name": "ae0",
+          "unit": [
+            {
+              "family": {
+                "ethernet_switching": {
+                  "vlan": {
+                    "members": [
+                      "1002"
+                    ]
+                  }
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "aggregated_ether_options": {
+            "lacp": {
+              "active": true,
+              "periodic": "fast",
+              "system_id": "00:00:00:01:02:00"
+            }
+          },
+          "esi": {
+            "all_active": true,
+            "identifier": "00:00:00:00:00:00:00:01:02:00"
+          },
+          "name": "ae1",
+          "unit": [
+            {
+              "family": {
+                "ethernet_switching": {
+                  "vlan": {
+                    "members": [
+                      "1002"
+                    ]
+                  }
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "name": "em0",
+          "unit": [
+            {
+              "description": "*** management ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "100.123.24.9/16"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "name": "em1",
+          "unit": [
+            {
+              "description": "*** to pfe ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "169.254.0.2/24"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            }
+          ]
+        },
+        {
+          "name": "irb",
+          "unit": [
+            {
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.1.2.1/24"
+                    }
+                  ]
+                }
+              },
+              "mac": "02:0a:01:02:01:18",
+              "name": "1002"
+            }
+          ]
+        },
+        {
+          "name": "lo0",
+          "unit": [
+            {
+              "description": "*** loopback ***",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.30.100.9/32"
+                    }
+                  ]
+                }
+              },
+              "name": "0"
+            },
+            {
+              "description": "Loopback for VXLAN control packets for VRF_10001",
+              "family": {
+                "inet": {
+                  "address": [
+                    {
+                      "name": "10.40.101.2/32"
+                    }
+                  ]
+                }
+              },
+              "name": "10001"
+            }
+          ]
+        }
+      ]
+    },
+    "policy_options": {
+      "community": [
+        {
+          "members": [
+            "65521:1"
+          ],
+          "name": "dc2-spine2"
+        }
+      ],
+      "policy_statement": [
+        {
+          "name": "EVPN_T5_EXPORT",
+          "term": [
+            {
+              "from": {
+                "protocol": [
+                  "direct"
+                ]
+              },
+              "name": "fm_direct",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "from": {
+                "protocol": [
+                  "static"
+                ]
+              },
+              "name": "fm_static",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "from": {
+                "protocol": [
+                  "evpn",
+                  "ospf"
+                ],
+                "route_filter": [
+                  {
+                    "address": "0.0.0.0/0",
+                    "exact": true
+                  }
+                ]
+              },
+              "name": "fm_v4_default",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "from": {
+                "protocol": [
+                  "evpn"
+                ],
+                "route_filter": [
+                  {
+                    "address": "0.0.0.0/0",
+                    "prefix_length_range": "/32-/32"
+                  }
+                ]
+              },
+              "name": "fm_v4_host",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "from": {
+                "protocol": [
+                  "evpn"
+                ],
+                "route_filter": [
+                  {
+                    "address": "0::0/0",
+                    "prefix_length_range": "/128-/128"
+                  }
+                ]
+              },
+              "name": "fm_v6_host",
+              "then": {
+                "accept": true
+              }
+            }
+          ]
+        },
+        {
+          "name": "IPCLOS_BGP_EXP",
+          "term": [
+            {
+              "from": {
+                "protocol": [
+                  "direct",
+                  "bgp"
+                ]
+              },
+              "name": "loopback",
+              "then": {
+                "accept": true,
+                "community": [
+                  {
+                    "add": true,
+                    "community_name": "dc2-spine2"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "default",
+              "then": {
+                "reject": true
+              }
+            }
+          ]
+        },
+        {
+          "name": "IPCLOS_BGP_IMP",
+          "term": [
+            {
+              "from": {
+                "protocol": [
+                  "bgp",
+                  "direct"
+                ]
+              },
+              "name": "loopback",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "name": "default",
+              "then": {
+                "reject": true
+              }
+            }
+          ]
+        },
+        {
+          "name": "PFE-LB",
+          "then": {
+            "load_balance": {
+              "per_packet": true
+            }
+          }
+        },
+        {
+          "name": "to-ospf",
+          "term": [
+            {
+              "from": {
+                "protocol": [
+                  "evpn"
+                ],
+                "route_filter": [
+                  {
+                    "address": "10.1.2.0/24",
+                    "orlonger": true
+                  }
+                ]
+              },
+              "name": "10",
+              "then": {
+                "accept": true
+              }
+            },
+            {
+              "name": "100",
+              "then": {
+                "reject": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "protocols": {
+      "bgp": {
+        "group": [
+          {
+            "family": {
+              "evpn": {
+                "signaling": {
+                  "delay_route_advertisements": {
+                    "minimum_delay": {
+                      "routing_uptime": "480"
+                    }
+                  }
+                }
+              }
+            },
+            "local_address": "10.30.100.9",
+            "local_as": {
+              "as_number": "65201"
+            },
+            "multihop": {
+              "no_nexthop_change": true
+            },
+            "multipath": {
+              "multiple_as": true
+            },
+            "name": "WAN_OVERLAY_eBGP",
+            "neighbor": [
+              {
+                "description": "DCI EBGP peering to 10.30.100.1",
+                "name": "10.30.100.1",
+                "peer_as": "65200"
+              },
+              {
+                "description": "DCI EBGP peering to 10.30.100.2",
+                "name": "10.30.100.2",
+                "peer_as": "65200"
+              }
+            ],
+            "type": "external"
+          },
+          {
+            "cluster": "10.30.100.9",
+            "family": {
+              "evpn": {
+                "signaling": ""
+              }
+            },
+            "local_address": "10.30.100.9",
+            "local_as": {
+              "as_number": "65201"
+            },
+            "multipath": "",
+            "name": "EVPN_iBGP",
+            "neighbor": [
+              {
+                "name": "10.30.100.8"
+              }
+            ],
+            "type": "internal"
+          },
+          {
+            "bfd_liveness_detection": {
+              "minimum_interval": "1000",
+              "multiplier": "3"
+            },
+            "export": [
+              "IPCLOS_BGP_EXP"
+            ],
+            "import": [
+              "IPCLOS_BGP_IMP"
+            ],
+            "local_as": {
+              "as_number": "65521"
+            },
+            "mtu_discovery": true,
+            "multipath": {
+              "multiple_as": true
+            },
+            "name": "IPCLOS_eBGP",
+            "neighbor": [
+              {
+                "description": "EBGP peering to 10.30.189.1",
+                "name": "10.30.189.1",
+                "peer_as": "65520"
+              },
+              {
+                "description": "EBGP peering to 10.32.12.2",
+                "name": "10.32.12.2",
+                "peer_as": "65401"
+              }
+            ],
+            "type": "external",
+            "vpn_apply_export": true
+          }
+        ]
+      },
+      "evpn": {
+        "default_gateway": "do-not-advertise",
+        "encapsulation": "vxlan",
+        "extended_vni_list": [
+          "all"
+        ],
+        "multicast_mode": "ingress-replication",
+        "no_core_isolation": true
+      },
+      "igmp_snooping": {
+        "vlan": [
+          {
+            "name": "default"
+          }
+        ]
+      },
+      "lldp": {
+        "interface": [
+          {
+            "name": "all"
+          }
+        ]
+      }
+    },
+    "routing_instances": {
+      "instance": [
+        {
+          "instance_type": "vrf",
+          "interface": [
+            {
+              "name": "xe-0/0/1.1"
+            },
+            {
+              "name": "xe-0/0/2.1"
+            },
+            {
+              "name": "irb.1002"
+            },
+            {
+              "name": "lo0.10001"
+            }
+          ],
+          "name": "VRF_10001",
+          "protocols": {
+            "evpn": {
+              "ip_prefix_routes": {
+                "advertise": "direct-nexthop",
+                "encapsulation": "vxlan",
+                "export": [
+                  "EVPN_T5_EXPORT"
+                ],
+                "vni": "10001"
+              }
+            },
+            "ospf": {
+              "area": [
+                {
+                  "interface": [
+                    {
+                      "metric": "100",
+                      "name": "xe-0/0/1.1"
+                    },
+                    {
+                      "metric": "200",
+                      "name": "xe-0/0/2.1"
+                    }
+                  ],
+                  "name": "0.0.0.0"
+                }
+              ],
+              "export": [
+                "to-ospf"
+              ]
+            }
+          },
+          "route_distinguisher": {
+            "rd_type": "10.40.101.2:10001"
+          },
+          "routing_options": {
+            "auto_export": ""
+          },
+          "vrf_table_label": "",
+          "vrf_target": {
+            "community": "target:1:10001"
+          }
+        }
+      ]
+    },
+    "routing_options": {
+      "forwarding_table": {
+        "chained_composite_next_hop": {
+          "ingress": {
+            "evpn": true
+          }
+        },
+        "ecmp_fast_reroute": true,
+        "export": [
+          "PFE-LB"
+        ]
+      },
+      "router_id": "10.30.100.9",
+      "static": {
+        "route": [
+          {
+            "name": "0.0.0.0/0",
+            "next_hop": [
+              "100.123.0.1"
+            ]
+          }
+        ]
+      }
+    },
+    "snmp": {
+      "community": [
+        {
+          "authorization": "read-only",
+          "name": "public"
+        }
+      ],
+      "contact": "aburston@juniper.net",
+      "location": "JCL Labs"
+    },
+    "switch_options": {
+      "route_distinguisher": {
+        "rd_type": "10.30.100.9:9999"
+      },
+      "vrf_target": {
+        "auto": "",
+        "community": "target:9999:9999"
+      },
+      "vtep_source_interface": {
+        "interface_name": "lo0.0"
+      }
+    },
+    "system": {
+      "extensions": {
+        "providers": [
+          {
+            "license_type": [
+              {
+                "deployment_scope": [
+                  "commercial"
+                ],
+                "name": "juniper"
+              }
+            ],
+            "name": "juniper"
+          },
+          {
+            "license_type": [
+              {
+                "deployment_scope": [
+                  "commercial"
+                ],
+                "name": "juniper"
+              }
+            ],
+            "name": "chef"
+          }
+        ]
+      },
+      "host_name": "dc2-spine2",
+      "login": {
+        "message": "***********************************************************************\\nThis system is restricted to __________, authorized users for legitimate\\nbusiness purposes only. All activity on the system will be logged and\\nis subject to monitoring. Unauthorized access, use or modification\\nof computers, data therein or data in transit to or from the computers\\nis a violation of state and federal laws. Unauthorized activity will\\nbe reported to the law enforcement for investigation and possible\\nprosecution. __________ reserves the right to investigate, refer for\\nprosecution and pursue monetary damages in civil actions in the event\\nof unauthorized access.\\n***********************************************************************\\n",
+        "user": [
+          {
+            "authentication": {
+              "encrypted_password": "$1$a31gJmWG$h9ohikT1ajySf/tVH.gmv1"
+            },
+            "class": "super-user",
+            "name": "jcluser",
+            "uid": "2000"
+          }
+        ]
+      },
+      "root_authentication": {
+        "encrypted_password": "$1$DbZ1Q3pj$s48cZytjsmSJRUJAf4LdM."
+      },
+      "services": {
+        "extension_service": {
+          "notification": {
+            "allow_clients": {
+              "address": [
+                "0.0.0.0/0"
+              ]
+            }
+          },
+          "request_response": {
+            "grpc": {
+              "max_connections": "30",
+              "undocumented": {
+                "skip_authentication": null
+              }
+            }
+          }
+        },
+        "netconf": {
+          "ssh": ""
+        },
+        "rest": {
+          "enable_explorer": true,
+          "http": {
+            "port": "3000"
+          }
+        },
+        "ssh": {
+          "root_login": "allow"
+        }
+      },
+      "syslog": {
+        "file": [
+          {
+            "contents": [
+              {
+                "name": "any",
+                "notice": true
+              },
+              {
+                "info": true,
+                "name": "authorization"
+              }
+            ],
+            "name": "messages"
+          },
+          {
+            "contents": [
+              {
+                "any": true,
+                "name": "interactive-commands"
+              }
+            ],
+            "name": "interactive-commands"
+          }
+        ],
+        "user": [
+          {
+            "contents": [
+              {
+                "emergency": true,
+                "name": "any"
+              }
+            ],
+            "name": "*"
+          }
+        ]
+      }
+    },
+    "version": "18.1R3-S5.3",
+    "vlans": {
+      "vlan": [
+        {
+          "l3_interface": "irb.1002",
+          "name": "vlan_1002",
+          "vlan_id": "1002",
+          "vxlan": {
+            "vni": "1002"
+          }
+        }
+      ]
+    }
   }
 }
