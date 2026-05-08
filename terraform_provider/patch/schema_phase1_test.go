@@ -236,6 +236,23 @@ func TestLeafMapWithSchema_LeafListSetDiff(t *testing.T) {
 	}
 }
 
+func TestBuildTree_PreservesTrailingNewlineInLeafText(t *testing.T) {
+	xmlStr := `<configuration><groups><name>g1</name><system><login><message>banner line
+</message></login></system></groups></configuration>`
+
+	tree := mustTree(t, xmlStr)
+	idx, err := UnmarshalTrimmedSchemaIndex(TrimmedSchemaJSON)
+	if err != nil {
+		t.Fatalf("UnmarshalTrimmedSchemaIndex error: %v", err)
+	}
+
+	leafMap := LeafMapWithSchema(tree, idx)
+	path := `configuration/groups[name=g1]/system/login/message`
+	if got := leafMap[path]; got != "banner line\n" {
+		t.Fatalf("expected %s => %q, got %q", path, "banner line\n", got)
+	}
+}
+
 func TestOrderedChanges_DeleteBeforeCreate_AndDepthRules(t *testing.T) {
 	diffMap := map[string]Change{
 		`configuration/groups[name=g1]/foo/bar/baz`: {Op: Delete, OldVal: "x"},

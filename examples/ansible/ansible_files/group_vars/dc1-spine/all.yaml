@@ -1,0 +1,127 @@
+policy_options:
+  policy_statement:
+  - term:
+    - then:
+        accept: true
+      from:
+        protocol:
+        - direct
+        - bgp
+      name: loopback
+    - then:
+        reject: true
+      name: default
+    name: IPCLOS_BGP_EXP
+  - term:
+    - from:
+        protocol:
+        - bgp
+        - direct
+      name: loopback
+      then:
+        accept: true
+    - name: default
+      then:
+        reject: true
+    name: IPCLOS_BGP_IMP
+  - then:
+      load_balance:
+        per_packet: true
+    name: PFE-LB
+protocols:
+  igmp_snooping:
+    vlan:
+    - name: default
+  bgp:
+    group:
+    - local_as:
+        as_number: '65200'
+      family:
+        evpn:
+          signaling: ''
+      name: EVPN_iBGP
+      type: internal
+      multipath: ''
+      allow:
+      - 10.30.100.0/24
+    - import:
+      - IPCLOS_BGP_IMP
+      name: IPCLOS_eBGP
+      mtu_discovery: true
+      type: external
+      bfd_liveness_detection:
+        minimum_interval: '1000'
+        multiplier: '3'
+      multipath:
+        multiple_as: true
+      vpn_apply_export: true
+      export:
+      - IPCLOS_BGP_EXP
+interfaces:
+  interface:
+  - description: '*** to dc1-borderleaf1 ***'
+    unit:
+    - name: '0'
+    name: xe-0/0/0
+  - description: '*** to dc1-borderleaf2 ***'
+    unit:
+    - name: '0'
+    name: xe-0/0/1
+  - description: '*** to dc1-leaf1 ***'
+    unit:
+    - name: '0'
+    name: xe-0/0/2
+  - description: '*** to dc1-leaf2 ***'
+    unit:
+    - name: '0'
+    name: xe-0/0/3
+  - description: '*** to dc1-leaf3 ***'
+    unit:
+    - name: '0'
+    name: xe-0/0/4
+  - unit:
+    - description: '*** management ***'
+      name: '0'
+    name: em0
+  - unit:
+    - description: '*** to pfe ***'
+      family:
+        inet:
+          address:
+          - name: 169.254.0.2/24
+      name: '0'
+    name: em1
+  - unit:
+    - description: '*** loopback ***'
+      name: '0'
+    name: lo0
+system:
+  syslog:
+    file:
+    - contents:
+      - notice: true
+        name: any
+      name: messages
+  extensions:
+    providers:
+    - license_type:
+      - deployment_scope:
+        - commercial
+        name: juniper
+      name: juniper
+    - license_type:
+      - deployment_scope:
+        - commercial
+        name: juniper
+      name: chef
+version: 18.1R3-S5.3
+forwarding_options:
+  storm_control_profiles:
+  - all: ''
+    name: default
+routing_options:
+  forwarding_table:
+    ecmp_fast_reroute: true
+    export:
+    - PFE-LB
+_merge_directive: merge_recursive

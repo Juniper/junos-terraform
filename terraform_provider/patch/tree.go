@@ -58,10 +58,9 @@ func BuildTree(xmlBytes []byte) (*Node, error) {
 
 		case xml.CharData:
 			if len(stack) > 0 {
-				text := string(bytes.TrimSpace([]byte(t)))
-				if text != "" {
+				if len(bytes.TrimSpace([]byte(t))) > 0 {
 					top := stack[len(stack)-1]
-					top.Text += text
+					top.Text += string(t)
 				}
 			}
 		}
