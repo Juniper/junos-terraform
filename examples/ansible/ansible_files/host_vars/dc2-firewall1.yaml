@@ -16,50 +16,17 @@ system:
         _merge_key: name
     _merge_directive: merge_recursive
   _merge_directive: merge_recursive
-security:
-  policies:
-    policy:
-    - from_zone_name: trust
-      to_zone_name: trust
-      policy:
-      - name: default-permit
-        match:
-          source_address:
-          - any
-          destination_address:
-          - any
-          application:
-          - any
-        then:
-          permit: ''
-    - from_zone_name: trust
-      to_zone_name: untrust
-      policy:
-      - name: default-permit
-        match:
-          source_address:
-          - any
-          destination_address:
-          - any
-          application:
-          - any
-        then:
-          permit: ''
-    _merge_directive: merge_recursive
-  _merge_directive: merge_recursive
 interfaces:
   interface:
   - unit:
-    - description: '*** to dc2-spine1 vlan 1 ***'
-      family:
+    - family:
         inet:
           address:
           - name: 10.95.1.2/30
       name: '1'
     name: ge-0/0/0
   - unit:
-    - description: '*** to dc2-spine2 vlan 1 ***'
-      family:
+    - family:
         inet:
           address:
           - name: 10.93.1.2/30

@@ -1,7 +1,6 @@
 interfaces:
   interface:
-  - description: '*** to wan-pe2 ***'
-    unit:
+  - unit:
     - family:
         inet:
           address:
@@ -14,8 +13,6 @@ interfaces:
           address:
           - name: 10.93.1.1/30
       name: '1'
-      vlan_id: '1'
-    vlan_tagging: true
     name: xe-0/0/1
   - unit:
     - family:
@@ -23,57 +20,15 @@ interfaces:
           address:
           - name: 10.92.1.1/30
       name: '1'
-      vlan_id: '1'
-    vlan_tagging: true
     name: xe-0/0/2
-  - ether_options:
-      ieee_802_3ad:
-        bundle: ae0
-    name: xe-0/0/3
-  - ether_options:
-      ieee_802_3ad:
-        bundle: ae1
-    name: xe-0/0/4
   - description: '*** to dc2-spine1 ***'
-    name: xe-0/0/5
     unit:
     - family:
         inet:
           address:
           - name: 10.30.189.2/30
       name: '0'
-  - aggregated_ether_options:
-      lacp:
-        active: true
-        periodic: fast
-        system_id: 00:00:00:01:01:00
-    esi:
-      all_active: true
-      identifier: 00:00:00:00:00:00:00:01:01:00
-    name: ae0
-    unit:
-    - family:
-        ethernet_switching:
-          vlan:
-            members:
-            - '1002'
-      name: '0'
-  - aggregated_ether_options:
-      lacp:
-        active: true
-        periodic: fast
-        system_id: 00:00:00:01:02:00
-    esi:
-      all_active: true
-      identifier: 00:00:00:00:00:00:00:01:02:00
-    name: ae1
-    unit:
-    - family:
-        ethernet_switching:
-          vlan:
-            members:
-            - '1002'
-      name: '0'
+    name: xe-0/0/5
   - unit:
     - family:
         inet:
@@ -81,22 +36,13 @@ interfaces:
           - name: 100.123.24.9/16
       name: '0'
     name: em0
-  - name: irb
-    unit:
-    - family:
-        inet:
-          address:
-          - name: 10.1.2.1/24
-      mac: 02:0a:01:02:01:18
-      name: '1002'
   - unit:
     - family:
         inet:
           address:
           - name: 10.30.100.9/32
       name: '0'
-    - description: Loopback for VXLAN control packets for VRF_10001
-      family:
+    - family:
         inet:
           address:
           - name: 10.40.101.2/32
@@ -113,48 +59,6 @@ policy_options:
     - '65521:1'
     name: dc2-spine2
   policy_statement:
-  - name: EVPN_T5_EXPORT
-    term:
-    - from:
-        protocol:
-        - direct
-      name: fm_direct
-      then:
-        accept: true
-    - from:
-        protocol:
-        - static
-      name: fm_static
-      then:
-        accept: true
-    - from:
-        protocol:
-        - evpn
-        - ospf
-        route_filter:
-        - address: 0.0.0.0/0
-          exact: true
-      name: fm_v4_default
-      then:
-        accept: true
-    - from:
-        protocol:
-        - evpn
-        route_filter:
-        - address: 0.0.0.0/0
-          prefix_length_range: /32-/32
-      name: fm_v4_host
-      then:
-        accept: true
-    - from:
-        protocol:
-        - evpn
-        route_filter:
-        - address: 0::0/0
-          prefix_length_range: /128-/128
-      name: fm_v6_host
-      then:
-        accept: true
   - term:
     - then:
         community:
@@ -162,20 +66,6 @@ policy_options:
           community_name: dc2-spine2
       name: loopback
     name: IPCLOS_BGP_EXP
-  - name: to-ospf
-    term:
-    - from:
-        protocol:
-        - evpn
-        route_filter:
-        - address: 10.1.2.0/24
-          orlonger: true
-      name: '10'
-      then:
-        accept: true
-    - name: '100'
-      then:
-        reject: true
   _merge_list_directives:
     policy_statement:
       _merge_directive: merge_by_key
@@ -184,32 +74,10 @@ policy_options:
 protocols:
   bgp:
     group:
-    - family:
-        evpn:
-          signaling:
-            delay_route_advertisements:
-              minimum_delay:
-                routing_uptime: '480'
-      local_address: 10.30.100.9
-      local_as:
-        as_number: '65201'
-      multihop:
-        no_nexthop_change: true
-      multipath:
-        multiple_as: true
+    - local_address: 10.30.100.9
       name: WAN_OVERLAY_eBGP
-      neighbor:
-      - description: DCI EBGP peering to 10.30.100.1
-        name: 10.30.100.1
-        peer_as: '65200'
-      - description: DCI EBGP peering to 10.30.100.2
-        name: 10.30.100.2
-        peer_as: '65200'
-      type: external
     - cluster: 10.30.100.9
       local_address: 10.30.100.9
-      local_as:
-        as_number: '65201'
       neighbor:
       - name: 10.30.100.8
       name: EVPN_iBGP
@@ -228,64 +96,25 @@ protocols:
         _merge_directive: merge_by_key
         _merge_key: name
     _merge_directive: merge_recursive
-  evpn:
-    default_gateway: do-not-advertise
-    encapsulation: vxlan
-    extended_vni_list:
-    - all
-    multicast_mode: ingress-replication
-    no_core_isolation: true
   _merge_directive: merge_recursive
 routing_instances:
   instance:
-  - instance_type: vrf
-    interface:
-    - name: xe-0/0/1.1
-    - name: xe-0/0/2.1
-    - name: irb.1002
-    - name: lo0.10001
-    name: VRF_10001
-    protocols:
-      evpn:
-        ip_prefix_routes:
-          advertise: direct-nexthop
-          encapsulation: vxlan
-          export:
-          - EVPN_T5_EXPORT
-          vni: '10001'
-      ospf:
-        area:
-        - interface:
-          - metric: '100'
-            name: xe-0/0/1.1
-          - metric: '200'
-            name: xe-0/0/2.1
-          name: 0.0.0.0
-        export:
-        - to-ospf
-    route_distinguisher:
+  - route_distinguisher:
       rd_type: 10.40.101.2:10001
-    routing_options:
-      auto_export: ''
-    vrf_table_label: ''
-    vrf_target:
-      community: target:1:10001
+    name: VRF_10001
+  _merge_list_directives:
+    instance:
+      _merge_directive: merge_by_key
+      _merge_key: name
+  _merge_directive: merge_recursive
 routing_options:
-  forwarding_table:
-    chained_composite_next_hop:
-      ingress:
-        evpn: true
-    _merge_directive: merge_recursive
   router_id: 10.30.100.9
   _merge_directive: merge_recursive
 switch_options:
   route_distinguisher:
     rd_type: 10.30.100.9:9999
-  vrf_target:
-    auto: ''
-    community: target:9999:9999
-  vtep_source_interface:
-    interface_name: lo0.0
+    _merge_directive: merge_recursive
+  _merge_directive: merge_recursive
 system:
   host_name: dc2-spine2
   syslog:
@@ -304,11 +133,4 @@ system:
         _merge_key: name
     _merge_directive: merge_recursive
   _merge_directive: merge_recursive
-vlans:
-  vlan:
-  - l3_interface: irb.1002
-    name: vlan_1002
-    vlan_id: '1002'
-    vxlan:
-      vni: '1002'
 _merge_directive: merge_recursive

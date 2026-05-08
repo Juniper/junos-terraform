@@ -1,39 +1,34 @@
 interfaces:
   interface:
-  - description: '*** to dc1-borderleaf1 ***'
-    unit:
+  - unit:
     - family:
         inet:
           address:
           - name: 10.30.141.1/30
       name: '0'
     name: xe-0/0/0
-  - description: '*** to dc1-borderleaf2 ***'
-    unit:
+  - unit:
     - family:
         inet:
           address:
           - name: 10.30.142.1/30
       name: '0'
     name: xe-0/0/1
-  - description: '*** to dc1-leaf1 ***'
-    unit:
+  - unit:
     - family:
         inet:
           address:
           - name: 10.30.145.1/30
       name: '0'
     name: xe-0/0/2
-  - description: '*** to dc1-leaf2 ***'
-    unit:
+  - unit:
     - family:
         inet:
           address:
           - name: 10.30.146.1/30
       name: '0'
     name: xe-0/0/3
-  - description: '*** to dc1-leaf3 ***'
-    unit:
+  - unit:
     - family:
         inet:
           address:
@@ -80,12 +75,8 @@ policy_options:
 protocols:
   bgp:
     group:
-    - allow:
-      - 10.30.100.0/24
-      cluster: 10.30.100.4
+    - cluster: 10.30.100.4
       local_address: 10.30.100.4
-      local_as:
-        as_number: '65200'
       neighbor:
       - name: 10.30.100.3
       name: EVPN_iBGP
