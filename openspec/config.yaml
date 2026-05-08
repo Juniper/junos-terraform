@@ -1,0 +1,22 @@
+# OpenSpec Configuration for JTAF (Junos Terraform Automation Framework)
+
+project:
+  name: junos-terraform
+  description: >
+    Framework that generates custom Junos Terraform providers from YANG models.
+    Converts YANG schemas to Go resource providers for declarative Junos
+    configuration management via NETCONF.
+  languages:
+    - python
+    - go
+  frameworks:
+    - terraform
+    - pyang
+    - netconf
+  conventions:
+    - Go files use gofmt; tests use testing package and testify
+    - Python follows PEP 8; tests use pytest
+    - NETCONF XML paths use Junos hierarchy notation
+    - Commit messages follow conventional commits format
+
+schema: spec-driven

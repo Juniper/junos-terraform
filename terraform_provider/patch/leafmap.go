@@ -67,7 +67,20 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 	// Process ALL children including key children.  Key leaves must appear
 	// in the leaf map so ComputeDiff can detect new/removed list entries
 	// (where the key leaf is the diff signal for entry-level operations).
+	//
+	// For ordered-by-user leaf-lists, track position per leaf-list tag so that
+	// reordering produces Replace diffs rather than being invisible.
+	orderedCounters := make(map[string]int) // tag -> next position
 	for _, child := range node.Children {
+		childSchemaPath := outputPathToSchemaPath(currentPath + "/" + child.Tag)
+		if info, ok := idx[childSchemaPath]; ok && info.Kind == KindLeafList && info.OrderedByUser {
+			pos := orderedCounters[child.Tag]
+			orderedCounters[child.Tag] = pos + 1
+			// Emit positional key: path[pos=N] = value
+			posPath := currentPath + "/" + child.Tag + fmt.Sprintf("[pos=%d]", pos)
+			result[posPath] = child.Text
+			continue
+		}
 		leafMapRecurseWithSchema(child, currentPath, result, idx)
 	}
 }
