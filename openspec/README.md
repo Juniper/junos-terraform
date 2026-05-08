@@ -120,6 +120,13 @@ junos-terraform/
     │   └── archive/         # Completed changes (date-prefixed)
     │       └── 2026-05-06-handle-union-types/
     └── specs/               # Accumulated project specs
+        ├── cli-tools/
+        ├── code-generation/
+        ├── netconf-mock/
+        ├── patch-engine/
+        ├── pyang-plugin/
+        ├── terraform-provider/
+        └── testing/
 ```
 
 ## Workflow Examples
@@ -201,3 +208,141 @@ schema: spec-driven
 ```
 
 Edit this file to update project conventions that guide artifact generation.
+
+## Project Specs
+
+Specs document every component of JTAF. They live at `openspec/specs/<component>/spec.md` and give the AI agent context when you run `/opsx-propose` or `/opsx-explore`.
+
+| Spec | Path | What It Covers |
+|------|------|----------------|
+| **CLI Tools** | `specs/cli-tools/spec.md` | Python entry points (jtaf-provider, jtaf-yang2go, jtaf-xml2tf, etc.), jtaf_common.py functions |
+| **Patch Engine** | `specs/patch-engine/spec.md` | LeafMap, Diff, Patch, Tree, Order — the Go diff/apply engine in `terraform_provider/patch/` |
+| **Terraform Provider** | `specs/terraform-provider/spec.md` | Provider struct, Config, NETCONF transport, resource CRUD lifecycle |
+| **Code Generation** | `specs/code-generation/spec.md` | Jinja2 templates, template variables, what gets generated |
+| **pyang Plugin** | `specs/pyang-plugin/spec.md` | YANG→JSON conversion, FNode classes, type mapping |
+| **NETCONF Mock** | `specs/netconf-mock/spec.md` | Mock NETCONF server for testing without live devices |
+| **Testing** | `specs/testing/spec.md` | All Go and Python test suites, patterns, test data locations |
+
+### How Specs Work With Commands
+
+Specs provide background context. When you run a command, the agent reads the relevant specs automatically:
+
+```
+/opsx-explore why does the diff engine produce spurious deletes for empty containers?
+
+  → Agent reads specs/patch-engine/spec.md for architecture context
+  → Investigates terraform_provider/patch/diff.go and leafmap.go
+  → Gives an informed answer grounded in how the engine actually works
+```
+
+```
+/opsx-propose add-snmp-community-support
+
+  → Agent reads specs/cli-tools/spec.md, specs/code-generation/spec.md,
+    specs/terraform-provider/spec.md to understand the full pipeline
+  → Generates proposal/design/tasks that follow existing patterns
+```
+
+You can also point the agent at a specific spec:
+
+```
+/opsx-explore review the testing spec — are we missing coverage for the NETCONF client?
+```
+
+### Creating a New Spec
+
+When you add a major feature or component, create a spec so future changes have context.
+
+**1. Create the directory and file:**
+
+```bash
+mkdir -p openspec/specs/<component-name>
+```
+
+**2. Write `spec.md` with these sections:**
+
+```markdown
+# Component Name
+
+Brief description of what this component does and where it lives.
+
+## Architecture
+
+How it fits into the overall system. Diagrams welcome.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `path/to/file.go` | What this file does |
+
+## Key Types / Functions
+
+Important interfaces, structs, functions — what a developer needs to know.
+
+## Usage
+
+How to use this component (commands, API calls, examples).
+
+## Tests
+
+Where the tests live and what they cover.
+```
+
+**3. Follow these guidelines:**
+
+- **One spec per component** — don't combine unrelated features
+- **Name the directory in kebab-case** — e.g., `snmp-support`, `bgp-filter-engine`
+- **Focus on what an AI agent needs** — architecture, file locations, key types, corner cases
+- **Keep it current** — update the spec when you change the component
+- **Don't duplicate code** — reference files and functions by name, don't paste source code
+
+**4. Commit it:**
+
+```bash
+git add openspec/specs/<component-name>/spec.md
+```
+
+### Example: Adding a Spec for a New Feature
+
+Say you're adding SNMP community management to the provider:
+
+```bash
+mkdir -p openspec/specs/snmp-support
+```
+
+Then create `openspec/specs/snmp-support/spec.md`:
+
+```markdown
+# SNMP Support
+
+Terraform resource for managing Junos SNMP community strings via NETCONF.
+
+## Architecture
+
+Extends the generated provider with an SNMP-specific resource that maps
+`configuration/snmp/community` YANG paths to Terraform schema attributes.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `terraform_provider/resource_snmp.go` | SNMP community resource (CRUD) |
+| `terraform_provider/resource_snmp_test.go` | Unit tests |
+| `examples/snmp_config.xml` | Sample SNMP XML config |
+
+## Key Types
+
+- `snmpCommunityResource` — implements Terraform resource interface
+- `snmpCommunityModel` — Terraform state model (name, authorization, clients)
+
+## YANG Path
+
+`configuration/snmp/community[name=<community>]`
+
+## Tests
+
+- `resource_snmp_test.go` — CRUD operations, authorization levels, client restrictions
+```
+
+Now when someone runs `/opsx-propose extend-snmp-v3`, the agent has full context about the existing SNMP implementation.
