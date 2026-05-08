@@ -1,0 +1,166 @@
+interfaces:
+  interface:
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.30.135.2/30
+      name: '0'
+    name: xe-0/0/0
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.30.145.2/30
+      name: '0'
+    name: xe-0/0/1
+  - ether_options:
+      ieee_802_3ad:
+        bundle: ae1
+    name: xe-0/0/3
+  - aggregated_ether_options:
+      lacp:
+        system_id: 00:00:00:00:01:00
+    esi:
+      identifier: 00:00:00:00:00:00:00:00:01:00
+    unit:
+    - family:
+        ethernet_switching:
+          vlan:
+            members:
+            - '1001'
+      name: '0'
+    name: ae0
+  - aggregated_ether_options:
+      lacp:
+        active: true
+        periodic: fast
+        system_id: 00:00:00:00:02:00
+    esi:
+      all_active: true
+      identifier: 00:00:00:00:00:00:00:00:02:00
+    name: ae1
+    unit:
+    - family:
+        ethernet_switching:
+          vlan:
+            members:
+            - '2001'
+      name: '0'
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 100.123.24.5/16
+      name: '0'
+    name: em0
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.30.100.5/32
+      name: '0'
+    - family:
+        inet:
+          address:
+          - name: 10.40.100.3/32
+      name: '10001'
+    - family:
+        inet:
+          address:
+          - name: 10.40.100.8/32
+      name: '10002'
+    - family:
+        inet:
+          address:
+          - name: 10.40.100.13/32
+      name: '10003'
+    name: lo0
+  _merge_list_directives:
+    interface:
+      _merge_directive: merge_by_key
+      _merge_key: name
+  _merge_directive: merge_recursive
+policy_options:
+  community:
+  - members:
+    - '65503:1'
+    name: dc1-leaf1
+  policy_statement:
+  - term:
+    - then:
+        community:
+        - add: true
+          community_name: dc1-leaf1
+      name: loopback
+    name: IPCLOS_BGP_EXP
+  _merge_list_directives:
+    policy_statement:
+      _merge_directive: merge_by_key
+      _merge_key: name
+  _merge_directive: merge_recursive
+protocols:
+  bgp:
+    group:
+    - cluster: 10.30.100.5
+      local_address: 10.30.100.5
+      name: EVPN_iBGP
+    - local_as:
+        as_number: '65503'
+      neighbor:
+      - description: EBGP peering to 10.30.135.1
+        name: 10.30.135.1
+        peer_as: '65501'
+      - description: EBGP peering to 10.30.145.1
+        name: 10.30.145.1
+        peer_as: '65502'
+      name: IPCLOS_eBGP
+    _merge_list_directives:
+      group:
+        _merge_directive: merge_by_key
+        _merge_key: name
+    _merge_directive: merge_recursive
+  _merge_directive: merge_recursive
+routing_instances:
+  instance:
+  - route_distinguisher:
+      rd_type: 10.40.100.3:10001
+    name: VRF_10001
+  - route_distinguisher:
+      rd_type: 10.40.100.8:10002
+    name: VRF_10002
+  - route_distinguisher:
+      rd_type: 10.40.100.13:10003
+    name: VRF_10003
+  _merge_list_directives:
+    instance:
+      _merge_directive: merge_by_key
+      _merge_key: name
+  _merge_directive: merge_recursive
+routing_options:
+  router_id: 10.30.100.5
+  _merge_directive: merge_recursive
+switch_options:
+  route_distinguisher:
+    rd_type: 10.30.100.5:9999
+    _merge_directive: merge_recursive
+  _merge_directive: merge_recursive
+system:
+  host_name: dc1-leaf1
+  syslog:
+    file:
+    - contents:
+      - info: true
+        name: authorization
+      name: messages
+    - contents:
+      - any: true
+        name: interactive-commands
+      name: interactive-commands
+    _merge_list_directives:
+      file:
+        _merge_directive: merge_by_key
+        _merge_key: name
+    _merge_directive: merge_recursive
+  _merge_directive: merge_recursive
+_merge_directive: merge_recursive

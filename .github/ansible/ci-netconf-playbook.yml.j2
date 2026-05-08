@@ -5,6 +5,38 @@
   vars:
     tmp_dir: configs
     generated_role_name: "[[ generated_role_name ]]"
+    jtaf_vars_root: "{{ playbook_dir }}"
+  pre_tasks:
+    - name: Initialize explicit variable layers
+      set_fact:
+        jtaf_group_all: {}
+        jtaf_group_merged: {}
+        jtaf_host_vars: {}
+
+    - name: Load global group vars
+      set_fact:
+        jtaf_group_all: "{{ lookup('file', jtaf_group_all_file) | from_yaml }}"
+      vars:
+        jtaf_group_all_file: "{{ jtaf_vars_root }}/group_vars/all.yaml"
+      when: (query('ansible.builtin.fileglob', jtaf_group_all_file) | length) > 0
+
+    - name: Merge group vars for each inventory group
+      set_fact:
+        jtaf_group_merged: "{{ jtaf_group_merged | combine(lookup('file', jtaf_group_file) | from_yaml, recursive=True, list_merge='append') }}"
+      vars:
+        jtaf_group_file: "{{ jtaf_vars_root }}/group_vars/{{ item }}/all.yaml"
+      loop: "{{ group_names }}"
+      when: (query('ansible.builtin.fileglob', jtaf_group_file) | length) > 0
+
+    - name: Locate host vars file
+      set_fact:
+        jtaf_host_file: "{{ (query('ansible.builtin.fileglob', jtaf_vars_root + '/host_vars/' + inventory_hostname + '.y*ml') | sort | first) | default('', true) }}"
+
+    - name: Load host vars
+      set_fact:
+        jtaf_host_vars: "{{ lookup('file', jtaf_host_file) | from_yaml }}"
+      when: jtaf_host_file | length > 0
+
   tasks:
     - name: Render XML using generated role
       ansible.builtin.include_role:

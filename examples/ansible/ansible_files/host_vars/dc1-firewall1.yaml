@@ -1,0 +1,67 @@
+system:
+  host_name: dc1-firewall1
+  syslog:
+    file:
+    - contents:
+      - name: authorization
+        info: true
+      name: messages
+    - name: interactive-commands
+      contents:
+      - name: interactive-commands
+        any: true
+    _merge_list_directives:
+      file:
+        _merge_directive: merge_by_key
+        _merge_key: name
+    _merge_directive: merge_recursive
+  _merge_directive: merge_recursive
+interfaces:
+  interface:
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.99.1.2/30
+      name: '1'
+    - family:
+        inet:
+          address:
+          - name: 10.99.2.2/30
+      name: '2'
+    - family:
+        inet:
+          address:
+          - name: 10.99.3.2/30
+      name: '3'
+    name: ge-0/0/0
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.97.1.2/30
+      name: '1'
+    - family:
+        inet:
+          address:
+          - name: 10.97.2.2/30
+      name: '2'
+    - family:
+        inet:
+          address:
+          - name: 10.97.3.2/30
+      name: '3'
+    name: ge-0/0/1
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 100.123.26.1/16
+      name: '0'
+    name: fxp0
+  _merge_list_directives:
+    interface:
+      _merge_directive: merge_by_key
+      _merge_key: name
+  _merge_directive: merge_recursive
+_merge_directive: merge_recursive

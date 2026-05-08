@@ -1,0 +1,5 @@
+ansible-provider-junos-srx-ansible-role/
+ansible-provider-junos-vqfx-ansible-role/
+srx_ansible_files/
+vqfx_ansible_files/
+

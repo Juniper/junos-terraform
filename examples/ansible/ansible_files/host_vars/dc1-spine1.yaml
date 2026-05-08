@@ -1,0 +1,129 @@
+interfaces:
+  interface:
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.30.131.1/30
+      name: '0'
+    name: xe-0/0/0
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.30.132.1/30
+      name: '0'
+    name: xe-0/0/1
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.30.135.1/30
+      name: '0'
+    name: xe-0/0/2
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.30.136.1/30
+      name: '0'
+    name: xe-0/0/3
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.30.137.1/30
+      name: '0'
+    name: xe-0/0/4
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 100.123.24.3/16
+      name: '0'
+    name: em0
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.30.100.3/32
+      name: '0'
+    name: lo0
+  _merge_list_directives:
+    interface:
+      _merge_directive: merge_by_key
+      _merge_key: name
+  _merge_directive: merge_recursive
+policy_options:
+  community:
+  - members:
+    - '65501:1'
+    name: dc1-spine1
+  policy_statement:
+  - term:
+    - then:
+        community:
+        - add: true
+          community_name: dc1-spine1
+      name: loopback
+    name: IPCLOS_BGP_EXP
+  _merge_list_directives:
+    policy_statement:
+      _merge_directive: merge_by_key
+      _merge_key: name
+  _merge_directive: merge_recursive
+protocols:
+  bgp:
+    group:
+    - cluster: 10.30.100.3
+      local_address: 10.30.100.3
+      neighbor:
+      - name: 10.30.100.4
+      name: EVPN_iBGP
+    - local_as:
+        as_number: '65501'
+      neighbor:
+      - description: EBGP peering to 10.30.135.2
+        name: 10.30.135.2
+        peer_as: '65503'
+      - description: EBGP peering to 10.30.136.2
+        name: 10.30.136.2
+        peer_as: '65504'
+      - description: EBGP peering to 10.30.137.2
+        name: 10.30.137.2
+        peer_as: '65505'
+      - description: EBGP peering to 10.30.131.2
+        name: 10.30.131.2
+        peer_as: '65506'
+      - description: EBGP peering to 10.30.132.2
+        name: 10.30.132.2
+        peer_as: '65507'
+      name: IPCLOS_eBGP
+    _merge_list_directives:
+      group:
+        _merge_directive: merge_by_key
+        _merge_key: name
+    _merge_directive: merge_recursive
+  _merge_directive: merge_recursive
+routing_options:
+  router_id: 10.30.100.3
+  _merge_directive: merge_recursive
+system:
+  host_name: dc1-spine1
+  syslog:
+    file:
+    - contents:
+      - info: true
+        name: authorization
+      name: messages
+    - contents:
+      - any: true
+        name: interactive-commands
+      name: interactive-commands
+    _merge_list_directives:
+      file:
+        _merge_directive: merge_by_key
+        _merge_key: name
+    _merge_directive: merge_recursive
+  _merge_directive: merge_recursive
+_merge_directive: merge_recursive

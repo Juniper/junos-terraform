@@ -1,0 +1,136 @@
+interfaces:
+  interface:
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.32.12.1/30
+      name: '0'
+    name: xe-0/0/0
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.93.1.1/30
+      name: '1'
+    name: xe-0/0/1
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.92.1.1/30
+      name: '1'
+    name: xe-0/0/2
+  - description: '*** to dc2-spine1 ***'
+    unit:
+    - family:
+        inet:
+          address:
+          - name: 10.30.189.2/30
+      name: '0'
+    name: xe-0/0/5
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 100.123.24.9/16
+      name: '0'
+    name: em0
+  - unit:
+    - family:
+        inet:
+          address:
+          - name: 10.30.100.9/32
+      name: '0'
+    - family:
+        inet:
+          address:
+          - name: 10.40.101.2/32
+      name: '10001'
+    name: lo0
+  _merge_list_directives:
+    interface:
+      _merge_directive: merge_by_key
+      _merge_key: name
+  _merge_directive: merge_recursive
+policy_options:
+  community:
+  - members:
+    - '65521:1'
+    name: dc2-spine2
+  policy_statement:
+  - term:
+    - then:
+        community:
+        - add: true
+          community_name: dc2-spine2
+      name: loopback
+    name: IPCLOS_BGP_EXP
+  _merge_list_directives:
+    policy_statement:
+      _merge_directive: merge_by_key
+      _merge_key: name
+  _merge_directive: merge_recursive
+protocols:
+  bgp:
+    group:
+    - local_address: 10.30.100.9
+      name: WAN_OVERLAY_eBGP
+    - cluster: 10.30.100.9
+      local_address: 10.30.100.9
+      neighbor:
+      - name: 10.30.100.8
+      name: EVPN_iBGP
+    - local_as:
+        as_number: '65521'
+      neighbor:
+      - description: EBGP peering to 10.30.189.1
+        name: 10.30.189.1
+        peer_as: '65520'
+      - description: EBGP peering to 10.32.12.2
+        name: 10.32.12.2
+        peer_as: '65401'
+      name: IPCLOS_eBGP
+    _merge_list_directives:
+      group:
+        _merge_directive: merge_by_key
+        _merge_key: name
+    _merge_directive: merge_recursive
+  _merge_directive: merge_recursive
+routing_instances:
+  instance:
+  - route_distinguisher:
+      rd_type: 10.40.101.2:10001
+    name: VRF_10001
+  _merge_list_directives:
+    instance:
+      _merge_directive: merge_by_key
+      _merge_key: name
+  _merge_directive: merge_recursive
+routing_options:
+  router_id: 10.30.100.9
+  _merge_directive: merge_recursive
+switch_options:
+  route_distinguisher:
+    rd_type: 10.30.100.9:9999
+    _merge_directive: merge_recursive
+  _merge_directive: merge_recursive
+system:
+  host_name: dc2-spine2
+  syslog:
+    file:
+    - contents:
+      - info: true
+        name: authorization
+      name: messages
+    - contents:
+      - any: true
+        name: interactive-commands
+      name: interactive-commands
+    _merge_list_directives:
+      file:
+        _merge_directive: merge_by_key
+        _merge_key: name
+    _merge_directive: merge_recursive
+  _merge_directive: merge_recursive
+_merge_directive: merge_recursive
