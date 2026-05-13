@@ -1,0 +1,13 @@
+change: jtaf-project-overview
+status: active
+created: 2026-05-11
+artifacts:
+  - id: proposal
+    path: proposal.md
+    status: done
+  - id: design
+    path: design.md
+    status: done
+  - id: tasks
+    path: tasks.md
+    status: done
