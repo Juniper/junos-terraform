@@ -13,3 +13,4 @@ __pycache__/
 /dist/
 /terraform-provider-junos-vqfx-evpn-vxlan/
 /.venv/
+.DS_Store
