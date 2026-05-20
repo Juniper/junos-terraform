@@ -110,7 +110,15 @@ def main():
     # Step 4: copy the template go files into place
     if os.path.exists(new_dir):
         shutil.rmtree(new_dir)
-    shutil.copytree(go_dir, new_dir)
+    # Exclude directories that should not be in generated providers
+    def _ignore_dirs(directory, contents):
+        ignored = set()
+        if directory == go_dir:
+            for item in contents:
+                if item in ('tools', '__pycache__'):
+                    ignored.add(item)
+        return ignored
+    shutil.copytree(go_dir, new_dir, ignore=_ignore_dirs)
     # if there is a terraform_provider executable left over from go testing, remove it
     tp_exe = f"{new_dir}/terraform_provider"
     if os.path.exists(tp_exe):
