@@ -1,6 +1,7 @@
+package main
 //go:build tools
 
-package main
+package tools
 
 import (
 	// release
