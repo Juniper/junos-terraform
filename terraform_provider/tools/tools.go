@@ -1,10 +1,10 @@
 //go:build tools
 
-package main
+package tools
 
 import (
 	// release
-	_ "github.com/goreleaser/goreleaser"
+	_ "github.com/goreleaser/goreleaser/v2"
 
 	// publish
 	_ "github.com/chrismarget/lambda-tf-registry/cmd/register"
