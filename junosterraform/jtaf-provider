@@ -71,10 +71,10 @@ def main():
     parser.add_argument(
         '-x',
         '--xml-config',
-        required=True,
+        required=False,
         action='append',
         nargs="+",
-        help='One or more Junos XML config files to merge/filter against schema.',
+        help='Optional Junos XML config files to merge/filter against schema.',
     )
     parser.add_argument(
         '-t',
@@ -84,12 +84,18 @@ def main():
     )
     args = parser.parse_args()
 
-    # Merge XML files if multiple are provided 
-    xml_files = [file for group in args.xml_config for file in group]
-    xml_config = xml_files[0] if len(xml_files) == 1 else load_and_merge_xmls(xml_files)
-
-    # Step 1: Filter the schema using the config
-    resources = filter_json_using_xml(args.json_schema, xml_config)
+    # Step 1: Filter the schema only when XML config is supplied.
+    # Without -x, keep trimmed_schema.json as a direct copy of pyang JSON output.
+    if args.xml_config:
+        xml_files = [file for group in args.xml_config for file in group]
+        xml_config = xml_files[0] if len(xml_files) == 1 else load_and_merge_xmls(xml_files)
+        resources = filter_json_using_xml(args.json_schema, xml_config)
+    else:
+        if args.json_schema == "-":
+            resources = json.load(sys.stdin)
+        else:
+            with open(args.json_schema) as f:
+                resources = json.load(f)
 
     # Step 2: Render the template into Go code
     with as_file(files('junosterraform').joinpath('__init__.py')) as init_py:
