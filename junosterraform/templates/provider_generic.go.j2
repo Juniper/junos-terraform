@@ -118,7 +118,8 @@ func (p Provider) Schema(_ context.Context, _ provider.SchemaRequest, resp *prov
 				Required: true,
 			},
 			"sshkey": schema.StringAttribute{
-				Optional: true,
+				Optional:  true,
+				Sensitive: true,
 			},
 		},
 	}
