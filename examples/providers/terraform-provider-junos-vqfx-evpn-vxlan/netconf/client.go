@@ -308,23 +308,6 @@ func (g *GoNCClient) MarshalConfig(obj interface{}) error {
 	return nil
 }
 
-// GetConfigXML fetches the full configuration and returns raw XML bytes.
-func (g *GoNCClient) GetConfigXML() ([]byte, error) {
-	reply, err := g.readRawConfig()
-	if err != nil {
-		return nil, err
-	}
-	return []byte(reply), nil
-}
-
-// SendDirectTransactionRaw loads a pre-built XML string directly without marshaling.
-func (g *GoNCClient) SendDirectTransactionRaw(xmlPayload string, commit bool) error {
-	if _, err := g.sendDirectRawConfig(xmlPayload, commit); err != nil {
-		return err
-	}
-	return nil
-}
-
 var applyGroupsList []string
 var applyGroupsMutex sync.Mutex
 

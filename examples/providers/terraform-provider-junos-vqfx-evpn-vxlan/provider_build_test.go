@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"terraform_provider/netconf"
+	"terraform-provider-junos-vqfx-evpn-vxlan/netconf"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -31,12 +31,6 @@ func (f *fakeNetconfClient) SendTransaction(string, interface{}, bool) error { r
 
 // SendDirectTransaction implements netconf.Client for unit tests.
 func (f *fakeNetconfClient) SendDirectTransaction(interface{}, bool) error { return nil }
-
-// GetConfigXML implements netconf.Client for unit tests.
-func (f *fakeNetconfClient) GetConfigXML() ([]byte, error) { return []byte("<configuration/>"), nil }
-
-// SendDirectTransactionRaw implements netconf.Client for unit tests.
-func (f *fakeNetconfClient) SendDirectTransactionRaw(string, bool) error { return nil }
 
 // SendUpdate implements netconf.Client for unit tests.
 func (f *fakeNetconfClient) SendUpdate(string, string, bool) error { return nil }

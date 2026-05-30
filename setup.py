@@ -28,6 +28,7 @@ setup(
     package_data={
         "terraform_provider": [
             "*",
+            "generic/*",
             "netconf/*",
             "patch/*",
             "go-netconf/*",
