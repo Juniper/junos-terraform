@@ -120,8 +120,9 @@ func containerToNodes(ctx context.Context, val attr.Value, schema patch.SchemaNo
 		return nil
 	}
 
-	// Container is modeled as SingleNestedAttribute → ObjectValue
-	ov, ok := val.(basetypes.ObjectValue)
+	// Container is modeled as ListNestedAttribute (max 1 element) for backward
+	// compatibility with generated .tf files that use list syntax: attr = [{...}]
+	lv, ok := val.(basetypes.ListValue)
 	if !ok {
 		// May be a string presence marker for empty containers
 		if sv, ok := val.(basetypes.StringValue); ok && !sv.IsNull() {
@@ -130,6 +131,16 @@ func containerToNodes(ctx context.Context, val attr.Value, schema patch.SchemaNo
 				Attrs: make(map[string]string),
 			}}
 		}
+		return nil
+	}
+
+	elems := lv.Elements()
+	if len(elems) == 0 {
+		return nil
+	}
+
+	ov, ok := elems[0].(basetypes.ObjectValue)
+	if !ok {
 		return nil
 	}
 
@@ -248,31 +259,41 @@ func xmlLeafListToValue(ctx context.Context, xmlParent *patch.Node, schema patch
 func xmlContainerToValue(ctx context.Context, xmlParent *patch.Node, schema patch.SchemaNode, diags *diag.Diagnostics) attr.Value {
 	attrTypes := containerAttrTypes(schema)
 	matches := findChildrenByTag(xmlParent, schema.Name)
-	if len(matches) == 0 {
-		if len(attrTypes) == 0 {
+
+	if len(schema.Children) == 0 {
+		// Empty container presence → empty string marker
+		if len(matches) == 0 {
 			return types.StringNull()
 		}
-		return types.ObjectNull(attrTypes)
+		return types.StringValue("")
+	}
+
+	objType := types.ObjectType{AttrTypes: attrTypes}
+
+	if len(matches) == 0 {
+		return types.ListNull(objType)
 	}
 
 	xmlNode := matches[0]
-	if len(schema.Children) == 0 {
-		// Empty container presence → empty string marker
-		return types.StringValue("")
-	}
 
 	objAttrs := make(map[string]attr.Value, len(schema.Children))
 	for _, child := range schema.Children {
 		childName := normalizeName(child.Name)
 		objAttrs[childName] = xmlNodeToModelValue(ctx, xmlNode, child, diags)
 		if diags.HasError() {
-			return types.ObjectNull(attrTypes)
+			return types.ListNull(objType)
 		}
 	}
 
 	ov, d := types.ObjectValue(attrTypes, objAttrs)
 	diags.Append(d...)
-	return ov
+	if diags.HasError() {
+		return types.ListNull(objType)
+	}
+
+	lv, d := types.ListValue(objType, []attr.Value{ov})
+	diags.Append(d...)
+	return lv
 }
 
 func xmlListToValue(ctx context.Context, xmlParent *patch.Node, schema patch.SchemaNode, diags *diag.Diagnostics) attr.Value {
@@ -345,7 +366,7 @@ func schemaNodeToAttrType(node patch.SchemaNode) attr.Type {
 		if len(childTypes) == 0 {
 			return types.StringType
 		}
-		return types.ObjectType{AttrTypes: childTypes}
+		return types.ListType{ElemType: types.ObjectType{AttrTypes: childTypes}}
 	case "list":
 		childTypes := containerAttrTypes(node)
 		if len(childTypes) == 0 {

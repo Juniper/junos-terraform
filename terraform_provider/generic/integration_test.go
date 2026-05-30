@@ -124,7 +124,8 @@ func TestIntegration_CreateFlow(t *testing.T) {
 	if !ok || sysObj.IsNull() {
 		t.Fatal("Read model missing 'system' attribute")
 	}
-	sysAttrs := sysObj.(types.Object).Attributes()
+	sysList := sysObj.(types.List)
+	sysAttrs := sysList.Elements()[0].(types.Object).Attributes()
 	hostName := sysAttrs["host_name"].(types.String)
 	if hostName.ValueString() != "router1" {
 		t.Fatalf("expected host_name='router1', got %q", hostName.ValueString())
@@ -334,7 +335,8 @@ func TestIntegration_FullCRUDCycle(t *testing.T) {
 	if diags.HasError() {
 		t.Fatalf("Read: XMLBytesToModel() failed: %v", diags)
 	}
-	sysObj := readModel["system"].(types.Object)
+	sysListVal := readModel["system"].(types.List)
+	sysObj := sysListVal.Elements()[0].(types.Object)
 	hostName := sysObj.Attributes()["host_name"].(types.String).ValueString()
 	if hostName != "router1" {
 		t.Fatalf("Read: expected host_name='router1', got %q", hostName)
@@ -440,13 +442,13 @@ func TestIntegration_XMLRoundTrip_WithInterfaces(t *testing.T) {
 	unitAttrTypes := map[string]attr.Type{
 		"name":        types.StringType,
 		"description": types.StringType,
-		"family": types.ObjectType{AttrTypes: map[string]attr.Type{
-			"inet": types.ObjectType{AttrTypes: map[string]attr.Type{
+		"family": types.ListType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{
+			"inet": types.ListType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{
 				"address": types.ListType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{
 					"name": types.StringType,
 				}}},
-			}},
-		}},
+			}}},
+		}}},
 	}
 
 	ifaceAttrTypes := map[string]attr.Type{
@@ -471,8 +473,8 @@ func TestIntegration_XMLRoundTrip_WithInterfaces(t *testing.T) {
 	attrs := map[string]attr.Value{
 		"resource_name": types.StringValue("iface-test"),
 		"interfaces":    ifaceList,
-		"system":        types.ObjectNull(map[string]attr.Type{"host_name": types.StringType, "name_server": types.ListType{ElemType: types.StringType}}),
-		"protocols":     types.ObjectNull(map[string]attr.Type{}),
+		"system":        types.ListNull(types.ObjectType{AttrTypes: map[string]attr.Type{"host_name": types.StringType, "name_server": types.ListType{ElemType: types.StringType}}}),
+		"protocols":     types.ListNull(types.ObjectType{AttrTypes: map[string]attr.Type{"lldp": types.StringType}}),
 	}
 
 	var diags diag.Diagnostics
@@ -545,10 +547,18 @@ func buildSystemAttrs(hostName string, nameServers []string) map[string]attr.Val
 		sysValues["name_server"] = types.ListNull(types.StringType)
 	}
 
+	sysObj := types.ObjectValueMust(sysAttrTypes, sysValues)
+	sysList := types.ListValueMust(types.ObjectType{AttrTypes: sysAttrTypes}, []attr.Value{sysObj})
+
+	protocolsAttrTypes := map[string]attr.Type{
+		"lldp": types.StringType,
+	}
+	protocolsObjType := types.ObjectType{AttrTypes: protocolsAttrTypes}
+
 	return map[string]attr.Value{
 		"resource_name": types.StringValue("test-resource"),
-		"system":        types.ObjectValueMust(sysAttrTypes, sysValues),
+		"system":        sysList,
 		"interfaces":    types.ListNull(types.ObjectType{AttrTypes: map[string]attr.Type{}}),
-		"protocols":     types.ObjectNull(map[string]attr.Type{}),
+		"protocols":     types.ListNull(protocolsObjType),
 	}
 }

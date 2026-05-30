@@ -182,13 +182,13 @@ func TestBuildTerraformSchema(t *testing.T) {
 		t.Fatalf("interfaces should be ListNestedAttribute, got %T", ifaces)
 	}
 
-	// system should be a SingleNestedAttribute
+	// system should be a ListNestedAttribute (containers are lists with max 1 element)
 	sys, ok := s.Attributes["system"]
 	if !ok {
 		t.Fatal("missing system attribute")
 	}
-	if _, ok := sys.(schema.SingleNestedAttribute); !ok {
-		t.Fatalf("system should be SingleNestedAttribute, got %T", sys)
+	if _, ok := sys.(schema.ListNestedAttribute); !ok {
+		t.Fatalf("system should be ListNestedAttribute, got %T", sys)
 	}
 
 	// protocols.lldp is an empty container — should be a StringAttribute
@@ -196,11 +196,11 @@ func TestBuildTerraformSchema(t *testing.T) {
 	if !ok {
 		t.Fatal("missing protocols attribute")
 	}
-	protoNested, ok := protocols.(schema.SingleNestedAttribute)
+	protoNested, ok := protocols.(schema.ListNestedAttribute)
 	if !ok {
-		t.Fatalf("protocols should be SingleNestedAttribute, got %T", protocols)
+		t.Fatalf("protocols should be ListNestedAttribute, got %T", protocols)
 	}
-	lldp, ok := protoNested.Attributes["lldp"]
+	lldp, ok := protoNested.NestedObject.Attributes["lldp"]
 	if !ok {
 		t.Fatal("missing protocols.lldp attribute")
 	}
@@ -218,7 +218,7 @@ func TestModelToXMLBytes_SimpleLeaf(t *testing.T) {
 	ctx := context.Background()
 	var diags diag.Diagnostics
 
-	// Build attrs for system container with host-name
+	// Build attrs for system container with host-name (containers are single-element lists)
 	systemAttrs := map[string]attr.Value{
 		"host_name":   types.StringValue("router1"),
 		"name_server": types.ListNull(types.StringType),
@@ -232,11 +232,17 @@ func TestModelToXMLBytes_SimpleLeaf(t *testing.T) {
 	if diags.HasError() {
 		t.Fatalf("failed to build system object: %v", diags)
 	}
+	systemList, d := types.ListValue(types.ObjectType{AttrTypes: systemAttrTypes}, []attr.Value{systemObj})
+	diags.Append(d...)
+	if diags.HasError() {
+		t.Fatalf("failed to build system list: %v", diags)
+	}
 
+	protocolsObjType := types.ObjectType{AttrTypes: containerAttrTypes(idx.TopLevel[2])}
 	attrs := map[string]attr.Value{
 		"interfaces": types.ListNull(types.ObjectType{AttrTypes: containerAttrTypes(idx.TopLevel[0])}),
-		"system":     systemObj,
-		"protocols":  types.ObjectNull(containerAttrTypes(idx.TopLevel[2])),
+		"system":     systemList,
+		"protocols":  types.ListNull(protocolsObjType),
 	}
 
 	xmlBytes := ModelToXMLBytes(ctx, attrs, idx, &diags)
@@ -276,11 +282,13 @@ func TestModelToXMLBytes_LeafList(t *testing.T) {
 		"name_server": types.ListType{ElemType: types.StringType},
 	}
 	systemObj, _ := types.ObjectValue(systemAttrTypes, systemAttrs)
+	systemList, _ := types.ListValue(types.ObjectType{AttrTypes: systemAttrTypes}, []attr.Value{systemObj})
 
+	protocolsObjType := types.ObjectType{AttrTypes: containerAttrTypes(idx.TopLevel[2])}
 	attrs := map[string]attr.Value{
 		"interfaces": types.ListNull(types.ObjectType{AttrTypes: containerAttrTypes(idx.TopLevel[0])}),
-		"system":     systemObj,
-		"protocols":  types.ObjectNull(containerAttrTypes(idx.TopLevel[2])),
+		"system":     systemList,
+		"protocols":  types.ListNull(protocolsObjType),
 	}
 
 	xmlBytes := ModelToXMLBytes(ctx, attrs, idx, &diags)
@@ -328,9 +336,17 @@ func TestXMLBytesToModel_SimpleLeaf(t *testing.T) {
 		t.Fatal("system value is null")
 	}
 
-	sysObj, ok := systemVal.(types.Object)
+	sysList, ok := systemVal.(types.List)
 	if !ok {
-		t.Fatalf("system should be Object, got %T", systemVal)
+		t.Fatalf("system should be List, got %T", systemVal)
+	}
+	if len(sysList.Elements()) != 1 {
+		t.Fatalf("system list should have 1 element, got %d", len(sysList.Elements()))
+	}
+
+	sysObj, ok := sysList.Elements()[0].(types.Object)
+	if !ok {
+		t.Fatalf("system[0] should be Object, got %T", sysList.Elements()[0])
 	}
 
 	hostName := sysObj.Attributes()["host_name"]
@@ -338,13 +354,13 @@ func TestXMLBytesToModel_SimpleLeaf(t *testing.T) {
 		t.Fatalf("expected host_name='router1', got %q", hostName.(types.String).ValueString())
 	}
 
-	nameServers := sysObj.Attributes()["name_server"]
-	if nameServers.IsNull() {
+	nameServerVal := sysObj.Attributes()["name_server"]
+	if nameServerVal.IsNull() {
 		t.Fatal("name_server should not be null")
 	}
-	nsList, ok := nameServers.(types.List)
+	nsList, ok := nameServerVal.(types.List)
 	if !ok {
-		t.Fatalf("name_server should be List, got %T", nameServers)
+		t.Fatalf("name_server should be List, got %T", nameServerVal)
 	}
 	if len(nsList.Elements()) != 2 {
 		t.Fatalf("expected 2 name-servers, got %d", len(nsList.Elements()))

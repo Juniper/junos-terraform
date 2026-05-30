@@ -48,9 +48,11 @@ func buildAttribute(node patch.SchemaNode) schema.Attribute {
 				Optional: true,
 			}
 		}
-		return schema.SingleNestedAttribute{
-			Attributes: nested,
-			Optional:   true,
+		return schema.ListNestedAttribute{
+			Optional: true,
+			NestedObject: schema.NestedAttributeObject{
+				Attributes: nested,
+			},
 		}
 	case "list":
 		nested := buildNestedAttributes(node.Children)
