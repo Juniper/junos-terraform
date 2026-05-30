@@ -82,7 +82,23 @@ def main():
         required=True,
         help='Device type suffix used in output directory name.',
     )
+    parser.add_argument(
+        '-m',
+        '--mode',
+        choices=['generic', 'legacy'],
+        default='generic',
+        help='Generation mode: "generic" (schema-driven runtime, small output) or "legacy" (full code expansion).',
+    )
     args = parser.parse_args()
+
+    if args.mode == 'legacy':
+        import warnings
+        warnings.warn(
+            "Legacy mode (-m legacy) is deprecated and will be removed in a future release. "
+            "Use generic mode (default) for significantly smaller provider binaries.",
+            DeprecationWarning,
+            stacklevel=1,
+        )
 
     # Step 1: Filter the schema only when XML config is supplied.
     # Without -x, keep trimmed_schema.json as a direct copy of pyang JSON output.
@@ -101,12 +117,23 @@ def main():
     with as_file(files('junosterraform').joinpath('__init__.py')) as init_py:
         package_dir = os.path.dirname(init_py)
     templates_dir = f"{package_dir}/templates"
-    with open(f"{templates_dir}/resource_config_provider.go.j2") as f:
-        jinja2_source = f.read()
-    tmpl = Template(jinja2_source)
-    render_context = dict(resources)
-    render_context["device_type"] = args.type
-    resource_config_provider_go = tmpl.render(data=render_context).lstrip()
+
+    if args.mode == 'generic':
+        # Generic mode: single combined template (provider + schema embed)
+        with open(f"{templates_dir}/provider_generic.go.j2") as f:
+            jinja2_source = f.read()
+        tmpl = Template(jinja2_source)
+        render_context = dict(resources)
+        render_context["device_type"] = args.type
+        provider_go = tmpl.render(data=render_context).lstrip()
+    else:
+        # Legacy mode: full code expansion template
+        with open(f"{templates_dir}/resource_config_provider.go.j2") as f:
+            jinja2_source = f.read()
+        tmpl = Template(jinja2_source)
+        render_context = dict(resources)
+        render_context["device_type"] = args.type
+        resource_config_provider_go = tmpl.render(data=render_context).lstrip()
 
     # Step 3: Prepare new output directory based on type
     with as_file(files('terraform_provider').joinpath('__init__.py')) as init_py:
@@ -130,18 +157,44 @@ def main():
     if os.path.exists(tp_exe):
         os.remove(tp_exe)
 
-    # Step 5: Save rendered Go file into new directory
-    resource_config_provider_go_fullpath = os.path.join(new_dir, "resource_config_provider.go")
-    with open(resource_config_provider_go_fullpath, "w") as f:
-        f.write(resource_config_provider_go)
-    print(f"Plugin created in {os.path.relpath(resource_config_provider_go_fullpath)}\n")
+    if args.mode == 'generic':
+        # Step 5g: In generic mode, write combined provider.go and remove legacy files
+        provider_go_fullpath = os.path.join(new_dir, "provider.go")
+        with open(provider_go_fullpath, "w") as f:
+            f.write(provider_go)
+        print(f"Plugin created in {os.path.relpath(provider_go_fullpath)} (generic mode)\n")
 
-    # Step 6-8: Update provider.go, go.mod, and config.go with correct type using a loop
-    files_to_update = [
-        ("provider.go.j2", "provider.go"),
-        ("go.mod.j2", "go.mod"),
-        ("config.go.j2", "config.go"),
-    ]
+        # Remove legacy resource_config_provider.go if copied from template dir
+        legacy_rcp = os.path.join(new_dir, "resource_config_provider.go")
+        if os.path.exists(legacy_rcp):
+            os.remove(legacy_rcp)
+
+        # Remove legacy test files that reference typed structs
+        for fname in ["resource_config_provider_test.go", "resource_file.go",
+                      "resource_file_crud_test.go", "resource_file_helpers_test.go",
+                      "resource_file_test.go"]:
+            fpath = os.path.join(new_dir, fname)
+            if os.path.exists(fpath):
+                os.remove(fpath)
+    else:
+        # Step 5: Save rendered Go file into new directory (legacy mode)
+        resource_config_provider_go_fullpath = os.path.join(new_dir, "resource_config_provider.go")
+        with open(resource_config_provider_go_fullpath, "w") as f:
+            f.write(resource_config_provider_go)
+        print(f"Plugin created in {os.path.relpath(resource_config_provider_go_fullpath)}\n")
+
+    # Step 6-8: Update go.mod and config.go with correct type using a loop
+    if args.mode == 'generic':
+        files_to_update = [
+            ("go.mod.j2", "go.mod"),
+            ("config.go.j2", "config.go"),
+        ]
+    else:
+        files_to_update = [
+            ("provider.go.j2", "provider.go"),
+            ("go.mod.j2", "go.mod"),
+            ("config.go.j2", "config.go"),
+        ]
     for template_name, output_name in files_to_update:
         with open(f"{templates_dir}/{template_name}") as f:
             jinja2_source = f.read()
