@@ -474,7 +474,7 @@ func TestIntegration_XMLRoundTrip_WithInterfaces(t *testing.T) {
 		"resource_name": types.StringValue("iface-test"),
 		"interfaces":    ifaceList,
 		"system":        types.ListNull(types.ObjectType{AttrTypes: map[string]attr.Type{"host_name": types.StringType, "name_server": types.ListType{ElemType: types.StringType}}}),
-		"protocols":     types.ListNull(types.ObjectType{AttrTypes: map[string]attr.Type{"lldp": types.StringType}}),
+		"protocols":     types.ListNull(types.ObjectType{AttrTypes: map[string]attr.Type{"lldp": types.ListType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{}}}}}),
 	}
 
 	var diags diag.Diagnostics
@@ -551,7 +551,7 @@ func buildSystemAttrs(hostName string, nameServers []string) map[string]attr.Val
 	sysList := types.ListValueMust(types.ObjectType{AttrTypes: sysAttrTypes}, []attr.Value{sysObj})
 
 	protocolsAttrTypes := map[string]attr.Type{
-		"lldp": types.StringType,
+		"lldp": types.ListType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{}}},
 	}
 	protocolsObjType := types.ObjectType{AttrTypes: protocolsAttrTypes}
 

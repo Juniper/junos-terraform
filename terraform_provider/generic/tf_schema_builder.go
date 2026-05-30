@@ -42,12 +42,6 @@ func buildAttribute(node patch.SchemaNode) schema.Attribute {
 		}
 	case "container":
 		nested := buildNestedAttributes(node.Children)
-		if len(nested) == 0 {
-			// Empty container — model as optional string presence marker
-			return schema.StringAttribute{
-				Optional: true,
-			}
-		}
 		return schema.ListNestedAttribute{
 			Optional: true,
 			NestedObject: schema.NestedAttributeObject{

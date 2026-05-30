@@ -191,7 +191,7 @@ func TestBuildTerraformSchema(t *testing.T) {
 		t.Fatalf("system should be ListNestedAttribute, got %T", sys)
 	}
 
-	// protocols.lldp is an empty container — should be a StringAttribute
+	// protocols.lldp is an empty container — should be a ListNestedAttribute
 	protocols, ok := s.Attributes["protocols"]
 	if !ok {
 		t.Fatal("missing protocols attribute")
@@ -204,8 +204,8 @@ func TestBuildTerraformSchema(t *testing.T) {
 	if !ok {
 		t.Fatal("missing protocols.lldp attribute")
 	}
-	if _, ok := lldp.(schema.StringAttribute); !ok {
-		t.Fatalf("protocols.lldp (empty container) should be StringAttribute, got %T", lldp)
+	if _, ok := lldp.(schema.ListNestedAttribute); !ok {
+		t.Fatalf("protocols.lldp (empty container) should be ListNestedAttribute, got %T", lldp)
 	}
 }
 

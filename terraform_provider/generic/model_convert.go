@@ -124,13 +124,6 @@ func containerToNodes(ctx context.Context, val attr.Value, schema patch.SchemaNo
 	// compatibility with generated .tf files that use list syntax: attr = [{...}]
 	lv, ok := val.(basetypes.ListValue)
 	if !ok {
-		// May be a string presence marker for empty containers
-		if sv, ok := val.(basetypes.StringValue); ok && !sv.IsNull() {
-			return []*patch.Node{{
-				Tag:   schema.Name,
-				Attrs: make(map[string]string),
-			}}
-		}
 		return nil
 	}
 
@@ -260,14 +253,6 @@ func xmlContainerToValue(ctx context.Context, xmlParent *patch.Node, schema patc
 	attrTypes := containerAttrTypes(schema)
 	matches := findChildrenByTag(xmlParent, schema.Name)
 
-	if len(schema.Children) == 0 {
-		// Empty container presence → empty string marker
-		if len(matches) == 0 {
-			return types.StringNull()
-		}
-		return types.StringValue("")
-	}
-
 	objType := types.ObjectType{AttrTypes: attrTypes}
 
 	if len(matches) == 0 {
@@ -343,9 +328,6 @@ func xmlListToValue(ctx context.Context, xmlParent *patch.Node, schema patch.Sch
 
 // containerAttrTypes builds the attr.Type map for a container/list schema node.
 func containerAttrTypes(schema patch.SchemaNode) map[string]attr.Type {
-	if len(schema.Children) == 0 {
-		return nil
-	}
 	attrTypes := make(map[string]attr.Type, len(schema.Children))
 	for _, child := range schema.Children {
 		name := normalizeName(child.Name)
@@ -363,9 +345,6 @@ func schemaNodeToAttrType(node patch.SchemaNode) attr.Type {
 		return types.ListType{ElemType: types.StringType}
 	case "container":
 		childTypes := containerAttrTypes(node)
-		if len(childTypes) == 0 {
-			return types.StringType
-		}
 		return types.ListType{ElemType: types.ObjectType{AttrTypes: childTypes}}
 	case "list":
 		childTypes := containerAttrTypes(node)
