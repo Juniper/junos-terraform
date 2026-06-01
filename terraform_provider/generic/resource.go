@@ -331,18 +331,33 @@ func (r *ConfigResource) readAndBuildState(ctx context.Context, referenceAttrs m
 		observed["resource_name"] = rn
 	}
 
-	// For null observed attrs where reference has a value, preserve reference
-	// (handles empty containers whose XML is not emitted by device)
+	// For null observed attrs where reference has a known value, preserve reference
+	// (handles empty containers whose XML is not emitted by device).
+	// Skip unknown references — state must not contain unknowns.
 	for key, refVal := range referenceAttrs {
 		if key == "resource_name" {
 			continue
 		}
 		obsVal, exists := observed[key]
 		if !exists || obsVal == nil || obsVal.IsNull() {
-			if refVal != nil && !refVal.IsNull() {
+			if refVal != nil && !refVal.IsNull() && !refVal.IsUnknown() {
 				observed[key] = refVal
 			}
 		}
+	}
+
+	// Reconcile list ordering: device may return list elements in different
+	// order than the prior state. Terraform ListNestedAttribute is ordered,
+	// so we must reorder observed elements to match prior state order by key.
+	for key, refVal := range referenceAttrs {
+		if key == "resource_name" {
+			continue
+		}
+		obsVal, exists := observed[key]
+		if !exists || obsVal == nil || obsVal.IsNull() {
+			continue
+		}
+		observed[key] = reconcileListOrder(obsVal, refVal)
 	}
 
 	return observed

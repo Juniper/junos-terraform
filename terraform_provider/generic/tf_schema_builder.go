@@ -34,16 +34,19 @@ func buildAttribute(node patch.SchemaNode) schema.Attribute {
 	case "leaf":
 		return schema.StringAttribute{
 			Optional: true,
+			Computed: true,
 		}
 	case "leaf-list":
 		return schema.ListAttribute{
 			ElementType: types.StringType,
 			Optional:    true,
+			Computed:    true,
 		}
 	case "container":
 		nested := buildNestedAttributes(node.Children)
 		return schema.ListNestedAttribute{
 			Optional: true,
+			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: nested,
 			},
@@ -54,10 +57,12 @@ func buildAttribute(node patch.SchemaNode) schema.Attribute {
 			return schema.ListAttribute{
 				ElementType: types.StringType,
 				Optional:    true,
+				Computed:    true,
 			}
 		}
 		return schema.ListNestedAttribute{
 			Optional: true,
+			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: nested,
 			},
@@ -65,6 +70,7 @@ func buildAttribute(node patch.SchemaNode) schema.Attribute {
 	default:
 		return schema.StringAttribute{
 			Optional: true,
+			Computed: true,
 		}
 	}
 }

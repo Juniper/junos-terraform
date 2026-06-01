@@ -369,3 +369,195 @@ func AttrTypesForSchema(idx *SchemaIndex) map[string]attr.Type {
 	}
 	return result
 }
+
+// reconcileListOrder reorders list elements in observed to match the order in
+// prior, matching elements by the "name" key field.  This handles the case
+// where the device returns YANG list entries in a different order than the .tf
+// file specified.  Terraform ListNestedAttribute is ordered, so mismatched
+// ordering causes spurious diffs.
+//
+// The function recurses into container (single-element list) and list values
+// to fix ordering at all nesting depths.
+func reconcileListOrder(observed, prior attr.Value) attr.Value {
+	if prior == nil || prior.IsNull() || prior.IsUnknown() {
+		return observed
+	}
+	if observed == nil || observed.IsNull() || observed.IsUnknown() {
+		return observed
+	}
+
+	obsLV, obsOk := observed.(basetypes.ListValue)
+	priorLV, priorOk := prior.(basetypes.ListValue)
+	if !obsOk || !priorOk {
+		return observed
+	}
+
+	obsElems := obsLV.Elements()
+	priorElems := priorLV.Elements()
+
+	if len(obsElems) == 0 || len(priorElems) == 0 {
+		return observed
+	}
+
+	// Check if elements are objects (ListNestedAttribute) vs strings (leaf-list)
+	if _, isObj := obsElems[0].(basetypes.ObjectValue); !isObj {
+		return observed
+	}
+
+	// Single-element list (container): recurse into the object's attributes
+	if len(obsElems) == 1 && len(priorElems) == 1 {
+		obsObj := obsElems[0].(basetypes.ObjectValue)
+		priorObj := priorElems[0].(basetypes.ObjectValue)
+		reconciledObj := reconcileObjectAttrs(obsObj, priorObj)
+		if reconciledObj != nil {
+			lv, _ := types.ListValue(obsLV.ElementType(nil), []attr.Value{*reconciledObj})
+			return lv
+		}
+		return observed
+	}
+
+	// Multi-element list: reorder observed to match prior by "name" key
+	obsMap := buildKeyMap(obsElems)
+	if obsMap == nil {
+		// No "name" keys found; cannot reconcile ordering, recurse into
+		// positional elements instead.
+		return reconcilePositional(obsLV, priorElems)
+	}
+
+	reordered := make([]attr.Value, 0, len(obsElems))
+	used := make(map[string]bool)
+
+	// First pass: emit elements in prior order
+	for _, pe := range priorElems {
+		po, ok := pe.(basetypes.ObjectValue)
+		if !ok {
+			continue
+		}
+		key := extractNameKey(po)
+		if key == "" {
+			continue
+		}
+		if ov, exists := obsMap[key]; exists {
+			// Recurse into this element's nested lists
+			reconciled := reconcileObjectAttrs(ov, po)
+			if reconciled != nil {
+				reordered = append(reordered, *reconciled)
+			} else {
+				reordered = append(reordered, ov)
+			}
+			used[key] = true
+		}
+	}
+
+	// Second pass: append any observed elements not in prior (new entries)
+	for _, oe := range obsElems {
+		oo, ok := oe.(basetypes.ObjectValue)
+		if !ok {
+			continue
+		}
+		key := extractNameKey(oo)
+		if key != "" && !used[key] {
+			reordered = append(reordered, oe)
+		}
+	}
+
+	if len(reordered) == 0 {
+		return observed
+	}
+
+	lv, _ := types.ListValue(obsLV.ElementType(nil), reordered)
+	return lv
+}
+
+// reconcileObjectAttrs reconciles nested list ordering within object attributes.
+func reconcileObjectAttrs(obs, prior basetypes.ObjectValue) *basetypes.ObjectValue {
+	obsAttrs := obs.Attributes()
+	priorAttrs := prior.Attributes()
+	changed := false
+	result := make(map[string]attr.Value, len(obsAttrs))
+
+	for k, ov := range obsAttrs {
+		pv, exists := priorAttrs[k]
+		if !exists {
+			result[k] = ov
+			continue
+		}
+		reconciled := reconcileListOrder(ov, pv)
+		result[k] = reconciled
+		if reconciled != ov {
+			changed = true
+		}
+	}
+
+	if !changed {
+		return nil
+	}
+	ov, _ := types.ObjectValue(obs.AttributeTypes(nil), result)
+	return &ov
+}
+
+// reconcilePositional handles lists without name keys by recursing into
+// positional elements to fix nested ordering.
+func reconcilePositional(obsLV basetypes.ListValue, priorElems []attr.Value) attr.Value {
+	obsElems := obsLV.Elements()
+	changed := false
+	result := make([]attr.Value, len(obsElems))
+
+	for i, oe := range obsElems {
+		if i < len(priorElems) {
+			obsObj, ok1 := oe.(basetypes.ObjectValue)
+			priorObj, ok2 := priorElems[i].(basetypes.ObjectValue)
+			if ok1 && ok2 {
+				reconciled := reconcileObjectAttrs(obsObj, priorObj)
+				if reconciled != nil {
+					result[i] = *reconciled
+					changed = true
+					continue
+				}
+			}
+		}
+		result[i] = oe
+	}
+
+	if !changed {
+		return obsLV
+	}
+	lv, _ := types.ListValue(obsLV.ElementType(nil), result)
+	return lv
+}
+
+// buildKeyMap indexes list elements by their "name" attribute value.
+// Returns nil if no elements have a "name" key.
+func buildKeyMap(elems []attr.Value) map[string]basetypes.ObjectValue {
+	m := make(map[string]basetypes.ObjectValue, len(elems))
+	hasKeys := false
+	for _, e := range elems {
+		ov, ok := e.(basetypes.ObjectValue)
+		if !ok {
+			continue
+		}
+		key := extractNameKey(ov)
+		if key != "" {
+			m[key] = ov
+			hasKeys = true
+		}
+	}
+	if !hasKeys {
+		return nil
+	}
+	return m
+}
+
+// extractNameKey returns the "name" string attribute value from an object.
+func extractNameKey(obj basetypes.ObjectValue) string {
+	attrs := obj.Attributes()
+	nameVal, exists := attrs["name"]
+	if !exists {
+		return ""
+	}
+	sv, ok := nameVal.(basetypes.StringValue)
+	if !ok || sv.IsNull() || sv.IsUnknown() {
+		return ""
+	}
+	return sv.ValueString()
+}
