@@ -79,9 +79,53 @@ func buildNestedAttributes(children []patch.SchemaNode) map[string]schema.Attrib
 	attrs := make(map[string]schema.Attribute, len(children))
 	for _, child := range children {
 		name := normalizeName(child.Name)
-		attrs[name] = buildAttribute(child)
+		attrs[name] = buildNestedAttribute(child)
 	}
 	return attrs
+}
+
+// buildNestedAttribute builds a schema attribute for a node inside a container/list.
+// Nested attributes are Optional only (not Computed) so that unspecified nested
+// values are null in the plan rather than unknown. This prevents "unknown value
+// after apply" errors from the Terraform framework during Create.
+func buildNestedAttribute(node patch.SchemaNode) schema.Attribute {
+	switch node.Type {
+	case "leaf":
+		return schema.StringAttribute{
+			Optional: true,
+		}
+	case "leaf-list":
+		return schema.ListAttribute{
+			ElementType: types.StringType,
+			Optional:    true,
+		}
+	case "container":
+		nested := buildNestedAttributes(node.Children)
+		return schema.ListNestedAttribute{
+			Optional: true,
+			NestedObject: schema.NestedAttributeObject{
+				Attributes: nested,
+			},
+		}
+	case "list":
+		nested := buildNestedAttributes(node.Children)
+		if len(nested) == 0 {
+			return schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			}
+		}
+		return schema.ListNestedAttribute{
+			Optional: true,
+			NestedObject: schema.NestedAttributeObject{
+				Attributes: nested,
+			},
+		}
+	default:
+		return schema.StringAttribute{
+			Optional: true,
+		}
+	}
 }
 
 // normalizeName converts a YANG name (with hyphens/dots) to a Terraform-safe attribute name.
