@@ -140,11 +140,7 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 	diffMap := patch.ComputeDiff(stateMap, planMap)
 
 	if len(diffMap) == 0 {
-		state := r.readAndBuildState(ctx, planAttrs, &resp.Diagnostics)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		r.setTopLevelAttrs(ctx, &resp.State, state, &resp.Diagnostics)
+		r.setTopLevelAttrs(ctx, &resp.State, planAttrs, &resp.Diagnostics)
 		return
 	}
 
@@ -190,11 +186,11 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 
-	state := r.readAndBuildState(ctx, planAttrs, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	r.setTopLevelAttrs(ctx, &resp.State, state, &resp.Diagnostics)
+	// Use plan values as state: the verification+fallback above ensure the
+	// device has the correct config.  Reading back from device can return
+	// extra list elements (e.g. from merge) that were not in the plan, which
+	// Terraform rejects as "inconsistent result after apply".
+	r.setTopLevelAttrs(ctx, &resp.State, planAttrs, &resp.Diagnostics)
 }
 
 func (r *ConfigResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
