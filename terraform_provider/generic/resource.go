@@ -295,12 +295,7 @@ func (r *ConfigResource) getAttr(ctx context.Context, src attrAccessor, name str
 		diags.Append(src.GetAttribute(ctx, path.Root(name), &val)...)
 		return val
 	case "container":
-		if len(node.Children) == 0 {
-			var val types.String
-			diags.Append(src.GetAttribute(ctx, path.Root(name), &val)...)
-			return val
-		}
-		var val types.Object
+		var val types.List
 		diags.Append(src.GetAttribute(ctx, path.Root(name), &val)...)
 		return val
 	case "list":
