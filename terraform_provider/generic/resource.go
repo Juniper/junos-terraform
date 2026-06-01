@@ -357,7 +357,8 @@ func (r *ConfigResource) readAndBuildState(ctx context.Context, referenceAttrs m
 		if !exists || obsVal == nil || obsVal.IsNull() {
 			continue
 		}
-		observed[key] = reconcileListOrder(obsVal, refVal)
+		reconciled, _ := reconcileListOrder(obsVal, refVal)
+		observed[key] = reconciled
 	}
 
 	return observed

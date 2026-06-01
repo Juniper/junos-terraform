@@ -11,6 +11,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
+// ctxBG is a package-level background context for type-system calls that
+// require a context parameter but do not perform any I/O.
+var ctxBG = context.Background()
+
 // ModelToXMLBytes converts Terraform plan attributes into XML config bytes.
 // It walks the schema tree and extracts values from the plan object map.
 func ModelToXMLBytes(ctx context.Context, attrs map[string]attr.Value, idx *SchemaIndex, diags *diag.Diagnostics) []byte {
@@ -378,30 +382,31 @@ func AttrTypesForSchema(idx *SchemaIndex) map[string]attr.Type {
 //
 // The function recurses into container (single-element list) and list values
 // to fix ordering at all nesting depths.
-func reconcileListOrder(observed, prior attr.Value) attr.Value {
+// Returns (result, changed) where changed indicates if the value was modified.
+func reconcileListOrder(observed, prior attr.Value) (attr.Value, bool) {
 	if prior == nil || prior.IsNull() || prior.IsUnknown() {
-		return observed
+		return observed, false
 	}
 	if observed == nil || observed.IsNull() || observed.IsUnknown() {
-		return observed
+		return observed, false
 	}
 
 	obsLV, obsOk := observed.(basetypes.ListValue)
 	priorLV, priorOk := prior.(basetypes.ListValue)
 	if !obsOk || !priorOk {
-		return observed
+		return observed, false
 	}
 
 	obsElems := obsLV.Elements()
 	priorElems := priorLV.Elements()
 
 	if len(obsElems) == 0 || len(priorElems) == 0 {
-		return observed
+		return observed, false
 	}
 
 	// Check if elements are objects (ListNestedAttribute) vs strings (leaf-list)
 	if _, isObj := obsElems[0].(basetypes.ObjectValue); !isObj {
-		return observed
+		return observed, false
 	}
 
 	// Single-element list (container): recurse into the object's attributes
@@ -410,10 +415,10 @@ func reconcileListOrder(observed, prior attr.Value) attr.Value {
 		priorObj := priorElems[0].(basetypes.ObjectValue)
 		reconciledObj := reconcileObjectAttrs(obsObj, priorObj)
 		if reconciledObj != nil {
-			lv, _ := types.ListValue(obsLV.ElementType(nil), []attr.Value{*reconciledObj})
-			return lv
+			lv, _ := types.ListValue(obsLV.ElementType(ctxBG), []attr.Value{*reconciledObj})
+			return lv, true
 		}
-		return observed
+		return observed, false
 	}
 
 	// Multi-element list: reorder observed to match prior by "name" key
@@ -462,14 +467,15 @@ func reconcileListOrder(observed, prior attr.Value) attr.Value {
 	}
 
 	if len(reordered) == 0 {
-		return observed
+		return observed, false
 	}
 
-	lv, _ := types.ListValue(obsLV.ElementType(nil), reordered)
-	return lv
+	lv, _ := types.ListValue(obsLV.ElementType(ctxBG), reordered)
+	return lv, true
 }
 
 // reconcileObjectAttrs reconciles nested list ordering within object attributes.
+// Returns a new ObjectValue if any nested lists were reordered, otherwise nil.
 func reconcileObjectAttrs(obs, prior basetypes.ObjectValue) *basetypes.ObjectValue {
 	obsAttrs := obs.Attributes()
 	priorAttrs := prior.Attributes()
@@ -482,9 +488,9 @@ func reconcileObjectAttrs(obs, prior basetypes.ObjectValue) *basetypes.ObjectVal
 			result[k] = ov
 			continue
 		}
-		reconciled := reconcileListOrder(ov, pv)
+		reconciled, didChange := reconcileListOrder(ov, pv)
 		result[k] = reconciled
-		if reconciled != ov {
+		if didChange {
 			changed = true
 		}
 	}
@@ -492,13 +498,13 @@ func reconcileObjectAttrs(obs, prior basetypes.ObjectValue) *basetypes.ObjectVal
 	if !changed {
 		return nil
 	}
-	ov, _ := types.ObjectValue(obs.AttributeTypes(nil), result)
+	ov, _ := types.ObjectValue(obs.AttributeTypes(ctxBG), result)
 	return &ov
 }
 
 // reconcilePositional handles lists without name keys by recursing into
 // positional elements to fix nested ordering.
-func reconcilePositional(obsLV basetypes.ListValue, priorElems []attr.Value) attr.Value {
+func reconcilePositional(obsLV basetypes.ListValue, priorElems []attr.Value) (attr.Value, bool) {
 	obsElems := obsLV.Elements()
 	changed := false
 	result := make([]attr.Value, len(obsElems))
@@ -520,10 +526,10 @@ func reconcilePositional(obsLV basetypes.ListValue, priorElems []attr.Value) att
 	}
 
 	if !changed {
-		return obsLV
+		return obsLV, false
 	}
-	lv, _ := types.ListValue(obsLV.ElementType(nil), result)
-	return lv
+	lv, _ := types.ListValue(obsLV.ElementType(ctxBG), result)
+	return lv, true
 }
 
 // buildKeyMap indexes list elements by their "name" attribute value.
