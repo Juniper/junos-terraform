@@ -361,6 +361,10 @@ func (r *ConfigResource) readAndBuildState(ctx context.Context, referenceAttrs m
 		observed[key] = reconciled
 	}
 
+	for key, val := range observed {
+		observed[key] = normalizeUnknowns(val)
+	}
+
 	return observed
 }
 

@@ -499,6 +499,77 @@ func TestModelToXML_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestNormalizeUnknowns_Recursive(t *testing.T) {
+	addressObjType := types.ObjectType{AttrTypes: map[string]attr.Type{
+		"name": types.StringType,
+	}}
+	inetObjType := types.ObjectType{AttrTypes: map[string]attr.Type{
+		"address": types.ListType{ElemType: addressObjType},
+	}}
+	familyObjType := types.ObjectType{AttrTypes: map[string]attr.Type{
+		"inet": types.ListType{ElemType: inetObjType},
+	}}
+	unitObjType := types.ObjectType{AttrTypes: map[string]attr.Type{
+		"name":        types.StringType,
+		"description": types.StringType,
+		"family":      types.ListType{ElemType: familyObjType},
+	}}
+	ifaceObjType := types.ObjectType{AttrTypes: map[string]attr.Type{
+		"name":        types.StringType,
+		"description": types.StringType,
+		"unit":        types.ListType{ElemType: unitObjType},
+	}}
+
+	unitObj, diags := types.ObjectValue(unitObjType.AttrTypes, map[string]attr.Value{
+		"name":        types.StringValue("0"),
+		"description": types.StringUnknown(),
+		"family":      types.ListUnknown(familyObjType),
+	})
+	if diags.HasError() {
+		t.Fatalf("failed to build unit object: %v", diags)
+	}
+
+	unitList, diags := types.ListValue(unitObjType, []attr.Value{unitObj})
+	if diags.HasError() {
+		t.Fatalf("failed to build unit list: %v", diags)
+	}
+
+	ifaceObj, diags := types.ObjectValue(ifaceObjType.AttrTypes, map[string]attr.Value{
+		"name":        types.StringValue("ge-0/0/0"),
+		"description": types.StringUnknown(),
+		"unit":        unitList,
+	})
+	if diags.HasError() {
+		t.Fatalf("failed to build interface object: %v", diags)
+	}
+
+	ifaces, diags := types.ListValue(ifaceObjType, []attr.Value{ifaceObj})
+	if diags.HasError() {
+		t.Fatalf("failed to build interfaces list: %v", diags)
+	}
+
+	normalized := normalizeUnknowns(ifaces)
+	listVal, ok := normalized.(types.List)
+	if !ok {
+		t.Fatalf("expected normalized list, got %T", normalized)
+	}
+
+	iface := listVal.Elements()[0].(types.Object)
+	if !iface.Attributes()["description"].IsNull() || iface.Attributes()["description"].IsUnknown() {
+		t.Fatal("top-level unknown leaf should be converted to null")
+	}
+
+	unit := iface.Attributes()["unit"].(types.List).Elements()[0].(types.Object)
+	if !unit.Attributes()["description"].IsNull() || unit.Attributes()["description"].IsUnknown() {
+		t.Fatal("nested unknown leaf should be converted to null")
+	}
+
+	family := unit.Attributes()["family"]
+	if !family.IsNull() || family.IsUnknown() {
+		t.Fatal("unknown nested list should be converted to typed null")
+	}
+}
+
 func TestNormalizeName(t *testing.T) {
 	tests := []struct {
 		input    string

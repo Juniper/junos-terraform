@@ -374,6 +374,64 @@ func AttrTypesForSchema(idx *SchemaIndex) map[string]attr.Type {
 	return result
 }
 
+// normalizeUnknowns converts any unknown descendants in a Terraform value to
+// typed nulls so Create/Read never write unknown state back to Terraform.
+func normalizeUnknowns(val attr.Value) attr.Value {
+	if val == nil {
+		return nil
+	}
+
+	switch v := val.(type) {
+	case basetypes.StringValue:
+		if v.IsUnknown() {
+			return types.StringNull()
+		}
+		return v
+	case basetypes.ListValue:
+		elemType := v.ElementType(ctxBG)
+		if v.IsUnknown() {
+			return types.ListNull(elemType)
+		}
+		if v.IsNull() {
+			return v
+		}
+
+		elems := v.Elements()
+		normalized := make([]attr.Value, 0, len(elems))
+		for _, elem := range elems {
+			normalized = append(normalized, normalizeUnknowns(elem))
+		}
+
+		lv, d := types.ListValue(elemType, normalized)
+		if d.HasError() {
+			return types.ListNull(elemType)
+		}
+		return lv
+	case basetypes.ObjectValue:
+		attrTypes := v.AttributeTypes(ctxBG)
+		if v.IsUnknown() {
+			return types.ObjectNull(attrTypes)
+		}
+		if v.IsNull() {
+			return v
+		}
+
+		attrs := v.Attributes()
+		normalized := make(map[string]attr.Value, len(attrs))
+		for key, child := range attrs {
+			normalized[key] = normalizeUnknowns(child)
+		}
+
+		ov, d := types.ObjectValue(attrTypes, normalized)
+		if d.HasError() {
+			return types.ObjectNull(attrTypes)
+		}
+		return ov
+	default:
+		return val
+	}
+}
+
 // reconcileListOrder reorders list elements in observed to match the order in
 // prior, matching elements by the "name" key field.  This handles the case
 // where the device returns YANG list entries in a different order than the .tf
