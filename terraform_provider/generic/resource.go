@@ -361,6 +361,13 @@ func (r *ConfigResource) readAndBuildState(ctx context.Context, referenceAttrs m
 		observed[key] = reconciled
 	}
 
+	for _, node := range r.idx.TopLevel {
+		name := normalizeName(node.Name)
+		if val, exists := observed[name]; !exists || val == nil {
+			observed[name] = nullValueForSchemaNode(node)
+		}
+	}
+
 	for key, val := range observed {
 		observed[key] = normalizeUnknowns(val)
 	}

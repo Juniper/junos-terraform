@@ -570,6 +570,37 @@ func TestNormalizeUnknowns_Recursive(t *testing.T) {
 	}
 }
 
+func TestReadAndBuildState_MissingTopLevelBecomesNull(t *testing.T) {
+	idx, err := LoadSchema([]byte(testSchemaJSON))
+	if err != nil {
+		t.Fatalf("LoadSchema() error: %v", err)
+	}
+
+	r := &ConfigResource{
+		idx: idx,
+		client: ProviderConfig{Client: newMockNetconfClient(), Host: "test-host"},
+	}
+
+	reference := map[string]attr.Value{
+		"resource_name": types.StringValue("router1"),
+		"system":        types.ListUnknown(types.ObjectType{AttrTypes: containerAttrTypes(idx.TopLevel[1])}),
+	}
+
+	var diags diag.Diagnostics
+	state := r.readAndBuildState(context.Background(), reference, &diags)
+	if diags.HasError() {
+		t.Fatalf("readAndBuildState() errors: %v", diags)
+	}
+
+	system := state["system"]
+	if system == nil || !system.IsNull() || system.IsUnknown() {
+		t.Fatalf("expected missing top-level system to become typed null, got %#v", system)
+	}
+	if _, ok := state["resource_name"]; !ok {
+		t.Fatal("expected resource_name to be preserved")
+	}
+}
+
 func TestNormalizeName(t *testing.T) {
 	tests := []struct {
 		input    string

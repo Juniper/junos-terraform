@@ -374,6 +374,19 @@ func AttrTypesForSchema(idx *SchemaIndex) map[string]attr.Type {
 	return result
 }
 
+func nullValueForSchemaNode(node patch.SchemaNode) attr.Value {
+	switch node.Type {
+	case "leaf":
+		return types.StringNull()
+	case "leaf-list":
+		return types.ListNull(types.StringType)
+	case "container", "list":
+		return types.ListNull(types.ObjectType{AttrTypes: containerAttrTypes(node)})
+	default:
+		return types.StringNull()
+	}
+}
+
 // normalizeUnknowns converts any unknown descendants in a Terraform value to
 // typed nulls so Create/Read never write unknown state back to Terraform.
 func normalizeUnknowns(val attr.Value) attr.Value {
