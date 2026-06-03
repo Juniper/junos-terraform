@@ -243,8 +243,46 @@ jobs:
         fi
 
     - name: Terraform apply changed plan
+      id: changed_apply
+      continue-on-error: true
       working-directory: ci-evpn-vxlan-tf
-      run: terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-updated
+      env:
+        JUNOS_TF_DEBUG_XML: "1"
+        JUNOS_TF_DEBUG_RPC: "1"
+        JUNOS_TF_DEBUG_PATCH: "1"
+        TF_LOG: TRACE
+        TF_LOG_PATH: terraform-provider-debug.log
+      run: |
+        set +e
+        terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-updated 2>&1 | tee terraform-apply-changed.log
+        rc=${PIPESTATUS[0]}
+        set -e
+        echo "exitcode=$rc" >> "$GITHUB_OUTPUT"
+
+    - name: Capture changed-apply diagnostics
+      if: always()
+      working-directory: ci-evpn-vxlan-tf
+      run: |
+        set +e
+        terraform show -no-color tfplan-updated > tfplan-updated.show.txt 2> tfplan-updated.show.err
+        terraform state list > terraform-state-list-after-changed-apply.txt 2>&1
+        terraform state pull > terraform-state-after-changed-apply.json 2> terraform-state-after-changed-apply.err
+
+        echo "==== tail: terraform-apply-changed.log ===="
+        tail -n 200 terraform-apply-changed.log || true
+
+        echo "==== tail: terraform-provider-debug.log ===="
+        tail -n 200 terraform-provider-debug.log || true
+
+        echo "==== tail: netconf-mock.log ===="
+        tail -n 200 ../netconf-mock.log || true
+
+    - name: Assert changed apply exit code
+      run: |
+        if [ "${{ steps.changed_apply.outputs.exitcode }}" != "0" ]; then
+          echo "Expected changed apply to succeed, got exit code ${{ steps.changed_apply.outputs.exitcode }}"
+          exit 1
+        fi
 
     - name: Terraform final no-op plan
       id: no_op_plan_final
@@ -433,4 +471,11 @@ jobs:
         path: |
           netconf-mock.log
           netconf-mock-state.json
+          ci-evpn-vxlan-tf/terraform-apply-changed.log
+          ci-evpn-vxlan-tf/terraform-provider-debug.log
+          ci-evpn-vxlan-tf/tfplan-updated.show.txt
+          ci-evpn-vxlan-tf/tfplan-updated.show.err
+          ci-evpn-vxlan-tf/terraform-state-list-after-changed-apply.txt
+          ci-evpn-vxlan-tf/terraform-state-after-changed-apply.json
+          ci-evpn-vxlan-tf/terraform-state-after-changed-apply.err
           ci-evpn-vxlan-tf-negative/negative_apply.log
