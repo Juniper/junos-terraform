@@ -71,6 +71,7 @@ func (r *ConfigResource) Create(ctx context.Context, req resource.CreateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	debugConfigXML("create plan xml", string(xmlBytes))
 
 	if err := r.client.SendDirectTransactionRaw(string(xmlBytes), false); err != nil {
 		resp.Diagnostics.AddError("Failed while applying configuration", err.Error())
@@ -85,6 +86,7 @@ func (r *ConfigResource) Create(ctx context.Context, req resource.CreateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	debugStateXML("create readback state xml", state, r.idx)
 	r.setTopLevelAttrs(ctx, &resp.State, state, &resp.Diagnostics)
 }
 
@@ -98,6 +100,7 @@ func (r *ConfigResource) Read(ctx context.Context, req resource.ReadRequest, res
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	debugStateXML("read observed state xml", state, r.idx)
 	r.setTopLevelAttrs(ctx, &resp.State, state, &resp.Diagnostics)
 }
 
@@ -111,12 +114,14 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	debugConfigXML("update plan xml", string(planXML))
 
 	stateXML, err := r.client.GetConfigXML()
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read current configuration", err.Error())
 		return
 	}
+	debugConfigXML("update current state xml", string(stateXML))
 
 	patchIdx, err := patch.UnmarshalTrimmedSchemaIndex(r.rawSchema)
 	if err != nil {
@@ -168,6 +173,7 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 		resp.Diagnostics.AddError("Failed to read patched configuration", err.Error())
 		return
 	}
+	debugConfigXML("update verified state xml", string(verifiedXML))
 	verifiedTree, err := patch.BuildTree(verifiedXML)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to parse verified XML", err.Error())
@@ -176,6 +182,7 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 	verifiedMap := patch.LeafMapWithSchema(verifiedTree, patchIdx)
 	remainingDiff := patch.ComputeDiff(verifiedMap, planMap)
 	if len(remainingDiff) > 0 {
+		debugConfigXML("update fallback plan xml", string(planXML))
 		if err := r.client.SendDirectTransactionRaw(string(planXML), false); err != nil {
 			resp.Diagnostics.AddError("Patch had no effect and fallback update failed", err.Error())
 			return
@@ -396,4 +403,24 @@ func debugPatchUpdate(resourceName string, planXML []byte, stateXML []byte, diff
 		fmt.Printf("%v | %s | old=%q | new=%q\n", entry.Op, entry.Path, entry.OldVal, entry.NewVal)
 	}
 	fmt.Printf("--- patch payload ---\n%s\n", patchPayload)
+}
+
+func debugConfigXML(label string, xmlText string) {
+	if os.Getenv("JUNOS_TF_DEBUG_XML") == "" {
+		return
+	}
+	fmt.Printf("\n=== %s ===\n%s\n", label, xmlText)
+}
+
+func debugStateXML(label string, attrs map[string]attr.Value, idx *SchemaIndex) {
+	if os.Getenv("JUNOS_TF_DEBUG_XML") == "" {
+		return
+	}
+	var diags diag.Diagnostics
+	xmlBytes := ModelToXMLBytes(context.Background(), attrs, idx, &diags)
+	if diags.HasError() {
+		fmt.Printf("\n=== %s ===\n<failed to render state xml: %v>\n", label, diags)
+		return
+	}
+	fmt.Printf("\n=== %s ===\n%s\n", label, string(xmlBytes))
 }
