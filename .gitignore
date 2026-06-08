@@ -13,6 +13,4 @@ __pycache__/
 /dist/
 /terraform-provider-junos-vqfx-evpn-vxlan/
 /.venv/
-examples/providers/terraform-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json
-examples/providers/terraform-provider-junos-vqfx-evpn-vxlan/resource_config_provider.go
-terraform_provider/venv/
+.DS_Store
