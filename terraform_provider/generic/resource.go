@@ -193,11 +193,26 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 
-	// Use plan values as state: the verification+fallback above ensure the
-	// device has the correct config.  Reading back from device can return
-	// extra list elements (e.g. from merge) that were not in the plan, which
-	// Terraform rejects as "inconsistent result after apply".
-	r.setTopLevelAttrs(ctx, &resp.State, planAttrs, &resp.Diagnostics)
+	// Build post-apply state from device readback so unknown planned values
+	// (from Optional+Computed attrs) are resolved to known/null values.
+	state := r.readAndBuildState(ctx, planAttrs, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Keep known, explicit plan values to avoid spurious state drift from
+	// device merge behavior while still replacing unknown plan values with
+	// known readback values.
+	for _, node := range r.idx.TopLevel {
+		name := normalizeName(node.Name)
+		pv, ok := planAttrs[name]
+		if !ok || pv == nil || pv.IsUnknown() {
+			continue
+		}
+		state[name] = normalizeUnknowns(pv)
+	}
+
+	r.setTopLevelAttrs(ctx, &resp.State, state, &resp.Diagnostics)
 }
 
 func (r *ConfigResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
