@@ -14,3 +14,7 @@ __pycache__/
 /terraform-provider-junos-vqfx-evpn-vxlan/
 /.venv/
 .DS_Store
+/examples/providers/terraform-provider-junos-*/
+/examples/terraform_files/terraform.tfstate
+/examples/terraform_files/terraform.tfvars
+/examples/terraform_files/variables.tf
