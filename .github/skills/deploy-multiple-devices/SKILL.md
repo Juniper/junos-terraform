@@ -1,6 +1,6 @@
 ---
 name: deploy-multiple-devices
-description: "Deploy Terraform config to multiple Junos devices in one operation. Use when user says push vqfx, push srx, deploy borderleaf pair, or run plan/apply for multiple targets."
+description: "Deploy Terraform config to multiple Junos devices in one operation. Example intents: push a device family, deploy a role group, or run plan/apply for explicit targets."
 ---
 
 Deploy Terraform configuration to a selected set of devices safely.
@@ -8,7 +8,7 @@ Deploy Terraform configuration to a selected set of devices safely.
 ## Inputs
 
 - Terraform working directory
-- Target mode (all, vqfx, srx, role group, or explicit resource list)
+- Target mode (all devices, device-family keyword, role group, or explicit resource list)
 - Optional plan filename
 
 ## Steps
@@ -18,11 +18,14 @@ Deploy Terraform configuration to a selected set of devices safely.
 - Confirm host and port are configured for each targeted provider alias.
 
 2. Resolve target set
-- vqfx: include all terraform-provider-junos-vqfx-evpn-vxlan resources requested by scope.
-- srx: include all terraform-provider-junos-vsrx-evpn-vxlan resources requested by scope.
-- role group: map requested group (example: borderleaf) to exact resource addresses.
+- device-family keyword: include all resources requested by the selected family scope.
+- role group: map requested group to exact resource addresses.
 - explicit list: validate each supplied resource address.
 - If ambiguous, list candidates and ask user to confirm.
+
+Example family mapping (example only):
+- `vqfx` -> `terraform-provider-junos-vqfx-evpn-vxlan.*`
+- `srx` -> `terraform-provider-junos-vsrx-evpn-vxlan.*`
 
 3. Create batch plan
 - For all devices, run full terraform plan -out <planfile>.
@@ -36,7 +39,7 @@ Deploy Terraform configuration to a selected set of devices safely.
 - Confirm if final plan is clean or list remaining changes.
 
 6. Report
-- Summarize mode (vqfx/srx/group/list), targeted devices, plan filename, apply status, and post-check result.
+- Summarize mode (family/group/list/all), targeted devices, plan filename, apply status, and post-check result.
 
 ## Guardrails
 

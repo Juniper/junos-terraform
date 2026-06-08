@@ -7,9 +7,9 @@ description: "Use when working on Terraform device provider endpoints, targeted 
 
 ## Endpoint and Credentials
 
-- Prefer variable-driven endpoints and credentials over hardcoded host, port, username, or password values.
-- Keep provider endpoint values in tfvars files so environments can switch without editing provider blocks.
-- Treat passwords as sensitive variables.
+- Prefer configurable endpoints and credentials over hardcoded host, port, username, or password values.
+- Keep provider endpoint values centralized so environments can switch without editing provider blocks.
+- Treat passwords as sensitive values.
 
 ## One-Device Deployment Workflow
 
