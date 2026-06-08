@@ -212,6 +212,8 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 		state[name] = normalizeUnknowns(pv)
 	}
 
+	debugStateXML("update post-apply state xml", state, r.idx)
+
 	r.setTopLevelAttrs(ctx, &resp.State, state, &resp.Diagnostics)
 }
 

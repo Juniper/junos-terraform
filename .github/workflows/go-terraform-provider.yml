@@ -358,8 +358,46 @@ jobs:
         fi
 
     - name: Terraform reconcile out-of-band drift
+      id: drift_apply
+      continue-on-error: true
       working-directory: ci-evpn-vxlan-tf
-      run: terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-drift
+      env:
+        JUNOS_TF_DEBUG_XML: "1"
+        JUNOS_TF_DEBUG_RPC: "1"
+        JUNOS_TF_DEBUG_PATCH: "1"
+        TF_LOG: TRACE
+        TF_LOG_PATH: terraform-provider-drift-debug.log
+      run: |
+        set +e
+        terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-drift 2>&1 | tee terraform-apply-drift.log
+        rc=${PIPESTATUS[0]}
+        set -e
+        echo "exitcode=$rc" >> "$GITHUB_OUTPUT"
+
+    - name: Capture drift-apply diagnostics
+      if: always()
+      working-directory: ci-evpn-vxlan-tf
+      run: |
+        set +e
+        terraform show -no-color tfplan-drift > tfplan-drift.show.txt 2> tfplan-drift.show.err
+        terraform state list > terraform-state-list-after-drift-apply.txt 2>&1
+        terraform state pull > terraform-state-after-drift-apply.json 2> terraform-state-after-drift-apply.err
+
+        echo "==== tail: terraform-apply-drift.log ===="
+        tail -n 200 terraform-apply-drift.log || true
+
+        echo "==== tail: terraform-provider-drift-debug.log ===="
+        tail -n 200 terraform-provider-drift-debug.log || true
+
+        echo "==== tail: netconf-mock.log ===="
+        tail -n 200 ../netconf-mock.log || true
+
+    - name: Assert drift reconcile exit code
+      run: |
+        if [ "${{ steps.drift_apply.outputs.exitcode }}" != "0" ]; then
+          echo "Expected drift reconcile apply to succeed, got exit code ${{ steps.drift_apply.outputs.exitcode }}"
+          exit 1
+        fi
 
     - name: Terraform no-op plan after drift reconcile
       id: drift_plan_final
