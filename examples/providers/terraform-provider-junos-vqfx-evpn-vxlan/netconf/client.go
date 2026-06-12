@@ -79,13 +79,6 @@ func debugRPC(label string, payload string) {
 	fmt.Printf("\n=== %s ===\n%s\n", label, payload)
 }
 
-func debugXML(label string, payload string) {
-	if os.Getenv("JUNOS_TF_DEBUG_XML") == "" {
-		return
-	}
-	fmt.Printf("\n=== %s ===\n%s\n", label, payload)
-}
-
 func marshalRPCRequest(operation string, messageID string) (string, error) {
 	rpc := netconf.NewRPC([]byte(operation))
 	if messageID != "" {
@@ -284,7 +277,6 @@ func (g *GoNCClient) sendApplyGroupsLocked(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	debugXML("netconf send apply-groups", fmt.Sprintf(applyGroupXML, string(cfg)))
 
 	_, err = g.execute(ctx, fmt.Sprintf(applyGroupXML, string(cfg)))
 	return err
@@ -311,24 +303,6 @@ func (g *GoNCClient) MarshalConfig(obj interface{}) error {
 	}
 
 	if err = xml.Unmarshal([]byte(reply), &obj); err != nil {
-		return err
-	}
-	return nil
-}
-
-// GetConfigXML fetches the full configuration and returns raw XML bytes.
-func (g *GoNCClient) GetConfigXML() ([]byte, error) {
-	reply, err := g.readRawConfig()
-	if err != nil {
-		return nil, err
-	}
-	debugXML("netconf read config xml", reply)
-	return []byte(reply), nil
-}
-
-// SendDirectTransactionRaw loads a pre-built XML string directly without marshaling.
-func (g *GoNCClient) SendDirectTransactionRaw(xmlPayload string, commit bool) error {
-	if _, err := g.sendDirectRawConfig(xmlPayload, commit); err != nil {
 		return err
 	}
 	return nil
@@ -399,7 +373,6 @@ func (g *GoNCClient) SendUpdate(id string, diff string, commit bool) error {
 	_ = id
 
 	patchPayload := fmt.Sprintf(patchEditConfigStr, diff)
-	debugXML("netconf send patch", patchPayload)
 	if _, err := g.execute(context.Background(), patchPayload); err != nil {
 		return err
 	}
@@ -425,7 +398,6 @@ func (g *GoNCClient) sendRawConfig(netconfCall string, commit bool) (string, err
 	}
 	groupName := netconfCall[nameStart+6 : nameEnd]
 	addToApplyGroupsList(groupName)
-	debugXML("netconf send raw config", fmt.Sprintf(groupStrXML, netconfCall))
 
 	reply, err := g.execute(context.Background(), fmt.Sprintf(groupStrXML, netconfCall))
 	if err != nil {
@@ -446,9 +418,7 @@ func (g *GoNCClient) sendDirectRawConfig(netconfCall string, commit bool) (strin
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
 
-	wrapped := fmt.Sprintf(groupStrXML, netconfCall)
-	debugXML("netconf send direct raw config", wrapped)
-	reply, err := g.execute(context.Background(), wrapped)
+	reply, err := g.execute(context.Background(), fmt.Sprintf(groupStrXML, netconfCall))
 	if err != nil {
 		return "", err
 	}
@@ -467,9 +437,7 @@ func (g *GoNCClient) readRawGroup(applyGroup string) (string, error) {
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
 
-	request := fmt.Sprintf(getGroupXMLStr, applyGroup)
-	debugXML("netconf get group request", request)
-	return g.execute(context.Background(), request)
+	return g.execute(context.Background(), fmt.Sprintf(getGroupXMLStr, applyGroup))
 }
 
 // readRawConfig fetches the full configuration payload.
@@ -477,7 +445,6 @@ func (g *GoNCClient) readRawConfig() (string, error) {
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
 
-	debugXML("netconf get config request", getConfigXMLStr)
 	return g.execute(context.Background(), getConfigXMLStr)
 }
 

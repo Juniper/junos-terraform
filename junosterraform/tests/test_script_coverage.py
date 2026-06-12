@@ -74,11 +74,12 @@ def test_jtaf_provider_main_smoke(tmp_path, monkeypatch):
     mod.main()
 
     out = tmp_path / "terraform-provider-junos-qfx"
-    assert (out / "resource_config_provider.go").exists()
     assert (out / "provider.go").exists()
     assert (out / "go.mod").exists()
     assert (out / "config.go").exists()
     assert (out / "trimmed_schema.json").exists()
+    # generic mode removes the legacy resource_config_provider.go
+    assert not (out / "resource_config_provider.go").exists()
 
 
 def test_xml2tf_helpers_and_main(tmp_path, monkeypatch):
