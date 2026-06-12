@@ -145,7 +145,11 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 	diffMap := patch.ComputeDiff(stateMap, planMap)
 
 	if len(diffMap) == 0 {
-		r.setTopLevelAttrs(ctx, &resp.State, planAttrs, &resp.Diagnostics)
+		state := r.buildPostApplyState(ctx, planAttrs, &resp.Diagnostics)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		r.setTopLevelAttrs(ctx, &resp.State, state, &resp.Diagnostics)
 		return
 	}
 
@@ -193,11 +197,22 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 
-	// Build post-apply state from device readback so unknown planned values
-	// (from Optional+Computed attrs) are resolved to known/null values.
-	state := r.readAndBuildState(ctx, planAttrs, &resp.Diagnostics)
+	state := r.buildPostApplyState(ctx, planAttrs, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	debugStateXML("update post-apply state xml", state, r.idx)
+
+	r.setTopLevelAttrs(ctx, &resp.State, state, &resp.Diagnostics)
+}
+
+func (r *ConfigResource) buildPostApplyState(ctx context.Context, planAttrs map[string]attr.Value, diags *diag.Diagnostics) map[string]attr.Value {
+	// Build post-apply state from device readback so unknown planned values
+	// (from Optional+Computed attrs) are resolved to known/null values.
+	state := r.readAndBuildState(ctx, planAttrs, diags)
+	if diags.HasError() {
+		return nil
 	}
 
 	// Keep known, explicit plan values to avoid spurious state drift from
@@ -212,9 +227,7 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 		state[name] = normalizeUnknowns(pv)
 	}
 
-	debugStateXML("update post-apply state xml", state, r.idx)
-
-	r.setTopLevelAttrs(ctx, &resp.State, state, &resp.Diagnostics)
+	return state
 }
 
 func (r *ConfigResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

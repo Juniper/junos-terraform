@@ -60,6 +60,12 @@ jtaf-provider -j junos.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml exa
 ```
 NOTE: If using multiple xml configurations (like the example above), ensure that the configurations are for the same device type
 
+No `-x` example (full schema from all YANG in the input JSON):
+```bash
+jtaf-provider -j junos.json -t vqfx
+```
+When `-x` is omitted, the provider is generated from the full YANG-derived JSON instead of filtering by XML usage. Use this when you want broad coverage in one provider or do not yet have representative XML configs. Use `-x` when you want a smaller, trimmed provider focused on specific configuration areas.
+
 All in one example (`-j` accepts `-` for `stdin` for `jtaf-provider`):
 ```bash
 pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang | jtaf-provider -j - -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml  -t vqfx
@@ -81,6 +87,12 @@ Example:
 jtaf-yang2go -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx
 ```
 NOTE: If using multiple xml configurations (like the example above), ensure that the configurations are for the same device type
+
+No `-x` example (parse all supplied YANG files into the provider schema):
+```bash
+jtaf-yang2go -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang -t vqfx
+```
+When `-x` is omitted here, `jtaf-yang2go` passes the full pyang JSON output to `jtaf-provider` without XML-based trimming.
 
 NOTE: The examples in this README use the YANG files shipped in this repository under `examples/yang/18.2`.
 

@@ -601,6 +601,45 @@ func TestReadAndBuildState_MissingTopLevelBecomesNull(t *testing.T) {
 	}
 }
 
+func TestBuildPostApplyState_UnknownTopLevelDoesNotLeak(t *testing.T) {
+	idx, err := LoadSchema([]byte(testSchemaJSON))
+	if err != nil {
+		t.Fatalf("LoadSchema() error: %v", err)
+	}
+
+	mock := newMockNetconfClient()
+	r := &ConfigResource{
+		idx:    idx,
+		client: ProviderConfig{Client: mock, Host: "test-host"},
+	}
+
+	// Simulate device readback containing only a known system hostname.
+	mock.configXML = "<configuration><system><host-name>router1</host-name></system></configuration>"
+
+	planAttrs := map[string]attr.Value{
+		"resource_name": types.StringValue("router1"),
+		"interfaces":    types.ListUnknown(types.ObjectType{AttrTypes: containerAttrTypes(idx.TopLevel[0])}),
+		"system":        types.ListUnknown(types.ObjectType{AttrTypes: containerAttrTypes(idx.TopLevel[1])}),
+		"protocols":     types.ListUnknown(types.ObjectType{AttrTypes: containerAttrTypes(idx.TopLevel[2])}),
+	}
+
+	var diags diag.Diagnostics
+	state := r.buildPostApplyState(context.Background(), planAttrs, &diags)
+	if diags.HasError() {
+		t.Fatalf("buildPostApplyState() errors: %v", diags)
+	}
+
+	for _, key := range []string{"interfaces", "system", "protocols"} {
+		v, ok := state[key]
+		if !ok {
+			t.Fatalf("missing %q in state", key)
+		}
+		if v.IsUnknown() {
+			t.Fatalf("state[%q] leaked unknown value", key)
+		}
+	}
+}
+
 func TestNormalizeName(t *testing.T) {
 	tests := []struct {
 		input    string
