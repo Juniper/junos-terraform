@@ -44,31 +44,38 @@ def main() -> int:
 
     text = providers_path.read_text(encoding="utf-8")
 
+    # Match any variant of the junos-vqfx-evpn-vxlan provider (e.g. -trim suffix).
     block_re = re.compile(
-        r'provider\s+"junos-vqfx-evpn-vxlan"\s*\{.*?\}',
+        r'provider\s+"junos-vqfx-evpn-vxlan[^"]*"\s*\{.*?\}',
         re.DOTALL,
     )
-    host_re = re.compile(r'host\s*=\s*"([^"]+)"')
-    port_re = re.compile(r'port\s*=\s*\d+')
+    alias_re = re.compile(r'alias\s*=\s*"([^"]+)"')
+    host_re = re.compile(r'(host\s*=\s*)"([^"]+)"')
+    port_re = re.compile(r'(port\s*=\s*)\d+')
 
-    hosts: list[str] = []
+    # Collect aliases in order of appearance; each gets a unique port.
+    aliases: list[str] = []
     for block in block_re.findall(text):
-        hm = host_re.search(block)
-        if hm:
-            host = hm.group(1)
-            if host not in hosts:
-                hosts.append(host)
+        am = alias_re.search(block)
+        if am:
+            alias = am.group(1)
+            if alias not in aliases:
+                aliases.append(alias)
 
-    host_port = {host: args.base_port + i for i, host in enumerate(hosts)}
+    alias_port = {alias: args.base_port + i for i, alias in enumerate(aliases)}
+    # devices file maps device-name (alias with underscores → hyphens) to port
+    devices: list[tuple[str, int]] = [
+        (alias.replace("_", "-"), port) for alias, port in alias_port.items()
+    ]
 
     def rewrite_block(block: str) -> str:
-        hm = host_re.search(block)
-        if not hm:
+        am = alias_re.search(block)
+        if not am:
             return block
-        host = hm.group(1)
-        port = host_port[host]
-        block = host_re.sub(f'host     = "{args.bind_host}"', block)
-        block = port_re.sub(f"port     = {port}", block)
+        alias = am.group(1)
+        port = alias_port[alias]
+        block = host_re.sub(lambda m: f'{m.group(1)}"{args.bind_host}"', block)
+        block = port_re.sub(lambda m: f"{m.group(1)}{port}", block)
         return block
 
     rewritten = block_re.sub(lambda m: rewrite_block(m.group(0)), text)
@@ -76,8 +83,8 @@ def main() -> int:
 
     devices_path.parent.mkdir(parents=True, exist_ok=True)
     with devices_path.open("w", encoding="utf-8") as f:
-        for host in hosts:
-            f.write(f"{host}:{host_port[host]}\n")
+        for device_name, port in devices:
+            f.write(f"{device_name}:{port}\n")
 
     return 0
 

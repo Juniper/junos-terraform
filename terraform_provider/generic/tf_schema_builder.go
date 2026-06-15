@@ -6,6 +6,7 @@ import (
 	"terraform_provider/patch"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -35,18 +36,21 @@ func buildAttribute(node patch.SchemaNode) schema.Attribute {
 		return schema.StringAttribute{
 			Optional: true,
 			Computed: true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 		}
 	case "leaf-list":
 		return schema.ListAttribute{
 			ElementType: types.StringType,
 			Optional:    true,
 			Computed:    true,
+			PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 		}
 	case "container":
 		nested := buildNestedAttributes(node.Children)
 		return schema.ListNestedAttribute{
 			Optional: true,
 			Computed: true,
+			PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: nested,
 			},
@@ -58,11 +62,13 @@ func buildAttribute(node patch.SchemaNode) schema.Attribute {
 				ElementType: types.StringType,
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			}
 		}
 		return schema.ListNestedAttribute{
 			Optional: true,
 			Computed: true,
+			PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: nested,
 			},
@@ -71,6 +77,7 @@ func buildAttribute(node patch.SchemaNode) schema.Attribute {
 		return schema.StringAttribute{
 			Optional: true,
 			Computed: true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 		}
 	}
 }

@@ -207,6 +207,20 @@ func TestBuildTerraformSchema(t *testing.T) {
 	if _, ok := lldp.(schema.ListNestedAttribute); !ok {
 		t.Fatalf("protocols.lldp (empty container) should be ListNestedAttribute, got %T", lldp)
 	}
+
+	// Top-level attrs should preserve state when unknown at plan time.
+	interfacesAttr := ifaces.(schema.ListNestedAttribute)
+	if len(interfacesAttr.PlanModifiers) == 0 {
+		t.Fatal("interfaces top-level attribute should have UseStateForUnknown plan modifier")
+	}
+	resourceNameAttr := rn.(schema.StringAttribute)
+	if len(resourceNameAttr.PlanModifiers) == 0 {
+		t.Fatal("resource_name should have RequiresReplace plan modifier")
+	}
+	systemAttr := sys.(schema.ListNestedAttribute)
+	if len(systemAttr.PlanModifiers) == 0 {
+		t.Fatal("system top-level attribute should have UseStateForUnknown plan modifier")
+	}
 }
 
 func TestModelToXMLBytes_SimpleLeaf(t *testing.T) {
@@ -637,6 +651,55 @@ func TestBuildPostApplyState_UnknownTopLevelDoesNotLeak(t *testing.T) {
 		if v.IsUnknown() {
 			t.Fatalf("state[%q] leaked unknown value", key)
 		}
+	}
+}
+
+func TestReadAndBuildState_PreservesNestedEmptyContainers(t *testing.T) {
+	idx, err := LoadSchema([]byte(testSchemaJSON))
+	if err != nil {
+		t.Fatalf("LoadSchema() error: %v", err)
+	}
+
+	mock := newMockNetconfClient()
+	r := &ConfigResource{
+		idx:    idx,
+		client: ProviderConfig{Client: mock, Host: "test-host"},
+	}
+
+	// Device readback omits the empty nested lldp container.
+	mock.configXML = "<configuration><protocols></protocols></configuration>"
+
+	protocolsAttrTypes := containerAttrTypes(idx.TopLevel[2])
+	lldpAttrTypes := containerAttrTypes(idx.TopLevel[2].Children[0])
+	lldpObj := types.ObjectValueMust(lldpAttrTypes, map[string]attr.Value{})
+	lldpList := types.ListValueMust(types.ObjectType{AttrTypes: lldpAttrTypes}, []attr.Value{lldpObj})
+	protocolsObj := types.ObjectValueMust(protocolsAttrTypes, map[string]attr.Value{
+		"lldp": lldpList,
+	})
+	protocolsList := types.ListValueMust(types.ObjectType{AttrTypes: protocolsAttrTypes}, []attr.Value{protocolsObj})
+
+	reference := map[string]attr.Value{
+		"resource_name": types.StringValue("router1"),
+		"interfaces":    types.ListNull(types.ObjectType{AttrTypes: containerAttrTypes(idx.TopLevel[0])}),
+		"system":        types.ListNull(types.ObjectType{AttrTypes: containerAttrTypes(idx.TopLevel[1])}),
+		"protocols":     protocolsList,
+	}
+
+	var diags diag.Diagnostics
+	state := r.readAndBuildState(context.Background(), reference, &diags)
+	if diags.HasError() {
+		t.Fatalf("readAndBuildState() errors: %v", diags)
+	}
+
+	protocols := state["protocols"].(types.List)
+	if protocols.IsNull() || protocols.IsUnknown() || len(protocols.Elements()) != 1 {
+		t.Fatalf("expected protocols list with one element, got %#v", state["protocols"])
+	}
+
+	protocolsObjState := protocols.Elements()[0].(types.Object)
+	lldp := protocolsObjState.Attributes()["lldp"].(types.List)
+	if lldp.IsNull() || lldp.IsUnknown() || len(lldp.Elements()) != 1 {
+		t.Fatalf("expected nested lldp empty container to be preserved, got %#v", lldp)
 	}
 }
 

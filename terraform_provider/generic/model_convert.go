@@ -445,6 +445,99 @@ func normalizeUnknowns(val attr.Value) attr.Value {
 	}
 }
 
+// preserveReferenceValue merges observed device state with a known reference
+// value, keeping explicit reference descendants where device readback omits
+// empty/default structures. Unknown reference values are never copied into
+// state.
+func preserveReferenceValue(observed, reference attr.Value) attr.Value {
+	if reference == nil || reference.IsUnknown() {
+		return observed
+	}
+	if observed == nil || observed.IsNull() || observed.IsUnknown() {
+		if reference.IsNull() {
+			return observed
+		}
+		return normalizeUnknowns(reference)
+	}
+
+	switch ov := observed.(type) {
+	case basetypes.ObjectValue:
+		rv, ok := reference.(basetypes.ObjectValue)
+		if !ok || rv.IsNull() || rv.IsUnknown() {
+			return observed
+		}
+
+		obsAttrs := ov.Attributes()
+		refAttrs := rv.Attributes()
+		merged := make(map[string]attr.Value, len(obsAttrs))
+		for key, obsChild := range obsAttrs {
+			if refChild, exists := refAttrs[key]; exists {
+				merged[key] = preserveReferenceValue(obsChild, refChild)
+			} else {
+				merged[key] = obsChild
+			}
+		}
+		obj, d := types.ObjectValue(ov.AttributeTypes(ctxBG), merged)
+		if d.HasError() {
+			return observed
+		}
+		return obj
+	case basetypes.ListValue:
+		rv, ok := reference.(basetypes.ListValue)
+		if !ok || rv.IsNull() || rv.IsUnknown() {
+			return observed
+		}
+
+		obsElems := ov.Elements()
+		refElems := rv.Elements()
+		if len(obsElems) == 0 || len(refElems) == 0 {
+			return observed
+		}
+
+		if len(obsElems) == 1 && len(refElems) == 1 {
+			obsObj, ok1 := obsElems[0].(basetypes.ObjectValue)
+			refObj, ok2 := refElems[0].(basetypes.ObjectValue)
+			if ok1 && ok2 {
+				merged := preserveReferenceValue(obsObj, refObj)
+				lv, d := types.ListValue(ov.ElementType(ctxBG), []attr.Value{merged})
+				if !d.HasError() {
+					return lv
+				}
+			}
+			return observed
+		}
+
+		obsMap := buildKeyMap(obsElems)
+		refMap := buildKeyMap(refElems)
+		if obsMap == nil || refMap == nil {
+			return observed
+		}
+
+		mergedElems := make([]attr.Value, 0, len(obsElems))
+		for _, elem := range obsElems {
+			obsObj, ok := elem.(basetypes.ObjectValue)
+			if !ok {
+				mergedElems = append(mergedElems, elem)
+				continue
+			}
+			key := extractNameKey(obsObj)
+			if refObj, exists := refMap[key]; exists {
+				mergedElems = append(mergedElems, preserveReferenceValue(obsObj, refObj))
+			} else {
+				mergedElems = append(mergedElems, elem)
+			}
+		}
+
+		lv, d := types.ListValue(ov.ElementType(ctxBG), mergedElems)
+		if d.HasError() {
+			return observed
+		}
+		return lv
+	default:
+		return observed
+	}
+}
+
 // reconcileListOrder reorders list elements in observed to match the order in
 // prior, matching elements by the "name" key field.  This handles the case
 // where the device returns YANG list entries in a different order than the .tf

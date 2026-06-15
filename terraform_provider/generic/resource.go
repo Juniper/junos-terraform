@@ -368,19 +368,20 @@ func (r *ConfigResource) readAndBuildState(ctx context.Context, referenceAttrs m
 		observed["resource_name"] = rn
 	}
 
-	// For null observed attrs where reference has a known value, preserve reference
-	// (handles empty containers whose XML is not emitted by device).
-	// Skip unknown references — state must not contain unknowns.
+	// Preserve explicit reference descendants where device readback omits
+	// empty/default structures. Skip unknown references.
 	for key, refVal := range referenceAttrs {
 		if key == "resource_name" {
 			continue
 		}
 		obsVal, exists := observed[key]
-		if !exists || obsVal == nil || obsVal.IsNull() {
+		if !exists || obsVal == nil {
 			if refVal != nil && !refVal.IsNull() && !refVal.IsUnknown() {
-				observed[key] = refVal
+				observed[key] = normalizeUnknowns(refVal)
 			}
+			continue
 		}
+		observed[key] = preserveReferenceValue(obsVal, refVal)
 	}
 
 	// Reconcile list ordering: device may return list elements in different
