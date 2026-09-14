@@ -14,3 +14,6 @@ __pycache__/
 /terraform-provider-junos-vqfx-evpn-vxlan/
 /.venv/
 .DS_Store
+/examples/providers/terraform-provider-junos-vqfx-evpn-vxlan/
+/examples/providers/terraform-provider-junos-vsrx-evpn-vxlan/
+/test-generic-provider/
