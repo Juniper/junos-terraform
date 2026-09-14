@@ -2,9 +2,7 @@ package generic
 
 import (
 	"context"
-	"encoding/xml"
 	"fmt"
-	"os"
 
 	"terraform_provider/netconf"
 	"terraform_provider/patch"
@@ -81,32 +79,4 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 }
 
 func (r *ConfigResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-}
-
-// --- helpers kept for future NETCONF wiring ---
-
-func (r *ConfigResource) readDeviceXML() ([]byte, error) {
-	type configuration struct {
-		XMLName xml.Name `xml:"configuration"`
-		Inner   []byte   `xml:",innerxml"`
-	}
-	var cfg configuration
-	if err := r.client.MarshalConfig(&cfg); err != nil {
-		return nil, err
-	}
-	return xml.Marshal(cfg)
-}
-
-func debugPatch(planXML, stateXML []byte, diffMap map[string]patch.Change, patchPayload string) {
-	if os.Getenv("JUNOS_TF_DEBUG_PATCH") == "" {
-		return
-	}
-	fmt.Printf("\n=== generic provider diff patch debug ===\n")
-	fmt.Printf("--- state xml ---\n%s\n", string(stateXML))
-	fmt.Printf("--- plan xml ---\n%s\n", string(planXML))
-	fmt.Printf("--- diff map ---\n")
-	for _, entry := range patch.DebugSortedChanges(diffMap) {
-		fmt.Printf("%v | %s | old=%q | new=%q\n", entry.Op, entry.Path, entry.OldVal, entry.NewVal)
-	}
-	fmt.Printf("--- patch payload ---\n%s\n", patchPayload)
 }

@@ -30,7 +30,7 @@ func LoadSchema(raw []byte) (map[string]*patch.NodeInfo, []patch.SchemaNode, err
 				schemaErr = fmt.Errorf("decompress schema: %w", err)
 				return
 			}
-			defer r.Close()
+			defer func() { _ = r.Close() }()
 			data, err = io.ReadAll(r)
 			if err != nil {
 				schemaErr = fmt.Errorf("read decompressed schema: %w", err)
