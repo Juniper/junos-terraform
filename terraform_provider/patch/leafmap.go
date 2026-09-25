@@ -159,17 +159,54 @@ func subtreeHasMaterialLeaves(node *Node, currentPath string, idx map[string]*No
 func buildSegmentWithSchema(node *Node, parentSchemaPath string, idx map[string]*NodeInfo) string {
 	currentSchemaPath := joinPath(parentSchemaPath, node.Tag)
 	if info, ok := idx[currentSchemaPath]; ok && info.Kind == KindList && info.ListKey != "" {
-		// Handle compound keys (space-separated) — try each part.
-		for _, keyPart := range strings.Fields(info.ListKey) {
-			for _, child := range node.Children {
-				if child.Tag == keyPart && child.Text != "" {
-					return fmt.Sprintf("%s[%s=%s]", node.Tag, keyPart, child.Text)
-				}
-			}
+		if pred := keyPredicates(node, info.ListKey); pred != "" {
+			return node.Tag + pred
 		}
 	}
 
 	return buildSegment(node)
+}
+
+// keyPredicates returns the [key=value] predicates identifying a list entry.
+//
+// For a single key it is the key's value. For a compound key (space-separated,
+// e.g. "address choice-ident choice-value") it is every key leaf present in
+// the entry, in key order, including empty values: in YANG-compliant output a
+// route-filter is <address>, <choice-ident>exact</choice-ident> and an empty
+// <choice-value/>, and all three identify it, so ::/0 exact and ::/0 orlonger
+// are different entries. Key leaves that are absent are skipped: in the
+// native Junos form the choice is an element (<exact/>, <add/>), not a key
+// leaf, and the entry is identified by the keys it does carry.
+//
+// Returns "" when no key has a value.
+func keyPredicates(node *Node, listKey string) string {
+	keyParts := strings.Fields(listKey)
+	if len(keyParts) == 1 {
+		for _, child := range node.Children {
+			if child.Tag == keyParts[0] && child.Text != "" {
+				return fmt.Sprintf("[%s=%s]", keyParts[0], child.Text)
+			}
+		}
+		return ""
+	}
+
+	var pred strings.Builder
+	hasValue := false
+	for _, keyPart := range keyParts {
+		for _, child := range node.Children {
+			if child.Tag == keyPart && len(child.Children) == 0 {
+				fmt.Fprintf(&pred, "[%s=%s]", keyPart, child.Text)
+				if child.Text != "" {
+					hasValue = true
+				}
+				break
+			}
+		}
+	}
+	if !hasValue {
+		return ""
+	}
+	return pred.String()
 }
 
 func isKeyChildWithSchema(child, parent *Node, parentOutputPath string, idx map[string]*NodeInfo) bool {

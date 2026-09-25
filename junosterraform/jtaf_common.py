@@ -325,9 +325,11 @@ def filter_json_using_xml(schema: str,
         # set the config node to be root
         root = config_node
 
-    # find and remove any version node
-    remove_tags_by_name(root, ["version", "versions", "model",
-                               "apply-groups"])
+    # remove the top-level version node (the Junos release, not configuration); a leaf named
+    # version elsewhere (system ntp server, protocols igmp interface, ...) is configuration
+    for elem in root.findall("version"):
+        root.remove(elem)
+    remove_tags_by_name(root, ["versions", "model", "apply-groups"])
 
     # find the unique paths
     paths = unique_xpaths(get_xpaths(root))
