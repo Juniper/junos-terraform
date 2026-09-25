@@ -114,9 +114,11 @@ Desired XML (plan) ──┘
 
 #### Container Delete Coalescing
 
-- **Given** ALL leaves under a container are Deletes (no Creates or Replaces) AND schema info is available, **When** `coalesceContainerDeletes()` runs, **Then**:
-  - Emit single `<container nc:operation="delete"/>` instead of individual leaf deletes
+- **Given** a container instance is removed entirely — the plan keeps no leaf under it — AND at least two leaf deletes fall under it AND schema info and the plan leaf map are available, **When** `coalesceContainerDeletes()` runs, **Then**:
+  - Emit single `<container nc:operation="delete"/>` at the container's instance path (list keys included) instead of individual leaf deletes
   - Individual leaf delete entries are removed from the diff
+- **Given** every change under a container is a Delete but the plan keeps other content under it (an unchanged leaf, another list entry), **When** coalescing, **Then** the container is not deleted
+- **Given** a removed container lies inside another removed container, **When** coalescing, **Then** only the outer container delete is emitted
 
 ---
 
