@@ -40,10 +40,13 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 	if len(node.Children) == 0 {
 		// Skip empty containers/lists — they have no leaf content to diff.
 		// Only emit actual leaves (YANG "empty" type like <any/>, <notice/>
-		// or regular text leaves).
+		// or regular text leaves), and presence containers like <multipath/>:
+		// they have no content either, but whether they exist is the setting.
+		// The schema doesn't say which containers are presence containers, so
+		// treat a container with no children in the schema as one.
 		leafSchemaPath := outputPathToSchemaPath(currentPath)
 		if info, ok := idx[leafSchemaPath]; ok {
-			if info.Kind == KindContainer || info.Kind == KindList {
+			if info.Kind == KindList || (info.Kind == KindContainer && len(info.Children) > 0) {
 				return
 			}
 			if info.Kind == KindLeafList {
