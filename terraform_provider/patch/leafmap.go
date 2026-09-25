@@ -42,11 +42,9 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 		// Only emit actual leaves (YANG "empty" type like <any/>, <notice/>
 		// or regular text leaves), and presence containers like <multipath/>:
 		// they have no content either, but whether they exist is the setting.
-		// The schema doesn't say which containers are presence containers, so
-		// treat a container with no children in the schema as one.
 		leafSchemaPath := outputPathToSchemaPath(currentPath)
 		if info, ok := idx[leafSchemaPath]; ok {
-			if info.Kind == KindList || (info.Kind == KindContainer && len(info.Children) > 0) {
+			if info.Kind == KindList || (info.Kind == KindContainer && !info.Presence) {
 				return
 			}
 			if info.Kind == KindLeafList {
@@ -65,6 +63,13 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 	if keyPath, keyValue, ok := structuralKeyedListLeaf(node, currentPath, idx); ok {
 		result[keyPath] = keyValue
 		return
+	}
+
+	// A presence container is configuration whether or not it has children:
+	// emit it too, or removing its last child would leave it on the device,
+	// where the plan has none (family inet unicast after extended-nexthop).
+	if info, ok := idx[outputPathToSchemaPath(currentPath)]; ok && info.Kind == KindContainer && info.Presence {
+		result[currentPath] = ""
 	}
 
 	// Process ALL children including key children.  Key leaves must appear

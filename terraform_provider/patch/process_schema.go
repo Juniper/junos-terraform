@@ -36,6 +36,7 @@ type SchemaNode struct {
 	Key       string `json:"key"`        // list key
 	LeafType  string `json:"leaf-type"`  // leaf-only: string, union, etc.
 	OrderedBy string `json:"ordered-by"` // "user" for ordered leaf-lists/lists
+	Presence  string `json:"presence"`   // container: YANG presence statement, if any
 
 	Children []SchemaNode `json:"children"`
 	// Union branches (when leaf-type == "union")
@@ -84,6 +85,8 @@ type NodeInfo struct {
 	ListKeyPath string
 	// Ordered-by user (meaningful ordering)
 	OrderedByUser bool
+	// Presence container: its existence is configuration
+	Presence bool
 	// Leaves
 	Leaf LeafInfo
 }
@@ -187,6 +190,11 @@ func UnmarshalTrimmedSchemaIndex(trimmedSchemaJSON string) (map[string]*NodeInfo
 		// Ordered-by user
 		if n.OrderedBy == "user" {
 			info.OrderedByUser = true
+		}
+
+		// Presence container
+		if info.Kind == KindContainer && n.Presence != "" {
+			info.Presence = true
 		}
 
 		// Leaf metadata
