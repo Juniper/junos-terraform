@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 import xml.etree.ElementTree as ElementTree
 
 from junosterraform import jtaf_common
@@ -692,6 +693,38 @@ class TestFilterJsonUsingXml(unittest.TestCase):
 
             # The filtering should have removed version tag
             self.assertIsInstance(result, dict)
+        finally:
+            os.remove(schema_file)
+
+    def test_filter_json_using_xml_keeps_nested_version_leaves(self):
+        """Only the top-level version (the Junos release) is removed; a leaf
+        named version elsewhere is configuration."""
+        xml_string = """<root>
+            <configuration>
+                <version>26.2R1.7</version>
+                <system>
+                    <ntp>
+                        <server>
+                            <name>192.0.2.1</name>
+                            <version>4</version>
+                        </server>
+                    </ntp>
+                </system>
+            </configuration>
+        </root>"""
+
+        root = ElementTree.fromstring(xml_string)
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump({"name": "configuration", "children": {}}, f)
+            schema_file = f.name
+
+        try:
+            with mock.patch.object(jtaf_common, "walk_schema") as walk:
+                jtaf_common.filter_json_using_xml(schema_file, root)
+            paths = walk.call_args[0][0]
+            self.assertIn("system/ntp/server/version", paths)
+            self.assertNotIn("version", paths)
         finally:
             os.remove(schema_file)
 

@@ -118,9 +118,8 @@ func nodeIdentity(node *Node, parentInstancePath string, idx map[string]*NodeInf
 
 	switch info.Kind {
 	case KindList:
-		keyVal := findKeyChild(node, info.ListKey)
-		if keyVal != "" {
-			return node.Tag + "[" + info.ListKey + "=" + keyVal + "]"
+		if pred := keyPredicates(node, info.ListKey); pred != "" {
+			return node.Tag + pred
 		}
 	case KindLeafList:
 		return node.Tag + "[value=" + node.Text + "]"
@@ -140,9 +139,8 @@ func instanceIdentity(child *Node, parentInstancePath string, idx map[string]*No
 	schPath := schemaPathFromInstance(parentInstancePath, child.Tag)
 	info := idx[schPath]
 	if info != nil && info.Kind == KindList && info.ListKey != "" {
-		keyVal := findKeyChild(child, info.ListKey)
-		if keyVal != "" {
-			return base + "[" + info.ListKey + "=" + keyVal + "]"
+		if pred := keyPredicates(child, info.ListKey); pred != "" {
+			return base + pred
 		}
 	}
 	return base
