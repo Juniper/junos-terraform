@@ -164,7 +164,7 @@ func TestCC5_ContainerDeleteCoalescing(t *testing.T) {
 	}
 
 	// Use schema-aware patch (with container coalescing)
-	patchBytes, err := CreateDiffPatchWithSchema(diffMap, "", idx)
+	patchBytes, err := CreateDiffPatchWithSchema(diffMap, planMap, "", idx)
 	if err != nil {
 		t.Fatal(err)
 	}
