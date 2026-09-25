@@ -162,17 +162,25 @@ func applyKeyedListEntryOperation(parent *Node, parentSegments []string, leafSeg
 		return false
 	}
 
-	_, parentKeyName, parentKeyValue := parseSegment(parentSegments[len(parentSegments)-1])
+	_, parentKeys := parseSegmentKeys(parentSegments[len(parentSegments)-1])
 	leafTag, _, _ := parseSegment(leafSegment)
-	if parentKeyName == "" || leafTag != parentKeyName {
-		return false
-	}
 
 	keyValue := change.NewVal
 	if change.Op == Delete {
 		keyValue = change.OldVal
 	}
-	if keyValue == "" || keyValue != parentKeyValue {
+
+	// The leaf is one of the parent entry's keys, with the entry's value for
+	// it. A single key must have a value; in a compound key one may be empty
+	// (choice-value of route-filter ... exact), and is still the entry's key.
+	isKey := false
+	for _, k := range parentKeys {
+		if k.name == leafTag && k.value == keyValue && (keyValue != "" || len(parentKeys) > 1) {
+			isKey = true
+			break
+		}
+	}
+	if !isKey {
 		return false
 	}
 
