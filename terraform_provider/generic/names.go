@@ -13,19 +13,17 @@ func SanitizeName(name string) string {
 	return strings.ToLower(strings.NewReplacer("-", "_", ".", "_").Replace(name))
 }
 
-// attributeNodes returns the schema nodes that are Terraform attributes, in
-// schema order. The schema builder and the value converters both use it, so
-// they agree on what the resource holds.
-func attributeNodes(nodes []patch.SchemaNode) []patch.SchemaNode {
-	out := make([]patch.SchemaNode, 0, len(nodes))
-	for _, n := range nodes {
-		if n.Name == "" || n.Name == "groups" || n.Name == "apply-groups" {
+// attributeNodes returns the children of a schema node that are Terraform
+// attributes, in schema order. The schema builder and the value converters
+// both use it, so they agree on what the resource holds.
+func attributeNodes(s *patch.Schema, parent patch.SchemaNodeID) []patch.SchemaNodeID {
+	out := make([]patch.SchemaNodeID, 0, s.NumChildren(parent))
+	for i := range s.NumChildren(parent) {
+		c := s.Child(parent, i)
+		if name := s.Name(c); name == "groups" || name == "apply-groups" {
 			continue
 		}
-		switch n.Type {
-		case "leaf", "leaf-list", "container", "list":
-			out = append(out, n)
-		}
+		out = append(out, c)
 	}
 	return out
 }

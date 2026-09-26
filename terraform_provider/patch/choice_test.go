@@ -1,10 +1,13 @@
 package patch
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // A choice and its cases have no element in the XML: their nodes are indexed
 // directly under the choice's parent.
-func TestFlattenChoices(t *testing.T) {
+func TestCompileSchemaFlattensChoices(t *testing.T) {
 	idx, err := UnmarshalTrimmedSchemaIndex(`{"root": {"children": [{"name": "configuration", "type": "container", "children": [
 		{"name": "access", "type": "container", "children": [
 			{"name": "address-pool", "type": "list", "key": "name", "children": [
@@ -21,28 +24,24 @@ func TestFlattenChoices(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range []string{"access/address-pool/address", "access/address-pool/address-range/low"} {
-		if _, ok := idx[p]; !ok {
+		if _, ok := idx.Lookup(p); !ok {
 			t.Errorf("%s not indexed", p)
 		}
 	}
-	for p := range idx {
-		for _, bad := range []string{"address_choice", "case_1", "case_2"} {
-			if containsSegment(p, bad) {
-				t.Errorf("choice or case in indexed path %s", p)
-			}
+	for _, p := range []string{"access/address-pool/address_choice", "access/address-pool/address_choice/case_1/address"} {
+		if _, ok := idx.Lookup(p); ok {
+			t.Errorf("choice or case indexed: %s", p)
 		}
 	}
-	pool := idx["access/address-pool"]
-	if pool == nil || len(pool.Children) != 3 {
-		t.Fatalf("address-pool children: %+v", pool)
+	pool, ok := idx.find("access/address-pool")
+	if !ok || idx.NumChildren(pool) != 3 {
+		t.Fatalf("address-pool children: %v %v", pool, ok)
 	}
-}
-
-func containsSegment(path, seg string) bool {
-	for _, s := range splitPathRespectingQuotes(path) {
-		if s == seg {
-			return true
-		}
+	var names []string
+	for i := 0; i < idx.NumChildren(pool); i++ {
+		names = append(names, idx.Name(idx.Child(pool, i)))
 	}
-	return false
+	if strings.Join(names, " ") != "name address address-range" {
+		t.Fatalf("address-pool children %v, want schema order", names)
+	}
 }

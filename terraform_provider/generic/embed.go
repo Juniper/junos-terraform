@@ -1,33 +1,31 @@
 package generic
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 
 	"terraform_provider/patch"
 )
 
 var (
-	schemaOnce  sync.Once
-	schemaIndex map[string]*patch.NodeInfo
-	schemaNodes []patch.SchemaNode
-	schemaErr   error
+	schemaOnce sync.Once
+	schema     *patch.Schema
+	schemaErr  error
 )
 
-// LoadSchema parses the embedded pyang JSON schema (raw or gzipped, trimmed or a
-// full model), flattens its choice and case nodes, and returns the patch
-// engine's index and the schema nodes. Safe to call from multiple goroutines;
-// parsing happens exactly once.
-func LoadSchema(raw []byte) (map[string]*patch.NodeInfo, []patch.SchemaNode, error) {
+// LoadSchema compiles the embedded pyang JSON schema (raw or gzipped, trimmed
+// or a full model). Safe to call from multiple goroutines; it is compiled
+// once.
+func LoadSchema(raw []byte) (*patch.Schema, error) {
 	schemaOnce.Do(func() {
 		data := raw
 		// Detect gzip magic bytes and decompress if needed.
 		if len(raw) >= 2 && raw[0] == 0x1f && raw[1] == 0x8b {
-			r, err := gzip.NewReader(strings.NewReader(string(raw)))
+			r, err := gzip.NewReader(bytes.NewReader(raw))
 			if err != nil {
 				schemaErr = fmt.Errorf("decompress schema: %w", err)
 				return
@@ -49,17 +47,14 @@ func LoadSchema(raw []byte) (map[string]*patch.NodeInfo, []patch.SchemaNode, err
 			schemaErr = fmt.Errorf("schema JSON has no root children")
 			return
 		}
-
-		schemaNodes = patch.FlattenChoices(w.Root.Children)
-		schemaIndex = patch.BuildSchemaIndex(schemaNodes)
+		schema = patch.CompileSchema(w.Root.Children)
 	})
-	return schemaIndex, schemaNodes, schemaErr
+	return schema, schemaErr
 }
 
 // ResetSchema allows tests to re-run LoadSchema with different data.
 func ResetSchema() {
 	schemaOnce = sync.Once{}
-	schemaIndex = nil
-	schemaNodes = nil
+	schema = nil
 	schemaErr = nil
 }

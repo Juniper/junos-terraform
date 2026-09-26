@@ -49,16 +49,16 @@ const convertSchema = `{"root": {"children": [{"name": "configuration", "type": 
   ]}
 ]}]}}`
 
-func convertFixture(t *testing.T) ([]patch.SchemaNode, tftypes.Object) {
+func convertFixture(t *testing.T) (*patch.Schema, tftypes.Object) {
 	t.Helper()
 	ResetSchema()
 	t.Cleanup(ResetSchema)
-	_, nodes, err := LoadSchema([]byte(convertSchema))
+	nodes, err := LoadSchema([]byte(convertSchema))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, typ := BuildSchema(nodes[0].Children)
-	return nodes[0].Children, typ
+	_, typ := BuildSchema(nodes)
+	return nodes, typ
 }
 
 func canonical(t *testing.T, xmlText string) (tftypes.Value, string) {

@@ -5,7 +5,7 @@ import "sort"
 // AlignXMLOrderToReference reorders current XML siblings to follow the order in
 // the reference XML where possible, while keeping a deterministic fallback
 // ordering for entries absent from the reference.
-func AlignXMLOrderToReference(currentXML []byte, referenceXML []byte, idx map[string]*NodeInfo) ([]byte, error) {
+func AlignXMLOrderToReference(currentXML []byte, referenceXML []byte, idx *Schema) ([]byte, error) {
 	currentTree, err := BuildTree(currentXML)
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func AlignXMLOrderToReference(currentXML []byte, referenceXML []byte, idx map[st
 	return marshalNodeTree(currentTree)
 }
 
-func alignNodeOrder(node *Node, ref map[string]map[string]int, idx map[string]*NodeInfo, instancePath string) {
+func alignNodeOrder(node *Node, ref map[string]map[string]int, idx *Schema, instancePath string) {
 	if len(node.Children) == 0 {
 		return
 	}
@@ -63,7 +63,7 @@ type sortKey struct {
 	text          string
 }
 
-func childSortKey(child *Node, parentInstancePath string, referenceOrder map[string]int, idx map[string]*NodeInfo) sortKey {
+func childSortKey(child *Node, parentInstancePath string, referenceOrder map[string]int, idx *Schema) sortKey {
 	identity := nodeIdentity(child, parentInstancePath, idx)
 	rank, ok := referenceOrder[identity]
 	if !ok {
@@ -79,7 +79,7 @@ func childSortKey(child *Node, parentInstancePath string, referenceOrder map[str
 	}
 }
 
-func referenceSiblingOrders(root *Node, idx map[string]*NodeInfo) map[string]map[string]int {
+func referenceSiblingOrders(root *Node, idx *Schema) map[string]map[string]int {
 	orders := make(map[string]map[string]int)
 	if root == nil {
 		return orders
@@ -106,10 +106,10 @@ func referenceSiblingOrders(root *Node, idx map[string]*NodeInfo) map[string]map
 
 // nodeIdentity returns a short identity string for sorting siblings under the
 // same parent.  It does NOT include the parent path.
-func nodeIdentity(node *Node, parentInstancePath string, idx map[string]*NodeInfo) string {
+func nodeIdentity(node *Node, parentInstancePath string, idx *Schema) string {
 	schPath := schemaPathFromInstance(parentInstancePath, node.Tag)
-	info := idx[schPath]
-	if info == nil {
+	info, ok := idx.Lookup(schPath)
+	if !ok {
 		if node.Text != "" {
 			return node.Tag + "=" + node.Text
 		}
@@ -134,11 +134,11 @@ func nodeIdentity(node *Node, parentInstancePath string, idx map[string]*NodeInf
 // instanceIdentity returns a full instance-aware path for a child node,
 // including keyed-list identity so that different list entries get distinct
 // ordering buckets.
-func instanceIdentity(child *Node, parentInstancePath string, idx map[string]*NodeInfo) string {
+func instanceIdentity(child *Node, parentInstancePath string, idx *Schema) string {
 	base := parentInstancePath + "/" + child.Tag
 	schPath := schemaPathFromInstance(parentInstancePath, child.Tag)
-	info := idx[schPath]
-	if info != nil && info.Kind == KindList && info.ListKey != "" {
+	info, ok := idx.Lookup(schPath)
+	if ok && info.Kind == KindList && info.ListKey != "" {
 		if pred := keyPredicates(child, info.ListKey); pred != "" {
 			return base + pred
 		}

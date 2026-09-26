@@ -34,7 +34,7 @@ func attribute(attrs []*tfprotov6.SchemaAttribute, name string) *tfprotov6.Schem
 }
 
 func TestBuildSchema(t *testing.T) {
-	s, typ := BuildSchema([]patch.SchemaNode{
+	s, typ := BuildSchema(patch.CompileSchema([]patch.SchemaNode{
 		{Name: "groups", Type: "container"},
 		{Name: "apply-groups", Type: "leaf-list"},
 		{Name: "system", Type: "container", Children: []patch.SchemaNode{
@@ -47,7 +47,7 @@ func TestBuildSchema(t *testing.T) {
 				{Name: "unit", Type: "list", Key: "name", Children: []patch.SchemaNode{{Name: "name", Type: "leaf"}}},
 			}},
 		}},
-	})
+	}))
 	attrs := s.Block.Attributes
 
 	rn := attribute(attrs, "resource_name")

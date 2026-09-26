@@ -46,10 +46,9 @@ type Server struct {
 }
 
 type loadedSchema struct {
-	idx    map[string]*patch.NodeInfo
-	nodes  []patch.SchemaNode // under <configuration>
-	schema *tfprotov6.Schema
-	typ    tftypes.Object
+	compiled *patch.Schema
+	schema   *tfprotov6.Schema
+	typ      tftypes.Object
 }
 
 var _ tfprotov6.ProviderServer = (*Server)(nil)
@@ -61,17 +60,13 @@ func NewServer(providerType string, schema []byte) *Server {
 
 func (s *Server) load() (*loadedSchema, error) {
 	s.loadOnce.Do(func() {
-		idx, nodes, err := LoadSchema(s.schemaRaw)
-		if err == nil && len(nodes) == 0 {
-			err = fmt.Errorf("schema has no configuration node")
-		}
+		nodes, err := LoadSchema(s.schemaRaw)
 		if err != nil {
 			s.loadErr = err
 			return
 		}
-		configNodes := nodes[0].Children
-		schema, typ := BuildSchema(configNodes)
-		s.loaded = &loadedSchema{idx: idx, nodes: configNodes, schema: schema, typ: typ}
+		schema, typ := BuildSchema(nodes)
+		s.loaded = &loadedSchema{compiled: nodes, schema: schema, typ: typ}
 	})
 	return s.loaded, s.loadErr
 }
@@ -87,7 +82,7 @@ func (s *Server) device() (*device, []*tfprotov6.Diagnostic) {
 	if client == nil {
 		return nil, errorDiag("Provider not configured", fmt.Errorf("no NETCONF client"))
 	}
-	return &device{client: client, idx: l.idx, nodes: l.nodes, typ: l.typ}, nil
+	return &device{client: client, schema: l.compiled, typ: l.typ}, nil
 }
 
 func errorDiag(summary string, err error) []*tfprotov6.Diagnostic {

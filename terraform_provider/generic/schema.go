@@ -15,8 +15,8 @@ const resourceNameAttribute = "resource_name"
 // from the schema nodes under <configuration>. A leaf is an optional string, a
 // leaf-list an optional list of strings, and a container or list an optional
 // list of nested objects (a container has at most one entry).
-func BuildSchema(configNodes []patch.SchemaNode) (*tfprotov6.Schema, tftypes.Object) {
-	attrs, types := buildAttributes(configNodes)
+func BuildSchema(s *patch.Schema) (*tfprotov6.Schema, tftypes.Object) {
+	attrs, types := buildAttributes(s, 0)
 	attrs = append([]*tfprotov6.SchemaAttribute{{
 		Name:     resourceNameAttribute,
 		Type:     tftypes.String,
@@ -27,22 +27,22 @@ func BuildSchema(configNodes []patch.SchemaNode) (*tfprotov6.Schema, tftypes.Obj
 		tftypes.Object{AttributeTypes: types}
 }
 
-func buildAttributes(nodes []patch.SchemaNode) ([]*tfprotov6.SchemaAttribute, map[string]tftypes.Type) {
-	nodes = attributeNodes(nodes)
+func buildAttributes(s *patch.Schema, parent patch.SchemaNodeID) ([]*tfprotov6.SchemaAttribute, map[string]tftypes.Type) {
+	nodes := attributeNodes(s, parent)
 	attrs := make([]*tfprotov6.SchemaAttribute, 0, len(nodes))
 	types := make(map[string]tftypes.Type, len(nodes))
 	for _, n := range nodes {
-		name := SanitizeName(n.Name)
-		switch n.Type {
-		case "leaf":
+		name := SanitizeName(s.Name(n))
+		switch s.Kind(n) {
+		case patch.KindLeaf:
 			attrs = append(attrs, &tfprotov6.SchemaAttribute{Name: name, Type: tftypes.String, Optional: true})
 			types[name] = tftypes.String
-		case "leaf-list":
+		case patch.KindLeafList:
 			t := tftypes.List{ElementType: tftypes.String}
 			attrs = append(attrs, &tfprotov6.SchemaAttribute{Name: name, Type: t, Optional: true})
 			types[name] = t
-		case "container", "list":
-			nested, nestedTypes := buildAttributes(n.Children)
+		case patch.KindContainer, patch.KindList:
+			nested, nestedTypes := buildAttributes(s, n)
 			attrs = append(attrs, &tfprotov6.SchemaAttribute{
 				Name:     name,
 				Optional: true,

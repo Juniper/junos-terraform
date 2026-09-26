@@ -17,14 +17,13 @@ import (
 // and configuration XML.
 type device struct {
 	client netconf.Client
-	idx    map[string]*patch.NodeInfo
-	nodes  []patch.SchemaNode // under <configuration>
+	schema *patch.Schema
 	typ    tftypes.Object
 }
 
 // create loads the planned configuration (merge) and commits.
 func (d *device) create(plan tftypes.Value) (tftypes.Value, error) {
-	root, err := ValueToConfig(plan, d.nodes)
+	root, err := ValueToConfig(plan, d.schema)
 	if err != nil {
 		return tftypes.Value{}, fmt.Errorf("building configuration: %w", err)
 	}
@@ -41,17 +40,17 @@ func (d *device) create(plan tftypes.Value) (tftypes.Value, error) {
 // plan as one patch and commits it. If the device still differs afterwards, it
 // loads the whole planned configuration (merge) and commits again.
 func (d *device) update(plan tftypes.Value) (tftypes.Value, error) {
-	planRoot, err := ValueToConfig(plan, d.nodes)
+	planRoot, err := ValueToConfig(plan, d.schema)
 	if err != nil {
 		return tftypes.Value{}, fmt.Errorf("building configuration: %w", err)
 	}
-	planMap := patch.LeafMapWithSchema(planRoot, d.idx)
+	planMap := patch.LeafMapWithSchema(planRoot, d.schema)
 
 	current, err := d.config()
 	if err != nil {
 		return tftypes.Value{}, fmt.Errorf("reading current configuration: %w", err)
 	}
-	diff := patch.ComputeDiff(patch.LeafMapWithSchema(current, d.idx), planMap)
+	diff := patch.ComputeDiff(patch.LeafMapWithSchema(current, d.schema), planMap)
 
 	if len(diff) > 0 {
 		name := resourceName(plan)
@@ -71,7 +70,7 @@ func (d *device) update(plan tftypes.Value) (tftypes.Value, error) {
 		if err != nil {
 			return tftypes.Value{}, fmt.Errorf("reading patched configuration: %w", err)
 		}
-		if len(patch.ComputeDiff(patch.LeafMapWithSchema(verified, d.idx), planMap)) == 0 {
+		if len(patch.ComputeDiff(patch.LeafMapWithSchema(verified, d.schema), planMap)) == 0 {
 			// The configuration just read is the new state.
 			return d.state(verified, plan)
 		}
@@ -89,12 +88,12 @@ func (d *device) update(plan tftypes.Value) (tftypes.Value, error) {
 
 // delete removes everything in the state from the device and commits.
 func (d *device) delete(state tftypes.Value) error {
-	root, err := ValueToConfig(state, d.nodes)
+	root, err := ValueToConfig(state, d.schema)
 	if err != nil {
 		return fmt.Errorf("building configuration: %w", err)
 	}
-	diff := patch.ComputeDiff(patch.LeafMapWithSchema(root, d.idx),
-		patch.LeafMapWithSchema(&patch.Node{Tag: "configuration"}, d.idx))
+	diff := patch.ComputeDiff(patch.LeafMapWithSchema(root, d.schema),
+		patch.LeafMapWithSchema(&patch.Node{Tag: "configuration"}, d.schema))
 	if len(diff) == 0 {
 		return nil
 	}
@@ -125,7 +124,7 @@ func (d *device) read(reference tftypes.Value) (tftypes.Value, error) {
 // state returns a configuration read from the device (config) as the
 // resource's state, ordered like reference and with its resource_name.
 func (d *device) state(current *patch.Node, reference tftypes.Value) (tftypes.Value, error) {
-	refRoot, err := ValueToConfig(reference, d.nodes)
+	refRoot, err := ValueToConfig(reference, d.schema)
 	if err != nil {
 		return tftypes.Value{}, err
 	}
@@ -137,7 +136,7 @@ func (d *device) state(current *patch.Node, reference tftypes.Value) (tftypes.Va
 	if err != nil {
 		return tftypes.Value{}, err
 	}
-	aligned, err := patch.AlignXMLOrderToReference(currentXML, refXML, d.idx)
+	aligned, err := patch.AlignXMLOrderToReference(currentXML, refXML, d.schema)
 	if err != nil {
 		return tftypes.Value{}, fmt.Errorf("aligning configuration order: %w", err)
 	}
@@ -145,7 +144,7 @@ func (d *device) state(current *patch.Node, reference tftypes.Value) (tftypes.Va
 	if err != nil {
 		return tftypes.Value{}, err
 	}
-	observed, err := ConfigToValue(tree, d.nodes, d.typ)
+	observed, err := ConfigToValue(tree, d.schema, d.typ)
 	if err != nil {
 		return tftypes.Value{}, err
 	}
@@ -173,11 +172,11 @@ func (d *device) config() (*patch.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	v, err := ConfigToValue(tree, d.nodes, d.typ)
+	v, err := ConfigToValue(tree, d.schema, d.typ)
 	if err != nil {
 		return nil, err
 	}
-	return ValueToConfig(v, d.nodes)
+	return ValueToConfig(v, d.schema)
 }
 
 // load merges a configuration into the device's candidate configuration.
