@@ -17,9 +17,9 @@ var (
 	schemaErr  error
 )
 
-// LoadSchema compiles the embedded pyang JSON schema (raw or gzipped, trimmed
-// or a full model). Safe to call from multiple goroutines; it is compiled
-// once.
+// LoadSchema returns the embedded schema: a compiled schema (patch.Schema's
+// binary form), or the pyang JSON (trimmed or a full model), either of them
+// raw or gzipped. Safe to call from multiple goroutines; it is read once.
 func LoadSchema(raw []byte) (*patch.Schema, error) {
 	schemaOnce.Do(func() {
 		data := raw
@@ -36,6 +36,11 @@ func LoadSchema(raw []byte) (*patch.Schema, error) {
 				schemaErr = fmt.Errorf("read decompressed schema: %w", err)
 				return
 			}
+		}
+
+		if patch.IsCompiledSchema(data) {
+			schema, schemaErr = patch.UnmarshalSchema(data)
+			return
 		}
 
 		var w patch.TrimmedSchemaWrapper

@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/xml"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -155,6 +156,30 @@ func TestGetProviderSchemaGzipped(t *testing.T) {
 	t.Cleanup(ResetSchema)
 	resp, _ := NewServer("junos-test", gzipped(t, convertSchema)).GetProviderSchema(context.Background(), &tfprotov6.GetProviderSchemaRequest{})
 	noDiags(t, resp.Diagnostics)
+}
+
+// A compiled schema, as jtaf-provider embeds it, serves the same resource
+// schema as the JSON it was compiled from.
+func TestGetProviderSchemaCompiled(t *testing.T) {
+	compiled, err := patch.UnmarshalTrimmedSchemaIndex(convertSchema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := compiled.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	schemas := map[string]*tfprotov6.Schema{}
+	for name, raw := range map[string][]byte{"json": []byte(convertSchema), "compiled": gzipped(t, string(data))} {
+		ResetSchema()
+		resp, _ := NewServer("junos-test", raw).GetProviderSchema(context.Background(), &tfprotov6.GetProviderSchemaRequest{})
+		noDiags(t, resp.Diagnostics)
+		schemas[name] = resp.ResourceSchemas["terraform-provider-junos-test"]
+	}
+	ResetSchema()
+	if schemas["compiled"] == nil || !reflect.DeepEqual(schemas["compiled"], schemas["json"]) {
+		t.Fatalf("compiled schema serves %+v, JSON %+v", schemas["compiled"], schemas["json"])
+	}
 }
 
 // A schema that does not load is reported, not a provider without resources.

@@ -1,6 +1,10 @@
 package patch
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"fmt"
 	"strings"
 	"sync"
 )
@@ -252,4 +256,109 @@ func (b *schemaBuilder) record(group []*SchemaNode) schemaRecord {
 		r.flags &^= flagPresence
 	}
 	return r
+}
+
+// The binary form of a Schema: schemaMagic, the number of names and the length
+// of each (uvarint), the names' bytes, the number of nodes, and each node's
+// record as five little-endian uint32 (name, key, first child, number of
+// children, kind | flags<<8).
+var schemaMagic = []byte("JTAFSCH1")
+
+// IsCompiledSchema reports whether data is a Schema's binary form.
+func IsCompiledSchema(data []byte) bool { return bytes.HasPrefix(data, schemaMagic) }
+
+// MarshalBinary returns the Schema's binary form.
+func (s *Schema) MarshalBinary() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.Write(schemaMagic)
+	buf.Write(binary.AppendUvarint(nil, uint64(len(s.names))))
+	for _, n := range s.names {
+		buf.Write(binary.AppendUvarint(nil, uint64(len(n))))
+	}
+	for _, n := range s.names {
+		buf.WriteString(n)
+	}
+	buf.Write(binary.AppendUvarint(nil, uint64(len(s.nodes))))
+	rec := make([]byte, 20)
+	for _, r := range s.nodes {
+		binary.LittleEndian.PutUint32(rec[0:], r.name)
+		binary.LittleEndian.PutUint32(rec[4:], r.key)
+		binary.LittleEndian.PutUint32(rec[8:], r.firstChild)
+		binary.LittleEndian.PutUint32(rec[12:], r.numChildren)
+		binary.LittleEndian.PutUint32(rec[16:], uint32(r.kind)|uint32(r.flags)<<8)
+		buf.Write(rec)
+	}
+	return buf.Bytes(), nil
+}
+
+var errSchemaTruncated = errors.New("compiled schema: truncated")
+
+// UnmarshalSchema reads a Schema's binary form.
+func UnmarshalSchema(data []byte) (*Schema, error) {
+	if !IsCompiledSchema(data) {
+		return nil, errors.New("compiled schema: bad magic")
+	}
+	p := data[len(schemaMagic):]
+	uvarint := func() (int, error) {
+		v, n := binary.Uvarint(p)
+		if n <= 0 || v > uint64(len(data)) {
+			return 0, errSchemaTruncated
+		}
+		p = p[n:]
+		return int(v), nil
+	}
+
+	numNames, err := uvarint()
+	if err != nil {
+		return nil, err
+	}
+	lengths := make([]int, numNames)
+	total := 0
+	for i := range lengths {
+		if lengths[i], err = uvarint(); err != nil {
+			return nil, err
+		}
+		total += lengths[i]
+	}
+	if total > len(p) {
+		return nil, errSchemaTruncated
+	}
+	all := string(p[:total]) // one allocation; the names are substrings of it
+	p = p[total:]
+	s := &Schema{names: make([]string, numNames)}
+	off := 0
+	for i, l := range lengths {
+		s.names[i] = all[off : off+l]
+		off += l
+	}
+	if numNames == 0 || s.names[0] != "" {
+		return nil, errors.New("compiled schema: names[0] is not empty")
+	}
+
+	numNodes, err := uvarint()
+	if err != nil {
+		return nil, err
+	}
+	if numNodes == 0 || len(p) != numNodes*20 {
+		return nil, errSchemaTruncated
+	}
+	s.nodes = make([]schemaRecord, numNodes)
+	for i := range s.nodes {
+		rec := p[i*20:]
+		kf := binary.LittleEndian.Uint32(rec[16:])
+		r := schemaRecord{
+			name:        binary.LittleEndian.Uint32(rec[0:]),
+			key:         binary.LittleEndian.Uint32(rec[4:]),
+			firstChild:  binary.LittleEndian.Uint32(rec[8:]),
+			numChildren: binary.LittleEndian.Uint32(rec[12:]),
+			kind:        NodeKind(kf),
+			flags:       uint8(kf >> 8),
+		}
+		if int(r.name) >= numNames || int(r.key) >= numNames ||
+			uint64(r.firstChild)+uint64(r.numChildren) > uint64(numNodes) {
+			return nil, fmt.Errorf("compiled schema: node %d out of range", i)
+		}
+		s.nodes[i] = r
+	}
+	return s, nil
 }

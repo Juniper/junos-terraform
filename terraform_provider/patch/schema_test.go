@@ -1,6 +1,9 @@
 package patch
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 // schemaTestNodes has a choice with the same node in two cases, and nodes
 // named "configuration" below the root, as Junos has (system archival
@@ -59,5 +62,41 @@ func TestSchemaLookup(t *testing.T) {
 	static, _ := s.find("routing-options/static")
 	if s.NumChildren(static) != 2 {
 		t.Errorf("merged static has %d children, want 2", s.NumChildren(static))
+	}
+}
+
+func TestSchemaBinaryRoundTrip(t *testing.T) {
+	s := CompileSchema(schemaTestNodes)
+	data, err := s.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !IsCompiledSchema(data) {
+		t.Fatal("not recognised as a compiled schema")
+	}
+	got, err := UnmarshalSchema(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got.nodes, s.nodes) || !reflect.DeepEqual(got.names, s.names) {
+		t.Fatalf("round trip differs:\n got %+v %q\nwant %+v %q", got.nodes, got.names, s.nodes, s.names)
+	}
+
+	for _, bad := range [][]byte{
+		nil,
+		[]byte("JTAFSCH1"),
+		data[:len(data)-1],
+		append(append([]byte{}, data...), 0),
+		[]byte(`{"root": {}}`),
+	} {
+		if _, err := UnmarshalSchema(bad); err == nil {
+			t.Errorf("UnmarshalSchema(%d bytes) did not fail", len(bad))
+		}
+	}
+	// A child out of range is rejected, not read later.
+	corrupt := append([]byte{}, data...)
+	corrupt[len(corrupt)-20+8] = 0xff
+	if _, err := UnmarshalSchema(corrupt); err == nil {
+		t.Error("out-of-range child accepted")
 	}
 }

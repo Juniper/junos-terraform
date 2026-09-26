@@ -31,6 +31,7 @@ setup(
             "generic/*",
             "netconf/*",
             "patch/*",
+            "cmd/compileschema/*",
             "go-netconf/*",
             "go-netconf/drivers/driver/*",
             "go-netconf/drivers/junos/*",

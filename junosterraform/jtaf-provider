@@ -9,6 +9,7 @@ import sys
 from jinja2 import Template
 import os
 import shutil
+import subprocess
 import os
 from importlib.resources import files, as_file
 from junosterraform.jtaf_common import filter_json_using_xml, load_and_merge_xmls
@@ -169,8 +170,21 @@ def validate_attribute_names(resources):
             stack.append((n.get("children"), f"{path}/{name}"))
 
 
+def _compile_schema(new_dir, json_name, compiled_name):
+    """Compile the schema into the form the provider embeds (patch.Schema's
+    binary form), with the provider's own cmd/compileschema, so that the
+    provider does not parse the JSON each time it starts."""
+    try:
+        subprocess.run(["go", "run", "./cmd/compileschema", json_name, compiled_name],
+                       cwd=new_dir, check=True)
+    except FileNotFoundError:
+        sys.exit("jtaf-provider: --generic needs Go on PATH to compile the schema")
+    except subprocess.CalledProcessError as e:
+        sys.exit(f"jtaf-provider: compiling the schema failed ({e})")
+
+
 def _generate_generic_provider(resources, device_type):
-    """Copy generic provider source and emit trimmed_schema.json."""
+    """Copy generic provider source, and emit the schema and its compiled form."""
     with as_file(files('terraform_provider').joinpath('__init__.py')) as init_py:
         go_dir = os.path.dirname(init_py)
 
@@ -203,20 +217,20 @@ def _generate_generic_provider(resources, device_type):
         if name.endswith('.go'):
             os.remove(os.path.join(new_dir, name))
 
-    # Write trimmed_schema.json.gz: compact and compressed, as the provider
-    # embeds it (a full model is hundreds of MB as indented JSON).
+    # Write trimmed_schema.json.gz, compact and compressed (a full model is
+    # hundreds of MB as indented JSON); it is compiled into schema.bin.gz below.
     schema_path = os.path.join(new_dir, "trimmed_schema.json.gz")
     with gzip.open(schema_path, "wt", encoding="utf-8") as f:
         json.dump(resources, f, separators=(",", ":"))
     print(f"Schema written to {os.path.relpath(schema_path)}")
 
-    # Generate embed_schema.go that loads the JSON via go:embed
+    # Generate embed_schema.go, which embeds the compiled schema via go:embed
     embed_go = os.path.join(new_dir, "embed_schema.go")
     with open(embed_go, "w") as f:
         f.write('package main\n\nimport _ "embed"\n\n')
-        f.write('//go:embed trimmed_schema.json.gz\n')
-        f.write('var trimmedSchemaBytes []byte\n\n')
-        f.write('func init() { embeddedSchema = trimmedSchemaBytes }\n')
+        f.write('//go:embed schema.bin.gz\n')
+        f.write('var compiledSchemaBytes []byte\n\n')
+        f.write('func init() { embeddedSchema = compiledSchemaBytes }\n')
     print(f"Created {os.path.relpath(embed_go)}")
 
     expected_module = f"terraform-provider-junos-{device_type}"
@@ -229,6 +243,9 @@ def _generate_generic_provider(resources, device_type):
     ensure_go_module_name(os.path.join(new_dir, "go.mod"), expected_module)
     print(f"Updated go.mod with type junos-{device_type}")
     rewrite_import_prefixes(new_dir, "terraform_provider", expected_module)
+
+    _compile_schema(new_dir, "trimmed_schema.json.gz", "schema.bin.gz")
+    print(f"Compiled schema written to {os.path.join(new_dir, 'schema.bin.gz')}")
 
     print(f"\nGeneric provider created in {new_dir}/")
     print(f"Build with: cd {new_dir} && go build .")
