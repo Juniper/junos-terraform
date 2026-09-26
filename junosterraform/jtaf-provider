@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import xml.etree.ElementTree as ElementTree
 from copy import copy
+import gzip
 import json
 import argparse
 import sys
@@ -55,121 +56,67 @@ def ensure_go_module_name(go_mod_path: str, module_name: str):
             f.writelines(lines)
 
 
-def _write_generic_provider_go(new_dir, module_name, device_type):
-    """Write provider.go with generic resource registration."""
-    content = f'''package main
+def _write_generic_main_go(new_dir, module_name, device_type):
+    """Write main.go, which serves the generic provider for the embedded schema."""
+    content = f"""package main
 
 import (
-\t"context"
+\t"flag"
+\t"log"
 
 \t"{module_name}/generic"
-\t"{module_name}/netconf"
-
-\t"github.com/hashicorp/terraform-plugin-framework/datasource"
-\t"github.com/hashicorp/terraform-plugin-framework/provider"
-\t"github.com/hashicorp/terraform-plugin-framework/provider/schema"
-\t"github.com/hashicorp/terraform-plugin-framework/resource"
-\t"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-var _ provider.Provider = new(Provider)
-
-var providerClientFactory = func(cfg *Config) (netconf.Client, error) {{
-\treturn cfg.Client()
-}}
-
-func newProvider() provider.Provider {{
-\treturn Provider{{}}
-}}
-
-type Provider struct {{
-}}
-
-type providerModel struct {{
-\tHost     types.String `tfsdk:"host"`
-\tUsername types.String `tfsdk:"username"`
-\tPassword types.String `tfsdk:"password"`
-\tPort     types.Int64  `tfsdk:"port"`
-\tSshKey   types.String `tfsdk:"sshkey"`
-}}
-
-type ProviderConfig struct {{
-\tnetconf.Client
-\tHost string
-}}
-
-func (p ProviderConfig) GetClient() netconf.Client {{ return p.Client }}
-func (p ProviderConfig) GetHost() string           {{ return p.Host }}
-
-func buildProviderConfig(config providerModel) (ProviderConfig, error) {{
-\tclientConfig := Config{{
-\t\tHost:     config.Host.ValueString(),
-\t\tPort:     int(config.Port.ValueInt64()),
-\t\tUsername: config.Username.ValueString(),
-\t\tPassword: config.Password.ValueString(),
-\t\tSSHKey:   config.SshKey.ValueString(),
-\t}}
-\tclient, err := providerClientFactory(&clientConfig)
-\tif err != nil {{
-\t\treturn ProviderConfig{{}}, err
-\t}}
-\treturn ProviderConfig{{Client: client, Host: clientConfig.Host}}, nil
-}}
-
-func (p Provider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {{
-\tvar config providerModel
-\tresp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
-\tif resp.Diagnostics.HasError() {{
-\t\treturn
-\t}}
-\tproviderConfig, err := buildProviderConfig(config)
-\tif err != nil {{
-\t\tresp.Diagnostics.AddError("failed to create client", err.Error())
-\t\treturn
-\t}}
-\tresp.ResourceData = providerConfig
-}}
-
-func (p Provider) DataSources(_ context.Context) []func() datasource.DataSource {{
-\treturn nil
-}}
-
-func (p Provider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {{
-\tresp.TypeName = "junos-{device_type}"
-}}
-
-// embeddedSchema is set by embed_schema.go init().
+// embeddedSchema is set by embed_schema.go.
 var embeddedSchema []byte
 
-func (p Provider) Resources(_ context.Context) []func() resource.Resource {{
-\tif embeddedSchema == nil {{
-\t\treturn nil
-\t}}
-\tidx, nodes, err := generic.LoadSchema(embeddedSchema)
-\tif err != nil {{
-\t\treturn nil
-\t}}
-\treturn []func() resource.Resource{{
-\t\tfunc() resource.Resource {{
-\t\t\treturn generic.NewConfigResource(idx, nodes, string(embeddedSchema))
-\t\t}},
+func main() {{
+\tdebug := flag.Bool("debug", false, "set to true to run the provider with support for debuggers like delve")
+\tflag.Parse()
+\tif err := generic.Serve("registry.terraform.io/juniper/junos-{device_type}", "junos-{device_type}", embeddedSchema, *debug); err != nil {{
+\t\tlog.Fatal(err)
 \t}}
 }}
-
-func (p Provider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {{
-\tresp.Schema = schema.Schema{{
-\t\tAttributes: map[string]schema.Attribute{{
-\t\t\t"host":     schema.StringAttribute{{Required: true}},
-\t\t\t"username": schema.StringAttribute{{Required: true}},
-\t\t\t"password": schema.StringAttribute{{Optional: true, Sensitive: true}},
-\t\t\t"port":     schema.Int64Attribute{{Required: true}},
-\t\t\t"sshkey":   schema.StringAttribute{{Optional: true, Sensitive: true}},
-\t\t}},
-\t}}
-}}
-'''
-    with open(os.path.join(new_dir, "provider.go"), "w") as f:
+"""
+    with open(os.path.join(new_dir, "main.go"), "w") as f:
         f.write(content)
+
+
+def drop_version(resources):
+    """Remove the top-level version leaf: it is the Junos release the
+    configuration was last committed with, not configuration, and cannot be
+    set. filter_json_using_xml drops it from a trimmed schema; a full model
+    is not trimmed."""
+    for root in resources.get("root", {}).get("children", []):
+        if root.get("name") == "configuration":
+            root["children"] = [c for c in root.get("children") or []
+                                if c.get("name") != "version"]
+    return resources
+
+
+def exclude_schema_paths(resources, paths):
+    """Remove the subtrees at paths (relative to configuration, e.g.
+    "logical-systems" or "system/services/web-management") from the schema.
+    A path that does not exist is an error, so a typo is not ignored."""
+    config = next((c for c in resources["root"].get("children", [])
+                   if c.get("name") == "configuration"), None)
+    if config is None:
+        raise ValueError("schema has no configuration node")
+    for path in paths:
+        parts = [p for p in path.strip("/").split("/") if p]
+        if not parts:
+            raise ValueError(f"--exclude {path!r}: empty path")
+        node = config
+        for part in parts[:-1]:
+            node = next((c for c in node.get("children") or [] if c.get("name") == part), None)
+            if node is None:
+                raise ValueError(f"--exclude {path}: {part} not found")
+        children = node.get("children") or []
+        kept = [c for c in children if c.get("name") != parts[-1]]
+        if len(kept) == len(children):
+            raise ValueError(f"--exclude {path}: {parts[-1]} not found")
+        node["children"] = kept
+    return resources
 
 
 def _generate_generic_provider(resources, device_type):
@@ -195,55 +142,43 @@ def _generate_generic_provider(resources, device_type):
 
     shutil.copytree(go_dir, new_dir, ignore=_ignore)
 
-    # Remove leftover build artifacts
+    # Remove leftover build artifacts, and the main package of the generated
+    # (Jinja2) provider: the generic provider's main package is main.go and
+    # embed_schema.go, written below.
     for name in ('terraform_provider', '__init__.py'):
         p = os.path.join(new_dir, name)
         if os.path.exists(p):
             os.remove(p)
+    for name in os.listdir(new_dir):
+        if name.endswith('.go'):
+            os.remove(os.path.join(new_dir, name))
 
-    # Write trimmed_schema.json
-    schema_path = os.path.join(new_dir, "trimmed_schema.json")
-    with open(schema_path, "w") as f:
-        json.dump(resources, f, indent=2)
+    # Write trimmed_schema.json.gz: compact and compressed, as the provider
+    # embeds it (a full model is hundreds of MB as indented JSON).
+    schema_path = os.path.join(new_dir, "trimmed_schema.json.gz")
+    with gzip.open(schema_path, "wt", encoding="utf-8") as f:
+        json.dump(resources, f, separators=(",", ":"))
     print(f"Schema written to {os.path.relpath(schema_path)}")
 
     # Generate embed_schema.go that loads the JSON via go:embed
     embed_go = os.path.join(new_dir, "embed_schema.go")
     with open(embed_go, "w") as f:
         f.write('package main\n\nimport _ "embed"\n\n')
-        f.write('//go:embed trimmed_schema.json\n')
+        f.write('//go:embed trimmed_schema.json.gz\n')
         f.write('var trimmedSchemaBytes []byte\n\n')
         f.write('func init() { embeddedSchema = trimmedSchemaBytes }\n')
     print(f"Created {os.path.relpath(embed_go)}")
 
     expected_module = f"terraform-provider-junos-{device_type}"
 
-    # Render config.go from its template; write provider.go directly for generic mode.
-    # go.mod and go.sum are the provider module's own, copied with the sources.
-    with as_file(files('junosterraform').joinpath('__init__.py')) as init_py:
-        templates_dir = os.path.join(os.path.dirname(init_py), "templates")
-
-    from jinja2 import Template
-    for template_name, output_name in [("config.go.j2", "config.go")]:
-        with open(f"{templates_dir}/{template_name}") as tf:
-            tmpl = Template(tf.read())
-        rendered = tmpl.render(data={"device_type": device_type}).lstrip()
-        with open(os.path.join(new_dir, output_name), "w") as of:
-            of.write(rendered)
-        print(f"Updated {output_name} with type junos-{device_type}")
-
-    # Write provider.go with generic resource registration
-    _write_generic_provider_go(new_dir, expected_module, device_type)
-    print("Updated provider.go with type junos-" + device_type)
+    # go.mod and go.sum are the provider module's own, copied above; only the
+    # module name changes.
+    _write_generic_main_go(new_dir, expected_module, device_type)
+    print("Created main.go with type junos-" + device_type)
 
     ensure_go_module_name(os.path.join(new_dir, "go.mod"), expected_module)
     print(f"Updated go.mod with type junos-{device_type}")
     rewrite_import_prefixes(new_dir, "terraform_provider", expected_module)
-
-    # Remove the Jinja2-generated stub resource_config_provider.go (generic/ replaces it)
-    stub = os.path.join(new_dir, "resource_config_provider.go")
-    if os.path.exists(stub):
-        os.remove(stub)
 
     print(f"\nGeneric provider created in {new_dir}/")
     print(f"Build with: cd {new_dir} && go build .")
@@ -282,6 +217,15 @@ def main():
         default=False,
         help='Use generic schema-driven provider instead of Jinja2 code generation.',
     )
+    parser.add_argument(
+        '--exclude',
+        action='append',
+        default=[],
+        metavar='PATH',
+        help='Leave the schema subtree at PATH (relative to configuration, e.g. '
+             'logical-systems or system/services/web-management) out of the '
+             'provider. Repeatable.',
+    )
     args = parser.parse_args()
 
     # Step 1: Filter the schema only when XML config is supplied.
@@ -296,6 +240,13 @@ def main():
         else:
             with open(args.json_schema) as f:
                 resources = json.load(f)
+
+    if args.exclude:
+        try:
+            resources = exclude_schema_paths(resources, args.exclude)
+        except ValueError as e:
+            parser.error(str(e))
+    drop_version(resources)
 
     # Step 2: Either use generic provider or Jinja2 template
     if args.generic:
