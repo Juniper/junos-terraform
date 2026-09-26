@@ -25,8 +25,9 @@ Result: Complete, buildable Go provider
 | `resource_config_provider.go.j2` | `resource_config_provider.go` | Resource structs, CRUD methods, schema definitions |
 | `provider.go.j2` | `provider.go` | Provider struct, plugin framework integration |
 | `config.go.j2` | `config.go` | Config struct, NETCONF Client() factory |
-| `go.mod.j2` | `go.mod` | Go module definition with correct module path |
 | `ansible.j2` | Ansible task files | Ansible role structure with tasks/templates |
+
+`go.mod` and `go.sum` are not templated: they are `terraform_provider`'s own, copied with the sources, and `ensure_go_module_name()` sets the module path. They match what the provider module is built and tested with, which Renovate keeps up to date.
 
 ---
 

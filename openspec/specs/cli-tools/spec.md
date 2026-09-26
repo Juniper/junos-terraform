@@ -48,8 +48,8 @@ Python command-line tools that drive the JTAF pipeline — from YANG models to g
 ```
 Plugin created in terraform-provider-junos-{type}/resource_config_provider.go
 Updated provider.go with type junos-{type}
-Updated go.mod with type junos-{type}
 Updated config.go with type junos-{type}
+Updated go.mod with type junos-{type}
 ```
 
 ---
