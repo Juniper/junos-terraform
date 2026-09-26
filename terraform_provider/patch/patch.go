@@ -310,6 +310,11 @@ func pathDepth(path string) int {
 	return len(splitPathRespectingQuotes(path))
 }
 
+// MarshalTree serializes a *Node tree to indented XML bytes, escaping text.
+func MarshalTree(root *Node) ([]byte, error) {
+	return marshalNodeTree(root)
+}
+
 // marshalNodeTree serializes a *Node tree to indented XML bytes.
 func marshalNodeTree(root *Node) ([]byte, error) {
 	var buf bytes.Buffer

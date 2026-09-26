@@ -2,6 +2,8 @@ package patch
 
 import (
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -61,6 +63,45 @@ type NumRange struct {
 	Min  *float64 `json:"min"`
 	Max  *float64 `json:"max"`
 	Path string   `json:"path"`
+}
+
+// UnmarshalJSON accepts a bound as a JSON number or a numeric string: the
+// pyang plugin writes decimal64 bounds as strings to keep them exact
+// ("9223372036.854775807").
+func (r *NumRange) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Min  json.RawMessage `json:"min"`
+		Max  json.RawMessage `json:"max"`
+		Path string          `json:"path"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	var err error
+	if r.Min, err = parseBound(raw.Min); err != nil {
+		return fmt.Errorf("range min: %w", err)
+	}
+	if r.Max, err = parseBound(raw.Max); err != nil {
+		return fmt.Errorf("range max: %w", err)
+	}
+	r.Path = raw.Path
+	return nil
+}
+
+func parseBound(raw json.RawMessage) (*float64, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	text := string(raw)
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		text = s
+	}
+	v, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &v, nil
 }
 
 type LenRange struct {
@@ -129,8 +170,29 @@ func UnmarshalTrimmedSchemaIndex(trimmedSchemaJSON string) (map[string]*NodeInfo
 		return nil, err
 	}
 
-	roots := w.Root.Children
+	return BuildSchemaIndex(FlattenChoices(w.Root.Children)), nil
+}
 
+// FlattenChoices replaces every YANG choice and case node with its children.
+// A choice has no element of its own in the XML: a case's nodes appear
+// directly under the choice's parent. The pyang output keeps them, and a
+// schema trimmed to example configuration has them flattened already.
+func FlattenChoices(nodes []SchemaNode) []SchemaNode {
+	out := make([]SchemaNode, 0, len(nodes))
+	for _, n := range nodes {
+		if n.Type == "choice" || n.Type == "case" {
+			out = append(out, FlattenChoices(n.Children)...)
+			continue
+		}
+		n.Children = FlattenChoices(n.Children)
+		out = append(out, n)
+	}
+	return out
+}
+
+// BuildSchemaIndex compiles schema nodes (with choices flattened) into the
+// path index the patch engine uses.
+func BuildSchemaIndex(roots []SchemaNode) map[string]*NodeInfo {
 	idx := make(map[string]*NodeInfo)
 
 	// Walk and compile
@@ -220,7 +282,7 @@ func UnmarshalTrimmedSchemaIndex(trimmedSchemaJSON string) (map[string]*NodeInfo
 		walk(r, "")
 	}
 
-	return idx, nil
+	return idx
 }
 
 // ------------------------- Process Trimmed Schema [END] -------------------------
