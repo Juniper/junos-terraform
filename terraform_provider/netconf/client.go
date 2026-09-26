@@ -112,44 +112,105 @@ type GoNCClient struct {
 
 	Lock sync.RWMutex
 	exec operationExecutor
+
+	// session is the NETCONF session RPCs are sent on, opened by the first
+	// RPC and kept: opening one is an SSH handshake and a NETCONF hello, which
+	// takes several seconds on a small device (about 11s on an SRX300), for
+	// every RPC otherwise. dial opens it; nil dials over SSH.
+	sessionMu sync.Mutex
+	session   rpcSession
+	dial      func(ctx context.Context) (rpcSession, error)
 }
 
-// Close keeps existing behavior contract for provider lifecycle hooks.
+// rpcSession sends RPCs on one NETCONF session.
+type rpcSession interface {
+	// do sends an RPC and returns the raw rpc-reply. An error is a transport
+	// error: an rpc-error is a reply.
+	do(ctx context.Context, operation string) ([]byte, error)
+	close() error
+}
+
+// Close closes the client's NETCONF session, if one is open.
 func (g *GoNCClient) Close() error {
-	return nil
+	g.sessionMu.Lock()
+	defer g.sessionMu.Unlock()
+
+	if g.session == nil {
+		return nil
+	}
+	err := g.session.close()
+	g.session = nil
+	return err
 }
 
 // execute sends a single NETCONF RPC and returns its inner XML payload.
+//
+// RPCs share one session. After a transport error the session is closed and
+// the error returned; the next RPC opens a new session. The RPC is not sent
+// again: it may have reached the device, and repeating it is not always
+// harmless (a patch that creates or deletes a statement fails the second
+// time).
 func (g *GoNCClient) execute(ctx context.Context, operation string) (string, error) {
 	if g.exec != nil {
 		return g.exec(ctx, operation)
 	}
 
+	g.sessionMu.Lock()
+	defer g.sessionMu.Unlock()
+
+	if g.session == nil {
+		dial := g.dial
+		if dial == nil {
+			dial = g.dialSSH
+		}
+		session, err := dial(ctx)
+		if err != nil {
+			return "", err
+		}
+		g.session = session
+	}
+
+	rawReply, err := g.session.do(ctx, operation)
+	if err != nil {
+		_ = g.session.close()
+		g.session = nil
+		return "", err
+	}
+
+	return parseReply(rawReply)
+}
+
+// dialSSH opens a NETCONF session over SSH.
+func (g *GoNCClient) dialSSH(ctx context.Context) (rpcSession, error) {
 	target := fmt.Sprintf("%s:%d", g.host, g.port)
 	transport, err := netconfssh.Dial(ctx, "tcp", target, g.sshConfig)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	session, err := netconf.NewSession(transport)
 	if err != nil {
 		_ = transport.Close()
-		return "", err
+		return nil, err
 	}
-	defer func() {
-		_ = session.Close(context.Background())
-	}()
+	return sshSession{session}, nil
+}
 
-	rpc := session.Prepare(netconf.NewRPC([]byte(operation)))
+type sshSession struct {
+	s *netconf.Session
+}
+
+func (s sshSession) do(ctx context.Context, operation string) ([]byte, error) {
+	rpc := s.s.Prepare(netconf.NewRPC([]byte(operation)))
 	rpcXML, err := xml.Marshal(rpc)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal rpc request: %w", err)
+		return nil, fmt.Errorf("failed to marshal rpc request: %w", err)
 	}
 	debugRPC("rpc request", string(rpcXML))
 
-	msg, err := session.Do(ctx, rpc)
+	msg, err := s.s.Do(ctx, rpc)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer func() {
 		_ = msg.Close()
@@ -157,17 +218,32 @@ func (g *GoNCClient) execute(ctx context.Context, operation string) (string, err
 
 	rawReply, err := io.ReadAll(msg)
 	if err != nil {
-		return "", fmt.Errorf("failed to read rpc-reply: %w", err)
+		return nil, fmt.Errorf("failed to read rpc-reply: %w", err)
 	}
 	debugRPC("rpc reply", string(rawReply))
+	return rawReply, nil
+}
 
+func (s sshSession) close() error {
+	return s.s.Close(context.Background())
+}
+
+// parseReply returns an rpc-reply's content, or its rpc-errors of severity
+// error as an error: the device answers a failed RPC (a load, edit or commit
+// it rejects) with an rpc-reply, not a transport error. Warnings are not
+// errors.
+func parseReply(rawReply []byte) (string, error) {
 	reply := struct {
-		XMLName xml.Name `xml:"rpc-reply"`
-		Data    string   `xml:",innerxml"`
+		XMLName   xml.Name          `xml:"rpc-reply"`
+		RPCErrors netconf.RPCErrors `xml:"rpc-error"`
+		Data      string            `xml:",innerxml"`
 	}{}
 
 	if err := xml.Unmarshal(rawReply, &reply); err != nil {
 		return "", fmt.Errorf("failed to decode rpc-reply: %w", err)
+	}
+	if errs := reply.RPCErrors.Filter(netconf.SevError); len(errs) > 0 {
+		return "", errs
 	}
 
 	return reply.Data, nil
