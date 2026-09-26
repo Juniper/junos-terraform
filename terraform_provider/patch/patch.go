@@ -45,6 +45,7 @@ func CreateDiffPatchWithSchema(diffMap map[string]Change, planMap map[string]str
 	}
 
 	diffMap = mergeContainerChanges(diffMap)
+	diffMap = mergeEntryDeletes(diffMap)
 
 	// Root of the output tree
 	root := &Node{Tag: "configuration"}
@@ -173,17 +174,7 @@ func applyKeyedListEntryOperation(parent *Node, parentSegments []string, leafSeg
 		keyValue = change.OldVal
 	}
 
-	// The leaf is one of the parent entry's keys, with the entry's value for
-	// it. A single key must have a value; in a compound key one may be empty
-	// (choice-value of route-filter ... exact), and is still the entry's key.
-	isKey := false
-	for _, k := range parentKeys {
-		if k.name == leafTag && k.value == keyValue && (keyValue != "" || len(parentKeys) > 1) {
-			isKey = true
-			break
-		}
-	}
-	if !isKey {
+	if !isEntryKey(parentKeys, leafTag, keyValue) {
 		return false
 	}
 
@@ -199,6 +190,65 @@ func applyKeyedListEntryOperation(parent *Node, parentSegments []string, leafSeg
 	}
 
 	return true
+}
+
+// isEntryKey reports whether a leaf is one of its list entry's keys, with the
+// entry's value for it. A single key must have a value; in a compound key one
+// may be empty (choice-value of route-filter ... exact), and is still the
+// entry's key.
+func isEntryKey(entryKeys []segmentKey, leafTag, value string) bool {
+	for _, k := range entryKeys {
+		if k.name == leafTag && k.value == value && (value != "" || len(entryKeys) > 1) {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeEntryDeletes drops the deletes below a deleted list entry's direct
+// children. The entry's key deletes delete it (applyKeyedListEntryOperation)
+// and its direct children go in without an operation, as a compound-key entry
+// needs its choice sibling (<add/>) to be identified; but a delete deeper in
+// it, in a term's from or then, keeps its operation, and Junos, having deleted
+// the entry, fails it with "statement not found".
+func mergeEntryDeletes(diffMap map[string]Change) map[string]Change {
+	entries := make(map[string]bool) // deleted entry paths
+	for path, change := range diffMap {
+		if change.Op != Delete {
+			continue
+		}
+		segments := splitPathRespectingQuotes(path)
+		if len(segments) < 2 {
+			continue
+		}
+		_, keys := parseSegmentKeys(segments[len(segments)-2])
+		leafTag, _, _ := parseSegment(segments[len(segments)-1])
+		if isEntryKey(keys, leafTag, change.OldVal) {
+			entries[strings.Join(segments[:len(segments)-1], "/")] = true
+		}
+	}
+	if len(entries) == 0 {
+		return diffMap
+	}
+
+	result := make(map[string]Change, len(diffMap))
+	for path, change := range diffMap {
+		if !belowDeletedEntry(path, entries) {
+			result[path] = change
+		}
+	}
+	return result
+}
+
+// belowDeletedEntry reports whether path lies below a direct child of a
+// deleted entry.
+func belowDeletedEntry(path string, entries map[string]bool) bool {
+	for entry := range entries {
+		if strings.HasPrefix(path, entry+"/") && len(splitPathRespectingQuotes(path[len(entry)+1:])) > 1 {
+			return true
+		}
+	}
+	return false
 }
 
 type orderedChange struct {
