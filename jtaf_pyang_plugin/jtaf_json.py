@@ -227,7 +227,8 @@ yang_coerce = {
 }
 
 yang_props = ["key", "if-feature", "default", "must", "units", "mandatory",
-              "min-elements", "ordered-by", "config", "path", "when"]
+              "min-elements", "ordered-by", "config", "path", "when",
+              "presence"]
 
 # These are explicitly skipped
 yang_props_skip = ["type", "description"]

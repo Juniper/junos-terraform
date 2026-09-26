@@ -44,6 +44,8 @@ func CreateDiffPatchWithSchema(diffMap map[string]Change, planMap map[string]str
 		diffMap = coalesceContainerDeletes(diffMap, planMap, idx)
 	}
 
+	diffMap = mergeContainerChanges(diffMap)
+
 	// Root of the output tree
 	root := &Node{Tag: "configuration"}
 
@@ -382,6 +384,58 @@ func coalesceContainerDeletes(diffMap map[string]Change, planMap map[string]stri
 	}
 
 	return result
+}
+
+// mergeContainerChanges folds a changed presence container and the changes
+// under it into one element. Only a presence container is in the leaf map
+// with leaves under it, so a changed path with changes under it is one. A
+// deleted container's own delete removes its children, so their deletes are
+// dropped; a created one is created by creating its children, so its own
+// create is dropped. Kept, each would add a second element beside the one
+// holding the children.
+func mergeContainerChanges(diffMap map[string]Change) map[string]Change {
+	var deleted, created []string
+	for path, change := range diffMap {
+		if !hasChangeUnder(diffMap, path) {
+			continue
+		}
+		switch change.Op {
+		case Delete:
+			deleted = append(deleted, path)
+		case Create:
+			created = append(created, path)
+		}
+	}
+	if len(deleted)+len(created) == 0 {
+		return diffMap
+	}
+
+	result := make(map[string]Change, len(diffMap))
+	for path, change := range diffMap {
+		result[path] = change
+	}
+	for _, path := range created {
+		delete(result, path)
+	}
+	for _, container := range deleted {
+		for path := range diffMap {
+			if strings.HasPrefix(path, container+"/") {
+				delete(result, path)
+			}
+		}
+	}
+	return result
+}
+
+// hasChangeUnder reports whether the diff changes anything below path.
+func hasChangeUnder(diffMap map[string]Change, path string) bool {
+	prefix := path + "/"
+	for p := range diffMap {
+		if strings.HasPrefix(p, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // planHasPathUnder reports whether the plan keeps any leaf at or below path.

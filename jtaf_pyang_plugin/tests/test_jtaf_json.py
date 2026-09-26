@@ -249,6 +249,9 @@ module presencemod {
     ssh = system["children"][0]
     assert ssh["name"] == "ssh"
     assert ssh["type"] == "container"
+    # The presence statement is emitted; a plain container has none
+    assert ssh["presence"] == "Enables SSH"
+    assert "presence" not in system
     # Verify it has child nodes
     assert "children" in ssh
     assert len(ssh["children"]) > 0
