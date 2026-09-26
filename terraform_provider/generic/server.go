@@ -65,9 +65,6 @@ func (s *Server) load() (*loadedSchema, error) {
 		if err == nil && len(nodes) == 0 {
 			err = fmt.Errorf("schema has no configuration node")
 		}
-		if err == nil {
-			err = ValidateNames(nodes[0].Children, nodes[0].Name)
-		}
 		if err != nil {
 			s.loadErr = err
 			return

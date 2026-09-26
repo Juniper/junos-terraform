@@ -24,23 +24,6 @@ func TestSanitizeName(t *testing.T) {
 	}
 }
 
-func TestValidateNames(t *testing.T) {
-	ok := []patch.SchemaNode{{Name: "firewall", Type: "container", Children: []patch.SchemaNode{
-		{Name: "AH_header", Type: "leaf"}, {Name: "ESP_header", Type: "leaf"},
-	}}}
-	if err := ValidateNames(ok, "configuration"); err != nil {
-		t.Fatalf("valid names rejected: %v", err)
-	}
-	collide := []patch.SchemaNode{{Name: "a-b", Type: "leaf"}, {Name: "a_b", Type: "leaf"}}
-	if err := ValidateNames(collide, "configuration"); err == nil {
-		t.Fatal("expected an error for a-b and a_b")
-	}
-	invalid := []patch.SchemaNode{{Name: "system", Type: "container", Children: []patch.SchemaNode{{Name: "802.1x", Type: "leaf"}}}}
-	if err := ValidateNames(invalid, "configuration"); err == nil {
-		t.Fatal("expected an error for a name starting with a digit")
-	}
-}
-
 func attribute(attrs []*tfprotov6.SchemaAttribute, name string) *tfprotov6.SchemaAttribute {
 	for _, a := range attrs {
 		if a.Name == name {

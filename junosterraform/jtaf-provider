@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ElementTree
 from copy import copy
 import gzip
 import json
+import re
 import argparse
 import sys
 from jinja2 import Template
@@ -117,6 +118,55 @@ def exclude_schema_paths(resources, paths):
             raise ValueError(f"--exclude {path}: {parts[-1]} not found")
         node["children"] = kept
     return resources
+
+
+def _flatten_choices(nodes):
+    """Replace YANG choice and case nodes with their children, as the generic
+    provider does (patch.FlattenChoices): a case's nodes appear directly under
+    the choice's parent."""
+    out = []
+    for n in nodes or []:
+        if n.get("type") in ("choice", "case"):
+            out.extend(_flatten_choices(n.get("children")))
+        else:
+            out.append(n)
+    return out
+
+
+_VALID_ATTRIBUTE_NAME = re.compile(r"^[a-z_][a-z0-9_]*$")
+
+
+def _attribute_name(name):
+    """The generic provider's Terraform attribute name for a YANG node name
+    (generic.SanitizeName)."""
+    return name.replace("-", "_").replace(".", "_").lower()
+
+
+def validate_attribute_names(resources):
+    """Check that every configuration node's attribute name in the generic
+    provider is valid and that no two siblings (with choices flattened) map to
+    the same one, so the provider's schema cannot silently drop a node. The
+    schema is fixed when the provider is generated, so it is checked here
+    rather than each time the provider starts."""
+    config = next((c for c in resources["root"].get("children", [])
+                   if c.get("name") == "configuration"), None)
+    if config is None:
+        raise ValueError("schema has no configuration node")
+    stack = [(config.get("children"), "configuration")]
+    while stack:
+        nodes, path = stack.pop()
+        seen = {}
+        for n in _flatten_choices(nodes):
+            name = n.get("name")
+            if not name:
+                continue
+            key = _attribute_name(name)
+            if not _VALID_ATTRIBUTE_NAME.match(key):
+                raise ValueError(f"{path}/{name}: {key!r} is not a valid attribute name")
+            if key in seen:
+                raise ValueError(f"{path}: {seen[key]} and {name} both map to attribute {key!r}")
+            seen[key] = name
+            stack.append((n.get("children"), f"{path}/{name}"))
 
 
 def _generate_generic_provider(resources, device_type):
@@ -250,6 +300,10 @@ def main():
 
     # Step 2: Either use generic provider or Jinja2 template
     if args.generic:
+        try:
+            validate_attribute_names(resources)
+        except ValueError as e:
+            sys.exit(f"jtaf-provider: {e}")
         _generate_generic_provider(resources, args.type)
         return
 

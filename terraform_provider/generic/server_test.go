@@ -161,8 +161,7 @@ func TestGetProviderSchemaGzipped(t *testing.T) {
 func TestGetProviderSchemaReportsErrors(t *testing.T) {
 	for name, schema := range map[string]string{
 		"load error": `{"root": `,
-		"collision": `{"root": {"children": [{"name": "configuration", "type": "container", "children": [
-			{"name": "a-b", "type": "leaf"}, {"name": "a_b", "type": "leaf"}]}]}}`,
+		"empty":      `{"root": {"children": []}}`,
 	} {
 		ResetSchema()
 		resp, _ := NewServer("junos-test", []byte(schema)).GetProviderSchema(context.Background(), &tfprotov6.GetProviderSchemaRequest{})

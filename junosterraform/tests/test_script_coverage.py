@@ -57,6 +57,37 @@ def test_jtaf_provider_exclude_schema_paths():
             mod.exclude_schema_paths(resources, [bad])
 
 
+def test_jtaf_provider_validate_attribute_names():
+    mod = _load_script("jtaf-provider", "jtaf_provider_names_mod")
+
+    def schema(*children):
+        return {"root": {"children": [{"name": "configuration", "children": list(children)}]}}
+
+    mod.validate_attribute_names(schema(
+        {"name": "firewall", "type": "container", "children": [
+            {"name": "AH_header", "type": "leaf"}, {"name": "ESP_header", "type": "leaf"},
+        ]},
+    ))
+    with pytest.raises(ValueError, match="both map to attribute 'a_b'"):
+        mod.validate_attribute_names(schema({"name": "a-b", "type": "leaf"}, {"name": "a_b", "type": "leaf"}))
+    with pytest.raises(ValueError, match="configuration/system/802.1x"):
+        mod.validate_attribute_names(schema(
+            {"name": "system", "type": "container", "children": [{"name": "802.1x", "type": "leaf"}]},
+        ))
+    # Nodes in different cases of a choice are siblings once the choice is flattened.
+    with pytest.raises(ValueError, match="configuration/system: a-b and a_b"):
+        mod.validate_attribute_names(schema(
+            {"name": "system", "type": "container", "children": [
+                {"name": "c", "type": "choice", "children": [
+                    {"name": "x", "type": "case", "children": [{"name": "a-b", "type": "leaf"}]},
+                    {"name": "y", "type": "case", "children": [{"name": "a_b", "type": "leaf"}]},
+                ]},
+            ]},
+        ))
+    with pytest.raises(ValueError, match="no configuration node"):
+        mod.validate_attribute_names({"root": {"children": []}})
+
+
 def test_jtaf_provider_drop_version():
     mod = _load_script("jtaf-provider", "jtaf_provider_version_mod")
     resources = {"root": {"children": [{"name": "configuration", "children": [
