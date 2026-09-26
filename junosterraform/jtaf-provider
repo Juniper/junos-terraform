@@ -218,13 +218,13 @@ def _generate_generic_provider(resources, device_type):
 
     expected_module = f"terraform-provider-junos-{device_type}"
 
-    # Render go.mod and config.go from templates; write provider.go directly for generic mode.
+    # Render config.go from its template; write provider.go directly for generic mode.
+    # go.mod and go.sum are the provider module's own, copied with the sources.
     with as_file(files('junosterraform').joinpath('__init__.py')) as init_py:
         templates_dir = os.path.join(os.path.dirname(init_py), "templates")
 
     from jinja2 import Template
-    for template_name, output_name in [("go.mod.j2", "go.mod"),
-                                        ("config.go.j2", "config.go")]:
+    for template_name, output_name in [("config.go.j2", "config.go")]:
         with open(f"{templates_dir}/{template_name}") as tf:
             tmpl = Template(tf.read())
         rendered = tmpl.render(data={"device_type": device_type}).lstrip()
@@ -237,6 +237,7 @@ def _generate_generic_provider(resources, device_type):
     print("Updated provider.go with type junos-" + device_type)
 
     ensure_go_module_name(os.path.join(new_dir, "go.mod"), expected_module)
+    print(f"Updated go.mod with type junos-{device_type}")
     rewrite_import_prefixes(new_dir, "terraform_provider", expected_module)
 
     # Remove the Jinja2-generated stub resource_config_provider.go (generic/ replaces it)
@@ -340,10 +341,9 @@ def main():
         f.write(resource_config_provider_go)
     print(f"Plugin created in {os.path.relpath(resource_config_provider_go_fullpath)}\n")
 
-    # Step 6-8: Update provider.go, go.mod, and config.go with correct type using a loop
+    # Step 6-7: Update provider.go and config.go with correct type using a loop
     files_to_update = [
         ("provider.go.j2", "provider.go"),
-        ("go.mod.j2", "go.mod"),
         ("config.go.j2", "config.go"),
     ]
     for template_name, output_name in files_to_update:
@@ -356,9 +356,13 @@ def main():
             f.write(rendered)
         print(f"Updated {output_name} with type junos-{args.type}")
 
+    # Step 8: go.mod and go.sum are the provider module's own, copied with the
+    # sources, so they match what the module is built and tested with; only the
+    # module name changes.
     expected_module = f"terraform-provider-junos-{args.type}"
     go_mod_path = os.path.join(new_dir, "go.mod")
     ensure_go_module_name(go_mod_path, expected_module)
+    print(f"Updated go.mod with type junos-{args.type}")
 
     # Step 8: Normalize import prefixes in copied Go files (including tests).
     rewrite_import_prefixes(new_dir, "terraform_provider", expected_module)
