@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 
-	"terraform_provider/generic"
 	"terraform_provider/netconf"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -94,23 +93,10 @@ func (p Provider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *
 
 // Resources implements provider.Provider.
 func (p Provider) Resources(_ context.Context) []func() resource.Resource {
-	resources := []func() resource.Resource{
+	return []func() resource.Resource{
 		func() resource.Resource { return new(configResource) },
 	}
-	// Register the generic schema-driven resource if schema JSON is embedded.
-	if embeddedSchema != nil {
-		idx, nodes, err := generic.LoadSchema(embeddedSchema)
-		if err == nil {
-			resources = append(resources, func() resource.Resource {
-				return generic.NewConfigResource(idx, nodes, string(embeddedSchema))
-			})
-		}
-	}
-	return resources
 }
-
-// embeddedSchema is set by generated providers that embed trimmed_schema.json.
-var embeddedSchema []byte
 
 // Schema implements provider.Provider.
 func (p Provider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {

@@ -18,8 +18,10 @@ var (
 	schemaErr   error
 )
 
-// LoadSchema parses trimmed-schema JSON (raw or gzipped) into the patch engine index.
-// Safe to call from multiple goroutines; parsing happens exactly once.
+// LoadSchema parses the embedded pyang JSON schema (raw or gzipped, trimmed or a
+// full model), flattens its choice and case nodes, and returns the patch
+// engine's index and the schema nodes. Safe to call from multiple goroutines;
+// parsing happens exactly once.
 func LoadSchema(raw []byte) (map[string]*patch.NodeInfo, []patch.SchemaNode, error) {
 	schemaOnce.Do(func() {
 		data := raw
@@ -48,8 +50,8 @@ func LoadSchema(raw []byte) (map[string]*patch.NodeInfo, []patch.SchemaNode, err
 			return
 		}
 
-		schemaNodes = w.Root.Children
-		schemaIndex, schemaErr = patch.UnmarshalTrimmedSchemaIndex(string(data))
+		schemaNodes = patch.FlattenChoices(w.Root.Children)
+		schemaIndex = patch.BuildSchemaIndex(schemaNodes)
 	})
 	return schemaIndex, schemaNodes, schemaErr
 }
