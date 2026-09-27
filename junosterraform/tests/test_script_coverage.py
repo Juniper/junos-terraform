@@ -38,6 +38,72 @@ def test_jtaf_provider_helpers(tmp_path):
     assert "terraform-provider-junos-qfx/netconf" in (go_dir / "a.go").read_text()
 
 
+def test_jtaf_provider_exclude_schema_paths():
+    mod = _load_script("jtaf-provider", "jtaf_provider_exclude_mod")
+    resources = {"root": {"children": [{"name": "configuration", "children": [
+        {"name": "groups"},
+        {"name": "system", "children": [
+            {"name": "host-name"},
+            {"name": "services", "children": [{"name": "ssh"}, {"name": "web-management"}]},
+        ]},
+    ]}]}}
+    mod.exclude_schema_paths(resources, ["groups", "system/services/web-management"])
+    config = resources["root"]["children"][0]
+    assert [c["name"] for c in config["children"]] == ["system"]
+    services = config["children"][0]["children"][1]
+    assert [c["name"] for c in services["children"]] == ["ssh"]
+    for bad in ["no-such-section", "system/no-such/ssh", "/"]:
+        with pytest.raises(ValueError):
+            mod.exclude_schema_paths(resources, [bad])
+
+
+def test_jtaf_provider_validate_attribute_names():
+    mod = _load_script("jtaf-provider", "jtaf_provider_names_mod")
+
+    def schema(*children):
+        return {"root": {"children": [{"name": "configuration", "children": list(children)}]}}
+
+    mod.validate_attribute_names(schema(
+        {"name": "firewall", "type": "container", "children": [
+            {"name": "AH_header", "type": "leaf"}, {"name": "ESP_header", "type": "leaf"},
+        ]},
+    ))
+    with pytest.raises(ValueError, match="both map to attribute 'a_b'"):
+        mod.validate_attribute_names(schema({"name": "a-b", "type": "leaf"}, {"name": "a_b", "type": "leaf"}))
+    with pytest.raises(ValueError, match="configuration/system/802.1x"):
+        mod.validate_attribute_names(schema(
+            {"name": "system", "type": "container", "children": [{"name": "802.1x", "type": "leaf"}]},
+        ))
+    # Nodes in different cases of a choice are siblings once the choice is flattened.
+    with pytest.raises(ValueError, match="configuration/system: a-b and a_b"):
+        mod.validate_attribute_names(schema(
+            {"name": "system", "type": "container", "children": [
+                {"name": "c", "type": "choice", "children": [
+                    {"name": "x", "type": "case", "children": [{"name": "a-b", "type": "leaf"}]},
+                    {"name": "y", "type": "case", "children": [{"name": "a_b", "type": "leaf"}]},
+                ]},
+            ]},
+        ))
+    with pytest.raises(ValueError, match="no configuration node"):
+        mod.validate_attribute_names({"root": {"children": []}})
+
+
+def test_jtaf_provider_drop_version():
+    mod = _load_script("jtaf-provider", "jtaf_provider_version_mod")
+    resources = {"root": {"children": [{"name": "configuration", "children": [
+        {"name": "version"},
+        {"name": "system", "children": [{"name": "ntp", "children": [{"name": "server", "children": [{"name": "version"}]}]}]},
+    ]}]}}
+    mod.drop_version(resources)
+    config = resources["root"]["children"][0]
+    assert [c["name"] for c in config["children"]] == ["system"]
+    server = config["children"][0]["children"][0]["children"][0]
+    assert [c["name"] for c in server["children"]] == ["version"]
+    # A schema without version is left as it is
+    mod.drop_version(resources)
+    assert [c["name"] for c in config["children"]] == ["system"]
+
+
 def test_jtaf_provider_main_smoke(tmp_path, monkeypatch):
     mod = _load_script("jtaf-provider", "jtaf_provider_main_mod")
 
@@ -181,6 +247,32 @@ class _FailPopen(_FakePopen):
         super().__init__(cmd, stdout=stdout, stderr=stderr, stdin=stdin)
         self.returncode = 1
         self._stdout = b""
+
+
+def test_yang2go_passes_generic_and_exclude(tmp_path, monkeypatch):
+    yang_file = tmp_path / "a.yang"
+    yang_file.write_text("module a { namespace \"x\"; prefix x; }")
+
+    import subprocess
+
+    commands = []
+
+    class _RecordingPopen(_FakePopen):
+        def __init__(self, cmd, **kwargs):
+            commands.append(cmd)
+            super().__init__(cmd, **kwargs)
+
+    monkeypatch.setattr(subprocess, "Popen", _RecordingPopen)
+    monkeypatch.setattr(sys, "argv", [
+        "jtaf-yang2go", "-p", str(yang_file), "-t", "srx", "--generic",
+        "--exclude", "groups", "--exclude", "system/services/web-management",
+    ])
+    runpy.run_path(str(JUNOS_DIR / "jtaf-yang2go"), run_name="__main__")
+
+    provider = next(c for c in commands if c[0] == "jtaf-provider")
+    assert provider[provider.index("--generic")] == "--generic"
+    excludes = [provider[i + 1] for i, a in enumerate(provider) if a == "--exclude"]
+    assert excludes == ["groups", "system/services/web-management"]
 
 
 def test_yang2go_and_yang2ansible_scripts(tmp_path, monkeypatch):

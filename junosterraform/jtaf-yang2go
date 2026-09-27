@@ -41,6 +41,14 @@ parser.add_argument(
     default=False,
     help='Use generic schema-driven provider instead of Jinja2 code generation.',
 )
+parser.add_argument(
+    '--exclude',
+    action='append',
+    default=[],
+    metavar='PATH',
+    help='Passed to jtaf-provider: leave the schema subtree at PATH (relative to '
+         'configuration) out of the provider. Repeatable.',
+)
 
 args = parser.parse_args()
 
@@ -82,6 +90,8 @@ if p1.returncode == 0 and pyang_out:
         provider_args.extend(['-x', *xml_files])
     if args.generic:
         provider_args.append('--generic')
+    for path in args.exclude:
+        provider_args.extend(['--exclude', path])
     p2 = subprocess.Popen(provider_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, error = p2.communicate(input=pyang_out)
     print(output.decode(), file=sys.stdout)

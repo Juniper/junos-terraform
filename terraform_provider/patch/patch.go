@@ -36,7 +36,7 @@ func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error
 // non-nil and a schema container is being removed entirely — the plan keeps
 // nothing under it — its leaf deletes are coalesced into a single
 // container-level nc:operation="delete".
-func CreateDiffPatchWithSchema(diffMap map[string]Change, planMap map[string]string, groupName string, idx map[string]*NodeInfo) ([]byte, error) {
+func CreateDiffPatchWithSchema(diffMap map[string]Change, planMap map[string]string, groupName string, idx *Schema) ([]byte, error) {
 	_ = groupName
 
 	// Pre-pass: coalesce container deletes when schema and plan are available.
@@ -310,6 +310,11 @@ func pathDepth(path string) int {
 	return len(splitPathRespectingQuotes(path))
 }
 
+// MarshalTree serializes a *Node tree to indented XML bytes, escaping text.
+func MarshalTree(root *Node) ([]byte, error) {
+	return marshalNodeTree(root)
+}
+
 // marshalNodeTree serializes a *Node tree to indented XML bytes.
 func marshalNodeTree(root *Node) ([]byte, error) {
 	var buf bytes.Buffer
@@ -387,7 +392,7 @@ func xmlEscape(s string) string {
 // policy-statement[name=a]/term[name=t]/from does not become one of every
 // term's from. Each leaf counts toward its deepest container ancestor; when a
 // container and one inside it are both removed, only the outer delete is kept.
-func coalesceContainerDeletes(diffMap map[string]Change, planMap map[string]string, idx map[string]*NodeInfo) map[string]Change {
+func coalesceContainerDeletes(diffMap map[string]Change, planMap map[string]string, idx *Schema) map[string]Change {
 	// Leaf paths grouped by their deepest container ancestor instance.
 	// A "container" here means a schema node of KindContainer (not KindList).
 	containers := make(map[string][]string)
@@ -399,7 +404,7 @@ func coalesceContainerDeletes(diffMap map[string]Change, planMap map[string]stri
 		// the configuration root and never a candidate.
 		for depth := len(segments) - 1; depth >= 2; depth-- {
 			instance := strings.Join(segments[:depth], "/")
-			info, ok := idx[outputPathToSchemaPath(instance)]
+			info, ok := idx.Lookup(outputPathToSchemaPath(instance))
 			if !ok || info.Kind != KindContainer {
 				continue
 			}

@@ -1,31 +1,31 @@
 package generic
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 
 	"terraform_provider/patch"
 )
 
 var (
-	schemaOnce  sync.Once
-	schemaIndex map[string]*patch.NodeInfo
-	schemaNodes []patch.SchemaNode
-	schemaErr   error
+	schemaOnce sync.Once
+	schema     *patch.Schema
+	schemaErr  error
 )
 
-// LoadSchema parses trimmed-schema JSON (raw or gzipped) into the patch engine index.
-// Safe to call from multiple goroutines; parsing happens exactly once.
-func LoadSchema(raw []byte) (map[string]*patch.NodeInfo, []patch.SchemaNode, error) {
+// LoadSchema returns the embedded schema: a compiled schema (patch.Schema's
+// binary form), or the pyang JSON (trimmed or a full model), either of them
+// raw or gzipped. Safe to call from multiple goroutines; it is read once.
+func LoadSchema(raw []byte) (*patch.Schema, error) {
 	schemaOnce.Do(func() {
 		data := raw
 		// Detect gzip magic bytes and decompress if needed.
 		if len(raw) >= 2 && raw[0] == 0x1f && raw[1] == 0x8b {
-			r, err := gzip.NewReader(strings.NewReader(string(raw)))
+			r, err := gzip.NewReader(bytes.NewReader(raw))
 			if err != nil {
 				schemaErr = fmt.Errorf("decompress schema: %w", err)
 				return
@@ -38,6 +38,11 @@ func LoadSchema(raw []byte) (map[string]*patch.NodeInfo, []patch.SchemaNode, err
 			}
 		}
 
+		if patch.IsCompiledSchema(data) {
+			schema, schemaErr = patch.UnmarshalSchema(data)
+			return
+		}
+
 		var w patch.TrimmedSchemaWrapper
 		if err := json.Unmarshal(data, &w); err != nil {
 			schemaErr = fmt.Errorf("unmarshal schema JSON: %w", err)
@@ -47,17 +52,14 @@ func LoadSchema(raw []byte) (map[string]*patch.NodeInfo, []patch.SchemaNode, err
 			schemaErr = fmt.Errorf("schema JSON has no root children")
 			return
 		}
-
-		schemaNodes = w.Root.Children
-		schemaIndex, schemaErr = patch.UnmarshalTrimmedSchemaIndex(string(data))
+		schema = patch.CompileSchema(w.Root.Children)
 	})
-	return schemaIndex, schemaNodes, schemaErr
+	return schema, schemaErr
 }
 
 // ResetSchema allows tests to re-run LoadSchema with different data.
 func ResetSchema() {
 	schemaOnce = sync.Once{}
-	schemaIndex = nil
-	schemaNodes = nil
+	schema = nil
 	schemaErr = nil
 }

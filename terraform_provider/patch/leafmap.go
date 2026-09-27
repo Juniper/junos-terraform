@@ -22,13 +22,13 @@ var junosListKeys = map[string]bool{
 //   - leaf-list entries are represented as distinct set elements by appending
 //     [value=<text>] to the path segment, enabling add/remove diff semantics
 //   - key leaf children are excluded from emitted leaves
-func LeafMapWithSchema(root *Node, idx map[string]*NodeInfo) map[string]string {
+func LeafMapWithSchema(root *Node, idx *Schema) map[string]string {
 	result := make(map[string]string)
 	leafMapRecurseWithSchema(root, "", result, idx)
 	return result
 }
 
-func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]string, idx map[string]*NodeInfo) {
+func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]string, idx *Schema) {
 	schemaPath := outputPathToSchemaPath(parentPath)
 	segment := buildSegmentWithSchema(node, schemaPath, idx)
 
@@ -43,7 +43,7 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 		// or regular text leaves), and presence containers like <multipath/>:
 		// they have no content either, but whether they exist is the setting.
 		leafSchemaPath := outputPathToSchemaPath(currentPath)
-		if info, ok := idx[leafSchemaPath]; ok {
+		if info, ok := idx.Lookup(leafSchemaPath); ok {
 			if info.Kind == KindList || (info.Kind == KindContainer && !info.Presence) {
 				return
 			}
@@ -68,7 +68,7 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 	// A presence container is configuration whether or not it has children:
 	// emit it too, or removing its last child would leave it on the device,
 	// where the plan has none (family inet unicast after extended-nexthop).
-	if info, ok := idx[outputPathToSchemaPath(currentPath)]; ok && info.Kind == KindContainer && info.Presence {
+	if info, ok := idx.Lookup(outputPathToSchemaPath(currentPath)); ok && info.Kind == KindContainer && info.Presence {
 		result[currentPath] = ""
 	}
 
@@ -81,7 +81,7 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 	orderedCounters := make(map[string]int) // tag -> next position
 	for _, child := range node.Children {
 		childSchemaPath := outputPathToSchemaPath(currentPath + "/" + child.Tag)
-		if info, ok := idx[childSchemaPath]; ok && info.Kind == KindLeafList && info.OrderedByUser {
+		if info, ok := idx.Lookup(childSchemaPath); ok && info.Kind == KindLeafList && info.OrderedByUser {
 			pos := orderedCounters[child.Tag]
 			orderedCounters[child.Tag] = pos + 1
 			// Emit positional key: path[pos=N] = value
@@ -93,9 +93,9 @@ func leafMapRecurseWithSchema(node *Node, parentPath string, result map[string]s
 	}
 }
 
-func structuralKeyedListLeaf(node *Node, currentPath string, idx map[string]*NodeInfo) (string, string, bool) {
+func structuralKeyedListLeaf(node *Node, currentPath string, idx *Schema) (string, string, bool) {
 	schemaPath := outputPathToSchemaPath(currentPath)
-	info, ok := idx[schemaPath]
+	info, ok := idx.Lookup(schemaPath)
 	if !ok || info.Kind != KindList || info.ListKey == "" {
 		return "", "", false
 	}
@@ -127,7 +127,7 @@ func keyedListValue(node *Node, keyName string) string {
 	return ""
 }
 
-func subtreeHasMaterialLeaves(node *Node, currentPath string, idx map[string]*NodeInfo) bool {
+func subtreeHasMaterialLeaves(node *Node, currentPath string, idx *Schema) bool {
 	for _, child := range node.Children {
 		if isKeyChildWithSchema(child, node, currentPath, idx) {
 			continue
@@ -143,7 +143,7 @@ func subtreeHasMaterialLeaves(node *Node, currentPath string, idx map[string]*No
 		// A non-key child that is a list entry is material even if its only
 		// descendant is its own key — nested list entries are real content.
 		childSchemaPath := outputPathToSchemaPath(childPath)
-		if info, ok := idx[childSchemaPath]; ok && info.Kind == KindList {
+		if info, ok := idx.Lookup(childSchemaPath); ok && info.Kind == KindList {
 			return true
 		}
 
@@ -161,9 +161,9 @@ func subtreeHasMaterialLeaves(node *Node, currentPath string, idx map[string]*No
 	return false
 }
 
-func buildSegmentWithSchema(node *Node, parentSchemaPath string, idx map[string]*NodeInfo) string {
+func buildSegmentWithSchema(node *Node, parentSchemaPath string, idx *Schema) string {
 	currentSchemaPath := joinPath(parentSchemaPath, node.Tag)
-	if info, ok := idx[currentSchemaPath]; ok && info.Kind == KindList && info.ListKey != "" {
+	if info, ok := idx.Lookup(currentSchemaPath); ok && info.Kind == KindList && info.ListKey != "" {
 		if pred := keyPredicates(node, info.ListKey); pred != "" {
 			return node.Tag + pred
 		}
@@ -214,9 +214,9 @@ func keyPredicates(node *Node, listKey string) string {
 	return pred.String()
 }
 
-func isKeyChildWithSchema(child, parent *Node, parentOutputPath string, idx map[string]*NodeInfo) bool {
+func isKeyChildWithSchema(child, parent *Node, parentOutputPath string, idx *Schema) bool {
 	parentSchemaPath := outputPathToSchemaPath(parentOutputPath)
-	if info, ok := idx[parentSchemaPath]; ok && info.Kind == KindList && info.ListKey != "" {
+	if info, ok := idx.Lookup(parentSchemaPath); ok && info.Kind == KindList && info.ListKey != "" {
 		for _, keyPart := range strings.Fields(info.ListKey) {
 			if child.Tag == keyPart {
 				return true

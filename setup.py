@@ -28,8 +28,10 @@ setup(
     package_data={
         "terraform_provider": [
             "*",
+            "generic/*",
             "netconf/*",
             "patch/*",
+            "cmd/compileschema/*",
             "go-netconf/*",
             "go-netconf/drivers/driver/*",
             "go-netconf/drivers/junos/*",

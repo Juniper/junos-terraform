@@ -2255,7 +2255,7 @@ var TrimmedSchemaJSON = `{
   }
 }`
 
-var idx map[string]*NodeInfo
+var idx *Schema
 
 func TestMain(m *testing.M) {
 	// setup
