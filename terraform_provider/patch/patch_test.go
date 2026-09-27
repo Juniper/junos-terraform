@@ -2342,8 +2342,6 @@ func TestCreateDiffPatch_KeyedListRenameWithDescendantsUsesEntryOperations(t *te
     <login>
       <user nc:operation="delete">
         <name>regress</name>
-        <class/>
-        <uid/>
       </user>
       <user nc:operation="create">
         <name>vinay</name>

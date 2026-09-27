@@ -148,8 +148,19 @@ func CreateDiffPatchWithSchema(diffMap map[string]Change, planMap map[string]str
 			// a structural sibling — do NOT add an operation.  This is
 			// critical for Junos compound-key lists where choice-ident
 			// elements (e.g. <add/>) must appear WITHOUT an operation.
+			//
+			// When a whole entry is deleted, Junos only needs its key (for
+			// example a BGP neighbor's address). Its other settings, such as
+			// the neighbor's local-address, are removed along with it. If we
+			// sent those settings too, they would go out as empty tags like
+			// <local-address/>, and Junos would reject the whole change
+			// because an empty tag is not a valid address. So any setting
+			// that had a value is skipped. Settings with no value, like <add/>
+			// above, are still sent because Junos needs them to find the entry.
 			if p.parent.Operation == "delete" {
-				// structural child — no operation
+				if p.change.OldVal != "" {
+					continue
+				}
 			} else {
 				leaf.Operation = "delete"
 			}
