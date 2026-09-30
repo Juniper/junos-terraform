@@ -2,6 +2,23 @@
 
 Comprehensive testing guide for JTAF — all test suites, how to run them, coverage strategies, and patterns.
 
+## Purpose
+
+Define the test coverage and verification expectations for JTAF components and workflows.
+
+## Requirements
+
+### Requirement: Schema loading and generated handoffs are tested
+The test suite SHALL verify the shared schema loader with plain JSON, gzip JSON (including an extensionless file), gzip JSON on stdin, and invalid input that reports the filename. It SHALL also verify that each generator's gzip-compressed schema is consumed by its downstream tool.
+
+#### Scenario: Terraform workflow handoff
+- **WHEN** the `jtaf-yang2go` workflow test runs
+- **THEN** it verifies `trimmed_schema.json.gz` exists, the plain schema file does not, and `jtaf-xml2tf` produces output from the gzip file
+
+#### Scenario: Ansible workflow handoff
+- **WHEN** the `jtaf-yang2ansible` workflow test runs
+- **THEN** it verifies `trimmed_schema.json.gz` exists, the plain schema file does not, and `jtaf-xml2yaml` produces host and group variables from the gzip file
+
 ---
 
 ## Test Suite Overview

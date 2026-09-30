@@ -98,6 +98,15 @@ Result: Complete, buildable Go provider
 
 - **Given** source files contain `"terraform_provider/"` imports, **When** `rewrite_import_prefixes()` runs, **Then** all occurrences replaced with `"terraform-provider-junos-{type}/"`
 
+## Requirements
+
+### Requirement: Generated providers carry a compressed schema
+Both Jinja2 and `--generic` provider generation paths SHALL write the trimmed schema as compact gzip-compressed JSON named `trimmed_schema.json.gz` and SHALL NOT write a plain `trimmed_schema.json`.
+
+#### Scenario: Schema is available to downstream tools
+- **WHEN** provider generation completes
+- **THEN** `trimmed_schema.json.gz` contains the filtered schema and `jtaf-xml2tf` can consume it to produce the same output as the equivalent plain JSON schema
+
 ### Schema Emission
 
 - **Given** code generation completes, **When** finalization runs, **Then** `trimmed_schema.json.gz` (compact JSON, gzip-compressed) is written to the output directory; no plain `trimmed_schema.json` is written
