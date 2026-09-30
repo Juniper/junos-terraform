@@ -7,6 +7,8 @@ from importlib.machinery import SourceFileLoader
 import pytest
 import yaml
 
+from junosterraform.jtaf_common import load_schema_json, write_schema_json_gz
+
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -78,8 +80,9 @@ def _basic_schema() -> dict:
 def _write_provider(tmp_path: pathlib.Path, provider_dir_name: str, role_name: str) -> pathlib.Path:
     provider_dir = tmp_path / provider_dir_name
     (provider_dir / "roles" / role_name).mkdir(parents=True, exist_ok=True)
-    schema_file = provider_dir / "trimmed_schema.json"
-    schema_file.write_text(json.dumps(_basic_schema()))
+    # As jtaf-ansible writes it: compact, gzipped.
+    schema_file = provider_dir / "trimmed_schema.json.gz"
+    write_schema_json_gz(_basic_schema(), str(schema_file))
     return schema_file
 
 
@@ -240,7 +243,7 @@ def test_parse_xml_to_payload(xml2yaml_mod, tmp_path):
     xml_file = tmp_path / "router1.xml"
     _write_xml(xml_file, host_name="router1", product_name="QFX5100", profile="qfx", router_id="1.1.1.1")
 
-    schema = json.loads(schema_file.read_text())
+    schema = load_schema_json(str(schema_file))
     hostname, payload, dtype = xml2yaml_mod.parse_xml_to_payload(str(xml_file), schema)
     assert hostname == "router1"
     assert payload["system"]["host_name"] == "router1"
@@ -469,7 +472,21 @@ def test_jtaf_ansible_main_generates_role(ansible_mod, tmp_path, monkeypatch):
     assert "Merge variables from hierarchy" in task_text
     assert "jtaf_apply_merge_directives" in task_text
     assert (out / "group_vars" / "all.yml").exists()
-    assert (out / "trimmed_schema.json").exists()
+    assert (out / "trimmed_schema.json.gz").exists()
+    assert not (out / "trimmed_schema.json").exists()
+    assert load_schema_json(str(out / "trimmed_schema.json.gz"))["root"]["children"][0]["name"] == "configuration"
+
+
+def test_xml2yaml_load_schema_accepts_plain_and_gzipped(xml2yaml_mod, tmp_path):
+    plain = tmp_path / "trimmed_schema.json"
+    plain.write_text(json.dumps(_basic_schema()))
+    gz = tmp_path / "trimmed_schema.json.gz"
+    write_schema_json_gz(_basic_schema(), str(gz))
+    assert xml2yaml_mod.load_schema(str(plain)) == xml2yaml_mod.load_schema(str(gz))
+    no_config = tmp_path / "empty.json.gz"
+    write_schema_json_gz({"root": {"children": []}}, str(no_config))
+    with pytest.raises(ValueError, match="No configuration node"):
+        xml2yaml_mod.load_schema(str(no_config))
 
 
 def test_elem_to_dict_list_leaflist_and_container(xml2yaml_mod):

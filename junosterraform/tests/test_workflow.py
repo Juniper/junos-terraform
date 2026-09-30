@@ -1,4 +1,3 @@
-import json
 import os
 from glob import glob
 import subprocess
@@ -8,6 +7,8 @@ import re
 import unittest
 import yaml
 import pytest
+
+from junosterraform.jtaf_common import load_schema_json
 
 
 class TestWorkflow(unittest.TestCase):
@@ -71,12 +72,12 @@ def test_yang2go():
     ]
 
     with tempfile.TemporaryDirectory(prefix="jtaf-yang2go-") as tmpdir:
-        # Test generated provider with trimmed_schema.json in isolated temp workspace.
+        # Test generated provider with trimmed_schema.json.gz in isolated temp workspace.
         generated_provider_dir = os.path.join(
             tmpdir, "terraform-provider-junos-vqfx-evpn-vxlan"
         )
         generated_trimmed_schema = os.path.join(
-            generated_provider_dir, "trimmed_schema.json"
+            generated_provider_dir, "trimmed_schema.json.gz"
         )
 
         proc = subprocess.run(
@@ -97,14 +98,30 @@ def test_yang2go():
             f"Expected provider dir not created: {generated_provider_dir}"
         )
         assert os.path.exists(generated_trimmed_schema), (
-            f"Expected trimmed_schema.json not found at {generated_trimmed_schema}"
+            f"Expected trimmed_schema.json.gz not found at {generated_trimmed_schema}"
+        )
+        assert not os.path.exists(os.path.join(generated_provider_dir, "trimmed_schema.json")), (
+            "Plain trimmed_schema.json should no longer be written"
         )
 
-        with open(generated_trimmed_schema) as f:
-            generated_json = json.load(f)
+        generated_json = load_schema_json(generated_trimmed_schema)
+
+        # The downstream tool consumes the gzipped schema as written.
+        xml2tf = shutil.which("jtaf-xml2tf")
+        assert xml2tf, "jtaf-xml2tf not found on PATH"
+        tf_dir = os.path.join(tmpdir, "tf")
+        proc = subprocess.run(
+            [xml2tf, "-j", generated_trimmed_schema, "-x", xml_args[0], "-t", "vqfx-evpn-vxlan", "-d", tf_dir],
+            text=True, capture_output=True, check=False, cwd=tmpdir, env=env,
+        )
+        assert proc.returncode == 0, (
+            f"jtaf-xml2tf failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
+        )
+        assert os.path.exists(os.path.join(tf_dir, "providers.tf"))
+        assert os.path.exists(os.path.join(tf_dir, "dc1-borderleaf1.tf"))
 
     # Validate generated schema shape without depending on committed generated fixtures.
-    assert isinstance(generated_json, dict), "Generated trimmed_schema.json should be a JSON object"
+    assert isinstance(generated_json, dict), "Generated trimmed_schema.json.gz should be a JSON object"
     assert "root" in generated_json, "Generated schema missing 'root' key"
     assert isinstance(generated_json["root"], dict), "Generated schema 'root' should be an object"
     assert "children" in generated_json["root"], "Generated schema root missing 'children' key"
@@ -188,7 +205,13 @@ def test_yang2ansible():
         )
 
         trimmed_schema_path = os.path.join(
-            role_dir, "trimmed_schema.json"
+            role_dir, "trimmed_schema.json.gz"
+        )
+        assert os.path.exists(trimmed_schema_path), (
+            f"Expected trimmed_schema.json.gz not found at {trimmed_schema_path}"
+        )
+        assert not os.path.exists(os.path.join(role_dir, "trimmed_schema.json")), (
+            "Plain trimmed_schema.json should no longer be written"
         )
 
         # xml2yaml command mirrors the GitHub Action invocation.

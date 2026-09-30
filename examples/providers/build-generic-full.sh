@@ -20,7 +20,7 @@ echo "Compiling full-model provider..."
 cd terraform-provider-junos-qfx-full
 go build .
 
-SCHEMA_SIZE=$(du -sh trimmed_schema.json | cut -f1)
+SCHEMA_SIZE=$(du -sh trimmed_schema.json.gz | cut -f1)
 BINARY_SIZE=$(du -sh terraform-provider-junos-qfx-full | cut -f1)
 echo ""
 echo "  Schema:  $SCHEMA_SIZE"

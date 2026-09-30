@@ -67,7 +67,7 @@ Run a command to generate a `.tf` test file to deploy the Terraform provider.
 
 **Flag Options:**
  * -j 
-	* **Required:** trimmed_json output file from jtaf-provider (stored in terraform provider folder /terraform-provider-junos-"device-type")
+	* **Required:** `trimmed_schema.json.gz` output file from jtaf-provider (stored in terraform provider folder /terraform-provider-junos-"device-type"); plain JSON is also accepted
  * -x
 	* **Required:** File(s) of xml config to create terraform files for
  * -t
@@ -91,15 +91,15 @@ jtaf-xml2tf -j <path-to-trimmed-schema> -x <path-to-config-files(s)> -t <device-
 
 Example: 
 
-* **trimmed_schema** - stored in terraform provider folder created from running the jtaf-provider module command (usually in terraform-provider-junos-'device-type')
+* **trimmed_schema** - `trimmed_schema.json.gz`, stored in the terraform provider folder created from running the jtaf-provider module command (usually in terraform-provider-junos-'device-type')
 * **xml_files** - directory containing xml file(s) (ensure xml file(s) are for the same device type)
 
 ```
-jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx -d testbed
+jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json.gz -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx -d testbed
 ```
 * If the user wants to provide the device(s) **username** and **password**, those additional flags can be added as well
 ```
-jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx -d testbed -u root -p password
+jtaf-xml2tf -j terraform-provider-junos-vqfx/trimmed_schema.json.gz -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx -d testbed -u root -p password
 ```
 
 Using the output which is outputted to the specified directory from the command, which represents a template for the HCL .tf file for each input XML file, we can now create our testing environment and fill in the template with any remaining necessary device or config information.
@@ -238,7 +238,7 @@ Device XML (get-config) ──┐
                           ├→ BuildTree() → LeafMapWithSchema() → map[path]value
 Plan XML (Terraform) ────┘                        ↑
                                             YANG Schema
-                                         (trimmed_schema.json)
+                                       (trimmed_schema.json.gz)
                                                   ↓
                                          ComputeDiff()
                                                   ↓
@@ -273,7 +273,7 @@ Plan XML (Terraform) ────┘                        ↑
 
 #### Schema-Aware Features
 
-The patch engine uses the `trimmed_schema.json` (generated alongside the provider) to make intelligent decisions:
+The patch engine uses the trimmed schema (`trimmed_schema.json.gz`, generated alongside the provider) to make intelligent decisions:
 
 - **List key detection:** Uses YANG `key` statement instead of hardcoded `name`/`id`/`type` guessing
 - **Leaf-list semantics:** Distinguishes `ordered-by user` (position matters) from `ordered-by system` (set semantics)

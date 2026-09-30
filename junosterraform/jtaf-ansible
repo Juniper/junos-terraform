@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 import argparse
-import json
 import os
 from importlib.resources import as_file, files
 
 from jinja2 import Template
 
-from junosterraform.jtaf_common import filter_json_using_xml, load_and_merge_xmls
+from junosterraform.jtaf_common import (
+    filter_json_using_xml,
+    load_and_merge_xmls,
+    write_schema_json_gz,
+)
 
 
 def main() -> None:
@@ -26,7 +29,7 @@ def main() -> None:
             host_vars/
             configs/
             jtaf-playbook.yml
-            trimmed_schema.json
+            trimmed_schema.json.gz
     """
     # other arguments
     parser = argparse.ArgumentParser(
@@ -37,7 +40,8 @@ def main() -> None:
         '-j',
         '--json-schema',
         required=True,
-        help="Path to JTAF JSON schema, or '-' to read JSON from stdin.",
+        help="Path to the JTAF JSON schema from pyang, plain or gzipped "
+             "(e.g. trimmed_schema.json.gz), or '-' to read it from stdin.",
     )
     parser.add_argument(
         '-x',
@@ -280,10 +284,8 @@ jtaf_group_name: "JTAF_ANSIBLE"
     with open(os.path.join(new_dir, "jtaf-playbook.yml"), "w") as f:
         f.write(playbook_content)
 
-    # Step 5: Add trimmed_schema.json to new directory
-    trimmed_schema_path = os.path.join(new_dir, "trimmed_schema.json")
-    with open(trimmed_schema_path, "w") as f:
-        json.dump(resources, f, indent=2)
+    # Step 5: Add trimmed_schema.json.gz to new directory, for jtaf-xml2yaml
+    write_schema_json_gz(resources, os.path.join(new_dir, "trimmed_schema.json.gz"))
 
 
 if __name__ == "__main__":

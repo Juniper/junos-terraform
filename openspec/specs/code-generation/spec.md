@@ -98,10 +98,19 @@ Result: Complete, buildable Go provider
 
 - **Given** source files contain `"terraform_provider/"` imports, **When** `rewrite_import_prefixes()` runs, **Then** all occurrences replaced with `"terraform-provider-junos-{type}/"`
 
+## Requirements
+
+### Requirement: Generated providers carry a compressed schema
+Both Jinja2 and `--generic` provider generation paths SHALL write the trimmed schema as compact gzip-compressed JSON named `trimmed_schema.json.gz` and SHALL NOT write a plain `trimmed_schema.json`.
+
+#### Scenario: Schema is available to downstream tools
+- **WHEN** provider generation completes
+- **THEN** `trimmed_schema.json.gz` contains the filtered schema and `jtaf-xml2tf` can consume it to produce the same output as the equivalent plain JSON schema
+
 ### Schema Emission
 
-- **Given** code generation completes, **When** finalization runs, **Then** `trimmed_schema.json` is written to the output directory
-- This JSON is loaded at runtime by `ProcessSchema()` in the patch engine for type-aware diffing
+- **Given** code generation completes, **When** finalization runs, **Then** `trimmed_schema.json.gz` (compact JSON, gzip-compressed) is written to the output directory; no plain `trimmed_schema.json` is written
+- This schema is read by the downstream tools (`jtaf-xml2tf`); the generated provider inlines the same schema in Go source for `ProcessSchema()` in the patch engine
 
 ---
 
@@ -116,7 +125,7 @@ terraform-provider-junos-vmx-4-topo/
 ├── config.go                    ← NETCONF config struct + Client() factory
 ├── resource_config_provider.go  ← Generated resource with CRUD
 ├── go.mod                       ← Module: terraform-provider-junos-vmx-4-topo
-├── trimmed_schema.json          ← Schema index for patch engine
+├── trimmed_schema.json.gz       ← Trimmed schema for downstream tools (jtaf-xml2tf)
 ├── patch/                       ← Patch engine package (copied from terraform_provider/patch/)
 └── netconf/                     ← NETCONF client package (copied from terraform_provider/netconf/)
 ```
@@ -148,7 +157,7 @@ cd terraform-provider-junos-test-qfx && go build .
 cd terraform-provider-junos-test-qfx && go test ./...
 
 # Verify schema file exists
-test -f terraform-provider-junos-test-qfx/trimmed_schema.json && echo "OK"
+test -f terraform-provider-junos-test-qfx/trimmed_schema.json.gz && echo "OK"
 
 # Verify import paths are correct (no leftover terraform_provider/ imports)
 grep -r '"terraform_provider/' terraform-provider-junos-test-qfx/ && echo "FAIL: leftover imports" || echo "OK"
@@ -161,5 +170,5 @@ grep -r '"terraform_provider/' terraform-provider-junos-test-qfx/ && echo "FAIL:
 | Compiles | `go build .` | Exit 0, no errors |
 | Tests pass | `go test ./...` | All tests pass |
 | No leftover imports | `grep -r '"terraform_provider/'` | No matches |
-| Schema exists | `test -f trimmed_schema.json` | File exists |
+| Schema exists | `test -f trimmed_schema.json.gz` | File exists |
 | Module name correct | `head -1 go.mod` | `module terraform-provider-junos-{type}` |

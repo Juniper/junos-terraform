@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **BREAKING:** `jtaf-provider` (both the Jinja2 and `--generic` paths) and `jtaf-ansible` now write the trimmed schema as compact, gzipped `trimmed_schema.json.gz`; the plain `trimmed_schema.json` is no longer written. Pass the `.gz` file to `jtaf-xml2tf -j` / `jtaf-xml2yaml -j`.
+- `jtaf-provider`, `jtaf-ansible`, `jtaf-xml2tf` and `jtaf-xml2yaml` read the schema given with `-j` (file or `-` for stdin) as plain or gzipped JSON, detected by content, through a shared loader (`jtaf_common.load_schema_json`); directories generated before this change still load.
+
 ## [1.2.0] - 2026-06-17
 
 ### Added

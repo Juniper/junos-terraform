@@ -2,6 +2,10 @@
 
 Python command-line tools that drive the JTAF pipeline — from YANG models to generated Terraform/Ansible providers.
 
+## Purpose
+
+Define the behavior of the JTAF command-line tools, including schema file handling and generated schema artifacts.
+
 ## Overview
 
 | Tool | Purpose |
@@ -12,6 +16,34 @@ Python command-line tools that drive the JTAF pipeline — from YANG models to g
 | `jtaf-xml2yaml` | Junos XML config → YAML representation |
 | `jtaf-yang2ansible` | YANG + XML → Ansible role structure |
 | `jtaf-ansible` | JSON schema + XML → Ansible artifacts |
+
+## Requirements
+
+### Requirement: Schema input supports plain and gzip JSON
+All CLI tools that accept a JTAF JSON schema with `-j` SHALL accept plain JSON or gzip-compressed JSON, detecting gzip from the file content rather than its extension. `-j -` SHALL read either form from stdin. The tools SHALL use a shared loader, and invalid schema input SHALL fail with an error naming the input.
+
+#### Scenario: Gzipped schema file
+- **WHEN** `-j` names a gzip-compressed JSON file, regardless of extension
+- **THEN** the tool decompresses and parses it as the equivalent plain JSON schema
+
+#### Scenario: Gzipped schema on stdin
+- **WHEN** `-j -` is given and stdin contains gzip-compressed JSON
+- **THEN** the tool decompresses and parses it
+
+#### Scenario: Invalid schema input
+- **WHEN** `-j` names a file that is neither plain JSON nor gzip-compressed JSON
+- **THEN** the tool exits with a non-zero status and an error naming the input
+
+### Requirement: Provider and role generators write compressed schemas
+`jtaf-provider` and `jtaf-ansible` SHALL write their trimmed schema as compact gzip-compressed JSON named `trimmed_schema.json.gz` and SHALL NOT write `trimmed_schema.json`. This applies to both Terraform provider generation paths.
+
+#### Scenario: Generated schema handoff
+- **WHEN** either generator completes
+- **THEN** its output directory contains `trimmed_schema.json.gz`, and downstream tools can consume that file
+
+#### Scenario: Schema help text
+- **WHEN** a user checks the `-j` help text for any of the four tools
+- **THEN** it names `trimmed_schema.json.gz` and states that plain JSON is also accepted
 
 ---
 
@@ -35,7 +67,7 @@ Python command-line tools that drive the JTAF pipeline — from YANG models to g
 3. **When** the output directory already exists, **Then** it is deleted via `shutil.rmtree()` and recreated via `shutil.copytree()`
 4. **When** the Go provider is created, **Then** `ensure_go_module_name()` sets `go.mod` to `module terraform-provider-junos-{type}`
 5. **When** module name is set, **Then** `rewrite_import_prefixes()` replaces all `"terraform_provider/"` imports with `"terraform-provider-junos-{type}/"`
-6. **When** code generation completes, **Then** `trimmed_schema.json` is written to the output directory for runtime use by the patch engine
+6. **When** code generation completes, **Then** `trimmed_schema.json.gz` (compact, gzipped JSON) is written to the output directory for the downstream tools; `-j` on all tools accepts plain or gzipped JSON, detected by content
 
 #### Error Handling
 

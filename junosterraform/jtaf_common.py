@@ -1,5 +1,42 @@
+import gzip
+import json
+import sys
 import xml.etree.ElementTree as ElementTree
 from typing import Any, Union
+
+
+GZIP_MAGIC = b"\x1f\x8b"
+
+
+def load_schema_json(path: str) -> Any:
+    """Load a JTAF JSON schema from a file, or stdin when path is '-'.
+
+    The schema may be plain JSON or gzip-compressed JSON; gzip is detected from
+    the content (the 1f 8b magic bytes), not the file extension, matching what
+    the Go provider's embed.go and cmd/compileschema do.
+    """
+    if path == "-":
+        data = sys.stdin.buffer.read()
+        name = "<stdin>"
+    else:
+        with open(path, "rb") as f:
+            data = f.read()
+        name = path
+    if data[:2] == GZIP_MAGIC:
+        try:
+            data = gzip.decompress(data)
+        except (OSError, EOFError) as e:
+            raise ValueError(f"{name}: not a valid gzip file ({e})") from None
+    try:
+        return json.loads(data)
+    except ValueError as e:
+        raise ValueError(f"{name}: not valid JSON ({e})") from None
+
+
+def write_schema_json_gz(resources: Any, path: str) -> None:
+    """Write a JTAF JSON schema to path as compact, gzip-compressed JSON."""
+    with gzip.open(path, "wt", encoding="utf-8") as f:
+        json.dump(resources, f, separators=(",", ":"))
 
 
 def get_xpaths(root: ElementTree.Element) -> dict[str, bool]:
@@ -302,13 +339,7 @@ def filter_json_using_xml(schema: str,
     Returns:
         Filtered schema structure as dict (will be serialized by caller).
     """
-    import sys
-    import json
-    if schema == "-":
-        schema = json.load(sys.stdin)
-    else:
-        with open(schema) as f:
-            schema = json.load(f)
+    schema = load_schema_json(schema)
 
     # Check if xml is a single file or merged xml element
     if isinstance(xml, str):
