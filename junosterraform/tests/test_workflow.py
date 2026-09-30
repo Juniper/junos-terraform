@@ -20,7 +20,8 @@ class TestWorkflow(unittest.TestCase):
 # Note for any changes need to rerun "pip install ./junos-terraform"
 
 
-def test_yang2go():
+@pytest.mark.parametrize("generic", [False, True], ids=["standard", "generic"])
+def test_yang2go(generic):
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     yang_root = os.path.abspath(os.path.join(repo_root, "examples", "yang"))
 
@@ -70,6 +71,8 @@ def test_yang2go():
         "-t",
         "vqfx-evpn-vxlan",
     ]
+    if generic:
+        cmd.append("--generic")
 
     with tempfile.TemporaryDirectory(prefix="jtaf-yang2go-") as tmpdir:
         # Test generated provider with trimmed_schema.json.gz in isolated temp workspace.
@@ -105,6 +108,28 @@ def test_yang2go():
         )
 
         generated_json = load_schema_json(generated_trimmed_schema)
+
+        if generic:
+            assert os.path.exists(os.path.join(generated_provider_dir, "main.go"))
+            assert os.path.exists(os.path.join(generated_provider_dir, "embed_schema.go"))
+            assert os.path.exists(os.path.join(generated_provider_dir, "schema.bin.gz"))
+
+            go_exe = shutil.which("go")
+            assert go_exe, "go is required to build the generated generic provider"
+            proc = subprocess.run(
+                [go_exe, "build", "."],
+                text=True,
+                capture_output=True,
+                check=False,
+                cwd=generated_provider_dir,
+                env=env,
+            )
+            assert proc.returncode == 0, (
+                f"generic provider go build failed:\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
+            )
+            assert os.path.isfile(
+                os.path.join(generated_provider_dir, "terraform-provider-junos-vqfx-evpn-vxlan")
+            )
 
         # The downstream tool consumes the gzipped schema as written.
         xml2tf = shutil.which("jtaf-xml2tf")

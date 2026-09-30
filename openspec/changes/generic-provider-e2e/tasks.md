@@ -10,6 +10,8 @@
 - [x] 2.1 Extend the existing end-to-end workflow to select the standard staged providers and run the existing Terraform plan first; verify the configuration and plan command are unchanged and no apply or init is run.
 - [x] 2.2 Select the generic staged providers and rerun the same plan scenario; verify the workflow keeps per-variant plan output, diagnostics, and exit status, and leaves the standard provider as the default selection.
 - [x] 2.3 Verify failure handling reports the provider variant and preserves its diagnostic output, still runs the second plan when the first plan fails, and cleans temporary selection/configuration state on success and failure.
+- [x] 2.4 Add a GitHub Actions matrix to run the same Terraform mock lifecycle with standard and generic provider implementations; verify jobs and uploaded logs are labeled by implementation.
+- [ ] 2.5 Add an Ansible schema-source matrix that feeds the generic-generated schema into `jtaf-xml2yaml` and runs the same mock playbook lifecycle; verify logs identify the schema source.
 
 ## 3. Resolve Reproduced Generic Provider Defects
 
@@ -18,5 +20,5 @@
 
 ## 4. Verify Integration
 
-- [ ] 4.1 Run the end-to-end workflow against the configured test target and verify both provider plans complete against the identical Terraform scenario without applying changes.
+- [ ] 4.1 Run both GitHub Actions matrix workflows and verify standard/generic Terraform and Ansible jobs pass the same scenarios against the NETCONF mock.
 - [x] 4.2 Run the focused Python and Go tests for touched components and verify both provider build paths still succeed.

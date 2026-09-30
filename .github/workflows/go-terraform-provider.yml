@@ -8,7 +8,12 @@ on:
 
 jobs:
   build-and-plan:
+    name: Terraform integration (${{ matrix.provider_implementation }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        provider_implementation: [standard, generic]
 
     steps:
     - uses: actions/checkout@v7
@@ -41,11 +46,17 @@ jobs:
     - name: Set up Terraform
       uses: hashicorp/setup-terraform@v4
 
-    - name: Generate provider with jtaf-yang2go
+    - name: Generate ${{ matrix.provider_implementation }} provider with jtaf-yang2go
       run: |
+        set -euo pipefail
         rm -rf terraform-provider-junos-vqfx-evpn-vxlan
 
-        jtaf-yang2go \
+        provider_args=()
+        if [[ "${{ matrix.provider_implementation }}" == "generic" ]]; then
+          provider_args+=(--generic)
+        fi
+
+        jtaf-yang2go "${provider_args[@]}" \
           -p examples/yang/18.2/18.2R3/common \
           examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang \
           -x \
@@ -60,7 +71,7 @@ jobs:
           examples/evpn-vxlan-dc/dc2/dc2-spine2.xml \
           -t vqfx-evpn-vxlan
 
-    - name: Build and test generated terraform provider
+    - name: Build and test generated ${{ matrix.provider_implementation }} Terraform provider
       working-directory: terraform-provider-junos-vqfx-evpn-vxlan
       run: |
         go build -v ./...
@@ -433,7 +444,7 @@ jobs:
       if: always() && env.ACTIONS_RUNTIME_TOKEN != ''
       uses: actions/upload-artifact@v7
       with:
-        name: netconf-integration-logs
+        name: netconf-integration-logs-${{ matrix.provider_implementation }}
         path: |
           netconf-mock.log
           netconf-mock-state.json
