@@ -252,7 +252,9 @@ def test_xml2tf_rejects_non_json_schema(tmp_path, monkeypatch):
     bad.write_text("<configuration/>")
     xml_file = tmp_path / "leaf1.xml"
     xml_file.write_text("<configuration/>")
-    monkeypatch.setattr(sys, "argv", ["jtaf-xml2tf", "-j", str(bad), "-x", str(xml_file), "-t", "qfx", "-d", str(tmp_path / "tf")])
+    monkeypatch.setattr(sys, "argv", [
+        "jtaf-xml2tf", "-j", str(bad), "-x", str(xml_file), "-t", "qfx", "-d", str(tmp_path / "tf"),
+    ])
     with pytest.raises(SystemExit) as exc:
         mod.main()
     assert exc.value.code == 2
