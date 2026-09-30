@@ -144,7 +144,33 @@ def test_jtaf_provider_main_smoke(tmp_path, monkeypatch):
     assert (out / "provider.go").exists()
     assert (out / "go.mod").exists()
     assert (out / "config.go").exists()
-    assert (out / "trimmed_schema.json").exists()
+    assert (out / "trimmed_schema.json.gz").exists()
+    assert not (out / "trimmed_schema.json").exists()
+    from junosterraform.jtaf_common import load_schema_json
+    assert load_schema_json(str(out / "trimmed_schema.json.gz")) == {"root": {"children": []}}
+
+
+def test_jtaf_provider_generic_writes_gzipped_schema(tmp_path, monkeypatch):
+    mod = _load_script("jtaf-provider", "jtaf_provider_generic_mod")
+    from junosterraform.jtaf_common import load_schema_json
+
+    resources = {"root": {"children": [{"name": "configuration", "children": [
+        {"name": "system", "type": "container", "children": [{"name": "host-name", "type": "leaf"}]},
+    ]}]}}
+    schema = tmp_path / "schema.json"
+    schema.write_text(json.dumps(resources))
+    monkeypatch.chdir(tmp_path)
+    # Compiling the schema needs Go; the copy/emit steps are what is under test.
+    monkeypatch.setattr(mod, "_compile_schema", lambda *_: None)
+    monkeypatch.setattr(sys, "argv", ["jtaf-provider", "-j", str(schema), "-t", "srx", "--generic"])
+    mod.main()
+
+    out = tmp_path / "terraform-provider-junos-srx"
+    assert (out / "main.go").exists()
+    assert (out / "embed_schema.go").exists()
+    assert (out / "trimmed_schema.json.gz").exists()
+    assert not (out / "trimmed_schema.json").exists()
+    assert load_schema_json(str(out / "trimmed_schema.json.gz")) == resources
 
 
 def test_xml2tf_helpers_and_main(tmp_path, monkeypatch):
@@ -207,6 +233,29 @@ def test_xml2tf_helpers_and_main(tmp_path, monkeypatch):
     assert (out / "providers.tf").exists()
     assert (out / "leaf1.tf").exists()
     assert "provider \"junos-qfx\"" in (out / "providers.tf").read_text()
+
+    # The same schema gzipped, as the generators write it, gives the same .tf.
+    from junosterraform.jtaf_common import write_schema_json_gz
+    gz_schema = tmp_path / "trimmed_schema.json.gz"
+    write_schema_json_gz(schema, str(gz_schema))
+    out_gz = tmp_path / "tf_gz"
+    argv[argv.index(str(schema_file))] = str(gz_schema)
+    argv[argv.index(str(out))] = str(out_gz)
+    monkeypatch.setattr(sys, "argv", argv)
+    mod.main()
+    assert (out_gz / "leaf1.tf").read_text() == (out / "leaf1.tf").read_text()
+
+
+def test_xml2tf_rejects_non_json_schema(tmp_path, monkeypatch):
+    mod = _load_script("jtaf-xml2tf", "jtaf_xml2tf_badschema_mod")
+    bad = tmp_path / "trimmed_schema.json"
+    bad.write_text("<configuration/>")
+    xml_file = tmp_path / "leaf1.xml"
+    xml_file.write_text("<configuration/>")
+    monkeypatch.setattr(sys, "argv", ["jtaf-xml2tf", "-j", str(bad), "-x", str(xml_file), "-t", "qfx", "-d", str(tmp_path / "tf")])
+    with pytest.raises(SystemExit) as exc:
+        mod.main()
+    assert exc.value.code == 2
 
 
 def test_template_filter_module_and_merge_function():

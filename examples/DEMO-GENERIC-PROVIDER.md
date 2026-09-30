@@ -207,7 +207,7 @@ terraform plan
 
 Terraform will:
 1. Load the generic provider binary
-2. Build the schema dynamically from embedded `trimmed_schema.json`
+2. Build the schema dynamically from the embedded schema (compiled from `trimmed_schema.json.gz`)
 3. Connect to the mock on `127.0.0.1:8301` via NETCONF/SSH
 4. Read the current device config (empty on mock)
 5. Show a plan with all the `dc1-spine1` config to be created
@@ -330,7 +330,7 @@ This runs 11 automated tests covering:
 | 2 | Generate filtered provider with `--generic -x` |
 | 3 | `go build .` the filtered provider |
 | 4 | Verify all generated files present, no test files leaked |
-| 5 | Validate `trimmed_schema.json` structure |
+| 5 | Validate `trimmed_schema.json.gz` structure |
 | 6 | Run the provider binary `--help` |
 | 7 | `terraform init` with dev_overrides |
 | 8 | `terraform validate` — confirms schema loads |
