@@ -66,7 +66,7 @@ jobs:
 
         jtaf-xml2yaml \
           -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml \
-          -j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json \
+          -j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json.gz \
           -d ci-evpn-vxlan-ansible \
           --grouping-hosts-file .github/ansible/ci-switches-grouping.hosts
 

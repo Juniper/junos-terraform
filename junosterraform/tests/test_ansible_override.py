@@ -24,6 +24,8 @@ def minimal_schema():
         "root": {
             "children": [
                 {
+                    "name": "configuration",
+                    "type": "container",
                     "children": [
                         {
                             "name": "system",
@@ -161,3 +163,41 @@ class TestJtafAnsibleCLI:
         if playbook_file.exists():
             content = playbook_file.read_text()
             assert "load: replace" in content
+
+    @pytest.mark.parametrize("mode", ["group", "override"])
+    def test_writes_gzipped_schema_only(self, run_jtaf_ansible, mode):
+        result, output_dir = run_jtaf_ansible(mode)
+        assert result.returncode == 0, result.stderr
+        assert (output_dir / "trimmed_schema.json.gz").exists()
+        assert not (output_dir / "trimmed_schema.json").exists()
+
+    def test_accepts_gzipped_schema_input(self, tmp_path, minimal_schema):
+        """Unmodeled paths are omitted the same whether -j is plain or gzipped."""
+        from junosterraform.jtaf_common import write_schema_json_gz
+
+        xml_file = tmp_path / "test.xml"
+        xml_file.write_text(
+            "<configuration><system><host-name>test</host-name></system>"
+            "<extension-service><notification/></extension-service></configuration>"
+        )
+
+        def _run(schema_path, workdir):
+            workdir.mkdir()
+            result = subprocess.run(
+                [sys.executable, os.path.join(REPO_ROOT, "junosterraform", "jtaf-ansible"),
+                 "-j", str(schema_path), "-x", str(xml_file), "-t", "test-device", "--mode", "override"],
+                capture_output=True, text=True, cwd=str(workdir),
+            )
+            assert result.returncode == 0, result.stderr
+            return (workdir / "ansible-provider-junos-test-device" / "roles" / "test-device_role"
+                    / "templates" / "template.j2").read_text()
+
+        plain = tmp_path / "schema.json"
+        plain.write_text(json.dumps(minimal_schema))
+        gz = tmp_path / "schema.json.gz"
+        write_schema_json_gz(minimal_schema, str(gz))
+
+        from_plain = _run(plain, tmp_path / "plain")
+        from_gz = _run(gz, tmp_path / "gz")
+        assert from_plain == from_gz
+        assert "extension-service" not in from_gz

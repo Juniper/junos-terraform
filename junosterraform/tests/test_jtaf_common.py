@@ -1,3 +1,5 @@
+import gzip
+import io
 import json
 import os
 import tempfile
@@ -6,6 +8,77 @@ from unittest import mock
 import xml.etree.ElementTree as ElementTree
 
 from junosterraform import jtaf_common
+
+
+class TestLoadSchemaJson(unittest.TestCase):
+    """Tests for load_schema_json and write_schema_json_gz."""
+
+    SCHEMA = {"root": {"children": [{"name": "configuration", "children": []}]}}
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def _path(self, name):
+        return os.path.join(self.tmp.name, name)
+
+    def test_plain_file(self):
+        p = self._path("s.json")
+        with open(p, "w") as f:
+            json.dump(self.SCHEMA, f, indent=2)
+        self.assertEqual(jtaf_common.load_schema_json(p), self.SCHEMA)
+
+    def test_gzipped_file(self):
+        p = self._path("s.json.gz")
+        with gzip.open(p, "wt") as f:
+            json.dump(self.SCHEMA, f)
+        self.assertEqual(jtaf_common.load_schema_json(p), self.SCHEMA)
+
+    def test_gzipped_file_without_gz_extension(self):
+        """Detection is by content, not extension."""
+        p = self._path("s.json")
+        with gzip.open(p, "wt") as f:
+            json.dump(self.SCHEMA, f)
+        self.assertEqual(jtaf_common.load_schema_json(p), self.SCHEMA)
+
+    def test_gzipped_stdin(self):
+        data = gzip.compress(json.dumps(self.SCHEMA).encode())
+        fake = mock.Mock()
+        fake.buffer = io.BytesIO(data)
+        with mock.patch.object(jtaf_common.sys, "stdin", fake):
+            self.assertEqual(jtaf_common.load_schema_json("-"), self.SCHEMA)
+
+    def test_plain_stdin(self):
+        fake = mock.Mock()
+        fake.buffer = io.BytesIO(json.dumps(self.SCHEMA).encode())
+        with mock.patch.object(jtaf_common.sys, "stdin", fake):
+            self.assertEqual(jtaf_common.load_schema_json("-"), self.SCHEMA)
+
+    def test_not_json_names_file(self):
+        p = self._path("bad.json")
+        with open(p, "w") as f:
+            f.write("<configuration/>")
+        with self.assertRaises(ValueError) as cm:
+            jtaf_common.load_schema_json(p)
+        self.assertIn(p, str(cm.exception))
+
+    def test_truncated_gzip_names_file(self):
+        p = self._path("bad.json.gz")
+        with open(p, "wb") as f:
+            f.write(gzip.compress(b"{}")[:6])
+        with self.assertRaises(ValueError) as cm:
+            jtaf_common.load_schema_json(p)
+        self.assertIn(p, str(cm.exception))
+
+    def test_write_round_trip(self):
+        p = self._path("trimmed_schema.json.gz")
+        jtaf_common.write_schema_json_gz(self.SCHEMA, p)
+        with open(p, "rb") as f:
+            self.assertEqual(f.read(2), jtaf_common.GZIP_MAGIC)
+        self.assertEqual(jtaf_common.load_schema_json(p), self.SCHEMA)
+        # compact: no indentation whitespace
+        with gzip.open(p, "rt") as f:
+            self.assertNotIn("\n", f.read())
 
 
 class TestGetXpaths(unittest.TestCase):
@@ -725,6 +798,18 @@ class TestFilterJsonUsingXml(unittest.TestCase):
             paths = walk.call_args[0][0]
             self.assertIn("system/ntp/server/version", paths)
             self.assertNotIn("version", paths)
+        finally:
+            os.remove(schema_file)
+
+    def test_filter_json_using_xml_gzipped_schema(self):
+        """The schema may be given gzipped, as the generators now write it."""
+        root = ElementTree.fromstring("<configuration><system/></configuration>")
+        with tempfile.NamedTemporaryFile(suffix='.json.gz', delete=False) as f:
+            schema_file = f.name
+        try:
+            jtaf_common.write_schema_json_gz({"name": "configuration", "children": {}}, schema_file)
+            result = jtaf_common.filter_json_using_xml(schema_file, root)
+            self.assertEqual(result["name"], "configuration")
         finally:
             os.remove(schema_file)
 

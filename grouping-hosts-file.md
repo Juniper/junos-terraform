@@ -85,7 +85,7 @@ Both the QFX and SRX roles reference the **same** grouping file. Run one command
 
 ```bash
 jtaf-xml2yaml \
-  -j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json \
+  -j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json.gz \
   -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml \
      examples/evpn-vxlan-dc/dc2/*spine*.xml \
   -d ansible-evpn-vxlan-deploy \
@@ -97,7 +97,7 @@ jtaf-xml2yaml \
 
 ```bash
 jtaf-xml2yaml \
-  -j ansible-provider-junos-srx-ansible-role/trimmed_schema.json \
+  -j ansible-provider-junos-srx-ansible-role/trimmed_schema.json.gz \
   -x examples/evpn-vxlan-dc/dc1/dc1-*firewall*.xml \
      examples/evpn-vxlan-dc/dc2/dc2-*firewall*.xml \
   -d ansible-evpn-vxlan-deploy \

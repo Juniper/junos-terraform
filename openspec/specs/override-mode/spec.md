@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Define how generated Ansible roles render and apply configuration in override mode.
+
+## Requirements
 
 ### Requirement: Override template renders bare configuration XML
 The Ansible Jinja2 template in override mode SHALL render `<configuration>...</configuration>` without any `<groups>` or `<apply-groups>` wrapper. The rendered XML SHALL contain all configuration subtrees covered by the trimmed schema, directly under `<configuration>`.
@@ -34,11 +38,15 @@ The generated playbook in override mode SHALL use `commit confirmed <N>` where N
 - **THEN** the playbook uses that value as the `confirmed:` parameter in the `juniper.device.config` task
 
 ### Requirement: Unmodeled paths are silently omitted
-When XML input contains configuration paths that do not exist in the YANG schema (trimmed_schema.json), those paths SHALL NOT be included in the generated Ansible role template or variables. This matches Terraform provider behavior.
+When XML input contains configuration paths that do not exist in the YANG schema (plain or gzip-compressed trimmed schema), those paths SHALL NOT be included in the generated Ansible role template or variables. This matches Terraform provider behavior.
 
 #### Scenario: XML config has paths not in YANG
 - **WHEN** input XML contains `<extension-service>` or other elements not modeled in the YANG files
 - **THEN** those elements are silently skipped during role/template generation — no error, no warning, no output for those paths
+
+#### Scenario: Schema given gzipped
+- **WHEN** an override-mode role and its variables are generated using a gzip-compressed trimmed schema
+- **THEN** unmodeled paths are omitted exactly as when the equivalent plain JSON schema is used
 
 ### Requirement: Continuous updates via YAML edits
 When an operator edits `host_vars` or `group_vars` YAML files and re-runs the playbook in override mode, the changes SHALL be automatically reflected. No intermediate tools or regeneration steps are needed — the Jinja2 template reads YAML vars at render time, and Junos candidate config computes the diff internally.

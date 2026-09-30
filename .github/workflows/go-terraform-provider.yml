@@ -69,7 +69,7 @@ jobs:
     - name: Generate EVPN-VXLAN Terraform files
       run: |
         jtaf-xml2tf \
-          -j terraform-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json \
+          -j terraform-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json.gz \
           -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml \
           -t vqfx-evpn-vxlan \
           -d ci-evpn-vxlan-tf \

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import xml.etree.ElementTree as ElementTree
 from copy import copy
-import gzip
-import json
 import re
 import argparse
 import sys
@@ -12,7 +10,12 @@ import shutil
 import subprocess
 import os
 from importlib.resources import files, as_file
-from junosterraform.jtaf_common import filter_json_using_xml, load_and_merge_xmls
+from junosterraform.jtaf_common import (
+    filter_json_using_xml,
+    load_and_merge_xmls,
+    load_schema_json,
+    write_schema_json_gz,
+)
 
  
 def render_template_and_write(input_template: str, output_file: str, context: dict, description: str):
@@ -220,8 +223,7 @@ def _generate_generic_provider(resources, device_type):
     # Write trimmed_schema.json.gz, compact and compressed (a full model is
     # hundreds of MB as indented JSON); it is compiled into schema.bin.gz below.
     schema_path = os.path.join(new_dir, "trimmed_schema.json.gz")
-    with gzip.open(schema_path, "wt", encoding="utf-8") as f:
-        json.dump(resources, f, separators=(",", ":"))
+    write_schema_json_gz(resources, schema_path)
     print(f"Schema written to {os.path.relpath(schema_path)}")
 
     # Generate embed_schema.go, which embeds the compiled schema via go:embed
@@ -262,7 +264,8 @@ def main():
         '-j',
         '--json-schema',
         required=True,
-        help="Path to JTAF JSON schema, or '-' to read JSON from stdin.",
+        help="Path to the JTAF JSON schema from pyang, plain or gzipped "
+             "(e.g. trimmed_schema.json.gz), or '-' to read it from stdin.",
     )
     parser.add_argument(
         '-x',
@@ -296,17 +299,13 @@ def main():
     args = parser.parse_args()
 
     # Step 1: Filter the schema only when XML config is supplied.
-    # Without -x, keep trimmed_schema.json as a direct copy of pyang JSON output.
+    # Without -x, keep the schema as a direct copy of pyang JSON output.
     if args.xml_config:
         xml_files = [file for group in args.xml_config for file in group]
         xml_config = xml_files[0] if len(xml_files) == 1 else load_and_merge_xmls(xml_files)
         resources = filter_json_using_xml(args.json_schema, xml_config)
     else:
-        if args.json_schema == "-":
-            resources = json.load(sys.stdin)
-        else:
-            with open(args.json_schema) as f:
-                resources = json.load(f)
+        resources = load_schema_json(args.json_schema)
 
     if args.exclude:
         try:
@@ -389,10 +388,11 @@ def main():
     # Step 8: Normalize import prefixes in copied Go files (including tests).
     rewrite_import_prefixes(new_dir, "terraform_provider", expected_module)
 
-    # Step 7: Add trimmed_schema.json to new directory
-    trimmed_schema_path = os.path.join(new_dir, "trimmed_schema.json")
-    with open(trimmed_schema_path, "w") as f:
-        json.dump(resources, f, indent=2)
+    # Step 7: Add trimmed_schema.json.gz to new directory, for the downstream
+    # tools (jtaf-xml2tf); the provider itself inlines the schema in Go source.
+    schema_path = os.path.join(new_dir, "trimmed_schema.json.gz")
+    write_schema_json_gz(resources, schema_path)
+    print(f"Schema written to {os.path.relpath(schema_path)}")
 
 # run main()
 if __name__ == "__main__":
