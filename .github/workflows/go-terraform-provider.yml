@@ -51,25 +51,28 @@ jobs:
         set -euo pipefail
         rm -rf terraform-provider-junos-vqfx-evpn-vxlan
 
-        provider_args=()
+        provider_args=(
+          -p examples/yang/18.2/18.2R3/common
+          examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang
+        )
         if [[ "${{ matrix.provider_implementation }}" == "generic" ]]; then
           provider_args+=(--generic)
+        else
+          provider_args+=(
+            -x
+            examples/evpn-vxlan-dc/dc1/dc1-borderleaf1.xml
+            examples/evpn-vxlan-dc/dc1/dc1-borderleaf2.xml
+            examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml
+            examples/evpn-vxlan-dc/dc1/dc1-leaf2.xml
+            examples/evpn-vxlan-dc/dc1/dc1-leaf3.xml
+            examples/evpn-vxlan-dc/dc1/dc1-spine1.xml
+            examples/evpn-vxlan-dc/dc1/dc1-spine2.xml
+            examples/evpn-vxlan-dc/dc2/dc2-spine1.xml
+            examples/evpn-vxlan-dc/dc2/dc2-spine2.xml
+          )
         fi
-
-        jtaf-yang2go "${provider_args[@]}" \
-          -p examples/yang/18.2/18.2R3/common \
-          examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang \
-          -x \
-          examples/evpn-vxlan-dc/dc1/dc1-borderleaf1.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-borderleaf2.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-leaf2.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-leaf3.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-spine1.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-spine2.xml \
-          examples/evpn-vxlan-dc/dc2/dc2-spine1.xml \
-          examples/evpn-vxlan-dc/dc2/dc2-spine2.xml \
-          -t vqfx-evpn-vxlan
+        provider_args+=(-t vqfx-evpn-vxlan)
+        jtaf-yang2go "${provider_args[@]}"
 
     - name: Build and test generated ${{ matrix.provider_implementation }} Terraform provider
       working-directory: terraform-provider-junos-vqfx-evpn-vxlan

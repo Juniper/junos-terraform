@@ -1,9 +1,10 @@
 # Demo: Generic Schema-Driven Terraform Provider
 
-This walkthrough demonstrates the new `--generic` provider workflow using the
-EVPN-VXLAN example configs already in this repository. Every step uses the
-existing XML files in `examples/evpn-vxlan-dc/` and the YANG models in
-`examples/yang/18.2/`.
+This walkthrough demonstrates the `--generic` provider workflow using the
+EVPN-VXLAN example configs already in this repository. Generic provider
+generation uses the YANG models in `examples/yang/18.2/` without XML filtering;
+the XML files in `examples/evpn-vxlan-dc/` are used later for Terraform input
+generation and integration tests.
 
 ---
 
@@ -28,7 +29,7 @@ pip install asyncssh   # needed for mock NETCONF server
 
 ## Part 1 — Build the Generic Provider
 
-### 1.1 Generate and compile (filtered schema, same XMLs as build.sh)
+### 1.1 Generate and compile (full YANG schema, without XML filtering)
 
 ```bash
 cd examples/providers
@@ -36,13 +37,14 @@ cd examples/providers
 bash build-generic.sh
 ```
 
-This runs `jtaf-yang2go --generic` with the same YANG files and XML configs
-that `build.sh` uses. It produces two providers:
+This runs `jtaf-yang2go --generic` with the QFX and SRX YANG files and no XML
+arguments. It produces two full-schema providers; the example XML files are
+used later to generate Terraform configuration, not to filter these providers:
 
-| Provider | YANG Platform | XML Configs Used | Binary Size |
-|----------|---------------|------------------|-------------|
-| `terraform-provider-junos-vqfx-evpn-vxlan` | QFX (junos-qfx) | dc1 spines + leaves | ~26 MB |
-| `terraform-provider-junos-vsrx-evpn-vxlan` | SRX (junos-es) | dc1/dc2 firewalls | ~26 MB |
+| Provider | YANG Platform | Schema |
+|----------|---------------|--------|
+| `terraform-provider-junos-vqfx-evpn-vxlan` | QFX (junos-qfx) | Full QFX model |
+| `terraform-provider-junos-vsrx-evpn-vxlan` | SRX (junos-es) | Full SRX model |
 
 Both are compiled and installed to `$GOPATH/bin/`.
 
@@ -327,8 +329,8 @@ This runs 11 automated tests covering:
 | # | Test |
 |---|------|
 | 1 | Go unit tests (105+ tests across 4 packages) |
-| 2 | Generate filtered provider with `--generic -x` |
-| 3 | `go build .` the filtered provider |
+| 2 | Generate full-model provider with `--generic` and no XML input |
+| 3 | `go build .` the generated provider |
 | 4 | Verify all generated files present, no test files leaked |
 | 5 | Validate `trimmed_schema.json.gz` structure |
 | 6 | Run the provider binary `--help` |

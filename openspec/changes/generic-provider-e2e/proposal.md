@@ -19,11 +19,13 @@ None.
 
 ### Modified Capabilities
 
+- `cli-tools`: Make generic provider generation and XML schema filtering mutually exclusive.
 - `testing`: Require the Terraform end-to-end workflow to validate both standard and generic provider builds using the same plan scenario.
 
 ## Impact
 
 - GitHub workflows for Terraform and Ansible, plus the parameterized Python workflow test.
+- `jtaf-yang2go` and `jtaf-provider` argument validation, generic build scripts, and generic-provider usage documentation.
 - Existing provider build/install scripts under `.github/prompts/` and `examples/providers/`.
 - Existing Terraform plan inputs under `examples/terraform_files/` and the testing capability documentation/specification.
 - Generic provider generation/runtime paths only where failures are demonstrated by the new test.

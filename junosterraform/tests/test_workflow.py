@@ -60,19 +60,14 @@ def test_yang2go(generic):
 
     stdin_json = "{}"
 
-    # yang2go command
-    cmd = [
-        exe,
-        "-p",
-        common_dir,
-        *conf_files,
-        "-x",
-        *xml_args,
-        "-t",
-        "vqfx-evpn-vxlan",
-    ]
+    # Generic providers use the full YANG schema; XML is only an input to the
+    # downstream conversion, not provider generation.
+    cmd = [exe, "-p", common_dir, *conf_files]
     if generic:
         cmd.append("--generic")
+    else:
+        cmd.extend(["-x", *xml_args])
+    cmd.extend(["-t", "vqfx-evpn-vxlan"])
 
     with tempfile.TemporaryDirectory(prefix="jtaf-yang2go-") as tmpdir:
         # Test generated provider with trimmed_schema.json.gz in isolated temp workspace.

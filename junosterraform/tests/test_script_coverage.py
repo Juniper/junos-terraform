@@ -326,6 +326,25 @@ def test_yang2go_passes_generic_and_exclude(tmp_path, monkeypatch):
     assert excludes == ["groups", "system/services/web-management"]
 
 
+@pytest.mark.parametrize(
+    ("script_name", "argv"),
+    [
+        ("jtaf-yang2go", ["-p", "a.yang", "-x", "config.xml", "-t", "qfx", "--generic"]),
+        ("jtaf-provider", ["-j", "-", "-x", "config.xml", "-t", "qfx", "--generic"]),
+        ("jtaf-provider", ["-j", "-", "--xml-config", "config.xml", "-t", "qfx", "--generic"]),
+    ],
+    ids=["yang2go", "provider-short-option", "provider-long-option"],
+)
+def test_generic_generation_rejects_xml_filter(script_name, argv, monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", [script_name, *argv])
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_path(str(JUNOS_DIR / script_name), run_name="__main__")
+
+    assert exc_info.value.code == 2
+    assert "not allowed with argument" in capsys.readouterr().err
+
+
 def test_yang2go_and_yang2ansible_scripts(tmp_path, monkeypatch):
     yang_dir = tmp_path / "yang"
     yang_dir.mkdir()

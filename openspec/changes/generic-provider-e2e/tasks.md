@@ -4,6 +4,9 @@
 
 - [x] 1.1 Update provider generation/build orchestration to create and compile standard and generic variants into separate staging locations before either plan run; verify both expected provider binaries and schemas are present and neither build overwrites the other.
 - [x] 1.2 Keep generated Terraform inputs shared between the two variants and verify the existing conversion step produces the same configuration used by both plan passes.
+- [x] 1.3 Make `--generic` and `-x` mutually exclusive in `jtaf-yang2go` and `jtaf-provider`; verify both CLIs reject the combination with an argument error and accept generic mode without XML.
+- [x] 1.4 Remove XML arguments from generic provider build, Terraform CI, Ansible CI, and pytest generation calls; verify standard XML filtering and downstream XML conversion remain intact.
+- [x] 1.5 Update generic-provider documentation and verify no supported example combines `--generic` with XML filtering.
 
 ## 2. Run the End-to-End Plan Twice
 
