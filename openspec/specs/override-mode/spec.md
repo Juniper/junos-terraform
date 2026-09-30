@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Override template renders bare configuration XML
 The Ansible Jinja2 template in override mode SHALL render `<configuration>...</configuration>` without any `<groups>` or `<apply-groups>` wrapper. The rendered XML SHALL contain all configuration subtrees covered by the trimmed schema, directly under `<configuration>`.

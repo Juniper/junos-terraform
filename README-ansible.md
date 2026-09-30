@@ -16,7 +16,7 @@ jtaf-ansible -j <junos.json> -x <config1.xml> [-x <config2.xml> ...] -t <device-
 What is created (under ansible-provider-junos-<type>/):
 - roles/<type>_role/ (tasks/main.yml, templates/template.j2)
 - jtaf-playbook.yml (uses connection: local)
-- host_vars/, configs/, trimmed_schema.json
+- host_vars/, configs/, trimmed_schema.json.gz
 
 Verify rendering without applying:
 ```
@@ -41,7 +41,7 @@ jtaf-yang2ansible -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/
 
 Notes:
 - If supplying multiple XML configs they must be for the same device type.
-- Output directory: ansible-provider-junos-<type>/ containing roles/<type>_role/ (tasks/templates), jtaf-playbook.yml (connection: local), host_vars/, group_vars/, configs/, trimmed_schema.json.
+- Output directory: ansible-provider-junos-<type>/ containing roles/<type>_role/ (tasks/templates), jtaf-playbook.yml (connection: local), host_vars/, group_vars/, configs/, trimmed_schema.json.gz.
 - Run the generated playbook in check/diff mode to verify rendered configs without applying:
 	ansible-playbook -i "localhost," jtaf-playbook.yml --check --diff
 
@@ -52,7 +52,7 @@ Notes:
 Convert one or more Junos XML configs into Ansible `host_vars`, `group_vars`, and inventory data.
 
 Important behavior:
-- Each run should use one `trimmed_schema.json` and matching XML configs for the generated role.
+- Each run should use one `trimmed_schema.json.gz` (plain JSON is also accepted) and matching XML configs for the generated role.
 - `--grouping-hosts-file` is required.
 - Inventory groups and optional `:children` sections come from the `grouping.hosts` file, not from a `-t/--type` flag.
 - Output can be split across directories so generated role location and provisioning playbook location can differ.
@@ -64,13 +64,13 @@ Important behavior:
 
 Usage:
 ```
-jtaf-xml2yaml -j <trimmed_schema.json> -x <config1.xml> [<config2.xml> ...] -d <output-dir> --grouping-hosts-file <grouping_hosts_file>
+jtaf-xml2yaml -j <trimmed_schema.json.gz> -x <config1.xml> [<config2.xml> ...] -d <output-dir> --grouping-hosts-file <grouping_hosts_file>
 
 ```
 
 Example:
 ```
-jtaf-xml2yaml -j ansible-provider-junos-vqfx/trimmed_schema.json \
+jtaf-xml2yaml -j ansible-provider-junos-vqfx/trimmed_schema.json.gz \
 	-x examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml examples/evpn-vxlan-dc/dc1/dc1-spine1.xml \
   -d ansible_files \
   --grouping-hosts-file examples/ansible/switches_grouping_hosts
@@ -287,7 +287,7 @@ Use the same `-d` directory for every `jtaf-xml2yaml` run that should share one 
 ```bash
 jtaf-xml2yaml \
 	-x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml \
-	-j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json \
+	-j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json.gz \
   -d ansible-evpn-vxlan-deploy \
   --hosts-file ansible-evpn-vxlan-deploy/inventory.ini \
   --grouping-hosts-file ansible-evpn-vxlan-deploy/qfx.grouping.hosts
@@ -298,7 +298,7 @@ jtaf-xml2yaml \
 ```bash
 jtaf-xml2yaml \
   -x examples/evpn-vxlan-dc/dc1/dc1-*firewall*.xml examples/evpn-vxlan-dc/dc2/dc2-*firewall*.xml \
-  -j ansible-provider-junos-srx-ansible-role/trimmed_schema.json \
+  -j ansible-provider-junos-srx-ansible-role/trimmed_schema.json.gz \
   -d ansible-evpn-vxlan-deploy \
   --hosts-file ansible-evpn-vxlan-deploy/inventory.ini \
   --grouping-hosts-file ansible-evpn-vxlan-deploy/firewall.grouping.hosts

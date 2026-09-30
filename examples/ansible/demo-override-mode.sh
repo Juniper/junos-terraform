@@ -87,7 +87,7 @@ rm -rf ansible_override_files
 jtaf-xml2yaml \
   -x ../evpn-vxlan-dc/dc1/dc1-*leaf* ../evpn-vxlan-dc/dc1/dc1-*spine* \
      ../evpn-vxlan-dc/dc1/dc1-*borderleaf* ../evpn-vxlan-dc/dc2/dc2-*spine* \
-  -j ansible-provider-junos-${DEVICE_TYPE}/trimmed_schema.json \
+  -j ansible-provider-junos-${DEVICE_TYPE}/trimmed_schema.json.gz \
   -d ansible_override_files \
   --grouping-hosts-file switches_grouping_hosts
 

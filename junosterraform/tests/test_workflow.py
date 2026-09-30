@@ -206,7 +206,13 @@ def test_yang2ansible():
         )
 
         trimmed_schema_path = os.path.join(
-            role_dir, "trimmed_schema.json"
+            role_dir, "trimmed_schema.json.gz"
+        )
+        assert os.path.exists(trimmed_schema_path), (
+            f"Expected trimmed_schema.json.gz not found at {trimmed_schema_path}"
+        )
+        assert not os.path.exists(os.path.join(role_dir, "trimmed_schema.json")), (
+            "Plain trimmed_schema.json should no longer be written"
         )
 
         # xml2yaml command mirrors the GitHub Action invocation.

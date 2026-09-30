@@ -35,7 +35,7 @@ Python command-line tools that drive the JTAF pipeline — from YANG models to g
 3. **When** the output directory already exists, **Then** it is deleted via `shutil.rmtree()` and recreated via `shutil.copytree()`
 4. **When** the Go provider is created, **Then** `ensure_go_module_name()` sets `go.mod` to `module terraform-provider-junos-{type}`
 5. **When** module name is set, **Then** `rewrite_import_prefixes()` replaces all `"terraform_provider/"` imports with `"terraform-provider-junos-{type}/"`
-6. **When** code generation completes, **Then** `trimmed_schema.json` is written to the output directory for runtime use by the patch engine
+6. **When** code generation completes, **Then** `trimmed_schema.json.gz` (compact, gzipped JSON) is written to the output directory for the downstream tools; `-j` on all tools accepts plain or gzipped JSON, detected by content
 
 #### Error Handling
 

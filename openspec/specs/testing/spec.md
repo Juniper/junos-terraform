@@ -204,7 +204,7 @@ pytest jtaf_pyang_plugin/tests/ netconf_mock/tests/ --cov --cov-report=term-miss
 | XML configs | `examples/evpn-vxlan-dc/` | Provider generation, E2E |
 | Terraform configs | `tests/terraform_fullstack_test/` | E2E apply/destroy |
 | Patch test XML | `examples/patch_test/` | Patch engine unit tests |
-| Schema JSON | `terraform_provider/trimmed_schema.json` | `ProcessSchema` tests |
+| Schema JSON | Inline schema strings in `terraform_provider/patch/*_test.go`; generated providers/roles carry `trimmed_schema.json.gz` | `ProcessSchema` tests; workflow tests |
 
 ---
 
