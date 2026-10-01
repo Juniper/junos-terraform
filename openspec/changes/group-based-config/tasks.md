@@ -78,14 +78,14 @@
 
 ## 7. Group-based example
 
-- [ ] 7.1 Add `examples/evpn-vxlan-dc-groups/` mirroring `examples/evpn-vxlan-dc/` device for device, with each device's
+- [x] 7.1 Add `examples/evpn-vxlan-dc-groups/` mirroring `examples/evpn-vxlan-dc/` device for device, with each device's
       non-identity configuration inside one role-named group and the base hierarchy holding host name, management
       addressing and the `apply-groups` reference; verify each XML parses and the device set matches the base example
-- [ ] 7.2 Add `examples/providers/build-groups.sh` and `convert-groups.sh` using `--groups`; verify they produce a
+- [x] 7.2 Add `examples/providers/build-groups.sh` and `convert-groups.sh` using `--groups`; verify they produce a
       compiled provider whose schema contains `groups` and `.tf` files containing a `groups` block per device
-- [ ] 7.3 Add the generated `.tf` output under its own directory alongside `examples/terraform_files/`; verify
+- [x] 7.3 Add the generated `.tf` output under its own directory alongside `examples/terraform_files/`; verify
       `terraform validate` passes against the group-based provider
-- [ ] 7.4 Document the example in `examples/DEMO-GENERIC-PROVIDER.md` or a sibling document, including the build,
+- [x] 7.4 Document the example in `examples/DEMO-GENERIC-PROVIDER.md` or a sibling document, including the build,
       convert and apply commands; verify the documented commands run as written
 
 ## 8. End-to-end verification
