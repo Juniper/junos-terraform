@@ -12,6 +12,16 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 JUNOS_DIR = REPO_ROOT / "junosterraform"
 
 
+def test_terraform_workflow_uses_shared_apply_parallelism():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "go-terraform-provider.yml").read_text()
+
+    assert "TF_APPLY_PARALLELISM: 3" in workflow
+    apply_commands = [line.strip() for line in workflow.splitlines() if "terraform apply " in line]
+    assert len(apply_commands) == 4
+    assert all('-parallelism="$TF_APPLY_PARALLELISM"' in command for command in apply_commands)
+    assert "-parallelism=1" not in workflow
+
+
 def _load_script(script_name: str, module_name: str):
     script_path = JUNOS_DIR / script_name
     loader = SourceFileLoader(module_name, str(script_path))

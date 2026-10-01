@@ -10,6 +10,8 @@ jobs:
   build-and-plan:
     name: Terraform integration (${{ matrix.provider_implementation }})
     runs-on: ubuntu-latest
+    env:
+      TF_APPLY_PARALLELISM: 3
     strategy:
       fail-fast: false
       matrix:
@@ -223,7 +225,7 @@ jobs:
         set -euo pipefail
         # With provider dev_overrides, skip `terraform init` to avoid registry lookups for unpublished providers.
         terraform plan -refresh=false -no-color -input=false -out=tfplan-initial
-        terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-initial
+        terraform apply -no-color -input=false -auto-approve -parallelism="$TF_APPLY_PARALLELISM" tfplan-initial
 
     - name: Terraform no-op plan after initial apply
       id: no_op_plan_initial
@@ -262,7 +264,7 @@ jobs:
 
     - name: Terraform apply changed plan
       working-directory: ci-evpn-vxlan-tf
-      run: terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-updated
+      run: terraform apply -no-color -input=false -auto-approve -parallelism="$TF_APPLY_PARALLELISM" tfplan-updated
 
     - name: Terraform final no-op plan
       id: no_op_plan_final
@@ -339,7 +341,7 @@ jobs:
 
     - name: Terraform reconcile out-of-band drift
       working-directory: ci-evpn-vxlan-tf
-      run: terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-drift
+      run: terraform apply -no-color -input=false -auto-approve -parallelism="$TF_APPLY_PARALLELISM" tfplan-drift
 
     - name: Terraform no-op plan after drift reconcile
       id: drift_plan_final
@@ -383,7 +385,7 @@ jobs:
       working-directory: ci-evpn-vxlan-tf-negative
       run: |
         set +e
-        terraform apply -refresh=false -no-color -input=false -auto-approve -parallelism=1 > negative_apply.log 2>&1
+        terraform apply -refresh=false -no-color -input=false -auto-approve -parallelism="$TF_APPLY_PARALLELISM" > negative_apply.log 2>&1
         rc=$?
         set -e
         echo "exitcode=$rc" >> "$GITHUB_OUTPUT"
