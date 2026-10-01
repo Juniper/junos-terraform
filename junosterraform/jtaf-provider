@@ -89,6 +89,20 @@ def drop_version(resources):
     return resources
 
 
+GROUP_NODES = ("groups", "apply-groups")
+
+
+def drop_groups(resources):
+    """Remove the groups subtree and the apply-groups leaf-list. In a full
+    Junos model groups is a second copy of the whole configuration model —
+    half of its nodes — so it is left out unless --groups asks for it."""
+    for root in resources.get("root", {}).get("children", []):
+        if root.get("name") == "configuration":
+            root["children"] = [c for c in root.get("children") or []
+                                if c.get("name") not in GROUP_NODES]
+    return resources
+
+
 def exclude_schema_paths(resources, paths):
     """Remove the subtrees at paths (relative to configuration, e.g.
     "logical-systems" or "system/services/web-management") from the schema.
@@ -287,14 +301,35 @@ def main():
              'logical-systems or system/services/web-management) out of the '
              'provider. Repeatable.',
     )
+    parser.add_argument(
+        '--groups',
+        action='store_true',
+        default=False,
+        help='Keep the groups subtree and the apply-groups leaf-list, so the '
+             'provider manages configuration groups. Left out by default: in a '
+             'full model groups is half the nodes.',
+    )
     args = parser.parse_args()
+
+    if args.groups:
+        # Excluding a path inside groups is how a full model is trimmed down;
+        # only excluding the subtree itself contradicts --groups.
+        if any(p.strip('/') == 'groups' for p in args.exclude):
+            parser.error(
+                "--groups keeps the groups subtree, but --exclude groups "
+                "removes it; drop one of them")
+        if args.generic:
+            print("jtaf-provider: warning: --groups with --generic advertises the "
+                  "whole model twice over, which needs several GB at plan time; "
+                  "trim it with -x, or --exclude paths inside groups",
+                  file=sys.stderr)
 
     # Step 1: Filter the schema only when XML config is supplied.
     # Without -x, keep the schema as a direct copy of pyang JSON output.
     if args.xml_config:
         xml_files = [file for group in args.xml_config for file in group]
         xml_config = xml_files[0] if len(xml_files) == 1 else load_and_merge_xmls(xml_files)
-        resources = filter_json_using_xml(args.json_schema, xml_config)
+        resources = filter_json_using_xml(args.json_schema, xml_config, args.groups)
     else:
         resources = load_schema_json(args.json_schema)
 
@@ -304,6 +339,8 @@ def main():
         except ValueError as e:
             parser.error(str(e))
     drop_version(resources)
+    if not args.groups:
+        drop_groups(resources)
 
     # Step 2: Generate the provider. Its source is the same either way; only the
     # schema it embeds differs, trimmed to the XML given with -x or the whole

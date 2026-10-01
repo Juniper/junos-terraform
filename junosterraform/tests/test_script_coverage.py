@@ -109,6 +109,100 @@ def test_jtaf_provider_drop_version():
     assert [c["name"] for c in config["children"]] == ["system"]
 
 
+def _groups_schema():
+    """A model shaped like Junos: groups repeats the configuration hierarchy."""
+    return {"root": {"children": [{"name": "configuration", "children": [
+        {"name": "apply-groups", "type": "leaf-list", "leaf-type": "string",
+         "ordered-by": "user"},
+        {"name": "groups", "type": "list", "key": "name", "children": [
+            {"name": "name", "type": "leaf"},
+            {"name": "system", "type": "container",
+             "children": [{"name": "host-name", "type": "leaf"}]},
+            {"name": "protocols", "type": "container",
+             "children": [{"name": "lldp", "type": "container", "children": []}]},
+        ]},
+        {"name": "system", "type": "container",
+         "children": [{"name": "host-name", "type": "leaf"}]},
+    ]}]}}
+
+
+def test_jtaf_provider_drop_groups():
+    mod = _load_script("jtaf-provider", "jtaf_provider_groups_mod")
+    resources = _groups_schema()
+    mod.drop_groups(resources)
+    config = resources["root"]["children"][0]
+    assert [c["name"] for c in config["children"]] == ["system"]
+    # A schema without groups is left as it is
+    mod.drop_groups(resources)
+    assert [c["name"] for c in config["children"]] == ["system"]
+
+
+def _generate(tmp_path, monkeypatch, name, extra_argv, resources):
+    mod = _load_script("jtaf-provider", f"jtaf_provider_{name}_mod")
+    schema = tmp_path / f"{name}.json"
+    schema.write_text(json.dumps(resources))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(mod, "_compile_schema", lambda *_: None)
+    monkeypatch.setattr(sys, "argv",
+                        ["jtaf-provider", "-j", str(schema), "-t", name, *extra_argv])
+    mod.main()
+    from junosterraform.jtaf_common import load_schema_json
+    out = load_schema_json(str(tmp_path / f"terraform-provider-junos-{name}"
+                               / "trimmed_schema.json.gz"))
+    return next(c for c in out["root"]["children"] if c["name"] == "configuration")
+
+
+def test_groups_left_out_by_default(tmp_path, monkeypatch):
+    config = _generate(tmp_path, monkeypatch, "nogroups", ["--generic"], _groups_schema())
+    assert [c["name"] for c in config["children"]] == ["system"]
+
+
+def test_groups_kept_with_flag(tmp_path, monkeypatch):
+    config = _generate(tmp_path, monkeypatch, "withgroups",
+                       ["--generic", "--groups"], _groups_schema())
+    names = [c["name"] for c in config["children"]]
+    assert "groups" in names and "apply-groups" in names
+
+    groups = next(c for c in config["children"] if c["name"] == "groups")
+    assert groups["key"] == "name", "a group is identified by its name leaf"
+
+    apply_groups = next(c for c in config["children"] if c["name"] == "apply-groups")
+    assert apply_groups["type"] == "leaf-list"
+    assert apply_groups["ordered-by"] == "user", "Junos applies groups in order"
+
+
+def test_groups_flag_conflicts_with_excluding_groups(tmp_path, monkeypatch, capsys):
+    schema = tmp_path / "s.json"
+    schema.write_text(json.dumps(_groups_schema()))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", [
+        "jtaf-provider", "-j", str(schema), "-t", "x",
+        "--generic", "--groups", "--exclude", "groups",
+    ])
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_path(str(JUNOS_DIR / "jtaf-provider"), run_name="__main__")
+
+    assert exc_info.value.code == 2
+    assert "--groups keeps the groups subtree" in capsys.readouterr().err
+
+
+def test_groups_flag_allows_excluding_inside_groups(tmp_path, monkeypatch):
+    """Trimming a path inside groups is how a full model is kept affordable."""
+    config = _generate(tmp_path, monkeypatch, "inner",
+                       ["--generic", "--groups", "--exclude", "groups/protocols"],
+                       _groups_schema())
+    groups = next(c for c in config["children"] if c["name"] == "groups")
+    kept = [c["name"] for c in groups["children"]]
+    assert "protocols" not in kept
+    assert "system" in kept
+
+
+def test_groups_with_untrimmed_model_warns(tmp_path, monkeypatch, capsys):
+    _generate(tmp_path, monkeypatch, "warned", ["--generic", "--groups"], _groups_schema())
+    assert "warning" in capsys.readouterr().err
+
+
 def test_jtaf_provider_main_smoke(tmp_path, monkeypatch):
     mod = _load_script("jtaf-provider", "jtaf_provider_main_mod")
 
@@ -121,7 +215,7 @@ def test_jtaf_provider_main_smoke(tmp_path, monkeypatch):
     xml.write_text("<configuration><system/></configuration>")
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(mod, "filter_json_using_xml", lambda _s, _x: resources)
+    monkeypatch.setattr(mod, "filter_json_using_xml", lambda _s, _x, _g=False: resources)
     # Compiling the schema needs Go; the copy/emit steps are what is under test.
     monkeypatch.setattr(mod, "_compile_schema", lambda *_: None)
 
@@ -166,7 +260,7 @@ def test_trimmed_and_untrimmed_builds_share_provider_source(tmp_path, monkeypatc
         ("untrimmed", ["-j", str(schema), "-t", "same", "--generic"]),
     ):
         mod = _load_script("jtaf-provider", f"jtaf_provider_{name}_mod")
-        monkeypatch.setattr(mod, "filter_json_using_xml", lambda _s, _x: resources)
+        monkeypatch.setattr(mod, "filter_json_using_xml", lambda _s, _x, _g=False: resources)
         monkeypatch.setattr(mod, "_compile_schema", lambda *_: None)
         monkeypatch.setattr(sys, "argv", ["jtaf-provider", *argv])
         mod.main()
@@ -486,6 +580,50 @@ def test_yang2go_passes_generic_and_exclude(tmp_path, monkeypatch):
     assert provider[provider.index("--generic")] == "--generic"
     excludes = [provider[i + 1] for i, a in enumerate(provider) if a == "--exclude"]
     assert excludes == ["groups", "system/services/web-management"]
+
+
+def test_yang2go_passes_groups(tmp_path, monkeypatch):
+    yang_file = tmp_path / "a.yang"
+    yang_file.write_text("module a { namespace \"x\"; prefix x; }")
+
+    import subprocess
+
+    commands = []
+
+    class _RecordingPopen(_FakePopen):
+        def __init__(self, cmd, **kwargs):
+            commands.append(cmd)
+            super().__init__(cmd, **kwargs)
+
+    monkeypatch.setattr(subprocess, "Popen", _RecordingPopen)
+    monkeypatch.setattr(sys, "argv",
+                        ["jtaf-yang2go", "-p", str(yang_file), "-t", "srx", "--groups"])
+    runpy.run_path(str(JUNOS_DIR / "jtaf-yang2go"), run_name="__main__")
+
+    provider = next(c for c in commands if c[0] == "jtaf-provider")
+    assert "--groups" in provider
+
+
+def test_yang2go_omits_groups_by_default(tmp_path, monkeypatch):
+    yang_file = tmp_path / "a.yang"
+    yang_file.write_text("module a { namespace \"x\"; prefix x; }")
+
+    import subprocess
+
+    commands = []
+
+    class _RecordingPopen(_FakePopen):
+        def __init__(self, cmd, **kwargs):
+            commands.append(cmd)
+            super().__init__(cmd, **kwargs)
+
+    monkeypatch.setattr(subprocess, "Popen", _RecordingPopen)
+    monkeypatch.setattr(sys, "argv",
+                        ["jtaf-yang2go", "-p", str(yang_file), "-t", "srx"])
+    runpy.run_path(str(JUNOS_DIR / "jtaf-yang2go"), run_name="__main__")
+
+    provider = next(c for c in commands if c[0] == "jtaf-provider")
+    assert "--groups" not in provider
 
 
 @pytest.mark.parametrize(

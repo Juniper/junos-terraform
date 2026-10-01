@@ -326,7 +326,8 @@ def walk_schema(paths: list[str], node: Any,
 
 # Method which starts the walk
 def filter_json_using_xml(schema: str,
-                          xml: Union[ElementTree.Element, str]) -> str:
+                          xml: Union[ElementTree.Element, str],
+                          groups: bool = False) -> str:
     """Filter JSON schema based on paths extracted from XML configuration.
 
     Reads schema from file or stdin, extracts configuration XPaths from XML,
@@ -335,6 +336,8 @@ def filter_json_using_xml(schema: str,
     Args:
         schema: Path to JSON schema file or '-' to read from stdin.
         xml: Path to XML file or ElementTree element containing configuration.
+        groups: Keep apply-groups, so that configuration inside <groups>
+            contributes paths and the group body survives trimming.
 
     Returns:
         Filtered schema structure as dict (will be serialized by caller).
@@ -360,7 +363,8 @@ def filter_json_using_xml(schema: str,
     # version elsewhere (system ntp server, protocols igmp interface, ...) is configuration
     for elem in root.findall("version"):
         root.remove(elem)
-    remove_tags_by_name(root, ["versions", "model", "apply-groups"])
+    drop = ["versions", "model"] if groups else ["versions", "model", "apply-groups"]
+    remove_tags_by_name(root, drop)
 
     # find the unique paths
     paths = unique_xpaths(get_xpaths(root))

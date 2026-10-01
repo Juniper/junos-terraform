@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `jtaf-provider --groups`, passed on by `jtaf-yang2go`, keeps the `groups` subtree and the `apply-groups` leaf-list so
+  the provider manages Junos configuration groups as ordinary hierarchy: a group is an entry of the `groups` list keyed
+  by its `name`, and `apply_groups` is an ordered list of group names. With `--generic` it warns, because advertising
+  the whole model twice over needs several GB at plan time.
+
 ### Changed
+- **BREAKING:** The `groups` subtree and the `apply-groups` leaf-list are now left out of a generated provider unless
+  `--groups` is given. In a full Junos model `groups` repeats the whole configuration hierarchy and is about half of
+  its nodes, and the provider never exposed it, so this removes a cost that bought nothing.
 - **BREAKING:** `jtaf-provider` no longer renders Go source from Jinja2 templates. Both invocations now generate the
   same schema-driven provider and differ only in the model it embeds: trimmed to the XML given with `-x`, or untrimmed
   with `--generic`. `junosterraform/templates/resource_config_provider.go.j2`, `provider.go.j2` and `config.go.j2` are

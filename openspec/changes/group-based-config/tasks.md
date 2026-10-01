@@ -19,18 +19,18 @@
 
 ## 2. Groups in the schema
 
-- [ ] 2.1 Add `--groups` to `jtaf-provider`, defaulting to excluding the `groups` subtree and the top-level
+- [x] 2.1 Add `--groups` to `jtaf-provider`, defaulting to excluding the `groups` subtree and the top-level
       `apply-groups` leaf-list the way `drop_version()` drops `version`; verify a test asserts neither name appears in
       `trimmed_schema.json.gz` without the flag and both appear with it
-- [ ] 2.2 Reject `--groups` combined with `--exclude groups` with a message naming the conflict; verify with a test
-- [ ] 2.3 Mark the `apply-groups` leaf-list as ordered in the schema it produces so the patch engine's `ordered-by user`
+- [x] 2.2 Reject `--groups` combined with `--exclude groups` with a message naming the conflict; verify with a test
+- [x] 2.3 Mark the `apply-groups` leaf-list as ordered in the schema it produces so the patch engine's `ordered-by user`
       handling applies; verify a test reads the compiled schema and asserts the ordered flag
-- [ ] 2.4 Stop `jtaf_common.filter_json_using_xml()` from removing `apply-groups`, and let `<groups>` children
+- [x] 2.4 Stop `jtaf_common.filter_json_using_xml()` from removing `apply-groups`, and let `<groups>` children
       contribute XPaths, when groups are requested; verify a test trims a schema against group-based XML and asserts
       the group body is present and the unused parts of the group subtree are not
-- [ ] 2.5 Add `--groups` pass-through to `jtaf-yang2go`; verify a test asserts the flag reaches the `jtaf-provider`
+- [x] 2.5 Add `--groups` pass-through to `jtaf-yang2go`; verify a test asserts the flag reaches the `jtaf-provider`
       argument list, mirroring the existing `--exclude` pass-through test
-- [ ] 2.6 Document `--groups` in `README-terraform.md` and the tools' help text, including that
+- [x] 2.6 Document `--groups` in `README-terraform.md` and the tools' help text, including that
       `--generic --groups` embeds the group subtree in full; verify the help text matches the documentation
 
 ## 3. Groups in the provider

@@ -42,6 +42,33 @@ NOTE: If using multiple xml configurations (like the example above), ensure that
 
 NOTE: The examples in this README use the YANG files shipped in this repository under `examples/yang/18.2`.
 
+### Schema scope
+
+The provider source is the same whichever way it is generated; only the model it embeds differs.
+
+| Option | Embedded model |
+|--------|----------------|
+| `-x <xml>` | Trimmed to the paths the XML configuration uses |
+| `--generic` | The whole model, untrimmed (mutually exclusive with `-x`) |
+| `--exclude PATH` | Leaves the subtree at PATH, relative to `configuration`, out. Repeatable |
+
+### Configuration groups
+
+Junos configuration groups are left out by default: in a full model the `groups` subtree repeats the
+whole configuration hierarchy and is about half of its nodes. Pass `--groups` to keep it, along with
+the `apply-groups` leaf-list, so the provider manages groups as ordinary configuration:
+
+```bash
+jtaf-yang2go -p <path-to-common> <path-to-yang-files> -x <xml-configuration(s)> -t <device-type> --groups
+```
+
+A group is then written as an entry of the `groups` list, keyed by its `name`, holding the same
+attributes it would have in the base hierarchy, and `apply_groups` is an ordered list of group names.
+
+NOTE: `--groups` with `--generic` makes the provider advertise the whole model twice over, which needs
+several GB of memory at plan time and warns when generated. Prefer trimming with `-x`, or use
+`--exclude` on paths inside `groups`.
+
 ---
 
 ## Build the Provider and Install

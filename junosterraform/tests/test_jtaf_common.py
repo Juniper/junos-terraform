@@ -711,6 +711,61 @@ class TestWalkSchema(unittest.TestCase):
 class TestFilterJsonUsingXml(unittest.TestCase):
     """Tests for filter_json_using_xml function."""
 
+    GROUPS_SCHEMA = {
+        "root": {"name": "root", "children": [{
+            "name": "configuration", "type": "container", "children": [
+                {"name": "apply-groups", "type": "leaf-list", "leaf-type": "string",
+                 "ordered-by": "user"},
+                {"name": "groups", "type": "list", "key": "name", "children": [
+                    {"name": "name", "type": "leaf"},
+                    {"name": "system", "type": "container",
+                     "children": [{"name": "host-name", "type": "leaf"}]},
+                    {"name": "protocols", "type": "container", "children": [
+                        {"name": "lldp", "type": "container", "children": []}]},
+                ]},
+                {"name": "system", "type": "container",
+                 "children": [{"name": "host-name", "type": "leaf"}]},
+            ]}]}}
+
+    GROUPS_XML = """<configuration>
+        <apply-groups>base</apply-groups>
+        <groups>
+            <name>base</name>
+            <system><host-name>r1</host-name></system>
+        </groups>
+    </configuration>"""
+
+    def _filter_groups_xml(self, groups):
+        root = ElementTree.fromstring(self.GROUPS_XML)
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(self.GROUPS_SCHEMA, f)
+            schema_file = f.name
+        try:
+            result = jtaf_common.filter_json_using_xml(schema_file, root, groups)
+        finally:
+            os.remove(schema_file)
+        return next(c for c in result["root"]["children"]
+                    if c["name"] == "configuration")
+
+    def test_groups_trimmed_to_what_the_xml_uses(self):
+        """With groups kept, the group body is trimmed like any other subtree."""
+        config = self._filter_groups_xml(groups=True)
+        names = [c["name"] for c in config["children"]]
+        self.assertIn("groups", names)
+        self.assertIn("apply-groups", names)
+
+        groups = next(c for c in config["children"] if c["name"] == "groups")
+        kept = [c["name"] for c in groups["children"]]
+        self.assertIn("system", kept)
+        # protocols is in the model but not in the XML, so it is trimmed away
+        self.assertNotIn("protocols", kept)
+
+    def test_groups_left_out_by_default(self):
+        """Without groups, apply-groups is stripped before paths are derived."""
+        config = self._filter_groups_xml(groups=False)
+        names = [c["name"] for c in config["children"]]
+        self.assertNotIn("apply-groups", names)
+
     def test_filter_json_using_xml_with_element(self):
         """Test filter_json_using_xml with ElementTree element."""
         schema_dict = {
