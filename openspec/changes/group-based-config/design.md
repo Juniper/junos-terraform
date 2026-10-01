@@ -109,8 +109,12 @@ of a realistic group body, which is the part most likely to break.
   unchanged, so only a rebuild is needed; the change is called out as BREAKING in the proposal and the changelog, and
   the old generator stays reachable through git history.
 - **`--generic --groups` roughly doubles an already large model**, raising provider start-up memory and plan time →
-  Documented as the expensive combination; `--exclude` trims the group subtree; the shipped example uses the trimmed
-  path.
+  Measured on the QFX 18.2 model with `terraform validate` over the 11-device example: untrimmed without groups is
+  7.4s and 2.6GB peak, untrimmed with groups exposed is 13.7s and 5.2GB. Almost all of that is Terraform core's own
+  representation of the attributes the provider advertises, not the provider: the provider process itself stays near
+  210MB either way, because the compact `patch.Schema` holds the `groups` subtree for about 2MB whether or not it is
+  exposed. 5.2GB is more than some CI runners have, so the combination is documented as expensive, `--exclude` trims
+  the group subtree, and the shipped example uses the trimmed path, where the whole model never appears.
 - **Inherited configuration read back as drift** → Addressed by the no-inheritance read decision above, with a test
   that applies a group-based configuration and asserts an empty second plan.
 - **Group deletion is destructive on the device**: deleting a group removes configuration from every device that
