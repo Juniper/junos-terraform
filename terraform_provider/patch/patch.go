@@ -75,12 +75,6 @@ func CreateDiffPatchWithSchema(diffMap map[string]Change, planMap map[string]str
 		if segments[0] == "configuration" {
 			segments = segments[1:]
 		}
-		if len(segments) > 0 {
-			firstTag, _, _ := parseSegment(segments[0])
-			if firstTag == "groups" {
-				segments = segments[1:]
-			}
-		}
 		if len(segments) == 0 {
 			continue
 		}

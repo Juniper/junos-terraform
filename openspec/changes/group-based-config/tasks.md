@@ -49,15 +49,15 @@
 
 ## 4. Patch engine
 
-- [ ] 4.1 Add leaf-map and diff tests for a single leaf changing inside `groups[name=X]` and assert the emitted edit
+- [x] 4.1 Add leaf-map and diff tests for a single leaf changing inside `groups[name=X]` and assert the emitted edit
       targets only that leaf below its `<groups>` element
-- [ ] 4.2 Add a test for the same path in two groups with different values and assert changing one leaves the other
+- [x] 4.2 Add a test for the same path in two groups with different values and assert changing one leaves the other
       untouched, and that neither affects the identically named base-hierarchy path
-- [ ] 4.3 Make removing a managed group emit one container-level delete rather than per-leaf deletes; verify with a
+- [x] 4.3 Make removing a managed group emit one container-level delete rather than per-leaf deletes; verify with a
       coalescing test in `terraform_provider/patch/`
-- [ ] 4.4 Add ordered-leaf-list tests for `apply-groups`: reordering produces a non-empty diff that results in the
+- [x] 4.4 Add ordered-leaf-list tests for `apply-groups`: reordering produces a non-empty diff that results in the
       declared order, an unchanged order produces an empty diff, and a removed entry is deleted
-- [ ] 4.5 Add a test with a wildcard group key (`<name>ge-*</name>`) asserting the key survives leaf-map encoding and
+- [x] 4.5 Add a test with a wildcard group key (`<name>ge-*</name>`) asserting the key survives leaf-map encoding and
       round-trips through the emitted patch
 
 ## 5. XML to Terraform conversion
