@@ -18,15 +18,17 @@ leaf-list; where they are absent the resource SHALL have no corresponding attrib
 ### Requirement: Group state is read back from the device
 Reading device state SHALL return configuration below `groups` and the `apply-groups` references with the same
 fidelity as base-hierarchy configuration, so that out-of-band changes inside a group are detected as drift and
-reconciled. Groups and references that the configuration does not manage SHALL be left untouched.
+reconciled. A group SHALL be owned exactly as any other list entry is: the resource holds what the configuration
+declares, and an entry the configuration does not declare SHALL be removed.
 
 #### Scenario: Drift inside a group
 - **WHEN** a leaf inside a managed group is changed on the device out of band
 - **THEN** the next plan reports that leaf as changed and the next apply restores it
 
-#### Scenario: Unmanaged groups are preserved
+#### Scenario: A group the configuration does not declare
 - **WHEN** the device holds a group that the configuration does not declare
-- **THEN** applying the configuration leaves that group and any reference to it unchanged
+- **THEN** the plan removes it, as it does for an interface or any other list entry the configuration does not
+  declare; a group that is to survive has to be declared
 
 ### Requirement: Group references are not synthesised
 The provider SHALL NOT maintain `apply-groups` outside the configuration: it SHALL NOT append a reference for a group

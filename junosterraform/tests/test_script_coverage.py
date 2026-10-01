@@ -17,9 +17,19 @@ def test_terraform_workflow_uses_shared_apply_parallelism():
     workflow = (REPO_ROOT / ".github" / "workflows" / "go-terraform-provider.yml").read_text()
 
     assert "TF_APPLY_PARALLELISM: 3" in workflow
-    apply_commands = [line.strip() for line in workflow.splitlines() if "terraform apply " in line]
-    assert len(apply_commands) == 4
-    assert all('-parallelism="$TF_APPLY_PARALLELISM"' in command for command in apply_commands)
+
+    # Join line continuations so an apply split over several lines is read as
+    # the one command it is.
+    joined = workflow.replace("\\\n", " ")
+    apply_commands = [
+        " ".join(line.split())
+        for line in joined.splitlines()
+        if "terraform apply " in line
+    ]
+    assert len(apply_commands) >= 4
+    unbounded = [c for c in apply_commands
+                 if '-parallelism="$TF_APPLY_PARALLELISM"' not in c]
+    assert not unbounded, f"apply without the shared bound: {unbounded}"
     assert "-parallelism=1" not in workflow
 
 

@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the whole model twice over needs several GB at plan time.
 - `jtaf-xml2tf --groups` converts a group-based configuration as it stands instead of flattening what a device inherits
   through `apply-groups` into the base hierarchy. Use it with a provider generated with `--groups`.
+- `examples/evpn-vxlan-dc-groups/`, a group-based example beside the base-configuration one, covering the same devices
+  with each device's configuration in a role-named group. `examples/providers/build-groups.sh` and `convert-groups.sh`
+  build and convert it; see [examples/DEMO-GROUPS.md](examples/DEMO-GROUPS.md). A CI job applies it against the NETCONF
+  mock and checks idempotency, drift inside a group, and group removal.
 
 ### Fixed
 - `jtaf-provider --exclude` now reaches configuration nodes held inside YANG `choice` and `case` nodes, such as

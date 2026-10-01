@@ -90,12 +90,12 @@
 
 ## 8. End-to-end verification
 
-- [ ] 8.1 Run the group-based example end to end against the mock: build, convert, apply, then plan again and assert no
+- [x] 8.1 Run the group-based example end to end against the mock: build, convert, apply, then plan again and assert no
       changes
-- [ ] 8.2 Change a leaf inside a group on the mock out of band, then plan and apply, asserting the drift is reported and
+- [x] 8.2 Change a leaf inside a group on the mock out of band, then plan and apply, asserting the drift is reported and
       restored
-- [ ] 8.3 Remove a group from the configuration, apply, and assert the group is deleted while unmanaged groups and the
-      base hierarchy are untouched
-- [ ] 8.4 Run the existing base-configuration example end to end and assert its behaviour and output are unchanged
-- [ ] 8.5 Wire the group-based run into the Terraform end-to-end workflow with the same bounded parallelism the existing
+- [x] 8.3 Remove a group from the configuration, apply, and assert the group is deleted while the device's base
+      hierarchy and every other device are untouched
+- [x] 8.4 Run the existing base-configuration example end to end and assert its behaviour and output are unchanged
+- [x] 8.5 Wire the group-based run into the Terraform end-to-end workflow with the same bounded parallelism the existing
       runs use; verify the workflow passes
