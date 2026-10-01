@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by its `name`, and `apply_groups` is an ordered list of group names. With `--generic` it warns, because advertising
   the whole model twice over needs several GB at plan time.
 
+### Fixed
+- `jtaf-provider --exclude` now reaches configuration nodes held inside YANG `choice` and `case` nodes, such as
+  `vlans/vlan/vlan-id`. Those group nodes in the model but are not configuration, and the provider already flattens
+  them away, so a path that a device would show was rejected as not found.
+
 ### Changed
 - **BREAKING:** The `groups` subtree and the `apply-groups` leaf-list are now left out of a generated provider unless
   `--groups` is given. In a full Junos model `groups` repeats the whole configuration hierarchy and is about half of

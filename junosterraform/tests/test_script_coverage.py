@@ -62,6 +62,43 @@ def test_jtaf_provider_exclude_schema_paths():
             mod.exclude_schema_paths(resources, [bad])
 
 
+def test_exclude_reaches_through_choice_and_case():
+    """choice and case group nodes in the model but are not configuration, so
+    a path names the nodes a device would show, not the wrappers."""
+    mod = _load_script("jtaf-provider", "jtaf_provider_exclude_choice_mod")
+    resources = {"root": {"children": [{"name": "configuration", "children": [
+        {"name": "vlans", "type": "container", "children": [
+            {"name": "vlan", "type": "list", "key": "name", "children": [
+                {"name": "name", "type": "leaf"},
+                {"name": "vlan-identifier-choice", "type": "choice", "children": [
+                    {"name": "case_1", "type": "case", "children": [
+                        {"name": "vlan-id", "type": "leaf"}]},
+                    {"name": "case_2", "type": "case", "children": [
+                        {"name": "vlan-id-list", "type": "leaf-list"},
+                        {"name": "vlan-tags", "type": "container", "children": [
+                            {"name": "outer", "type": "leaf"}]}]},
+                ]},
+            ]},
+        ]},
+    ]}]}}
+
+    mod.exclude_schema_paths(resources, ["vlans/vlan/vlan-id"])
+    choice = resources["root"]["children"][0]["children"][0]["children"][0]["children"][1]
+    assert [c["name"] for c in choice["children"][0]["children"]] == []
+    # the sibling case is untouched
+    assert [c["name"] for c in choice["children"][1]["children"]] == ["vlan-id-list", "vlan-tags"]
+
+    # a path may also descend through a node that sits inside a case
+    mod.exclude_schema_paths(resources, ["vlans/vlan/vlan-tags/outer"])
+    vlan_tags = choice["children"][1]["children"][1]
+    assert vlan_tags["children"] == []
+
+    # a name that is not there is still an error, wrappers included
+    for bad in ["vlans/vlan/no-such-leaf", "vlans/vlan/case_1", "vlans/vlan/vlan-identifier-choice"]:
+        with pytest.raises(ValueError):
+            mod.exclude_schema_paths(resources, [bad])
+
+
 def test_jtaf_provider_validate_attribute_names():
     mod = _load_script("jtaf-provider", "jtaf_provider_names_mod")
 

@@ -52,6 +52,12 @@ The provider source is the same whichever way it is generated; only the model it
 | `--generic` | The whole model, untrimmed (mutually exclusive with `-x`) |
 | `--exclude PATH` | Leaves the subtree at PATH, relative to `configuration`, out. Repeatable |
 
+`--exclude` takes any configuration path, at any depth, naming the nodes a device would show:
+`logical-systems`, `system/services/web-management`, `routing-instances/instance/protocols`,
+`vlans/vlan/vlan-id`. YANG `choice` and `case` nodes group nodes in the model but are not
+configuration, so a path reaches through them and cannot name one. A path that does not exist is an
+error rather than a silent no-op, so a typo does not leave the subtree in place.
+
 ### Configuration groups
 
 Junos configuration groups are left out by default: in a full model the `groups` subtree repeats the

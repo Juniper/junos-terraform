@@ -103,6 +103,31 @@ def drop_groups(resources):
     return resources
 
 
+def _configuration_children(node):
+    """Yield (owner, children) for the lists holding node's configuration
+    children, looking through YANG choice and case nodes: those group nodes in
+    the model but do not appear in configuration, and the provider flattens
+    them away (patch.FlattenChoices)."""
+    stack = [node]
+    while stack:
+        n = stack.pop()
+        children = n.get("children") or []
+        yield n, children
+        for c in children:
+            if c.get("type") in ("choice", "case"):
+                stack.append(c)
+
+
+def _find_configuration_child(node, name):
+    """The child of node named name, and the node that holds it, which is node
+    itself unless the child sits inside a choice or case."""
+    for owner, children in _configuration_children(node):
+        for c in children:
+            if c.get("type") not in ("choice", "case") and c.get("name") == name:
+                return owner, c
+    return None, None
+
+
 def exclude_schema_paths(resources, paths):
     """Remove the subtrees at paths (relative to configuration, e.g.
     "logical-systems" or "system/services/web-management") from the schema.
@@ -117,14 +142,13 @@ def exclude_schema_paths(resources, paths):
             raise ValueError(f"--exclude {path!r}: empty path")
         node = config
         for part in parts[:-1]:
-            node = next((c for c in node.get("children") or [] if c.get("name") == part), None)
+            _, node = _find_configuration_child(node, part)
             if node is None:
                 raise ValueError(f"--exclude {path}: {part} not found")
-        children = node.get("children") or []
-        kept = [c for c in children if c.get("name") != parts[-1]]
-        if len(kept) == len(children):
+        owner, target = _find_configuration_child(node, parts[-1])
+        if target is None:
             raise ValueError(f"--exclude {path}: {parts[-1]} not found")
-        node["children"] = kept
+        owner["children"] = [c for c in owner["children"] if c is not target]
     return resources
 
 
