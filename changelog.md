@@ -8,7 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- **BREAKING:** `jtaf-provider` (both the Jinja2 and `--generic` paths) and `jtaf-ansible` now write the trimmed schema as compact, gzipped `trimmed_schema.json.gz`; the plain `trimmed_schema.json` is no longer written. Pass the `.gz` file to `jtaf-xml2tf -j` / `jtaf-xml2yaml -j`.
+- **BREAKING:** `jtaf-provider` no longer renders Go source from Jinja2 templates. Both invocations now generate the
+  same schema-driven provider and differ only in the model it embeds: trimmed to the XML given with `-x`, or untrimmed
+  with `--generic`. `junosterraform/templates/resource_config_provider.go.j2`, `provider.go.j2` and `config.go.j2` are
+  removed. The resource type, provider block and attribute names are unchanged, so existing `.tf` files and Terraform
+  state keep working; rebuild the provider binary to pick this up.
+- **BREAKING:** `jtaf-provider` and `jtaf-ansible` now write the trimmed schema as compact, gzipped `trimmed_schema.json.gz`; the plain `trimmed_schema.json` is no longer written. Pass the `.gz` file to `jtaf-xml2tf -j` / `jtaf-xml2yaml -j`.
 - `jtaf-provider`, `jtaf-ansible`, `jtaf-xml2tf` and `jtaf-xml2yaml` read the schema given with `-j` (file or `-` for stdin) as plain or gzipped JSON, detected by content, through a shared loader (`jtaf_common.load_schema_json`); directories generated before this change still load.
 
 ## [1.2.0] - 2026-06-17

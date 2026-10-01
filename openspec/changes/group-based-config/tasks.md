@@ -2,19 +2,19 @@
 
 ## 1. Unify on the schema-driven generator
 
-- [ ] 1.1 Make `jtaf-provider` without `--generic` run the same generation as `--generic`, differing only in that the
+- [x] 1.1 Make `jtaf-provider` without `--generic` run the same generation as `--generic`, differing only in that the
       schema is trimmed with `-x` first; verify `jtaf-provider -j <schema> -x <xml> -t t1` produces `main.go`,
       `embed_schema.go`, `schema.bin.gz` and `trimmed_schema.json.gz`, and no `resource_config_provider.go`
-- [ ] 1.2 Delete `junosterraform/templates/resource_config_provider.go.j2`, `provider.go.j2` and `config.go.j2` plus
+- [x] 1.2 Delete `junosterraform/templates/resource_config_provider.go.j2`, `provider.go.j2` and `config.go.j2` plus
       the rendering helpers only they used; verify `grep -r "resource_config_provider.go.j2" junosterraform` returns
       nothing and `pytest junosterraform/tests/` passes after updating `test_script_coverage.py` and `test_workflow.py`
-- [ ] 1.3 Reject `--generic` with `-x` with a message naming the conflict, and update the `--generic` help text to say
+- [x] 1.3 Reject `--generic` with `-x` with a message naming the conflict, and update the `--generic` help text to say
       it embeds the untrimmed model; verify both behaviours with a test in `junosterraform/tests/test_script_coverage.py`
-- [ ] 1.4 Assert the two invocations produce identical Go source: add a test generating a provider with `-x` and one
+- [x] 1.4 Assert the two invocations produce identical Go source: add a test generating a provider with `-x` and one
       with `--generic` from the same model and comparing every `.go` file byte for byte except `embed_schema.go`
-- [ ] 1.5 Collapse `examples/providers/test-both-providers.sh` and `build.sh`/`build-generic.sh` to the single
+- [x] 1.5 Collapse `examples/providers/test-both-providers.sh` and `build.sh`/`build-generic.sh` to the single
       generator, keeping a trimmed and an untrimmed build; verify both scripts run to a compiled binary
-- [ ] 1.6 Record the breaking change in `changelog.md` and update `openspec/specs`-adjacent docs (`README-terraform.md`,
+- [x] 1.6 Record the breaking change in `changelog.md` and update `openspec/specs`-adjacent docs (`README-terraform.md`,
       `terraform_provider/README.md`) that describe template rendering; verify the documented commands run as written
 
 ## 2. Groups in the schema

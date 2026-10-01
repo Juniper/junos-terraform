@@ -30,10 +30,10 @@ fi
 mkdir -p "$standard_dir" "$generic_dir" "$terraform_dir"
 cp -a "$terraform_source_dir"/. "$terraform_dir"/
 
-echo "Generating standard provider variants..."
+echo "Generating providers with a trimmed schema..."
 JTAF_PROVIDER_OUTPUT_DIR="$standard_dir" bash "$providers_dir/build.sh"
 
-echo "Generating generic provider variants..."
+echo "Generating providers with the untrimmed model..."
 JTAF_PROVIDER_OUTPUT_DIR="$generic_dir" \
 JTAF_SKIP_PROVIDER_INSTALL=1 \
   bash "$providers_dir/build-generic.sh"

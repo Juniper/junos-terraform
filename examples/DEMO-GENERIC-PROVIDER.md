@@ -1,10 +1,11 @@
-# Demo: Generic Schema-Driven Terraform Provider
+# Demo: Untrimmed-Model Terraform Provider
 
 This walkthrough demonstrates the `--generic` provider workflow using the
-EVPN-VXLAN example configs already in this repository. Generic provider
-generation uses the YANG models in `examples/yang/18.2/` without XML filtering;
-the XML files in `examples/evpn-vxlan-dc/` are used later for Terraform input
-generation and integration tests.
+EVPN-VXLAN example configs already in this repository. `--generic` embeds the
+YANG models in `examples/yang/18.2/` untrimmed; the XML files in
+`examples/evpn-vxlan-dc/` are used later for Terraform input generation and
+integration tests. The provider source is the same one `build.sh` produces —
+only the scope of the embedded model differs.
 
 ---
 

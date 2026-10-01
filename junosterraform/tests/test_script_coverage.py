@@ -2,6 +2,7 @@ import importlib.util
 import json
 import pathlib
 import runpy
+import shutil
 import sys
 from importlib.machinery import SourceFileLoader
 
@@ -34,12 +35,6 @@ def _load_script(script_name: str, module_name: str):
 
 def test_jtaf_provider_helpers(tmp_path):
     mod = _load_script("jtaf-provider", "jtaf_provider_mod")
-
-    tpl = tmp_path / "in.j2"
-    tpl.write_text("hello {{ data.name }}")
-    out = tmp_path / "out.txt"
-    mod.render_template_and_write(str(tpl), str(out), {"name": "world"}, "sample")
-    assert out.read_text() == "hello world"
 
     go_dir = tmp_path / "go"
     go_dir.mkdir()
@@ -117,25 +112,18 @@ def test_jtaf_provider_drop_version():
 def test_jtaf_provider_main_smoke(tmp_path, monkeypatch):
     mod = _load_script("jtaf-provider", "jtaf_provider_main_mod")
 
+    resources = {"root": {"children": [{"name": "configuration", "children": [
+        {"name": "system", "type": "container", "children": [{"name": "host-name", "type": "leaf"}]},
+    ]}]}}
     schema = tmp_path / "schema.json"
-    schema.write_text(json.dumps({"root": {"children": []}}))
+    schema.write_text(json.dumps(resources))
     xml = tmp_path / "cfg.xml"
     xml.write_text("<configuration><system/></configuration>")
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(mod, "filter_json_using_xml", lambda _s, _x: {"root": {"children": []}})
-
-    # Keep Template usage deterministic and lightweight.
-    class _FakeTemplate:
-        def __init__(self, _src):
-            pass
-
-        def render(self, **kwargs):
-            if "data" in kwargs and isinstance(kwargs["data"], dict) and "device_type" in kwargs["data"]:
-                return "package main\n"
-            return "package main\n"
-
-    monkeypatch.setattr(mod, "Template", _FakeTemplate)
+    monkeypatch.setattr(mod, "filter_json_using_xml", lambda _s, _x: resources)
+    # Compiling the schema needs Go; the copy/emit steps are what is under test.
+    monkeypatch.setattr(mod, "_compile_schema", lambda *_: None)
 
     argv = [
         "jtaf-provider",
@@ -150,14 +138,52 @@ def test_jtaf_provider_main_smoke(tmp_path, monkeypatch):
     mod.main()
 
     out = tmp_path / "terraform-provider-junos-qfx"
-    assert (out / "resource_config_provider.go").exists()
-    assert (out / "provider.go").exists()
+    assert (out / "main.go").exists()
+    assert (out / "embed_schema.go").exists()
     assert (out / "go.mod").exists()
-    assert (out / "config.go").exists()
     assert (out / "trimmed_schema.json.gz").exists()
     assert not (out / "trimmed_schema.json").exists()
+    # No Go source is rendered from a template any more.
+    assert not (out / "resource_config_provider.go").exists()
     from junosterraform.jtaf_common import load_schema_json
-    assert load_schema_json(str(out / "trimmed_schema.json.gz")) == {"root": {"children": []}}
+    assert load_schema_json(str(out / "trimmed_schema.json.gz")) == resources
+
+
+def test_trimmed_and_untrimmed_builds_share_provider_source(tmp_path, monkeypatch):
+    """-x and --generic choose the schema, not the provider implementation."""
+    resources = {"root": {"children": [{"name": "configuration", "children": [
+        {"name": "system", "type": "container", "children": [{"name": "host-name", "type": "leaf"}]},
+    ]}]}}
+    schema = tmp_path / "schema.json"
+    schema.write_text(json.dumps(resources))
+    xml = tmp_path / "cfg.xml"
+    xml.write_text("<configuration><system><host-name>r1</host-name></system></configuration>")
+
+    monkeypatch.chdir(tmp_path)
+
+    for name, argv in (
+        ("trimmed", ["-j", str(schema), "-x", str(xml), "-t", "same"]),
+        ("untrimmed", ["-j", str(schema), "-t", "same", "--generic"]),
+    ):
+        mod = _load_script("jtaf-provider", f"jtaf_provider_{name}_mod")
+        monkeypatch.setattr(mod, "filter_json_using_xml", lambda _s, _x: resources)
+        monkeypatch.setattr(mod, "_compile_schema", lambda *_: None)
+        monkeypatch.setattr(sys, "argv", ["jtaf-provider", *argv])
+        mod.main()
+        shutil.copytree(tmp_path / "terraform-provider-junos-same", tmp_path / name)
+        shutil.rmtree(tmp_path / "terraform-provider-junos-same")
+
+    trimmed_go = sorted(p.relative_to(tmp_path / "trimmed")
+                        for p in (tmp_path / "trimmed").rglob("*.go"))
+    untrimmed_go = sorted(p.relative_to(tmp_path / "untrimmed")
+                          for p in (tmp_path / "untrimmed").rglob("*.go"))
+    assert trimmed_go == untrimmed_go
+    assert trimmed_go, "expected Go source in the generated provider"
+
+    for rel in trimmed_go:
+        a = (tmp_path / "trimmed" / rel).read_bytes()
+        b = (tmp_path / "untrimmed" / rel).read_bytes()
+        assert a == b, f"{rel} differs between the trimmed and untrimmed builds"
 
 
 def test_jtaf_provider_generic_writes_gzipped_schema(tmp_path, monkeypatch):
@@ -479,6 +505,18 @@ def test_generic_generation_rejects_xml_filter(script_name, argv, monkeypatch, c
 
     assert exc_info.value.code == 2
     assert "not allowed with argument" in capsys.readouterr().err
+
+
+def test_provider_schema_scope_help(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["jtaf-provider", "--help"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_path(str(JUNOS_DIR / "jtaf-provider"), run_name="__main__")
+
+    assert exc_info.value.code == 0
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "Embed the untrimmed model rather than trimming it to XML" in help_text
+    assert "trim the embedded schema to" in help_text
 
 
 def test_yang2go_and_yang2ansible_scripts(tmp_path, monkeypatch):

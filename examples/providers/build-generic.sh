@@ -1,6 +1,6 @@
 #!/bin/bash
-# Build generic providers using --generic flag.
-# Mirrors examples/providers/build.sh but uses schema-driven generic provider.
+# Build providers that embed the untrimmed model (--generic).
+# Same provider source as build.sh; only the schema scope differs.
 #
 # Usage: cd examples/providers && bash build-generic.sh
 
@@ -12,14 +12,14 @@ output_dir="${JTAF_PROVIDER_OUTPUT_DIR:-$providers_dir}"
 mkdir -p "$output_dir"
 cd "$output_dir"
 
-echo "Building generic QFX provider..."
+echo "Building untrimmed QFX provider..."
 jtaf-yang2go --generic \
   -p "$repo_root/examples/yang/18.2/18.2R3/common" \
   "$repo_root"/examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang \
   -t vqfx-evpn-vxlan
 
 echo ""
-echo "Building generic SRX provider..."
+echo "Building untrimmed SRX provider..."
 jtaf-yang2go --generic \
   -p "$repo_root/examples/yang/18.2/18.2R3/common" \
   "$repo_root"/examples/yang/18.2/18.2R3/junos-es/conf/*.yang \
