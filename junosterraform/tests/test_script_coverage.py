@@ -173,6 +173,59 @@ def test_jtaf_provider_generic_writes_gzipped_schema(tmp_path, monkeypatch):
     assert load_schema_json(str(out / "trimmed_schema.json.gz")) == resources
 
 
+def test_xml2tf_build_type_map_flattens_choice_case_for_xml_path():
+    mod = _load_script("jtaf-xml2tf", "jtaf_xml2tf_choice_mod")
+    schema = {
+        "name": "configuration",
+        "type": "container",
+        "children": [
+            {
+                "name": "routing-options",
+                "type": "container",
+                "children": [
+                    {
+                        "name": "static",
+                        "type": "list",
+                        "children": [
+                            {
+                                "name": "route",
+                                "type": "list",
+                                "children": [
+                                    {
+                                        "name": "next_hop",
+                                        "type": "choice",
+                                        "children": [
+                                            {
+                                                "name": "case_1",
+                                                "type": "case",
+                                                "children": [
+                                                    {"name": "next-hop", "type": "leaf-list"},
+                                                ],
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    }
+
+    type_map = mod.build_type_map(schema)
+    xml_leaf_list_path = "routing_options/static/route/next_hop"
+    assert type_map[xml_leaf_list_path]["type"] == "leaf-list"
+
+    xml = mod.etree.fromstring("<next-hop>100.123.0.1</next-hop>")
+    assert mod.parse_element(
+        xml,
+        explicit_empty_tags=set(),
+        type_lookup=type_map,
+        parent_path="routing-options/static/route",
+    ) == ["100.123.0.1"]
+
+
 def test_xml2tf_helpers_and_main(tmp_path, monkeypatch):
     mod = _load_script("jtaf-xml2tf", "jtaf_xml2tf_mod")
 

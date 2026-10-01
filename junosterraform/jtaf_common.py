@@ -401,6 +401,11 @@ def load_and_merge_xmls(xml_file_list: list[str]) -> ElementTree.Element:
 def build_type_map(node, parent_path=""):
     type_map = {}
 
+    if node.get("type") in {"choice", "case"}:
+        for child in node.get("children", []):
+            type_map.update(build_type_map(child, parent_path))
+        return type_map
+
     # Normalize node name
     node_name = normalize_tag(node["name"])
     path = f"{parent_path}/{node_name}" if parent_path else node_name

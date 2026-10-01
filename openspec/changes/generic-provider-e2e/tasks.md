@@ -18,7 +18,7 @@
 
 ## 3. Resolve Reproduced Generic Provider Defects
 
-- [ ] 3.1 Run the generic-provider end-to-end pass, fix each in-scope defect it reproduces, and add a focused regression test for every fix; verify each regression test fails before the fix and passes afterward.
+- [x] 3.1 Run the generic-provider end-to-end pass, fix each in-scope defect it reproduces, and add a focused regression test for every fix; verify each regression test fails before the fix and passes afterward.
 - [x] 3.2 Update the end-to-end workflow documentation/output contract to describe both provider results and verify the documented invocation matches the implemented flow.
 
 ## 4. Verify Integration
