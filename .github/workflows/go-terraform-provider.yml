@@ -491,6 +491,10 @@ jobs:
 
     - name: Set up Terraform
       uses: hashicorp/setup-terraform@v4
+      with:
+        # The wrapper swallows the exit code, and these steps read it to tell a
+        # plan with changes from one without.
+        terraform_wrapper: false
 
     - name: Build a provider that manages groups
       run: |
