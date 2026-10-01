@@ -28,11 +28,8 @@ type fakeDevice struct {
 	closed  bool
 }
 
-func (f *fakeDevice) Close() error                                    { f.closed = true; return nil }
-func (f *fakeDevice) DeleteConfig(string, bool) (string, error)       { return "", nil }
-func (f *fakeDevice) MarshalGroup(string, interface{}) error          { return nil }
-func (f *fakeDevice) SendTransaction(string, interface{}, bool) error { return nil }
-func (f *fakeDevice) SendCommit() error                               { f.commits++; return nil }
+func (f *fakeDevice) Close() error      { f.closed = true; return nil }
+func (f *fakeDevice) SendCommit() error { f.commits++; return nil }
 
 func (f *fakeDevice) MarshalConfig(obj interface{}) error {
 	f.reads++

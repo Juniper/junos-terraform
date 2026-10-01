@@ -35,16 +35,16 @@
 
 ## 3. Groups in the provider
 
-- [ ] 3.1 Remove the `groups`/`apply-groups` skip from `attributeNodes()` in `terraform_provider/generic/names.go` so
+- [x] 3.1 Remove the `groups`/`apply-groups` skip from `attributeNodes()` in `terraform_provider/generic/names.go` so
       attribute listing is purely structural; verify `go test ./generic/...` passes with a test building a schema that
       contains `groups` and asserting the resource exposes `groups` and `apply_groups`
-- [ ] 3.2 Verify a schema without `groups` yields a resource with no such attribute and no error, with a test
-- [ ] 3.3 Confirm the read path requests the committed configuration without inheritance and add a test asserting the
+- [x] 3.2 Verify a schema without `groups` yields a resource with no such attribute and no error, with a test
+- [x] 3.3 Confirm the read path requests the committed configuration without inheritance and add a test asserting the
       `get-configuration` RPC carries no `inherit` attribute
-- [ ] 3.4 Delete the legacy group bookkeeping in `terraform_provider/netconf/client.go` (`groupStrXML`,
+- [x] 3.4 Delete the legacy group bookkeeping in `terraform_provider/netconf/client.go` (`groupStrXML`,
       `getGroupXMLStr`, `applyGroupsList`, `applyGroupsMutex`, `sendApplyGroupsLocked`, `addToApplyGroupsList`,
       `sortApplyGroupsList`, `MarshalGroup` and their call sites); verify `go build ./...` and `go test ./...` pass
-- [ ] 3.5 Add a provider-level test asserting a group declared without an `apply_groups` entry is sent without any
+- [x] 3.5 Add a provider-level test asserting a group declared without an `apply_groups` entry is sent without any
       reference being synthesised
 
 ## 4. Patch engine

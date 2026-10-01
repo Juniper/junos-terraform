@@ -195,3 +195,80 @@ func compactXML(s string) string {
 	}
 	return b.String()
 }
+
+// groupsSchema is what --groups produces: groups repeats the configuration
+// hierarchy, keyed by name, and apply-groups is an ordered leaf-list.
+const groupsSchema = `{"root": {"children": [{"name": "configuration", "type": "container", "children": [
+  {"name": "apply-groups", "type": "leaf-list", "ordered-by": "user"},
+  {"name": "groups", "type": "list", "key": "name", "children": [
+    {"name": "name", "type": "leaf"},
+    {"name": "system", "type": "container", "children": [{"name": "host-name", "type": "leaf"}]}
+  ]},
+  {"name": "system", "type": "container", "children": [{"name": "host-name", "type": "leaf"}]}
+]}]}}`
+
+func groupsRoundTrip(t *testing.T, xmlText string) string {
+	t.Helper()
+	ResetSchema()
+	t.Cleanup(ResetSchema)
+	nodes, err := LoadSchema([]byte(groupsSchema))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, typ := BuildSchema(nodes)
+	tree, err := patch.BuildTree([]byte(xmlText))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := ConfigToValue(tree, nodes, typ)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := ValueToConfig(v, nodes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := patch.MarshalTree(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return compactXML(string(b))
+}
+
+// A group is ordinary configuration: it survives the round trip with its body
+// under its own name, and nothing invents a reference to it.
+func TestGroupWithoutApplyGroupsGetsNoReference(t *testing.T) {
+	got := groupsRoundTrip(t, `<configuration>
+  <groups><name>base</name><system><host-name>from-group</host-name></system></groups>
+  <system><host-name>device</host-name></system>
+</configuration>`)
+
+	if !strings.Contains(got, "<groups>") || !strings.Contains(got, "<name>base</name>") {
+		t.Fatalf("group body did not survive: %s", got)
+	}
+	if !strings.Contains(got, "<host-name>from-group</host-name>") {
+		t.Fatalf("configuration inside the group was lost: %s", got)
+	}
+	if strings.Contains(got, "apply-groups") {
+		t.Fatalf("a reference was invented for a group that declares none: %s", got)
+	}
+}
+
+// Declared references are kept, in the order they were declared.
+func TestApplyGroupsKeepsDeclaredOrder(t *testing.T) {
+	got := groupsRoundTrip(t, `<configuration>
+  <apply-groups>second</apply-groups>
+  <apply-groups>first</apply-groups>
+  <groups><name>first</name><system><host-name>a</host-name></system></groups>
+  <groups><name>second</name><system><host-name>b</host-name></system></groups>
+</configuration>`)
+
+	first := strings.Index(got, "<apply-groups>second</apply-groups>")
+	second := strings.Index(got, "<apply-groups>first</apply-groups>")
+	if first == -1 || second == -1 {
+		t.Fatalf("references lost: %s", got)
+	}
+	if first > second {
+		t.Fatalf("Junos applies groups in order, so the declared order must be kept: %s", got)
+	}
+}

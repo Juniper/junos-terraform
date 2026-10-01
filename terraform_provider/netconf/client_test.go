@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"encoding/xml"
 	"errors"
 	"os"
 	"path/filepath"
@@ -26,27 +25,6 @@ func newMockClient(calls *[]string, ret string, err error) *GoNCClient {
 			*calls = append(*calls, op)
 			return ret, err
 		},
-	}
-}
-
-// TestDeleteConfigCallsExpectedOperations verifies delete then commit RPC sequencing.
-func TestDeleteConfigCallsExpectedOperations(t *testing.T) {
-	calls := []string{}
-	client := newMockClient(&calls, "<ok/>", nil)
-
-	_, err := client.DeleteConfig("base-config", true)
-	if err != nil {
-		t.Fatalf("DeleteConfig returned error: %v", err)
-	}
-
-	if len(calls) != 2 {
-		t.Fatalf("expected 2 operations, got %d", len(calls))
-	}
-	if !strings.Contains(calls[0], "<edit-config>") {
-		t.Fatalf("first call should be edit-config, got %q", calls[0])
-	}
-	if strings.TrimSpace(calls[1]) != commitStr {
-		t.Fatalf("second call should be commit, got %q", calls[1])
 	}
 }
 
@@ -87,34 +65,6 @@ func TestMarshalRPCRequestUsesInnerXML(t *testing.T) {
 	}
 }
 
-// TestSendTransactionWithIDReplacesGroup verifies ID-based transactions use update flow.
-func TestSendTransactionWithIDReplacesGroup(t *testing.T) {
-	calls := []string{}
-	client := newMockClient(&calls, "<ok/>", nil)
-
-	obj := struct {
-		XMLName struct{} `xml:"configuration"`
-		Groups  struct {
-			Name string `xml:"name"`
-		} `xml:"groups"`
-	}{}
-	obj.Groups.Name = "base-config"
-
-	if err := client.SendTransaction("base-config", obj, false); err != nil {
-		t.Fatalf("SendTransaction returned error: %v", err)
-	}
-
-	if len(calls) != 2 {
-		t.Fatalf("expected 2 operations for update flow, got %d", len(calls))
-	}
-	if !strings.Contains(calls[0], "operation=\"delete\"") {
-		t.Fatalf("expected delete operation first, got %q", calls[0])
-	}
-	if !strings.Contains(calls[1], "<load-configuration") {
-		t.Fatalf("expected load-configuration second, got %q", calls[1])
-	}
-}
-
 // TestSendCommitDiscardsOnCommitError verifies discard-changes is sent after commit failure.
 func TestSendCommitDiscardsOnCommitError(t *testing.T) {
 	calls := []string{}
@@ -129,14 +79,18 @@ func TestSendCommitDiscardsOnCommitError(t *testing.T) {
 		},
 	}
 
-	applyGroupsList = []string{"b", "a"}
 	err := client.SendCommit()
 	if err == nil {
 		t.Fatal("expected commit error")
 	}
 
-	if len(calls) < 3 {
-		t.Fatalf("expected apply-groups, commit, discard operations, got %d", len(calls))
+	// Only the commit and the discard that follows it: apply-groups is
+	// ordinary configuration and is not emitted on the resource's behalf.
+	if len(calls) != 2 {
+		t.Fatalf("expected commit then discard, got %#v", calls)
+	}
+	if strings.TrimSpace(calls[0]) != commitStr {
+		t.Fatalf("expected commit first, got %q", calls[0])
 	}
 	if strings.TrimSpace(calls[len(calls)-1]) != discardChanges {
 		t.Fatalf("expected discard-changes after commit failure, got %q", calls[len(calls)-1])
@@ -162,162 +116,25 @@ func TestGoNCClientCloseNoop(t *testing.T) {
 	}
 }
 
-// TestUpdateRawConfigMissingName verifies group name extraction failures are surfaced.
-func TestUpdateRawConfigMissingName(t *testing.T) {
-	client := newMockClient(&[]string{}, "<ok/>", nil)
-	_, err := client.updateRawConfig("group", "<configuration></configuration>", false)
-	if err == nil || !strings.Contains(err.Error(), "failed to extract") {
-		t.Fatalf("expected extract error, got: %v", err)
-	}
-}
-
-// TestUpdateRawConfigIgnoresMissingDelete verifies initial group creation tolerates missing-group deletes.
-func TestUpdateRawConfigIgnoresMissingDelete(t *testing.T) {
+// TestReadRawConfigAsksForCommittedConfiguration checks that the read does not
+// ask the device to resolve apply-groups. With inheritance resolved, a device
+// reports a group's values in the base hierarchy too, and configuration that
+// was never declared there would be read back as drift on every plan.
+func TestReadRawConfigAsksForCommittedConfiguration(t *testing.T) {
 	calls := []string{}
-	client := &GoNCClient{
-		Lock: sync.RWMutex{},
-		exec: func(_ context.Context, op string) (string, error) {
-			calls = append(calls, op)
-			if strings.Contains(op, "operation=\"delete\"") {
-				return "", errors.New("multiple netconf errors: netconf error: application data-missing: statement not found")
-			}
-			return "<ok/>", nil
-		},
+	client := newMockClient(&calls, "<configuration/>", nil)
+
+	if _, err := client.readRawConfig(); err != nil {
+		t.Fatalf("readRawConfig() returned error: %v", err)
 	}
-
-	_, err := client.updateRawConfig("group", "<configuration><groups><name>group</name></groups></configuration>", false)
-	if err != nil {
-		t.Fatalf("expected missing delete to be ignored, got: %v", err)
+	if len(calls) != 1 {
+		t.Fatalf("expected one call, got %#v", calls)
 	}
-	if len(calls) != 2 {
-		t.Fatalf("expected delete then load calls, got %d", len(calls))
+	if !strings.Contains(calls[0], "<get-configuration>") {
+		t.Fatalf("expected get-configuration, got %q", calls[0])
 	}
-}
-
-// TestSendRawConfigCommitFlow verifies raw config load followed by commit.
-func TestSendRawConfigCommitFlow(t *testing.T) {
-	calls := []string{}
-	client := newMockClient(&calls, "<ok/>", nil)
-	applyGroupsList = nil
-
-	reply, err := client.sendRawConfig("<configuration><groups><name>z-group</name></groups></configuration>", true)
-	if err != nil {
-		t.Fatalf("sendRawConfig() returned error: %v", err)
-	}
-	if reply != "<ok/>" {
-		t.Fatalf("unexpected reply: %q", reply)
-	}
-	if len(calls) != 2 {
-		t.Fatalf("expected load and commit calls, got: %d", len(calls))
-	}
-	if strings.TrimSpace(calls[1]) != commitStr {
-		t.Fatalf("expected commit as second call, got %q", calls[1])
-	}
-}
-
-// TestSendRawConfigMissingName verifies missing group names return an error.
-func TestSendRawConfigMissingName(t *testing.T) {
-	client := newMockClient(&[]string{}, "<ok/>", nil)
-	_, err := client.sendRawConfig("<configuration></configuration>", false)
-	if err == nil || !strings.Contains(err.Error(), "failed to extract") {
-		t.Fatalf("expected extract error, got: %v", err)
-	}
-}
-
-// TestReadRawGroupUsesGetConfigRPC verifies group reads use get-configuration RPC.
-func TestReadRawGroupUsesGetConfigRPC(t *testing.T) {
-	calls := []string{}
-	client := newMockClient(&calls, "<group/>", nil)
-
-	reply, err := client.readRawGroup("base-config")
-	if err != nil {
-		t.Fatalf("readRawGroup() returned error: %v", err)
-	}
-	if reply != "<group/>" {
-		t.Fatalf("unexpected reply: %q", reply)
-	}
-	if len(calls) != 1 || !strings.Contains(calls[0], "<get-configuration>") {
-		t.Fatalf("expected get-configuration call, got %#v", calls)
-	}
-}
-
-// TestMarshalGroupSuccessAndError verifies XML unmarshalling success and failure paths.
-func TestMarshalGroupSuccessAndError(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		calls := []string{}
-		reply := `<configuration><groups><name>g1</name></groups></configuration>`
-		client := newMockClient(&calls, reply, nil)
-
-		var out struct {
-			XMLName xml.Name `xml:"configuration"`
-			Groups  struct {
-				Name string `xml:"name"`
-			} `xml:"groups"`
-		}
-
-		if err := client.MarshalGroup("g1", &out); err != nil {
-			t.Fatalf("MarshalGroup() returned error: %v", err)
-		}
-		if out.Groups.Name != "g1" {
-			t.Fatalf("unexpected group name: %q", out.Groups.Name)
-		}
-	})
-
-	t.Run("invalid xml", func(t *testing.T) {
-		calls := []string{}
-		client := newMockClient(&calls, `<bad`, nil)
-		var out struct{}
-		if err := client.MarshalGroup("g1", &out); err == nil {
-			t.Fatalf("expected unmarshal error")
-		}
-	})
-}
-
-// TestSendTransactionEmptyIDPathAndMarshalError verifies empty-ID path and marshal failures.
-func TestSendTransactionEmptyIDPathAndMarshalError(t *testing.T) {
-	t.Run("empty id uses raw path", func(t *testing.T) {
-		calls := []string{}
-		client := newMockClient(&calls, "<ok/>", nil)
-		applyGroupsList = nil
-
-		obj := struct {
-			XMLName xml.Name `xml:"configuration"`
-			Groups  struct {
-				Name string `xml:"name"`
-			} `xml:"groups"`
-		}{}
-		obj.Groups.Name = "group-a"
-
-		if err := client.SendTransaction("", obj, false); err != nil {
-			t.Fatalf("SendTransaction() error: %v", err)
-		}
-		if len(calls) != 1 || !strings.Contains(calls[0], "<load-configuration") {
-			t.Fatalf("expected single load-configuration call, got %#v", calls)
-		}
-	})
-
-	t.Run("marshal error", func(t *testing.T) {
-		client := newMockClient(&[]string{}, "", nil)
-		obj := map[string]interface{}{"bad": make(chan int)}
-		if err := client.SendTransaction("", obj, false); err == nil {
-			t.Fatalf("expected marshal error")
-		}
-	})
-}
-
-// TestApplyGroupsHelpersSortAndFilter verifies helper list sanitization and sorting.
-func TestApplyGroupsHelpersSortAndFilter(t *testing.T) {
-	applyGroupsList = nil
-	addToApplyGroupsList("b")
-	addToApplyGroupsList("")
-	addToApplyGroupsList("a")
-	sortApplyGroupsList()
-
-	if len(applyGroupsList) != 2 {
-		t.Fatalf("expected empty value to be filtered out, got %#v", applyGroupsList)
-	}
-	if applyGroupsList[0] != "a" || applyGroupsList[1] != "b" {
-		t.Fatalf("unexpected sorted list: %#v", applyGroupsList)
+	if strings.Contains(calls[0], "inherit") {
+		t.Fatalf("read must not resolve inheritance: %q", calls[0])
 	}
 }
 
@@ -369,169 +186,24 @@ func TestExecuteWithoutMockReturnsDialError(t *testing.T) {
 	}
 }
 
-// TestUpdateRawConfigCommitAndErrorBranches verifies update commit and error branches.
-func TestUpdateRawConfigCommitAndErrorBranches(t *testing.T) {
-	t.Run("commit true success", func(t *testing.T) {
-		calls := []string{}
-		client := newMockClient(&calls, "<ok/>", nil)
-		applyGroupsList = nil
+// TestSendCommitOnlyCommits checks that committing does not write configuration
+// of its own. apply-groups is part of the payload the resource sends, so a group
+// reference the configuration does not declare must never reach the device.
+func TestSendCommitOnlyCommits(t *testing.T) {
+	calls := []string{}
+	client := newMockClient(&calls, "<ok/>", nil)
 
-		reply, err := client.updateRawConfig("grp", "<configuration><groups><name>grp</name></groups></configuration>", true)
-		if err != nil {
-			t.Fatalf("updateRawConfig() error: %v", err)
-		}
-		if reply != "<ok/>" {
-			t.Fatalf("unexpected reply: %q", reply)
-		}
-		if len(calls) != 3 {
-			t.Fatalf("expected 3 calls (delete, load, commit), got %d", len(calls))
-		}
-	})
-
-	t.Run("delete error", func(t *testing.T) {
-		client := &GoNCClient{
-			Lock: sync.RWMutex{},
-			exec: func(_ context.Context, op string) (string, error) {
-				if strings.Contains(op, "operation=\"delete\"") {
-					return "", errors.New("delete failed")
-				}
-				return "<ok/>", nil
-			},
-		}
-		_, err := client.updateRawConfig("grp", "<configuration><groups><name>grp</name></groups></configuration>", false)
-		if err == nil {
-			t.Fatalf("expected delete error")
-		}
-	})
-
-	t.Run("commit error", func(t *testing.T) {
-		client := &GoNCClient{
-			Lock: sync.RWMutex{},
-			exec: func(_ context.Context, op string) (string, error) {
-				if strings.TrimSpace(op) == commitStr {
-					return "", errors.New("commit failed")
-				}
-				return "<ok/>", nil
-			},
-		}
-		_, err := client.updateRawConfig("grp", "<configuration><groups><name>grp</name></groups></configuration>", true)
-		if err == nil {
-			t.Fatalf("expected commit error")
-		}
-	})
-}
-
-// TestDeleteConfigBranches verifies non-commit and commit-error delete behavior.
-func TestDeleteConfigBranches(t *testing.T) {
-	t.Run("without commit", func(t *testing.T) {
-		calls := []string{}
-		client := newMockClient(&calls, "<ok/>\n", nil)
-		reply, err := client.DeleteConfig("grp", false)
-		if err != nil {
-			t.Fatalf("DeleteConfig() error: %v", err)
-		}
-		if reply != "<ok/>" {
-			t.Fatalf("expected newline-stripped reply, got %q", reply)
-		}
-		if len(calls) != 1 {
-			t.Fatalf("expected single delete call, got %d", len(calls))
-		}
-	})
-
-	t.Run("commit error", func(t *testing.T) {
-		client := &GoNCClient{
-			Lock: sync.RWMutex{},
-			exec: func(_ context.Context, op string) (string, error) {
-				if strings.TrimSpace(op) == commitStr {
-					return "", errors.New("commit failed")
-				}
-				return "<ok/>", nil
-			},
-		}
-		_, err := client.DeleteConfig("grp", true)
-		if err == nil {
-			t.Fatalf("expected commit error")
-		}
-	})
-
-	t.Run("missing group delete", func(t *testing.T) {
-		client := &GoNCClient{
-			Lock: sync.RWMutex{},
-			exec: func(_ context.Context, _ string) (string, error) {
-				return "", errors.New("netconf error: application data-missing: statement not found")
-			},
-		}
-
-		reply, err := client.DeleteConfig("grp", false)
-		if err != nil {
-			t.Fatalf("expected missing-group delete to be ignored, got: %v", err)
-		}
-		if reply != "<ok/>" {
-			t.Fatalf("expected synthetic ok reply, got %q", reply)
-		}
-	})
-}
-
-// TestSendCommitSuccessAndApplyGroupError verifies commit success and apply-group RPC failure behavior.
-func TestSendCommitSuccessAndApplyGroupError(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		calls := []string{}
-		client := newMockClient(&calls, "<ok/>", nil)
-		applyGroupsList = []string{"z", "", "a"}
-
-		if err := client.SendCommit(); err != nil {
-			t.Fatalf("SendCommit() error: %v", err)
-		}
-		if len(calls) < 2 {
-			t.Fatalf("expected apply-group load then commit calls, got %d", len(calls))
-		}
-		if !strings.Contains(calls[0], "<apply-groups>a</apply-groups>") || !strings.Contains(calls[0], "<apply-groups>z</apply-groups>") {
-			t.Fatalf("expected sorted apply groups in RPC, got %q", calls[0])
-		}
-	})
-
-	t.Run("apply-group load error", func(t *testing.T) {
-		client := &GoNCClient{
-			Lock: sync.RWMutex{},
-			exec: func(_ context.Context, op string) (string, error) {
-				if strings.Contains(op, "<load-configuration") {
-					return "", errors.New("load failed")
-				}
-				return "<ok/>", nil
-			},
-		}
-		applyGroupsList = []string{"x"}
-		if err := client.SendCommit(); err == nil {
-			t.Fatalf("expected sendApplyGroupsLocked error")
-		}
-	})
-}
-
-// TestMarshalGroupReadError verifies read errors are propagated by MarshalGroup.
-func TestMarshalGroupReadError(t *testing.T) {
-	client := &GoNCClient{
-		Lock: sync.RWMutex{},
-		exec: func(_ context.Context, _ string) (string, error) {
-			return "", errors.New("read failed")
-		},
+	if err := client.SendCommit(); err != nil {
+		t.Fatalf("SendCommit() error: %v", err)
 	}
-	var out struct{}
-	if err := client.MarshalGroup("x", &out); err == nil {
-		t.Fatalf("expected read error")
+	if len(calls) != 1 {
+		t.Fatalf("expected a single commit call, got %#v", calls)
 	}
-}
-
-// TestSendRawConfigExecuteError verifies RPC execution errors are returned.
-func TestSendRawConfigExecuteError(t *testing.T) {
-	client := &GoNCClient{
-		Lock: sync.RWMutex{},
-		exec: func(_ context.Context, _ string) (string, error) {
-			return "", errors.New("rpc failed")
-		},
+	if strings.TrimSpace(calls[0]) != commitStr {
+		t.Fatalf("expected commit, got %q", calls[0])
 	}
-	_, err := client.sendRawConfig("<configuration><groups><name>g</name></groups></configuration>", false)
-	if err == nil {
-		t.Fatalf("expected rpc error")
+	if strings.Contains(calls[0], "apply-groups") {
+		t.Fatalf("commit must not emit apply-groups: %q", calls[0])
 	}
 }
 

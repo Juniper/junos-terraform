@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 
@@ -15,44 +14,17 @@ import (
 	netconfssh "nemith.io/netconf/transport/ssh"
 )
 
-const groupStrXML = `<load-configuration action="merge" format="xml">
+const loadConfigXML = `<load-configuration action="merge" format="xml">
 %s
 </load-configuration>
 `
 
-const deleteStr = `<edit-config>
-	<target>
-		<candidate/>
-	</target>
-	<default-operation>none</default-operation>
-	<config>
-		<configuration>
-			<groups operation="delete">
-				<name>%s</name>
-			</groups>
-			<apply-groups operation="delete">%s</apply-groups>
-		</configuration>
-	</config>
-</edit-config>`
-
 const commitStr = `<commit/>`
-
-const getGroupXMLStr = `<get-configuration>
-  <configuration>
-  <groups><name>%s</name></groups>
-  </configuration>
-</get-configuration>
-`
 
 const getConfigXMLStr = `<get-configuration>
 	<configuration>
 	</configuration>
 </get-configuration>
-`
-
-const applyGroupXML = `<load-configuration action="merge" format="xml">
-	%s
-</load-configuration>
 `
 
 const discardChanges = `<discard-changes/>`
@@ -249,125 +221,18 @@ func parseReply(rawReply []byte) (string, error) {
 	return reply.Data, nil
 }
 
-// updateRawConfig replaces an existing apply-group payload and optionally commits.
-func (g *GoNCClient) updateRawConfig(applyGroup string, netconfCall string, commit bool) (string, error) {
-	g.Lock.Lock()
-	defer g.Lock.Unlock()
-
-	ctx := context.Background()
-	deleteString := fmt.Sprintf(deleteStr, applyGroup, applyGroup)
-	if _, err := g.execute(ctx, deleteString); err != nil {
-		if !isMissingDeleteError(err) {
-			return "", err
-		}
-	}
-
-	nameStart := strings.Index(netconfCall, "<name>")
-	nameEnd := strings.Index(netconfCall, "</name>")
-	if nameStart == -1 || nameEnd == -1 {
-		return "", fmt.Errorf("failed to extract the group name from the netconfcall")
-	}
-	groupName := netconfCall[nameStart+6 : nameEnd]
-	addToApplyGroupsList(groupName)
-
-	groupString := fmt.Sprintf(groupStrXML, netconfCall)
-	reply, err := g.execute(ctx, groupString)
-	if err != nil {
-		return "", err
-	}
-
-	if commit {
-		if _, err := g.execute(ctx, commitStr); err != nil {
-			return "", err
-		}
-	}
-
-	return reply, nil
-}
-
-// DeleteConfig deletes the target apply-group and optionally commits.
-func (g *GoNCClient) DeleteConfig(applyGroup string, commit bool) (string, error) {
-	g.Lock.Lock()
-	defer g.Lock.Unlock()
-
-	ctx := context.Background()
-	deleteString := fmt.Sprintf(deleteStr, applyGroup, applyGroup)
-	reply, err := g.execute(ctx, deleteString)
-	if err != nil {
-		if !isMissingDeleteError(err) {
-			return "", err
-		}
-		reply = "<ok/>"
-	}
-
-	if commit {
-		if _, err := g.execute(ctx, commitStr); err != nil {
-			return "", err
-		}
-	}
-
-	return strings.ReplaceAll(reply, "\n", ""), nil
-}
-
-// SendCommit emits apply-groups in deterministic order and commits candidate config.
+// SendCommit commits the candidate configuration. apply-groups is ordinary
+// configuration, carried in the payload like any other node, so nothing is
+// emitted here on the resource's behalf.
 func (g *GoNCClient) SendCommit() error {
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
-
-	hasApplyGroups := false
-	applyGroupsMutex.Lock()
-	for _, group := range applyGroupsList {
-		if group != "" {
-			hasApplyGroups = true
-			break
-		}
-	}
-	applyGroupsMutex.Unlock()
-
-	if hasApplyGroups {
-		sortApplyGroupsList()
-		if err := g.sendApplyGroupsLocked(context.Background()); err != nil {
-			return err
-		}
-	}
 
 	if _, err := g.execute(context.Background(), commitStr); err != nil {
 		_, _ = g.execute(context.Background(), discardChanges)
 		return err
 	}
 
-	return nil
-}
-
-// sendApplyGroupsLocked emits the current apply-groups list as load-configuration XML.
-func (g *GoNCClient) sendApplyGroupsLocked(ctx context.Context) error {
-	applyGroupsMutex.Lock()
-	applyGroupsCopy := make([]string, len(applyGroupsList))
-	copy(applyGroupsCopy, applyGroupsList)
-	applyGroupsMutex.Unlock()
-
-	var applyG configuration
-	applyG.ApplyGroup = applyGroupsCopy
-
-	cfg, err := xml.Marshal(applyG)
-	if err != nil {
-		return err
-	}
-
-	_, err = g.execute(ctx, fmt.Sprintf(applyGroupXML, string(cfg)))
-	return err
-}
-
-// MarshalGroup fetches a group and unmarshals XML into obj.
-func (g *GoNCClient) MarshalGroup(id string, obj interface{}) error {
-	reply, err := g.readRawGroup(id)
-	if err != nil {
-		return err
-	}
-
-	if err = xml.Unmarshal([]byte(reply), &obj); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -384,30 +249,7 @@ func (g *GoNCClient) MarshalConfig(obj interface{}) error {
 	return nil
 }
 
-var applyGroupsList []string
-var applyGroupsMutex sync.Mutex
-
-// SendTransaction updates or creates a config payload and optionally commits it.
-func (g *GoNCClient) SendTransaction(id string, obj interface{}, commit bool) error {
-	cfg, err := xml.Marshal(obj)
-	if err != nil {
-		return err
-	}
-
-	if id != "" {
-		if _, err = g.updateRawConfig(id, string(cfg), commit); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	if _, err = g.sendRawConfig(string(cfg), commit); err != nil {
-		return err
-	}
-	return nil
-}
-
-// SendDirectTransaction loads raw XML config directly without apply-groups wrapping.
+// SendDirectTransaction loads raw XML config directly.
 func (g *GoNCClient) SendDirectTransaction(obj interface{}, commit bool) error {
 	cfg, err := xml.Marshal(obj)
 	if err != nil {
@@ -418,28 +260,6 @@ func (g *GoNCClient) SendDirectTransaction(obj interface{}, commit bool) error {
 		return err
 	}
 	return nil
-}
-
-// addToApplyGroupsList records a group ID for deferred apply-groups emission.
-func addToApplyGroupsList(id string) {
-	applyGroupsMutex.Lock()
-	defer applyGroupsMutex.Unlock()
-	applyGroupsList = append(applyGroupsList, id)
-}
-
-// sortApplyGroupsList removes empty values and keeps group ordering deterministic.
-func sortApplyGroupsList() {
-	applyGroupsMutex.Lock()
-	defer applyGroupsMutex.Unlock()
-
-	filteredGroups := make([]string, 0, len(applyGroupsList))
-	for _, group := range applyGroupsList {
-		if group != "" {
-			filteredGroups = append(filteredGroups, group)
-		}
-	}
-	sort.Strings(filteredGroups)
-	applyGroupsList = filteredGroups
 }
 
 // SendUpdate applies a prepared XML diff payload and optionally commits it.
@@ -462,39 +282,12 @@ func (g *GoNCClient) SendUpdate(id string, diff string, commit bool) error {
 	return nil
 }
 
-// sendRawConfig loads raw XML config and optionally commits it.
-func (g *GoNCClient) sendRawConfig(netconfCall string, commit bool) (string, error) {
-	g.Lock.Lock()
-	defer g.Lock.Unlock()
-
-	nameStart := strings.Index(netconfCall, "<name>")
-	nameEnd := strings.Index(netconfCall, "</name>")
-	if nameStart == -1 || nameEnd == -1 {
-		return "", fmt.Errorf("failed to extract the group name from the netconfCall")
-	}
-	groupName := netconfCall[nameStart+6 : nameEnd]
-	addToApplyGroupsList(groupName)
-
-	reply, err := g.execute(context.Background(), fmt.Sprintf(groupStrXML, netconfCall))
-	if err != nil {
-		return "", err
-	}
-
-	if commit {
-		if _, err = g.execute(context.Background(), commitStr); err != nil {
-			return "", err
-		}
-	}
-
-	return reply, nil
-}
-
-// sendDirectRawConfig loads raw XML configuration without group bookkeeping.
+// sendDirectRawConfig loads raw XML configuration.
 func (g *GoNCClient) sendDirectRawConfig(netconfCall string, commit bool) (string, error) {
 	g.Lock.Lock()
 	defer g.Lock.Unlock()
 
-	reply, err := g.execute(context.Background(), fmt.Sprintf(groupStrXML, netconfCall))
+	reply, err := g.execute(context.Background(), fmt.Sprintf(loadConfigXML, netconfCall))
 	if err != nil {
 		return "", err
 	}
@@ -506,14 +299,6 @@ func (g *GoNCClient) sendDirectRawConfig(netconfCall string, commit bool) (strin
 	}
 
 	return reply, nil
-}
-
-// readRawGroup fetches a single apply-group configuration payload.
-func (g *GoNCClient) readRawGroup(applyGroup string) (string, error) {
-	g.Lock.Lock()
-	defer g.Lock.Unlock()
-
-	return g.execute(context.Background(), fmt.Sprintf(getGroupXMLStr, applyGroup))
 }
 
 // readRawConfig fetches the full configuration payload.
