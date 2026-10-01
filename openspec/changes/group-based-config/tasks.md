@@ -70,10 +70,10 @@
 
 ## 6. Mock NETCONF server
 
-- [ ] 6.1 Change the mock to hold one configuration tree with `groups` inside it instead of blob state keyed by group
+- [x] 6.1 Change the mock to hold one configuration tree with `groups` inside it instead of blob state keyed by group
       name, so patches can edit inside a group; verify `pytest netconf_mock/tests/` passes with a new test applying an
       `edit-config` to a leaf under `<groups>`
-- [ ] 6.2 Add mock tests for deleting a group and for `apply-groups` ordering, asserting the committed tree matches what
+- [x] 6.2 Add mock tests for deleting a group and for `apply-groups` ordering, asserting the committed tree matches what
       a device would hold
 
 ## 7. Group-based example

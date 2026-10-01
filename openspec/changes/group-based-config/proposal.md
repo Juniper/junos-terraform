@@ -52,6 +52,8 @@ provider for both the trimmed and the full-model builds.
 - `terraform-provider`: the resource exposes `groups`/`apply-groups` when the embedded schema carries them, instead of
   filtering those names unconditionally.
 - `patch-engine`: paths below `groups[name=X]` and ordered `apply-groups` entries.
+- `netconf-mock`: the mock keeps a device's configuration as one tree rather than a blob per group, so a
+  configuration holding groups alongside base hierarchy, or more than one group, can be represented and patched.
 - `testing`: an end-to-end example whose configuration lives in a group.
 
 ## Impact
