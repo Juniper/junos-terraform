@@ -49,4 +49,4 @@
 - [x] 7.1 Build provider with small filtered schema (existing EVPN test XMLs) and verify `terraform plan` works
 - [x] 7.2 Build provider with full QFX 18.2 schema (no -x) and verify compile + `terraform init` succeeds
 - [x] 7.3 Test CRUD cycle against mock NETCONF server with generic provider
-- [ ] 7.4 Add CI workflow step that builds generic provider and runs `terraform validate`
+- [x] 7.4 Add CI workflow step that builds generic provider and runs `terraform validate`
