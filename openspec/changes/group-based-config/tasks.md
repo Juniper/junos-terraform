@@ -62,11 +62,11 @@
 
 ## 5. XML to Terraform conversion
 
-- [ ] 5.1 Add `--groups` to `jtaf-xml2tf` so it keeps `<groups>` and `<apply-groups>` instead of flattening applied
+- [x] 5.1 Add `--groups` to `jtaf-xml2tf` so it keeps `<groups>` and `<apply-groups>` instead of flattening applied
       groups into the base hierarchy; verify a test in `junosterraform/tests/test_xml2tf_flatten.py` asserts the
       preserved output contains a `groups` block and an `apply_groups` list and copies nothing into the base hierarchy
-- [ ] 5.2 Verify the default conversion output is unchanged, with a test comparing against the current flattened result
-- [ ] 5.3 Document the flag in `README-terraform.md` alongside the provider flag; verify the documented command runs
+- [x] 5.2 Verify the default conversion output is unchanged, with a test comparing against the current flattened result
+- [x] 5.3 Document the flag in `README-terraform.md` alongside the provider flag; verify the documented command runs
 
 ## 6. Mock NETCONF server
 

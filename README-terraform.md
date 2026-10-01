@@ -71,6 +71,28 @@ jtaf-yang2go -p <path-to-common> <path-to-yang-files> -x <xml-configuration(s)> 
 A group is then written as an entry of the `groups` list, keyed by its `name`, holding the same
 attributes it would have in the base hierarchy, and `apply_groups` is an ordered list of group names.
 
+`jtaf-xml2tf` takes the same flag, and the two need to agree. By default it flattens: the
+configuration a device inherits through `apply-groups` is merged into the base hierarchy and the
+groups themselves are dropped, which is what a provider built without `--groups` expects. With
+`--groups` it converts the hierarchy as it stands:
+
+```bash
+jtaf-xml2tf -j <trimmed_schema.json.gz> -x <xml-configuration(s)> -t <device-type> -d <output-dir> --groups
+```
+
+```hcl
+resource "terraform-provider-junos-<device-type>" "dev1-base-config" {
+  resource_name = "base-config"
+  apply_groups  = ["base"]
+  groups = [
+    {
+      name   = "base"
+      system = [{ host_name = "from-group" }]
+    }
+  ]
+}
+```
+
 NOTE: `--groups` with `--generic` makes the provider advertise the whole model twice over, which needs
 several GB of memory at plan time and warns when generated. Prefer trimming with `-x`, or use
 `--exclude` on paths inside `groups`.

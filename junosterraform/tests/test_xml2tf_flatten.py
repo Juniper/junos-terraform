@@ -5,6 +5,18 @@ import tempfile
 import unittest
 
 
+def _load_xml2tf():
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    script_path = os.path.join(repo_root, "junosterraform", "jtaf-xml2tf")
+    loader = SourceFileLoader("jtaf_xml2tf", script_path)
+    spec = importlib.util.spec_from_loader("jtaf_xml2tf", loader)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
 class TestXMLToTerraformFlatten(unittest.TestCase):
 
     def test_applied_groups_are_flattened_into_base_config(self):
@@ -65,6 +77,65 @@ class TestXMLToTerraformFlatten(unittest.TestCase):
         self.assertIn("ssh = [", rendered)
         self.assertNotIn("unused", rendered)
         self.assertNotIn("telnet", rendered)
+
+    def test_groups_are_kept_when_requested(self):
+        """--groups converts a group-based configuration as it stands."""
+        type_lookup = {
+            "system": {"type": "container"},
+            "system/host_name": {"type": "leaf"},
+            "system/services": {"type": "container"},
+            "system/services/ssh": {"type": "container"},
+            "apply_groups": {"type": "leaf-list"},
+            "groups": {"type": "list", "key": "name"},
+            "groups/name": {"type": "leaf"},
+            "groups/system": {"type": "container"},
+            "groups/system/services": {"type": "container"},
+            "groups/system/services/ssh": {"type": "container"},
+        }
+
+        xml_content = """<configuration>
+  <apply-groups>overlay</apply-groups>
+  <system>
+    <host-name>router1</host-name>
+  </system>
+  <groups>
+    <name>overlay</name>
+    <system>
+      <services>
+        <ssh></ssh>
+      </services>
+    </system>
+  </groups>
+</configuration>
+"""
+        with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as handle:
+            handle.write(xml_content)
+            xml_path = handle.name
+
+        try:
+            # A fresh module each time: the converter remembers paths it has
+            # warned about and dropped.
+            kept = _load_xml2tf().parse_xml_to_hcl(
+                xml_path, "vmx", "router1", type_lookup, True)
+            flattened = _load_xml2tf().parse_xml_to_hcl(
+                xml_path, "vmx", "router1", type_lookup)
+        finally:
+            os.remove(xml_path)
+
+        self.assertIsNotNone(kept)
+        # The group survives with its name and its body.
+        self.assertIn("groups = [", kept)
+        self.assertIn("overlay", kept)
+        self.assertIn("apply_groups", kept)
+        # and nothing from it is copied into the base hierarchy.
+        base = kept.split("groups = [")[0]
+        self.assertNotIn("ssh", base)
+
+        # The default is unchanged: the group body is merged in and the group
+        # itself is gone.
+        self.assertNotIn("groups = [", flattened)
+        self.assertNotIn("apply_groups", flattened)
+        self.assertIn("ssh = [", flattened)
 
     def test_common_tf_created_with_locals_for_shared_config(self):
         repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))

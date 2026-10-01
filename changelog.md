@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the provider manages Junos configuration groups as ordinary hierarchy: a group is an entry of the `groups` list keyed
   by its `name`, and `apply_groups` is an ordered list of group names. With `--generic` it warns, because advertising
   the whole model twice over needs several GB at plan time.
+- `jtaf-xml2tf --groups` converts a group-based configuration as it stands instead of flattening what a device inherits
+  through `apply-groups` into the base hierarchy. Use it with a provider generated with `--groups`.
 
 ### Fixed
 - `jtaf-provider --exclude` now reaches configuration nodes held inside YANG `choice` and `case` nodes, such as
