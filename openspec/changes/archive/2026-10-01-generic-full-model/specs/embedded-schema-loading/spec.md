@@ -1,3 +1,9 @@
+# Spec Delta
+
+## Purpose
+
+Carries a Junos model inside the provider binary and makes it available at start-up, including models that cover the whole configuration hierarchy.
+
 ## ADDED Requirements
 
 ### Requirement: Load a full model

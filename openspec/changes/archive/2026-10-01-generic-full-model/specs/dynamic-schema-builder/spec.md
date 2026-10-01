@@ -1,3 +1,9 @@
+# Spec Delta
+
+## Purpose
+
+Turns a Junos YANG model into the schema a Terraform provider advertises, so one provider binary can serve any model by swapping the model it carries.
+
 ## ADDED Requirements
 
 ### Requirement: Build the protocol schema from schema nodes

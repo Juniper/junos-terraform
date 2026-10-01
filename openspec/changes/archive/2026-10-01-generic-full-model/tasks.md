@@ -26,4 +26,4 @@
 ## 5. Verification
 - [x] 5.1 Plan against an SRX300 (26.2R1.7) with a full model: no changes, existing state loads
 - [x] 5.2 Apply a change against a device: an SRX300, adding and removing an interface description, one commit each
-- [ ] 5.3 CI step building a generic provider (go-generator-replacement 7.4)
+- [x] 5.3 CI step building a generic provider (go-generator-replacement 7.4)

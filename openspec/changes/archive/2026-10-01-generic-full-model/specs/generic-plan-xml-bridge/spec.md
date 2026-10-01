@@ -1,3 +1,9 @@
+# Spec Delta
+
+## Purpose
+
+Translates between the values Terraform holds for a resource and Junos configuration XML, keeping list entries identified by their keys in both directions.
+
 ## ADDED Requirements
 
 ### Requirement: Convert between values and configuration XML with list keys
