@@ -2,6 +2,42 @@
 
 Custom pyang output plugin that converts YANG modules into a JSON schema tree used by JTAF code generation. Lives at `jtaf_pyang_plugin/`.
 
+## Purpose
+
+Define how the `jtaf` pyang output plugin converts parsed YANG modules into the JSON schema tree that the rest of the
+JTAF pipeline consumes.
+
+## Requirements
+
+### Requirement: Plugin registers the jtaf output format
+The plugin SHALL register as pyang output format `jtaf`, and `jtaf-pyang-plugindir` SHALL print the absolute directory
+containing `jtaf_json.py` so pyang can be pointed at it with `--plugindir`.
+
+#### Scenario: Plugin directory is discoverable
+- **WHEN** `jtaf-pyang-plugindir` is executed
+- **THEN** it prints the absolute path of the directory holding `jtaf_json.py`
+
+#### Scenario: Format selected on the pyang command line
+- **WHEN** pyang runs with `--plugindir $(jtaf-pyang-plugindir) -f jtaf`
+- **THEN** the plugin emits a JTAF JSON schema tree on stdout
+
+### Requirement: Schema records ordered-by user leaf-lists
+The emitted schema SHALL carry the `ordered-by` property for nodes that declare it, so downstream consumers can treat
+position-sensitive leaf-lists such as `apply-groups` as ordered rather than as a set.
+
+#### Scenario: Leaf-list declared ordered-by user
+- **WHEN** a YANG `leaf-list` declares `ordered-by user`
+- **THEN** the corresponding JSON node carries `"ordered-by": "user"`
+
+### Requirement: Choice and case nodes are preserved in the schema
+The emitted schema SHALL retain `choice` and `case` nodes as nodes in the tree rather than flattening their children
+into the enclosing container. Consumers that address configuration by Junos path therefore SHALL look through
+`choice` and `case` levels when resolving a path segment.
+
+#### Scenario: Leaf nested under a choice
+- **WHEN** a leaf is reachable only via a `choice`/`case` pair
+- **THEN** the schema contains the `choice` and `case` nodes, with the leaf as a descendant
+
 ## Architecture
 
 ```
@@ -60,8 +96,9 @@ Filtered schema for code generation
 
 #### Choice/Case
 
-- **Given** a YANG `choice` statement with `case` children, **When** processed, **Then** choice children are flattened into the parent container (no choice/case wrappers in JSON)
+- **Given** a YANG `choice` statement with `case` children, **When** processed, **Then** `choice` and `case` are emitted as nodes in the tree, with the case children beneath them
 - **Given** overlapping case branches, **When** processed, **Then** all branches are included (runtime config determines which is active)
+- Consumers that resolve a Junos configuration path must therefore descend through `choice`/`case` levels, which do not appear in the device's configuration hierarchy
 
 #### Ordered-by-User
 
@@ -105,10 +142,25 @@ Filtered schema for code generation
 
 ### Root Structure
 
-- **Given** YANG modules are processed, **When** JSON emitted, **Then** root object has:
-  - `"name": "configuration"` — top-level Junos config container
-  - `"children": [...]` — all top-level config sections
-  - `"identities": [...]` — all YANG identity definitions (for identityref resolution)
+- **Given** YANG modules are processed, **When** JSON emitted, **Then** the top-level object has exactly two keys:
+  - `"root"` — a synthetic container node named `root`, whose single child is the `configuration` node that holds all top-level config sections
+  - `"identities"` — all YANG identity definitions gathered across the processed modules (for identityref resolution)
+
+```json
+{
+  "root": {
+    "name": "root",
+    "type": "container",
+    "children": [
+      {"name": "configuration", "type": "container", "children": ["..."]}
+    ]
+  },
+  "identities": []
+}
+```
+
+The synthetic `root` wrapper means a Junos path such as `configuration/interfaces` sits two levels below the top of the
+emitted tree; consumers that build or match paths must account for this.
 
 ---
 

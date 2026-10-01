@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Define the `--mode` flag that selects between group and override generation for the Ansible CLI tools.
+
+## Requirements
 
 ### Requirement: Mode flag on CLI tools
 The `jtaf-ansible` and `jtaf-yang2ansible` CLI tools SHALL accept a `--mode` flag with values `group` (default) or `override`. This flag controls which template variant is used and what playbook pattern is generated.
