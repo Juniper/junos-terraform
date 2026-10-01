@@ -9,7 +9,6 @@ Run from the repository root; the output is committed, so this only needs
 running when examples/evpn-vxlan-dc changes.
 """
 import pathlib
-import re
 import sys
 import xml.etree.ElementTree as ET
 

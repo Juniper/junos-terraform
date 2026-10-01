@@ -314,7 +314,6 @@ jobs:
 
         # Use the generated device map as source-of-truth for mock hostnames.
         target_host="$(head -n 1 mock-devices.txt | cut -d: -f1 | tr -d '[:space:]')"
-        target_group="base-config"
 
         if [ -z "$target_host" ]; then
           echo "Failed to extract target host from mock-devices.txt"
@@ -322,7 +321,6 @@ jobs:
         fi
 
         echo "host=$target_host" >> "$GITHUB_OUTPUT"
-        echo "group=$target_group" >> "$GITHUB_OUTPUT"
 
     - name: Simulate out-of-band NETCONF drift
       run: |
@@ -330,7 +328,6 @@ jobs:
         python .github/scripts/apply_netconf_drift.py \
           --devices-file ci-evpn-vxlan-tf/mock-devices.txt \
           --target-host '${{ steps.state_baseline.outputs.host }}' \
-          --target-group '${{ steps.state_baseline.outputs.group }}' \
           --drift-ip 203.0.113.250/32 \
           --username ci-user \
           --password ci-password \
@@ -602,10 +599,17 @@ jobs:
 
     - name: Assert the device holds the group, not a flattened copy
       run: |
+        set -euo pipefail
+        python .github/scripts/fetch_netconf_config.py \
+          --devices-file groups-tf/mock-devices.txt \
+          --target-host dc1-spine1 \
+          --username jcluser \
+          --password 'Juniper!1' \
+          --output dc1-spine1.xml
+
         python - <<'PY'
-        import json, xml.etree.ElementTree as ET
-        state = json.load(open("netconf-mock-state.json"))
-        config = ET.fromstring(state["dc1-spine1"]["running_config"])
+        import xml.etree.ElementTree as ET
+        config = ET.parse("dc1-spine1.xml").getroot()
         groups = [g.findtext("name") for g in config.findall("groups")]
         assert groups == ["spine"], f"expected one group named spine, got {groups}"
         assert config.findtext("system/host-name") == "dc1-spine1", "base host-name missing"
@@ -670,13 +674,21 @@ jobs:
           -parallelism="$TF_APPLY_PARALLELISM"
         cd ..
 
+        for device in dc1-leaf3 dc1-leaf1; do
+          python .github/scripts/fetch_netconf_config.py \
+            --devices-file groups-tf/mock-devices.txt \
+            --target-host "$device" \
+            --username jcluser \
+            --password 'Juniper!1' \
+            --output "$device.xml"
+        done
+
         python - <<'PY'
-        import json, xml.etree.ElementTree as ET
-        state = json.load(open("netconf-mock-state.json"))
-        leaf3 = ET.fromstring(state["dc1-leaf3"]["running_config"])
+        import xml.etree.ElementTree as ET
+        leaf3 = ET.parse("dc1-leaf3.xml").getroot()
         assert leaf3.findall("groups") == [], "the group should be gone"
         assert leaf3.findtext("system/host-name") == "dc1-leaf3", "base hierarchy was damaged"
-        leaf1 = ET.fromstring(state["dc1-leaf1"]["running_config"])
+        leaf1 = ET.parse("dc1-leaf1.xml").getroot()
         assert [g.findtext("name") for g in leaf1.findall("groups")] == ["leaf"], \
             "another device's group was touched"
         print("group removed from one device, every other device untouched")

@@ -39,10 +39,6 @@ def state_and_session():
 
 
 def direct_config_xml(body: str) -> str:
-    return f"<configuration><groups><name>base-config</name>{body}</groups></configuration>"
-
-
-def direct_config_xml(body: str) -> str:
     return f"<configuration>{body}</configuration>"
 
 
@@ -1063,7 +1059,8 @@ def _commit(session, state, configuration_body):
 def test_groups_and_base_hierarchy_are_both_committed(state_and_session):
     state, session, _channel = state_and_session
 
-    committed = _commit(session, state,
+    committed = _commit(
+        session, state,
         "<groups><name>a</name><system><host-name>from-a</host-name></system></groups>"
         "<groups><name>b</name><system><host-name>from-b</host-name></system></groups>"
         "<system><host-name>device</host-name></system>"
@@ -1087,7 +1084,8 @@ def test_configuration_without_groups_gains_none(state_and_session):
 def test_edit_below_a_group_leaves_everything_else(state_and_session):
     state, session, _channel = state_and_session
 
-    _commit(session, state,
+    _commit(
+        session, state,
         "<groups><name>a</name><system><host-name>from-a</host-name></system></groups>"
         "<groups><name>b</name><system><host-name>from-b</host-name></system></groups>"
         "<system><host-name>device</host-name></system>"
@@ -1113,7 +1111,8 @@ def test_edit_below_a_group_leaves_everything_else(state_and_session):
 def test_deleting_a_group_keeps_the_others(state_and_session):
     state, session, _channel = state_and_session
 
-    _commit(session, state,
+    _commit(
+        session, state,
         "<groups><name>a</name><system><host-name>from-a</host-name></system></groups>"
         "<groups><name>b</name><system><host-name>from-b</host-name></system></groups>"
     )
@@ -1136,7 +1135,8 @@ def test_deleting_a_group_keeps_the_others(state_and_session):
 def test_apply_groups_keep_the_order_they_were_sent(state_and_session):
     state, session, _channel = state_and_session
 
-    committed = _commit(session, state,
+    committed = _commit(
+        session, state,
         "<apply-groups>second</apply-groups>"
         "<apply-groups>first</apply-groups>"
     )
@@ -1150,7 +1150,8 @@ def test_apply_groups_keep_the_order_they_were_sent(state_and_session):
 def test_reading_one_group_returns_only_that_group(state_and_session):
     state, session, channel = state_and_session
 
-    _commit(session, state,
+    _commit(
+        session, state,
         "<groups><name>a</name><system><host-name>from-a</host-name></system></groups>"
         "<groups><name>b</name><system><host-name>from-b</host-name></system></groups>"
     )

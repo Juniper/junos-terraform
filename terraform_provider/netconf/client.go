@@ -40,10 +40,6 @@ const patchEditConfigStr = `<edit-config>
 // defaultPort is the NETCONF-over-SSH default.
 const defaultPort = 830
 
-type configuration struct {
-	ApplyGroup []string `xml:"apply-groups"`
-}
-
 func debugRPC(label string, payload string) {
 	if os.Getenv("JUNOS_TF_DEBUG_RPC") == "" {
 		return
