@@ -226,6 +226,79 @@ def test_xml2tf_build_type_map_flattens_choice_case_for_xml_path():
     ) == ["100.123.0.1"]
 
 
+def test_xml2yaml_resolves_duplicate_tags_by_xml_path(tmp_path):
+    mod = _load_script("jtaf-xml2yaml", "jtaf_xml2yaml_path_mod")
+    schema = {
+        "root": {
+            "name": "root",
+            "children": [
+                {
+                    "name": "configuration",
+                    "type": "container",
+                    "children": [
+                        {
+                            "name": "routing-options",
+                            "type": "container",
+                            "children": [{"name": "address", "type": "leaf"}],
+                        },
+                        {
+                            "name": "interfaces",
+                            "type": "container",
+                            "children": [
+                                {
+                                    "name": "interface",
+                                    "type": "list",
+                                    "children": [
+                                        {"name": "name", "type": "leaf"},
+                                        {
+                                            "name": "unit",
+                                            "type": "list",
+                                            "children": [
+                                                {"name": "name", "type": "leaf"},
+                                                {
+                                                    "name": "family",
+                                                    "type": "container",
+                                                    "children": [
+                                                        {
+                                                            "name": "inet",
+                                                            "type": "container",
+                                                            "children": [
+                                                                {
+                                                                    "name": "address",
+                                                                    "type": "list",
+                                                                    "children": [
+                                                                        {"name": "name", "type": "leaf"},
+                                                                    ],
+                                                                },
+                                                            ],
+                                                        },
+                                                    ],
+                                                },
+                                            ],
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
+    }
+    xml_file = tmp_path / "device.xml"
+    xml_file.write_text(
+        "<rpc-reply><configuration><interfaces><interface><name>ge-0/0/0</name>"
+        "<unit><name>0</name><family><inet><address><name>192.0.2.1/24</name>"
+        "</address></inet></family></unit></interface></interfaces></configuration></rpc-reply>",
+        encoding="utf-8",
+    )
+
+    _, payload, _ = mod.parse_xml_to_payload(str(xml_file), schema)
+
+    address = payload["interfaces"]["interface"][0]["unit"][0]["family"]["inet"]["address"][0]
+    assert address == {"name": "192.0.2.1/24"}
+
+
 def test_xml2tf_helpers_and_main(tmp_path, monkeypatch):
     mod = _load_script("jtaf-xml2tf", "jtaf_xml2tf_mod")
 
