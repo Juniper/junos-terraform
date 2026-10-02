@@ -11,7 +11,7 @@ with as_file(files('jtaf_pyang_plugin').joinpath('__init__.py')) as init_py:
     package_dir = os.path.dirname(init_py)
 
 parser = argparse.ArgumentParser(
-    description='Generate a Terraform provider from YANG files and XML config.'
+    description='Generate a Terraform provider from YANG files and optional XML config.'
 )
 parser.add_argument(
     '-p',
@@ -21,13 +21,14 @@ parser.add_argument(
     action='extend',
     help='YANG search paths and/or .yang files passed to pyang.',
 )
-parser.add_argument(
+schema_mode = parser.add_mutually_exclusive_group()
+schema_mode.add_argument(
     '-x',
     type=str,
     required=False,
     action='append',
     nargs="+",
-    help='Optional Junos XML config files passed to jtaf-provider for schema filtering.',
+    help='Optional Junos XML config files for schema filtering; incompatible with --generic.',
 )
 parser.add_argument(
     '-t',
@@ -35,11 +36,11 @@ parser.add_argument(
     help='Device type suffix used in output directory name.',
     required=True,
 )
-parser.add_argument(
+schema_mode.add_argument(
     '--generic',
     action='store_true',
     default=False,
-    help='Use generic schema-driven provider instead of Jinja2 code generation.',
+    help='Embed the untrimmed model rather than trimming it to XML; incompatible with -x.',
 )
 parser.add_argument(
     '--exclude',
@@ -48,6 +49,13 @@ parser.add_argument(
     metavar='PATH',
     help='Passed to jtaf-provider: leave the schema subtree at PATH (relative to '
          'configuration) out of the provider. Repeatable.',
+)
+parser.add_argument(
+    '--groups',
+    action='store_true',
+    default=False,
+    help='Passed to jtaf-provider: keep the groups subtree and the apply-groups '
+         'leaf-list, so the provider manages configuration groups.',
 )
 
 args = parser.parse_args()
@@ -90,6 +98,8 @@ if p1.returncode == 0 and pyang_out:
         provider_args.extend(['-x', *xml_files])
     if args.generic:
         provider_args.append('--generic')
+    if args.groups:
+        provider_args.append('--groups')
     for path in args.exclude:
         provider_args.extend(['--exclude', path])
     p2 = subprocess.Popen(provider_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

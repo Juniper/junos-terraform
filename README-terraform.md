@@ -42,6 +42,61 @@ NOTE: If using multiple xml configurations (like the example above), ensure that
 
 NOTE: The examples in this README use the YANG files shipped in this repository under `examples/yang/18.2`.
 
+### Schema scope
+
+The provider source is the same whichever way it is generated; only the model it embeds differs.
+
+| Option | Embedded model |
+|--------|----------------|
+| `-x <xml>` | Trimmed to the paths the XML configuration uses |
+| `--generic` | The whole model, untrimmed (mutually exclusive with `-x`) |
+| `--exclude PATH` | Leaves the subtree at PATH, relative to `configuration`, out. Repeatable |
+
+`--exclude` takes any configuration path, at any depth, naming the nodes a device would show:
+`logical-systems`, `system/services/web-management`, `routing-instances/instance/protocols`,
+`vlans/vlan/vlan-id`. YANG `choice` and `case` nodes group nodes in the model but are not
+configuration, so a path reaches through them and cannot name one. A path that does not exist is an
+error rather than a silent no-op, so a typo does not leave the subtree in place.
+
+### Configuration groups
+
+Junos configuration groups are left out by default: in a full model the `groups` subtree repeats the
+whole configuration hierarchy and is about half of its nodes. Pass `--groups` to keep it, along with
+the `apply-groups` leaf-list, so the provider manages groups as ordinary configuration:
+
+```bash
+jtaf-yang2go -p <path-to-common> <path-to-yang-files> -x <xml-configuration(s)> -t <device-type> --groups
+```
+
+A group is then written as an entry of the `groups` list, keyed by its `name`, holding the same
+attributes it would have in the base hierarchy, and `apply_groups` is an ordered list of group names.
+
+`jtaf-xml2tf` takes the same flag, and the two need to agree. By default it flattens: the
+configuration a device inherits through `apply-groups` is merged into the base hierarchy and the
+groups themselves are dropped, which is what a provider built without `--groups` expects. With
+`--groups` it converts the hierarchy as it stands:
+
+```bash
+jtaf-xml2tf -j <trimmed_schema.json.gz> -x <xml-configuration(s)> -t <device-type> -d <output-dir> --groups
+```
+
+```hcl
+resource "terraform-provider-junos-<device-type>" "dev1-base-config" {
+  resource_name = "base-config"
+  apply_groups  = ["base"]
+  groups = [
+    {
+      name   = "base"
+      system = [{ host_name = "from-group" }]
+    }
+  ]
+}
+```
+
+NOTE: `--groups` with `--generic` makes the provider advertise the whole model twice over, which needs
+several GB of memory at plan time and warns when generated. Prefer trimming with `-x`, or use
+`--exclude` on paths inside `groups`.
+
 ---
 
 ## Build the Provider and Install

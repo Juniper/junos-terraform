@@ -2271,7 +2271,7 @@ func TestCreateDiffPatch_ReplaceHostName_DeleteThenCreate(t *testing.T) {
 	name := "base-config"
 
 	editLeaf := map[string]Change{
-		`configuration/groups[name="base-config"]/system/host-name`: {
+		`configuration/system/host-name`: {
 			Op:     Replace,
 			OldVal: "dc1-leaf1",
 			NewVal: "dc1-leaf1-test",
@@ -2303,35 +2303,35 @@ func TestCreateDiffPatch_KeyedListRenameWithDescendantsUsesEntryOperations(t *te
 	name := "base-config"
 
 	editLeaf := map[string]Change{
-		`configuration/groups[name="base-config"]/system/login/user[name="regress"]/name`: {
+		`configuration/system/login/user[name="regress"]/name`: {
 			Op:     Delete,
 			OldVal: "regress",
 		},
-		`configuration/groups[name="base-config"]/system/login/user[name="regress"]/uid`: {
+		`configuration/system/login/user[name="regress"]/uid`: {
 			Op:     Delete,
 			OldVal: "928",
 		},
-		`configuration/groups[name="base-config"]/system/login/user[name="regress"]/class`: {
+		`configuration/system/login/user[name="regress"]/class`: {
 			Op:     Delete,
 			OldVal: "superuser",
 		},
-		`configuration/groups[name="base-config"]/system/login/user[name="regress"]/authentication/encrypted-password`: {
+		`configuration/system/login/user[name="regress"]/authentication/encrypted-password`: {
 			Op:     Delete,
 			OldVal: "$1$kPU..$w.4FGRAGanJ8U4Yq6sbj7.",
 		},
-		`configuration/groups[name="base-config"]/system/login/user[name="vinay"]/name`: {
+		`configuration/system/login/user[name="vinay"]/name`: {
 			Op:     Create,
 			NewVal: "vinay",
 		},
-		`configuration/groups[name="base-config"]/system/login/user[name="vinay"]/uid`: {
+		`configuration/system/login/user[name="vinay"]/uid`: {
 			Op:     Create,
 			NewVal: "928",
 		},
-		`configuration/groups[name="base-config"]/system/login/user[name="vinay"]/class`: {
+		`configuration/system/login/user[name="vinay"]/class`: {
 			Op:     Create,
 			NewVal: "superuser",
 		},
-		`configuration/groups[name="base-config"]/system/login/user[name="vinay"]/authentication/encrypted-password`: {
+		`configuration/system/login/user[name="vinay"]/authentication/encrypted-password`: {
 			Op:     Create,
 			NewVal: "$1$kPU..$w.4FGRAGanJ8U4Yq6sbj7.",
 		},
@@ -2370,11 +2370,11 @@ func TestCreateDiffPatch_StructuralKeyRenameUsesEntryOperations(t *testing.T) {
 	name := "base-config"
 
 	editLeaf := map[string]Change{
-		`configuration/groups[name="base-config"]/system/syslog/file[name="security"]/name`: {
+		`configuration/system/syslog/file[name="security"]/name`: {
 			Op:     Delete,
 			OldVal: "security",
 		},
-		`configuration/groups[name="base-config"]/system/syslog/file[name="vinay"]/name`: {
+		`configuration/system/syslog/file[name="vinay"]/name`: {
 			Op:     Create,
 			NewVal: "vinay",
 		},
@@ -2411,11 +2411,11 @@ func TestCreateDiffPatch_CompoundKeyDeleteIncludesChoiceSibling(t *testing.T) {
 	name := "base-config"
 
 	editLeaf := map[string]Change{
-		`configuration/groups[name="base-config"]/policy-options/policy-statement[name="PS1"]/term[name="T1"]/then/community[community-name=OC-STD]/add`: {
+		`configuration/policy-options/policy-statement[name="PS1"]/term[name="T1"]/then/community[community-name=OC-STD]/add`: {
 			Op:     Delete,
 			OldVal: "",
 		},
-		`configuration/groups[name="base-config"]/policy-options/policy-statement[name="PS1"]/term[name="T1"]/then/community[community-name=OC-STD]/community-name`: {
+		`configuration/policy-options/policy-statement[name="PS1"]/term[name="T1"]/then/community[community-name=OC-STD]/community-name`: {
 			Op:     Delete,
 			OldVal: "OC-STD",
 		},

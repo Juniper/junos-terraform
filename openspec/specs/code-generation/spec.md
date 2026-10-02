@@ -1,6 +1,10 @@
 # Code Generation Specification
 
-Jinja2 templates that render YANG-derived JSON schema into Go Terraform provider source code. Lives at `junosterraform/templates/`.
+Turning a YANG-derived JSON schema into a buildable Go Terraform provider directory.
+
+## Purpose
+
+Define what provider generation produces for a given model and device type, so a generated directory builds and carries the schema downstream tools need.
 
 ## Architecture
 
@@ -101,18 +105,47 @@ Result: Complete, buildable Go provider
 ## Requirements
 
 ### Requirement: Generated providers carry a compressed schema
-Both Jinja2 and `--generic` provider generation paths SHALL write the trimmed schema as compact gzip-compressed JSON named `trimmed_schema.json.gz` and SHALL NOT write a plain `trimmed_schema.json`.
+Provider generation SHALL write the schema as compact gzip-compressed JSON named `trimmed_schema.json.gz` and SHALL
+NOT write a plain `trimmed_schema.json`, whether the schema was trimmed to XML or left untrimmed.
 
 #### Scenario: Schema is available to downstream tools
 - **WHEN** provider generation completes
-- **THEN** `trimmed_schema.json.gz` contains the filtered schema and `jtaf-xml2tf` can consume it to produce the same output as the equivalent plain JSON schema
+- **THEN** `trimmed_schema.json.gz` contains the schema and `jtaf-xml2tf` can consume it to produce the same output as
+  the equivalent plain JSON schema
 
-### Schema Emission
+### Requirement: Generic provider generation
+`jtaf-provider --generic` SHALL write the provider's main package (`main.go` calling `generic.Serve`, `embed_schema.go`), and the schema compiled into `patch.Schema`'s binary form and gzipped, which the provider embeds.
 
-- **Given** code generation completes, **When** finalization runs, **Then** `trimmed_schema.json.gz` (compact JSON, gzip-compressed) is written to the output directory; no plain `trimmed_schema.json` is written
-- This schema is read by the downstream tools (`jtaf-xml2tf`); the generated provider inlines the same schema in Go source for `ProcessSchema()` in the patch engine
+#### Scenario: Excluding subtrees
+- **WHEN** `--exclude PATH` is given (repeatable) to `jtaf-provider`, or to `jtaf-yang2go`, which passes it on
+- **THEN** the subtree at PATH, relative to `configuration`, SHALL be left out of the schema; a PATH that does not exist SHALL be an error
 
----
+#### Scenario: Top-level version
+- **WHEN** the schema has a top-level `version` leaf (the Junos release the configuration was committed with)
+- **THEN** it SHALL be left out, whether or not the schema is trimmed; nested leaves named `version` SHALL be kept
+
+### Requirement: One provider generator
+Provider generation SHALL produce a single schema-driven Go provider whose source does not depend on the contents of
+the YANG model. No Go source SHALL be rendered from a template. The generated output SHALL differ between device types
+only in the module name, the provider type name and the embedded schema.
+
+#### Scenario: No templated Go source
+- **WHEN** a provider is generated for any device type
+- **THEN** the output directory contains no file produced by template expansion of schema contents, and its size does
+  not grow with the number of nodes in the model
+
+#### Scenario: Equivalent providers across models
+- **WHEN** providers are generated for two different models
+- **THEN** their Go sources are identical apart from module name, provider type name and embedded schema
+
+### Requirement: Generated provider carries the group decision
+The embedded schema SHALL be the sole record of whether groups are managed. A provider built with groups SHALL expose
+them, and a provider built without groups SHALL NOT, with no runtime flag, environment variable or provider-block
+setting able to change that.
+
+#### Scenario: Behaviour follows the binary
+- **WHEN** a provider built without groups is used with a `.tf` file that declares a `groups` block
+- **THEN** Terraform reports an unsupported attribute, regardless of provider configuration
 
 ## Output Structure
 

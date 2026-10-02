@@ -60,24 +60,38 @@ def element_node(
     Returns:
         The matching resource node or None if not found.
     """
-
-    if resources["name"] == element.tag:
-        resource_path = resources.get("path")
-        if resource_path is None:
-            return {k: v for k, v in resources.items() if k != "children"}
-        expected = (resource_path + "/" + element.tag) if resource_path else element.tag
-        if expected == path:
-            return {k: v for k, v in resources.items() if k != "children"}
-
-    try:
-        for elem in resources["children"]:
-            matched_type = element_node(element, path, elem)
-            if matched_type:
-                return matched_type
-    except KeyError:
+    configuration = resources if resources.get("name") == "configuration" else next(
+        (
+            node
+            for node in resources.get("children", [])
+            if node.get("name") == "configuration"
+        ),
+        None,
+    )
+    if configuration is None:
         return None
 
-    return None
+    def find_child(nodes: list[dict[str, Any]], name: str) -> Optional[dict[str, Any]]:
+        for node in nodes:
+            if node.get("type") in {"choice", "case"}:
+                match = find_child(node.get("children", []), name)
+                if match is not None:
+                    return match
+            elif node.get("name") == name:
+                return node
+        return None
+
+    matched = configuration
+    for segment in path.split("/"):
+        if not segment:
+            continue
+        matched = find_child(matched.get("children", []), segment)
+        if matched is None:
+            return None
+
+    if matched.get("name") != element.tag:
+        return None
+    return {key: value for key, value in matched.items() if key != "children"}
 
 
 def elem_to_dict(

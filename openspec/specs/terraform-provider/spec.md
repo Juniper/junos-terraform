@@ -1,6 +1,67 @@
 # Terraform Provider Specification
 
-Go implementation of a Terraform Plugin Framework provider for Junos configuration management via NETCONF. Lives at `terraform_provider/`.
+Go implementation of a Terraform provider for Junos configuration management via NETCONF. Lives at `terraform_provider/`.
+
+## Purpose
+
+Define how the provider connects to a Junos device and how its configuration resource behaves across the Terraform lifecycle.
+
+## Requirements
+
+### Requirement: Generic provider serves the plugin protocol directly
+The generic provider SHALL implement tfprotov6 with terraform-plugin-go, without terraform-plugin-framework.
+
+#### Scenario: Plan
+- **WHEN** Terraform calls `PlanResourceChange`
+- **THEN** the planned state SHALL be the proposed state, and a change of `resource_name` SHALL require replacement
+
+#### Scenario: State from an earlier schema
+- **WHEN** Terraform calls `UpgradeResourceState` with attributes the schema does not have
+- **THEN** they SHALL be ignored and missing attributes SHALL be null
+
+#### Scenario: Update
+- **WHEN** Terraform applies a change
+- **THEN** the provider SHALL patch the difference between the device's configuration and the plan, commit, and if the device still differs load the plan and commit again
+
+#### Scenario: Unsupported operations
+- **WHEN** Terraform calls import, a data source, a function, an ephemeral or list resource, or an action
+- **THEN** the provider SHALL return an error diagnostic
+
+### Requirement: Resource attributes follow the embedded schema
+The resource SHALL expose exactly the configuration nodes present in its embedded schema, with no node name excluded
+by the provider itself. Where `groups` and `apply-groups` are present they SHALL be exposed like any other list and
+leaf-list; where they are absent the resource SHALL have no corresponding attributes.
+
+#### Scenario: Groups present in schema
+- **WHEN** the embedded schema contains `groups` and `apply-groups`
+- **THEN** the resource exposes `groups` and `apply_groups`, and values written to them are sent to the device
+
+#### Scenario: Groups absent from schema
+- **WHEN** the embedded schema does not contain `groups`
+- **THEN** the resource has no `groups` attribute and the provider reports no error about the missing node
+
+### Requirement: Group state is read back from the device
+Reading device state SHALL return configuration below `groups` and the `apply-groups` references with the same
+fidelity as base-hierarchy configuration, so that out-of-band changes inside a group are detected as drift and
+reconciled. A group SHALL be owned exactly as any other list entry is: the resource holds what the configuration
+declares, and an entry the configuration does not declare SHALL be removed.
+
+#### Scenario: Drift inside a group
+- **WHEN** a leaf inside a managed group is changed on the device out of band
+- **THEN** the next plan reports that leaf as changed and the next apply restores it
+
+#### Scenario: A group the configuration does not declare
+- **WHEN** the device holds a group that the configuration does not declare
+- **THEN** the plan removes it, as it does for an interface or any other list entry the configuration does not
+  declare; a group that is to survive has to be declared
+
+### Requirement: Group references are not synthesised
+The provider SHALL NOT maintain `apply-groups` outside the configuration: it SHALL NOT append a reference for a group
+it writes, SHALL NOT sort references, and SHALL NOT carry references between resources.
+
+#### Scenario: Group without a reference
+- **WHEN** a configuration declares a group but does not list it in `apply_groups`
+- **THEN** the committed device configuration contains the group body and no reference to it
 
 ## Architecture
 

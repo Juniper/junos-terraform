@@ -326,12 +326,15 @@ def generate_hcl_resources(parsed_data, device_type, hostname, extraction_points
     return resource_block
 
 
-def _parse_xml_to_dict(xml_file, type_lookup):
+def _parse_xml_to_dict(xml_file, type_lookup, groups=False):
     """
     Parse a Junos XML config file into a normalized Python dict.
 
-    Handles <rpc-reply>/<configuration> wrapping, <apply-groups>, <groups>,
-    and <version> removal. Returns the merged config dict or None on error.
+    Handles <rpc-reply>/<configuration> wrapping and <version> removal. By
+    default the configuration a device inherits through <apply-groups> is
+    merged into the base hierarchy and the groups themselves are dropped. With
+    groups, the hierarchy is kept as it is, so groups and apply-groups are
+    converted like any other configuration.
     """
     try:
         with open(xml_file, 'r') as file:
@@ -348,19 +351,20 @@ def _parse_xml_to_dict(xml_file, type_lookup):
         if config_node is not None:
             root = config_node
 
-        groups = {}
+        group_map = {}
         apply_groups = []
 
-        for ag in root.findall('./apply-groups'):
-            if ag.text:
-                apply_groups.append(ag.text.strip())
-            root.remove(ag)
+        if not groups:
+            for ag in root.findall('./apply-groups'):
+                if ag.text:
+                    apply_groups.append(ag.text.strip())
+                root.remove(ag)
 
-        for group in root.findall('./groups'):
-            group_name_elem = group.find('./name')
-            if group_name_elem is not None:
-                groups[group_name_elem.text.strip()] = group
-            root.remove(group)
+            for group in root.findall('./groups'):
+                group_name_elem = group.find('./name')
+                if group_name_elem is not None:
+                    group_map[group_name_elem.text.strip()] = group
+                root.remove(group)
 
         version_node = root.find("./version")
         if version_node is not None:
@@ -378,7 +382,7 @@ def _parse_xml_to_dict(xml_file, type_lookup):
         for group_name in apply_groups:
             if group_name == "base-config":
                 continue
-            group_node = groups.get(group_name)
+            group_node = group_map.get(group_name)
             if group_node is None:
                 continue
             group_data = {}
@@ -399,12 +403,12 @@ def _parse_xml_to_dict(xml_file, type_lookup):
         return None
 
 
-def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
+def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup, groups=False):
     """
     Parses an XML file and converts it to Terraform-style HCL resources.
     Starts from <configuration> if under <rpc-reply> and removes <version> if present.
     """
-    final_data = _parse_xml_to_dict(xml_file, type_lookup)
+    final_data = _parse_xml_to_dict(xml_file, type_lookup, groups)
     if final_data is None:
         return None
     return generate_hcl_resources(final_data, device_type, hostname)
@@ -686,6 +690,18 @@ def main():
             'per-device files.'
         ),
     )
+    parser.add_argument(
+        '--groups',
+        action='store_true',
+        default=False,
+        help=(
+            'Keep Junos configuration groups. By default the configuration a '
+            'device inherits through apply-groups is merged into the base '
+            'hierarchy and the groups are dropped; with this flag groups and '
+            'apply_groups are emitted as ordinary configuration, for a provider '
+            'generated with jtaf-provider --groups.'
+        ),
+    )
     args = parser.parse_args()
 
     trimmed_json_file = args.trimmed_json
@@ -750,7 +766,7 @@ def main():
         for file in xml_files:
             hostname = file.split("/")[-1].split(".")[0]
             hostname_by_file[file] = hostname
-            parsed_dict = _parse_xml_to_dict(file, type_lookup)
+            parsed_dict = _parse_xml_to_dict(file, type_lookup, args.groups)
             if parsed_dict is not None:
                 parsed_by_host[hostname] = parsed_dict
 
@@ -819,7 +835,7 @@ def main():
                     print(f"\n  -> Skipping provider block for hostname '{hostname}' (already exists).\n")
 
             # Write per-device .tf file (all values inline)
-            hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup)
+            hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup, args.groups)
             if hcl_output:
                 filename = f"{directory}/{hostname}.tf"
                 os.makedirs(os.path.dirname(filename), exist_ok=True)

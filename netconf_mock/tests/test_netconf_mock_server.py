@@ -38,10 +38,6 @@ def state_and_session():
     return state, session, channel
 
 
-def base_group_xml(body: str) -> str:
-    return f"<configuration><groups><name>base-config</name>{body}</groups></configuration>"
-
-
 def direct_config_xml(body: str) -> str:
     return f"<configuration>{body}</configuration>"
 
@@ -119,8 +115,8 @@ def test_load_configuration_updates_candidate_and_submitted(state_and_session):
     handled = session._handle_load_configuration(rpc, "11")
 
     assert handled is True
-    assert "base-config" in state.candidate_groups
-    assert state.submitted_xml_by_group["base-config"].startswith(
+    assert "base-config" in state.candidate_config
+    assert state.submitted_xml.startswith(
         "<configuration>"
     )
     assert 'message-id="11"' in channel.writes[-1]
@@ -130,10 +126,8 @@ def test_load_configuration_updates_candidate_and_submitted(state_and_session):
 def test_edit_patch_replace_updates_existing_group(state_and_session):
     state, session, channel = state_and_session
 
-    state.candidate_groups["base-config"] = (
-        "<configuration><groups><name>base-config</name>"
+    state.candidate_config = direct_config_xml(
         "<system><host-name>leaf1</host-name></system>"
-        "</groups></configuration>"
     )
 
     rpc = (
@@ -149,13 +143,13 @@ def test_edit_patch_replace_updates_existing_group(state_and_session):
     handled = session._handle_edit_patch(rpc, "11")
 
     assert handled is True
-    assert "leaf2" in state.candidate_groups["base-config"]
-    assert "leaf1" not in state.candidate_groups["base-config"]
+    assert "leaf2" in state.candidate_config
+    assert "leaf1" not in state.candidate_config
     assert state.history[-1]["op"] == "edit-config-patch"
     assert 'message-id="11"' in channel.writes[-1]
 
 
-def test_edit_patch_create_initializes_default_group(state_and_session):
+def test_edit_patch_create_without_a_group(state_and_session):
     state, session, _channel = state_and_session
 
     rpc = (
@@ -171,15 +165,15 @@ def test_edit_patch_create_initializes_default_group(state_and_session):
     handled = session._handle_edit_patch(rpc, "15")
 
     assert handled is True
-    assert "base-config" in state.candidate_groups
-    assert "<name>base-config</name>" in state.candidate_groups["base-config"]
-    assert "leaf1" in state.candidate_groups["base-config"]
+    assert "leaf1" in state.candidate_config
+    # No group is invented for configuration that does not ask for one.
+    assert "<groups>" not in state.candidate_config
 
 
-def test_edit_patch_group_wrapped_payload_updates_existing_group(state_and_session):
+def test_edit_patch_group_payload_adds_group_beside_base(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<system><host-name>leaf1</host-name></system>"
     )
 
@@ -196,18 +190,19 @@ def test_edit_patch_group_wrapped_payload_updates_existing_group(state_and_sessi
     handled = session._handle_edit_patch(rpc, "15a")
 
     assert handled is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
+    # The group is added beside the base hierarchy, which is left alone.
     assert updated.count("<groups>") == 1
+    assert "<name>base-config</name>" in updated
     assert "leaf2" in updated
-    assert "leaf1" not in updated
+    assert "leaf1" in updated
 
 
 def test_handle_rpc_routes_patch_delete_before_group_delete(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = (
-        "<configuration><groups><name>base-config</name><system>"
-        "<services><ssh/></services></system></groups></configuration>"
+    state.candidate_config = direct_config_xml(
+        "<system><services><ssh/></services></system>"
     )
 
     rpc = (
@@ -221,14 +216,14 @@ def test_handle_rpc_routes_patch_delete_before_group_delete(state_and_session):
 
     session._handle_rpc(rpc)
 
-    assert "<services>" not in state.candidate_groups["base-config"]
+    assert "<services>" not in state.candidate_config
     assert state.history[-1]["op"] == "edit-config-patch"
 
 
 def test_edit_patch_create_keyed_list_entry_appends_new_interface(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<interfaces><interface><name>xe-0/0/0</name>"
         "<description>uplink-0</description></interface></interfaces>"
     )
@@ -244,7 +239,7 @@ def test_edit_patch_create_keyed_list_entry_appends_new_interface(state_and_sess
     )
 
     assert session._handle_edit_patch(rpc, "17") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert updated.count("<interface>") == 2
     assert "xe-0/0/1" in updated
     assert "uplink-1" in updated
@@ -253,7 +248,7 @@ def test_edit_patch_create_keyed_list_entry_appends_new_interface(state_and_sess
 def test_edit_patch_replace_leaf_in_keyed_nested_path(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<interfaces><interface><name>lo0</name><unit><name>0</name>"
         "<family><inet><address><name>203.0.113.1/32</name>"
         "<description>old-desc</description></address></inet></family>"
@@ -273,7 +268,7 @@ def test_edit_patch_replace_leaf_in_keyed_nested_path(state_and_session):
     )
 
     assert session._handle_edit_patch(rpc, "18") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "new-desc" in updated
     assert "old-desc" not in updated
 
@@ -281,7 +276,7 @@ def test_edit_patch_replace_leaf_in_keyed_nested_path(state_and_session):
 def test_edit_patch_delete_keyed_nested_list_entry_removes_whole_address(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<interfaces><interface><name>lo0</name><unit><name>0</name>"
         "<family><inet>"
         "<address><name>198.51.100.10/32</name></address>"
@@ -302,7 +297,7 @@ def test_edit_patch_delete_keyed_nested_list_entry_removes_whole_address(state_a
     )
 
     assert session._handle_edit_patch(rpc, "18a") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "198.51.100.10/32" in updated
     assert "203.0.113.250/32" not in updated
     assert updated.count("<address>") == 1
@@ -311,7 +306,7 @@ def test_edit_patch_delete_keyed_nested_list_entry_removes_whole_address(state_a
 def test_edit_patch_delete_keyed_list_entry_removes_matching_interface(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<interfaces>"
         "<interface><name>xe-0/0/0</name><description>keep</description></interface>"
         "<interface><name>xe-0/0/1</name><description>delete-me</description></interface>"
@@ -329,7 +324,7 @@ def test_edit_patch_delete_keyed_list_entry_removes_matching_interface(state_and
     )
 
     assert session._handle_edit_patch(rpc, "19") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "xe-0/0/1" not in updated
     assert "delete-me" not in updated
     assert "xe-0/0/0" in updated
@@ -338,7 +333,7 @@ def test_edit_patch_delete_keyed_list_entry_removes_matching_interface(state_and
 def test_edit_patch_create_leaf_list_appends_new_value(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<system><domain-search>example.com</domain-search></system>"
     )
 
@@ -352,7 +347,7 @@ def test_edit_patch_create_leaf_list_appends_new_value(state_and_session):
     )
 
     assert session._handle_edit_patch(rpc, "20") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert updated.count("<domain-search>") == 2
     assert "example.com" in updated
     assert "lab.example" in updated
@@ -361,7 +356,7 @@ def test_edit_patch_create_leaf_list_appends_new_value(state_and_session):
 def test_edit_patch_delete_leaf_list_value_removes_only_matching_value(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<system><domain-search>example.com</domain-search>"
         "<domain-search>lab.example</domain-search></system>"
     )
@@ -376,7 +371,7 @@ def test_edit_patch_delete_leaf_list_value_removes_only_matching_value(state_and
     )
 
     assert session._handle_edit_patch(rpc, "21") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "lab.example" not in updated
     assert "example.com" in updated
     assert updated.count("<domain-search>") == 1
@@ -385,7 +380,7 @@ def test_edit_patch_delete_leaf_list_value_removes_only_matching_value(state_and
 def test_edit_patch_mixed_operations_updates_configuration_consistently(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<system><host-name>leaf1</host-name><services><ssh/></services></system>"
     )
 
@@ -402,7 +397,7 @@ def test_edit_patch_mixed_operations_updates_configuration_consistently(state_an
     )
 
     assert session._handle_edit_patch(rpc, "22") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "leaf2" in updated
     assert "leaf1" not in updated
     assert "<services>" not in updated
@@ -412,37 +407,37 @@ def test_edit_patch_mixed_operations_updates_configuration_consistently(state_an
 def test_commit_discard_and_delete_flow(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = (
-        "<configuration><groups><name>base-config</name>"
-        "</groups></configuration>"
+    state.candidate_config = direct_config_xml(
+        "<groups><name>base-config</name></groups>"
     )
     assert session._handle_commit("<commit/>", "12") is True
-    assert "base-config" in state.running_groups
+    assert "base-config" in state.running_config
 
-    state.candidate_groups["temp"] = (
-        "<configuration><groups><name>temp</name></groups></configuration>"
+    state.candidate_config = direct_config_xml(
+        "<groups><name>temp</name></groups>"
     )
     assert session._handle_discard_changes("<discard-changes/>", "13") is True
-    assert "temp" not in state.candidate_groups
+    assert "temp" not in state.candidate_config
+    assert "base-config" in state.candidate_config
 
     delete_rpc = (
         '<rpc message-id="14">'
         "<edit-config><target><candidate/></target>"
-        "<config><configuration><groups operation=\"delete\">"
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">'
+        '<configuration><groups nc:operation="delete">'
         "<name>base-config</name>"
         "</groups></configuration></config></edit-config>"
         "</rpc>"
     )
-    assert session._handle_edit_delete(delete_rpc, "14") is True
-    assert "base-config" not in state.candidate_groups
+    assert session._handle_edit_patch(delete_rpc, "14") is True
+    assert "base-config" not in state.candidate_config
 
 
 def test_get_configuration_returns_group_or_fallback(state_and_session):
     state, session, channel = state_and_session
 
-    state.running_groups["base-config"] = (
-        "<configuration><groups><name>base-config</name>"
-        "<system><services/></system></groups></configuration>"
+    state.running_config = direct_config_xml(
+        "<groups><name>base-config</name><system><services/></system></groups>"
     )
 
     rpc_existing = (
@@ -459,13 +454,13 @@ def test_get_configuration_returns_group_or_fallback(state_and_session):
         "</name></groups></configuration></get-configuration></rpc>"
     )
     assert session._handle_get_configuration(rpc_missing, "22") is True
-    assert "<name>does-not-exist</name>" in channel.writes[-1]
+    assert "does-not-exist" not in channel.writes[-1]
 
 
 def test_get_configuration_without_group_returns_direct_base_config(state_and_session):
     state, session, channel = state_and_session
 
-    state.running_groups["base-config"] = base_group_xml(
+    state.running_config = direct_config_xml(
         "<system><host-name>leaf1</host-name></system>"
     )
 
@@ -529,7 +524,7 @@ def test_extract_group_name_prefers_groups_name_over_nested_name():
 def test_load_configuration_updates_all_groups_in_payload(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = (
+    state.candidate_config = (
         "<configuration><groups><name>base-config</name>"
         "<interfaces><interface><name>lo0</name><unit><name>0</name>"
         "<family><inet><address><name>203.0.113.250/32</name></address>"
@@ -555,16 +550,16 @@ def test_load_configuration_updates_all_groups_in_payload(state_and_session):
     handled = session._handle_load_configuration(rpc, "120")
 
     assert handled is True
-    assert "overlay-config" in state.candidate_groups
-    assert "base-config" in state.candidate_groups
-    assert "203.0.113.10/32" in state.candidate_groups["base-config"]
-    assert "203.0.113.250/32" not in state.candidate_groups["base-config"]
+    assert "overlay-config" in state.candidate_config
+    assert "base-config" in state.candidate_config
+    assert "203.0.113.10/32" in state.candidate_config
+    assert "203.0.113.250/32" not in state.candidate_config
 
 
 def test_load_configuration_regex_fallback_updates_all_groups(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = (
+    state.candidate_config = (
         "<configuration><groups><name>base-config</name>"
         "<interfaces><interface><name>lo0</name><unit><name>0</name>"
         "<family><inet><address><name>203.0.113.250/32</name></address>"
@@ -591,16 +586,16 @@ def test_load_configuration_regex_fallback_updates_all_groups(state_and_session)
     handled = session._handle_load_configuration(rpc, "121")
 
     assert handled is True
-    assert "overlay-config" in state.candidate_groups
-    assert "base-config" in state.candidate_groups
-    assert "203.0.113.10/32" in state.candidate_groups["base-config"]
-    assert "203.0.113.250/32" not in state.candidate_groups["base-config"]
+    assert "overlay-config" in state.candidate_config
+    assert "base-config" in state.candidate_config
+    assert "203.0.113.10/32" in state.candidate_config
+    assert "203.0.113.250/32" not in state.candidate_config
 
 
 def test_load_configuration_merge_preserves_existing_group_content(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<interfaces><interface><name>lo0</name><unit><name>0</name>"
         "<family><inet><address><name>198.51.100.10/32</name></address></inet></family>"
         "</unit></interface></interfaces>"
@@ -621,7 +616,7 @@ def test_load_configuration_merge_preserves_existing_group_content(state_and_ses
     handled = session._handle_load_configuration(rpc, "122")
 
     assert handled is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "198.51.100.10/32" in updated
     assert "203.0.113.250/32" in updated
     assert "<host-name>leaf1</host-name>" in updated
@@ -630,7 +625,7 @@ def test_load_configuration_merge_preserves_existing_group_content(state_and_ses
 def test_load_configuration_merge_preserves_repeated_leaf_list_values(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<policy-options><policy-statement><name>IPCLOS_BGP_IMP</name>"
         "<term><name>loopback</name><from><protocol>direct</protocol></from></term>"
         "</policy-statement></policy-options>"
@@ -639,19 +634,19 @@ def test_load_configuration_merge_preserves_repeated_leaf_list_values(state_and_
     rpc = (
         '<rpc message-id="123">'
         '<load-configuration action="merge" format="xml">'
-        '<configuration><groups><name>base-config</name>'
+        '<configuration>'
         '<policy-options><policy-statement><name>IPCLOS_BGP_IMP</name>'
         '<term><name>loopback</name><from>'
         '<protocol>bgp</protocol><protocol>direct</protocol>'
         '</from></term></policy-statement></policy-options>'
-        '</groups></configuration>'
+        '</configuration>'
         '</load-configuration></rpc>'
     )
 
     handled = session._handle_load_configuration(rpc, "123")
 
     assert handled is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert updated.count("<protocol>") == 2
     assert "<protocol>bgp</protocol>" in updated
     assert "<protocol>direct</protocol>" in updated
@@ -670,15 +665,16 @@ def test_load_configuration_replace_accepts_direct_configuration(state_and_sessi
     handled = session._handle_load_configuration(rpc, "123a")
 
     assert handled is True
-    updated = state.candidate_groups["base-config"]
-    assert "<name>base-config</name>" in updated
+    updated = state.candidate_config
+    # Stored as sent, with no group wrapped around it.
+    assert "<groups>" not in updated
     assert "<host-name>leaf1</host-name>" in updated
 
 
 def test_load_configuration_merge_accepts_direct_configuration(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<system><services><ssh/></services></system>"
     )
 
@@ -692,7 +688,7 @@ def test_load_configuration_merge_accepts_direct_configuration(state_and_session
     handled = session._handle_load_configuration(rpc, "123b")
 
     assert handled is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "<services><ssh /></services>" in updated or "<services><ssh/></services>" in updated
     assert "<host-name>leaf1</host-name>" in updated
 
@@ -700,16 +696,18 @@ def test_load_configuration_merge_accepts_direct_configuration(state_and_session
 def test_delete_then_merge_rebuilds_group_from_empty_candidate(state_and_session):
     state, session, _channel = state_and_session
 
-    existing = base_group_xml(
+    existing = direct_config_xml(
+        "<groups><name>base-config</name>"
         "<interfaces><interface><name>lo0</name><unit><name>0</name>"
         "<family><inet>"
         "<address><name>10.30.100.3/32</name></address>"
         "<address><name>203.0.113.250/32</name></address>"
         "</inet></family></unit></interface></interfaces>"
+        "</groups>"
     )
-    state.running_groups["base-config"] = existing
-    state.candidate_groups["base-config"] = existing
-    state.submitted_xml_by_group["base-config"] = existing
+    state.running_config = existing
+    state.candidate_config = existing
+    state.submitted_xml = existing
 
     delete_rpc = (
         '<rpc message-id="124">'
@@ -728,17 +726,19 @@ def test_delete_then_merge_rebuilds_group_from_empty_candidate(state_and_session
         '</load-configuration></rpc>'
     )
 
-    assert session._handle_edit_delete(delete_rpc, "124") is True
+    assert session._handle_edit_patch(delete_rpc, "124") is True
     assert session._handle_load_configuration(merge_rpc, "125") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "10.30.100.3/32" in updated
     assert "203.0.113.250/32" not in updated
 
 
-def test_handle_rpc_routes_group_delete_to_edit_delete(state_and_session):
+def test_handle_rpc_routes_group_delete_as_a_patch(state_and_session):
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
+        "<apply-groups>base-config</apply-groups>"
+        "<groups><name>base-config</name></groups>"
         "<system><host-name>leaf1</host-name></system>"
     )
 
@@ -752,21 +752,23 @@ def test_handle_rpc_routes_group_delete_to_edit_delete(state_and_session):
 
     session._handle_rpc(rpc)
 
-    assert "base-config" not in state.candidate_groups
-    assert state.history[-1]["op"] == "edit-config-delete"
+    assert "base-config" not in state.candidate_config
+    # The base hierarchy is untouched by removing a group.
+    assert "leaf1" in state.candidate_config
+    assert state.history[-1]["op"] == "edit-config-patch"
 
 
 def test_dump_state_if_requested_writes_json(tmp_path):
     out_file = tmp_path / "state.json"
     state = MODULE.DeviceState(name="leaf1")
-    state.running_groups["base-config"] = "<configuration/>"
+    state.running_config = "<configuration><groups><name>base-config</name></groups></configuration>"
 
     MODULE._dump_state_if_requested(str(out_file), {"leaf1": state})
 
     data = json.loads(out_file.read_text(encoding="utf-8"))
     assert "leaf1" in data
     assert data["leaf1"]["name"] == "leaf1"
-    assert "base-config" in data["leaf1"]["running_groups"]
+    assert "base-config" in data["leaf1"]["running_config"]
 
 
 # ---------------------------------------------------------------------------
@@ -778,7 +780,7 @@ def test_matrix_L1_patch_create_leaf(state_and_session):
     """L1: Create a leaf that does not exist (host-name)."""
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<system/>"
     )
 
@@ -793,7 +795,7 @@ def test_matrix_L1_patch_create_leaf(state_and_session):
     )
 
     assert session._handle_edit_patch(rpc, "m-L1") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "router1" in updated
     assert "<host-name" in updated
 
@@ -802,7 +804,7 @@ def test_matrix_L2_patch_replace_leaf(state_and_session):
     """L2: Replace an existing leaf value."""
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<system><host-name>router1</host-name></system>"
     )
 
@@ -817,7 +819,7 @@ def test_matrix_L2_patch_replace_leaf(state_and_session):
     )
 
     assert session._handle_edit_patch(rpc, "m-L2") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "router2" in updated
     assert "router1" not in updated
 
@@ -826,7 +828,7 @@ def test_matrix_L3_patch_delete_leaf(state_and_session):
     """L3: Delete a leaf from a list entry."""
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<interfaces><interface><name>ge-0/0/0</name>"
         "<description>uplink</description></interface></interfaces>"
     )
@@ -844,7 +846,7 @@ def test_matrix_L3_patch_delete_leaf(state_and_session):
     )
 
     assert session._handle_edit_patch(rpc, "m-L3") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "<description" not in updated
     assert "ge-0/0/0" in updated
 
@@ -853,7 +855,7 @@ def test_matrix_LL1_patch_create_leaf_list_entry(state_and_session):
     """LL1: Append a new value to a leaf-list."""
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<policy-options><community><name>my-comm</name>"
         "<members>target:65000:100</members>"
         "</community></policy-options>"
@@ -872,7 +874,7 @@ def test_matrix_LL1_patch_create_leaf_list_entry(state_and_session):
     )
 
     assert session._handle_edit_patch(rpc, "m-LL1") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert updated.count("<members>") == 2
     assert "target:65000:100" in updated
     assert "target:65000:200" in updated
@@ -882,7 +884,7 @@ def test_matrix_LL2_patch_delete_leaf_list_entry(state_and_session):
     """LL2: Remove a specific value from a leaf-list."""
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<policy-options><community><name>my-comm</name>"
         "<members>target:65000:100</members>"
         "<members>target:65000:200</members>"
@@ -902,7 +904,7 @@ def test_matrix_LL2_patch_delete_leaf_list_entry(state_and_session):
     )
 
     assert session._handle_edit_patch(rpc, "m-LL2") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert updated.count("<members>") == 1
     assert "target:65000:200" not in updated
     assert "target:65000:100" in updated
@@ -912,7 +914,7 @@ def test_matrix_K1_patch_create_keyed_list_entry(state_and_session):
     """K1: Add a new keyed list entry."""
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<interfaces><interface><name>ge-0/0/0</name>"
         "<description>uplink</description></interface></interfaces>"
     )
@@ -930,7 +932,7 @@ def test_matrix_K1_patch_create_keyed_list_entry(state_and_session):
     )
 
     assert session._handle_edit_patch(rpc, "m-K1") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert updated.count("<interface>") == 2
     assert "ge-0/0/1" in updated
     assert "downlink" in updated
@@ -941,7 +943,7 @@ def test_matrix_K2_patch_delete_keyed_list_entry(state_and_session):
     """K2: Delete a keyed list entry by key."""
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<interfaces>"
         "<interface><name>ge-0/0/0</name><description>keep</description>"
         "</interface>"
@@ -962,7 +964,7 @@ def test_matrix_K2_patch_delete_keyed_list_entry(state_and_session):
     )
 
     assert session._handle_edit_patch(rpc, "m-K2") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "ge-0/0/1" not in updated
     assert "remove" not in updated
     assert "ge-0/0/0" in updated
@@ -973,7 +975,7 @@ def test_matrix_M1_patch_mixed_ops(state_and_session):
     """M1: Combined create + replace + delete in one edit-config."""
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<system><host-name>r1</host-name>"
         "<services><ssh/></services></system>"
         "<interfaces><interface><name>ge-0/0/0</name>"
@@ -997,7 +999,7 @@ def test_matrix_M1_patch_mixed_ops(state_and_session):
     )
 
     assert session._handle_edit_patch(rpc, "m-M1") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "r2" in updated
     assert "r1" not in updated
     assert "<services>" not in updated
@@ -1009,7 +1011,7 @@ def test_matrix_M2_patch_deep_nested_replace(state_and_session):
     """M2: Replace a leaf 4+ levels deep."""
     state, session, _channel = state_and_session
 
-    state.candidate_groups["base-config"] = base_group_xml(
+    state.candidate_config = direct_config_xml(
         "<interfaces><interface><name>lo0</name>"
         "<unit><name>0</name>"
         "<family><inet><address><name>10.0.0.1/32</name>"
@@ -1033,6 +1035,133 @@ def test_matrix_M2_patch_deep_nested_replace(state_and_session):
     )
 
     assert session._handle_edit_patch(rpc, "m-M2") is True
-    updated = state.candidate_groups["base-config"]
+    updated = state.candidate_config
     assert "new" in updated
     assert "old" not in updated
+
+
+# ---------------------------------------------------------------------------
+# Configuration groups
+# ---------------------------------------------------------------------------
+
+
+def _commit(session, state, configuration_body):
+    rpc = (
+        '<rpc message-id="g1"><load-configuration action="merge" format="xml">'
+        f"{direct_config_xml(configuration_body)}"
+        "</load-configuration></rpc>"
+    )
+    assert session._handle_load_configuration(rpc, "g1") is True
+    assert session._handle_commit("<commit/>", "g2") is True
+    return state.running_config
+
+
+def test_groups_and_base_hierarchy_are_both_committed(state_and_session):
+    state, session, _channel = state_and_session
+
+    committed = _commit(
+        session, state,
+        "<groups><name>a</name><system><host-name>from-a</host-name></system></groups>"
+        "<groups><name>b</name><system><host-name>from-b</host-name></system></groups>"
+        "<system><host-name>device</host-name></system>"
+    )
+
+    assert committed.count("<groups>") == 2
+    assert "<name>a</name>" in committed and "<name>b</name>" in committed
+    assert "from-a" in committed and "from-b" in committed
+    # The device's own configuration sits beside the groups, not inside them.
+    assert "<host-name>device</host-name>" in committed
+
+
+def test_configuration_without_groups_gains_none(state_and_session):
+    state, session, _channel = state_and_session
+
+    committed = _commit(session, state, "<system><host-name>device</host-name></system>")
+
+    assert "<groups>" not in committed
+
+
+def test_edit_below_a_group_leaves_everything_else(state_and_session):
+    state, session, _channel = state_and_session
+
+    _commit(
+        session, state,
+        "<groups><name>a</name><system><host-name>from-a</host-name></system></groups>"
+        "<groups><name>b</name><system><host-name>from-b</host-name></system></groups>"
+        "<system><host-name>device</host-name></system>"
+    )
+
+    rpc = (
+        '<rpc message-id="g3"><edit-config><target><candidate/></target>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0"><configuration>'
+        "<groups><name>a</name><system>"
+        '<host-name nc:operation="replace">changed</host-name>'
+        "</system></groups></configuration></config></edit-config></rpc>"
+    )
+    assert session._handle_edit_patch(rpc, "g3") is True
+    assert session._handle_commit("<commit/>", "g4") is True
+
+    committed = state.running_config
+    assert "changed" in committed
+    assert "from-a" not in committed
+    assert "from-b" in committed
+    assert "<host-name>device</host-name>" in committed
+
+
+def test_deleting_a_group_keeps_the_others(state_and_session):
+    state, session, _channel = state_and_session
+
+    _commit(
+        session, state,
+        "<groups><name>a</name><system><host-name>from-a</host-name></system></groups>"
+        "<groups><name>b</name><system><host-name>from-b</host-name></system></groups>"
+    )
+
+    rpc = (
+        '<rpc message-id="g5"><edit-config><target><candidate/></target>'
+        '<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0"><configuration>'
+        '<groups nc:operation="delete"><name>b</name></groups>'
+        "</configuration></config></edit-config></rpc>"
+    )
+    assert session._handle_edit_patch(rpc, "g5") is True
+    assert session._handle_commit("<commit/>", "g6") is True
+
+    committed = state.running_config
+    assert "<name>b</name>" not in committed
+    assert "from-b" not in committed
+    assert "<name>a</name>" in committed
+
+
+def test_apply_groups_keep_the_order_they_were_sent(state_and_session):
+    state, session, _channel = state_and_session
+
+    committed = _commit(
+        session, state,
+        "<apply-groups>second</apply-groups>"
+        "<apply-groups>first</apply-groups>"
+    )
+
+    assert committed.count("<apply-groups>") == 2
+    assert committed.index("<apply-groups>second</apply-groups>") < committed.index(
+        "<apply-groups>first</apply-groups>"
+    )
+
+
+def test_reading_one_group_returns_only_that_group(state_and_session):
+    state, session, channel = state_and_session
+
+    _commit(
+        session, state,
+        "<groups><name>a</name><system><host-name>from-a</host-name></system></groups>"
+        "<groups><name>b</name><system><host-name>from-b</host-name></system></groups>"
+    )
+
+    rpc = (
+        '<rpc message-id="g7"><get-configuration><configuration>'
+        "<groups><name>a</name></groups>"
+        "</configuration></get-configuration></rpc>"
+    )
+    assert session._handle_get_configuration(rpc, "g7") is True
+    reply = channel.writes[-1]
+    assert "from-a" in reply
+    assert "from-b" not in reply

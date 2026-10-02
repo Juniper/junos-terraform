@@ -46,6 +46,6 @@ jobs:
       # stdlib from newer Go releases than the one it was built with.
       if: matrix.go-version == '1.25.6'
       with:
-        version: v2.12.2
+        version: v2.14.0
         working-directory: terraform_provider
 

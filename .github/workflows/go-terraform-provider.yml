@@ -8,7 +8,14 @@ on:
 
 jobs:
   build-and-plan:
+    name: Terraform integration (${{ matrix.provider_implementation }})
     runs-on: ubuntu-latest
+    env:
+      TF_APPLY_PARALLELISM: 3
+    strategy:
+      fail-fast: false
+      matrix:
+        provider_implementation: [standard, generic]
 
     steps:
     - uses: actions/checkout@v7
@@ -41,26 +48,35 @@ jobs:
     - name: Set up Terraform
       uses: hashicorp/setup-terraform@v4
 
-    - name: Generate provider with jtaf-yang2go
+    - name: Generate ${{ matrix.provider_implementation }} provider with jtaf-yang2go
       run: |
+        set -euo pipefail
         rm -rf terraform-provider-junos-vqfx-evpn-vxlan
 
-        jtaf-yang2go \
-          -p examples/yang/18.2/18.2R3/common \
-          examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang \
-          -x \
-          examples/evpn-vxlan-dc/dc1/dc1-borderleaf1.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-borderleaf2.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-leaf2.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-leaf3.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-spine1.xml \
-          examples/evpn-vxlan-dc/dc1/dc1-spine2.xml \
-          examples/evpn-vxlan-dc/dc2/dc2-spine1.xml \
-          examples/evpn-vxlan-dc/dc2/dc2-spine2.xml \
-          -t vqfx-evpn-vxlan
+        provider_args=(
+          -p examples/yang/18.2/18.2R3/common
+          examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang
+        )
+        if [[ "${{ matrix.provider_implementation }}" == "generic" ]]; then
+          provider_args+=(--generic)
+        else
+          provider_args+=(
+            -x
+            examples/evpn-vxlan-dc/dc1/dc1-borderleaf1.xml
+            examples/evpn-vxlan-dc/dc1/dc1-borderleaf2.xml
+            examples/evpn-vxlan-dc/dc1/dc1-leaf1.xml
+            examples/evpn-vxlan-dc/dc1/dc1-leaf2.xml
+            examples/evpn-vxlan-dc/dc1/dc1-leaf3.xml
+            examples/evpn-vxlan-dc/dc1/dc1-spine1.xml
+            examples/evpn-vxlan-dc/dc1/dc1-spine2.xml
+            examples/evpn-vxlan-dc/dc2/dc2-spine1.xml
+            examples/evpn-vxlan-dc/dc2/dc2-spine2.xml
+          )
+        fi
+        provider_args+=(-t vqfx-evpn-vxlan)
+        jtaf-yang2go "${provider_args[@]}"
 
-    - name: Build and test generated terraform provider
+    - name: Build and test generated ${{ matrix.provider_implementation }} Terraform provider
       working-directory: terraform-provider-junos-vqfx-evpn-vxlan
       run: |
         go build -v ./...
@@ -158,6 +174,16 @@ jobs:
           echo "Neither ss nor netstat is available in this runner"
         fi
 
+    - name: Terraform validate ${{ matrix.provider_implementation }} provider configuration
+      working-directory: ci-evpn-vxlan-tf
+      run: |
+        set -euo pipefail
+        # dev_overrides resolve the provider without `terraform init`, so validate
+        # loads the built provider's schema the same way plan and apply do. It fails
+        # here, before the mock lifecycle, if the schema cannot be built from the
+        # embedded model or the generated configuration does not match it.
+        terraform validate -no-color
+
     - name: Preflight NETCONF mock before Terraform apply
       run: |
         set -euo pipefail
@@ -209,7 +235,7 @@ jobs:
         set -euo pipefail
         # With provider dev_overrides, skip `terraform init` to avoid registry lookups for unpublished providers.
         terraform plan -refresh=false -no-color -input=false -out=tfplan-initial
-        terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-initial
+        terraform apply -no-color -input=false -auto-approve -parallelism="$TF_APPLY_PARALLELISM" tfplan-initial
 
     - name: Terraform no-op plan after initial apply
       id: no_op_plan_initial
@@ -248,7 +274,7 @@ jobs:
 
     - name: Terraform apply changed plan
       working-directory: ci-evpn-vxlan-tf
-      run: terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-updated
+      run: terraform apply -no-color -input=false -auto-approve -parallelism="$TF_APPLY_PARALLELISM" tfplan-updated
 
     - name: Terraform final no-op plan
       id: no_op_plan_final
@@ -288,7 +314,6 @@ jobs:
 
         # Use the generated device map as source-of-truth for mock hostnames.
         target_host="$(head -n 1 mock-devices.txt | cut -d: -f1 | tr -d '[:space:]')"
-        target_group="base-config"
 
         if [ -z "$target_host" ]; then
           echo "Failed to extract target host from mock-devices.txt"
@@ -296,7 +321,6 @@ jobs:
         fi
 
         echo "host=$target_host" >> "$GITHUB_OUTPUT"
-        echo "group=$target_group" >> "$GITHUB_OUTPUT"
 
     - name: Simulate out-of-band NETCONF drift
       run: |
@@ -304,7 +328,6 @@ jobs:
         python .github/scripts/apply_netconf_drift.py \
           --devices-file ci-evpn-vxlan-tf/mock-devices.txt \
           --target-host '${{ steps.state_baseline.outputs.host }}' \
-          --target-group '${{ steps.state_baseline.outputs.group }}' \
           --drift-ip 203.0.113.250/32 \
           --username ci-user \
           --password ci-password \
@@ -325,7 +348,7 @@ jobs:
 
     - name: Terraform reconcile out-of-band drift
       working-directory: ci-evpn-vxlan-tf
-      run: terraform apply -no-color -input=false -auto-approve -parallelism=1 tfplan-drift
+      run: terraform apply -no-color -input=false -auto-approve -parallelism="$TF_APPLY_PARALLELISM" tfplan-drift
 
     - name: Terraform no-op plan after drift reconcile
       id: drift_plan_final
@@ -369,7 +392,7 @@ jobs:
       working-directory: ci-evpn-vxlan-tf-negative
       run: |
         set +e
-        terraform apply -refresh=false -no-color -input=false -auto-approve -parallelism=1 > negative_apply.log 2>&1
+        terraform apply -refresh=false -no-color -input=false -auto-approve -parallelism="$TF_APPLY_PARALLELISM" > negative_apply.log 2>&1
         rc=$?
         set -e
         echo "exitcode=$rc" >> "$GITHUB_OUTPUT"
@@ -433,8 +456,264 @@ jobs:
       if: always() && env.ACTIONS_RUNTIME_TOKEN != ''
       uses: actions/upload-artifact@v7
       with:
-        name: netconf-integration-logs
+        name: netconf-integration-logs-${{ matrix.provider_implementation }}
         path: |
           netconf-mock.log
           netconf-mock-state.json
           ci-evpn-vxlan-tf-negative/negative_apply.log
+
+  groups-lifecycle:
+    name: Terraform integration (configuration groups)
+    runs-on: ubuntu-latest
+    env:
+      TF_APPLY_PARALLELISM: 3
+      PROVIDER: junos-vqfx-evpn-vxlan-groups
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Set up Python (latest)
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.x'
+
+    - name: Install Python dependencies for tooling
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        python -m pip install .
+        python -m pip install asyncssh
+
+    - name: Set up Go
+      uses: actions/setup-go@v7
+      with:
+        go-version: 'stable'
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v4
+      with:
+        # The wrapper swallows the exit code, and these steps read it to tell a
+        # plan with changes from one without.
+        terraform_wrapper: false
+
+    - name: Build a provider that manages groups
+      run: |
+        set -euo pipefail
+        cd examples/providers
+        JTAF_PROVIDER_OUTPUT_DIR="$GITHUB_WORKSPACE/groups-provider" \
+        JTAF_SKIP_PROVIDER_INSTALL=1 \
+          bash build-groups.sh
+
+    - name: Assert the embedded schema carries groups
+      run: |
+        python - <<'PY'
+        import gzip, json, os, sys, pathlib
+        path = (pathlib.Path(os.environ["GITHUB_WORKSPACE"]) / "groups-provider"
+                / f"terraform-provider-{os.environ['PROVIDER']}" / "trimmed_schema.json.gz")
+        schema = json.load(gzip.open(path))
+        config = next(c for c in schema["root"]["children"] if c["name"] == "configuration")
+        names = [c["name"] for c in config["children"]]
+        missing = [n for n in ("groups", "apply-groups") if n not in names]
+        if missing:
+            sys.exit(f"schema is missing {missing}; top level is {names}")
+        groups = next(c for c in config["children"] if c["name"] == "groups")
+        if groups.get("key") != "name":
+            sys.exit("groups should be keyed by name")
+        print("schema carries groups and apply-groups")
+        PY
+
+    - name: Convert the group-based example
+      run: |
+        set -euo pipefail
+        cd examples/providers
+        JTAF_PROVIDER_OUTPUT_DIR="$GITHUB_WORKSPACE/groups-provider" \
+        JTAF_TERRAFORM_OUTPUT_DIR="$GITHUB_WORKSPACE/groups-tf" \
+          bash convert-groups.sh
+
+    - name: Prepare Terraform and the NETCONF mock
+      run: |
+        set -euo pipefail
+
+        pushd "groups-provider/terraform-provider-$PROVIDER"
+        go install .
+        popd
+
+        cat > "$HOME/.terraformrc" <<EOF
+        provider_installation {
+          dev_overrides {
+            "hashicorp/$PROVIDER" = "$HOME/go/bin"
+          }
+          direct {}
+        }
+        EOF
+        echo "TF_CLI_CONFIG_FILE=$HOME/.terraformrc" >> "$GITHUB_ENV"
+        echo "TF_IN_AUTOMATION=1" >> "$GITHUB_ENV"
+
+        python .github/scripts/rewrite_mock_providers.py \
+          --providers-file groups-tf/providers.tf \
+          --devices-file groups-tf/mock-devices.txt \
+          --bind-host 127.0.0.1 \
+          --base-port 8401 \
+          --provider-name "$PROVIDER"
+
+        nohup python netconf_mock/netconf_mock_server.py \
+          --host 127.0.0.1 \
+          --username jcluser \
+          --password 'Juniper!1' \
+          --log-level DEBUG \
+          --devices-file groups-tf/mock-devices.txt \
+          --state-dump netconf-mock-state.json \
+          > netconf-mock.log 2>&1 < /dev/null &
+        echo "$!" > .netconf_mock.pid
+
+        for _ in $(seq 1 30); do
+          ready=1
+          while IFS=: read -r _name port; do
+            [ -z "${port}" ] && continue
+            (echo > /dev/tcp/127.0.0.1/"${port}") >/dev/null 2>&1 || ready=0
+          done < groups-tf/mock-devices.txt
+          [ "$ready" -eq 1 ] && break
+          sleep 1
+        done
+        if [ "$ready" -ne 1 ]; then
+          echo "NETCONF mock listeners were not ready in time"
+          cat netconf-mock.log || true
+          exit 1
+        fi
+
+    - name: Terraform validate
+      working-directory: groups-tf
+      run: terraform validate -no-color
+
+    - name: Terraform apply
+      working-directory: groups-tf
+      run: |
+        set -euo pipefail
+        terraform apply -no-color -input=false -auto-approve \
+          -parallelism="$TF_APPLY_PARALLELISM"
+
+    - name: Assert the applied configuration is idempotent
+      working-directory: groups-tf
+      run: |
+        set +e
+        terraform plan -refresh=false -no-color -input=false -detailed-exitcode
+        code=$?
+        set -e
+        [ "$code" -eq 0 ] || { echo "expected no changes, got exit $code"; exit 1; }
+
+    - name: Assert the device holds the group, not a flattened copy
+      run: |
+        set -euo pipefail
+        python .github/scripts/fetch_netconf_config.py \
+          --devices-file groups-tf/mock-devices.txt \
+          --target-host dc1-spine1 \
+          --username jcluser \
+          --password 'Juniper!1' \
+          --output dc1-spine1.xml
+
+        python - <<'PY'
+        import xml.etree.ElementTree as ET
+        config = ET.parse("dc1-spine1.xml").getroot()
+        groups = [g.findtext("name") for g in config.findall("groups")]
+        assert groups == ["spine"], f"expected one group named spine, got {groups}"
+        assert config.findtext("system/host-name") == "dc1-spine1", "base host-name missing"
+        assert config.findtext("apply-groups") == "spine", "group reference missing"
+        print("device holds the group, the reference and its own host name")
+        PY
+
+    - name: Simulate drift inside a group
+      run: |
+        set -euo pipefail
+        python .github/scripts/apply_netconf_drift.py \
+          --devices-file groups-tf/mock-devices.txt \
+          --target-host dc1-spine1 \
+          --target-group spine \
+          --drift-ip 203.0.113.250/32 \
+          --username jcluser \
+          --password 'Juniper!1' \
+          --connect-host 127.0.0.1
+
+    - name: Assert drift inside a group is detected and reconciled
+      working-directory: groups-tf
+      run: |
+        set +e
+        terraform plan -no-color -input=false -detailed-exitcode -out=tfplan-drift
+        code=$?
+        set -e
+        [ "$code" -eq 2 ] || { echo "expected drift, got exit $code"; exit 1; }
+
+        terraform apply -no-color -input=false -auto-approve \
+          -parallelism="$TF_APPLY_PARALLELISM" tfplan-drift
+
+        set +e
+        terraform plan -no-color -input=false -detailed-exitcode
+        code=$?
+        set -e
+        [ "$code" -eq 0 ] || { echo "drift not reconciled, got exit $code"; exit 1; }
+
+    - name: Assert removing a group leaves the rest of the device alone
+      run: |
+        set -euo pipefail
+        python - <<'PY'
+        import pathlib, re
+        p = pathlib.Path("groups-tf/dc1-leaf3.tf")
+        s = p.read_text()
+        s = re.sub(r"\n  apply_groups = [^\n]*\n", "\n", s)
+        start = s.index("  groups = [")
+        depth, i = 0, start
+        while True:
+            if s[i] == "[":
+                depth += 1
+            elif s[i] == "]":
+                depth -= 1
+                if depth == 0:
+                    i += 1
+                    break
+            i += 1
+        p.write_text(s[:start] + s[i:].lstrip("\n"))
+        PY
+
+        cd groups-tf
+        terraform apply -no-color -input=false -auto-approve \
+          -parallelism="$TF_APPLY_PARALLELISM"
+        cd ..
+
+        for device in dc1-leaf3 dc1-leaf1; do
+          python .github/scripts/fetch_netconf_config.py \
+            --devices-file groups-tf/mock-devices.txt \
+            --target-host "$device" \
+            --username jcluser \
+            --password 'Juniper!1' \
+            --output "$device.xml"
+        done
+
+        python - <<'PY'
+        import xml.etree.ElementTree as ET
+        leaf3 = ET.parse("dc1-leaf3.xml").getroot()
+        assert leaf3.findall("groups") == [], "the group should be gone"
+        assert leaf3.findtext("system/host-name") == "dc1-leaf3", "base hierarchy was damaged"
+        leaf1 = ET.parse("dc1-leaf1.xml").getroot()
+        assert [g.findtext("name") for g in leaf1.findall("groups")] == ["leaf"], \
+            "another device's group was touched"
+        print("group removed from one device, every other device untouched")
+        PY
+
+    - name: Stop NETCONF mock
+      if: always()
+      run: |
+        set +e
+        if [ -f .netconf_mock.pid ]; then
+          MOCK_PID="$(cat .netconf_mock.pid)"
+          if kill -0 "$MOCK_PID" 2>/dev/null; then
+            kill "$MOCK_PID"
+          fi
+        fi
+
+    - name: Upload NETCONF integration logs
+      if: always() && env.ACTIONS_RUNTIME_TOKEN != ''
+      uses: actions/upload-artifact@v7
+      with:
+        name: netconf-integration-logs-groups
+        path: |
+          netconf-mock.log
+          netconf-mock-state.json

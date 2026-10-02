@@ -28,8 +28,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--target-group",
-        required=True,
-        help="Apply-group name to mutate.",
+        default="",
+        help="Configuration group to mutate. Without it the drift goes into the "
+             "base hierarchy, which is where a provider built without --groups "
+             "keeps its configuration.",
     )
     parser.add_argument(
         "--drift-ip",
@@ -124,16 +126,21 @@ async def run(args: argparse.Namespace) -> None:
         )
         writer.write(hello + MSG_SEP + "\n")
 
-        # Out-of-band change: alter interface IP in the managed apply-group.
-        drift_cfg = (
-            '<load-configuration action="merge" format="xml">'
-            "<configuration><groups>"
-            f"<name>{args.target_group}</name>"
+        # Out-of-band change: alter an interface address where the provider
+        # keeps it, which is inside a group only if one was named.
+        interfaces = (
             "<interfaces><interface><name>lo0</name><unit><name>0</name>"
             f"<family><inet><address><name>{args.drift_ip}</name>"
             "</address></inet></family>"
             "</unit></interface></interfaces>"
-            "</groups></configuration>"
+        )
+        if args.target_group:
+            body = f"<groups><name>{args.target_group}</name>{interfaces}</groups>"
+        else:
+            body = interfaces
+        drift_cfg = (
+            '<load-configuration action="merge" format="xml">'
+            f"<configuration>{body}</configuration>"
             "</load-configuration>"
         )
 

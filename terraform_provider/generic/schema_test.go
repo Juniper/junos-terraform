@@ -35,8 +35,6 @@ func attribute(attrs []*tfprotov6.SchemaAttribute, name string) *tfprotov6.Schem
 
 func TestBuildSchema(t *testing.T) {
 	s, typ := BuildSchema(patch.CompileSchema([]patch.SchemaNode{
-		{Name: "groups", Type: "container"},
-		{Name: "apply-groups", Type: "leaf-list"},
 		{Name: "system", Type: "container", Children: []patch.SchemaNode{
 			{Name: "host-name", Type: "leaf"},
 			{Name: "name-server", Type: "leaf-list"},
@@ -54,9 +52,10 @@ func TestBuildSchema(t *testing.T) {
 	if rn == nil || !rn.Required || !rn.Type.Is(tftypes.String) {
 		t.Fatalf("resource_name: %+v", rn)
 	}
-	for _, skipped := range []string{"groups", "apply_groups"} {
-		if attribute(attrs, skipped) != nil {
-			t.Errorf("%s should be left out", skipped)
+	// A schema without groups gives a resource without them, and no error.
+	for _, absent := range []string{"groups", "apply_groups"} {
+		if attribute(attrs, absent) != nil {
+			t.Errorf("%s is not in the schema, so it should not be an attribute", absent)
 		}
 	}
 
@@ -88,5 +87,48 @@ func TestBuildSchema(t *testing.T) {
 	}
 	if _, ok := typ.AttributeTypes["groups"]; ok {
 		t.Fatal("groups in the value type")
+	}
+}
+
+// A provider generated with --groups carries them, and they are ordinary
+// configuration: groups is a list keyed by name holding the same hierarchy as
+// the base configuration, and apply-groups is a list of strings.
+func TestBuildSchemaWithGroups(t *testing.T) {
+	s, typ := BuildSchema(patch.CompileSchema([]patch.SchemaNode{
+		{Name: "apply-groups", Type: "leaf-list", OrderedBy: "user"},
+		{Name: "groups", Type: "list", Key: "name", Children: []patch.SchemaNode{
+			{Name: "name", Type: "leaf"},
+			{Name: "system", Type: "container", Children: []patch.SchemaNode{
+				{Name: "host-name", Type: "leaf"},
+			}},
+		}},
+		{Name: "system", Type: "container", Children: []patch.SchemaNode{
+			{Name: "host-name", Type: "leaf"},
+		}},
+	}))
+	attrs := s.Block.Attributes
+
+	ag := attribute(attrs, "apply_groups")
+	if ag == nil || !ag.Type.Is(tftypes.List{ElementType: tftypes.String}) {
+		t.Fatalf("apply_groups: %+v", ag)
+	}
+
+	groups := attribute(attrs, "groups")
+	if groups == nil || groups.NestedType == nil {
+		t.Fatalf("groups: %+v", groups)
+	}
+	if attribute(groups.NestedType.Attributes, "name") == nil {
+		t.Error("a group is identified by its name")
+	}
+
+	// The hierarchy inside a group has the same shape as the base hierarchy.
+	inGroup := attribute(groups.NestedType.Attributes, "system")
+	base := attribute(attrs, "system")
+	if inGroup == nil || base == nil {
+		t.Fatalf("system in group %+v, at the top %+v", inGroup, base)
+	}
+	if !typ.AttributeTypes["groups"].(tftypes.List).ElementType.(tftypes.Object).
+		AttributeTypes["system"].Is(typ.AttributeTypes["system"]) {
+		t.Error("system inside a group should have the same type as at the top")
 	}
 }

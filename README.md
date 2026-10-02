@@ -56,3 +56,10 @@ JTAF supports two output modes from the same YANG models and XML configurations:
 | **Ansible Role** | Ansible role + playbook with Jinja2 templates | [Junos Ansible Guide](README-ansible.md) |
 
 Both workflows start from the same YANG → JSON conversion above, then diverge into their respective toolchains.
+
+Worked examples for the Terraform workflow:
+
+| Example | Shows |
+|---------|-------|
+| [Untrimmed model](examples/DEMO-GENERIC-PROVIDER.md) | `--generic`, embedding a whole Junos model |
+| [Configuration groups](examples/DEMO-GROUPS.md) | `--groups`, managing configuration that lives in Junos groups |
