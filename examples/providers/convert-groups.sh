@@ -14,6 +14,8 @@ mkdir -p "$terraform_dir"
 
 jtaf-xml2tf \
         --groups --generic \
+	-x "$repo_root"/examples/evpn-vxlan-dc-groups/dc1/*{spine,leaf}*.xml \
+		 "$repo_root"/examples/evpn-vxlan-dc-groups/dc2/*spine*.xml \
         -j "$provider_root/terraform-provider-junos-vqfx-evpn-vxlan-groups/trimmed_schema.json.gz" \
         -t vqfx-evpn-vxlan-groups \
         -d "$terraform_dir" \
