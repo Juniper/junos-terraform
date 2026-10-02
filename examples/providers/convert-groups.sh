@@ -13,7 +13,7 @@ terraform_dir="${JTAF_TERRAFORM_OUTPUT_DIR:-$repo_root/examples/terraform_files_
 mkdir -p "$terraform_dir"
 
 jtaf-xml2tf \
-        --groups --generic \
+        --groups \
 	-x "$repo_root"/examples/evpn-vxlan-dc-groups/dc1/*{spine,leaf}*.xml \
 		 "$repo_root"/examples/evpn-vxlan-dc-groups/dc2/*spine*.xml \
         -j "$provider_root/terraform-provider-junos-vqfx-evpn-vxlan-groups/trimmed_schema.json.gz" \
