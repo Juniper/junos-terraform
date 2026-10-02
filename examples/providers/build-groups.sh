@@ -13,12 +13,9 @@ mkdir -p "$output_dir"
 cd "$output_dir"
 
 echo "Building groups-aware QFX provider..."
-jtaf-yang2go --groups \
+jtaf-yang2go --groups --generic \
         -p "$repo_root/examples/yang/18.2/18.2R3/common" \
         "$repo_root"/examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang \
-        -x "$repo_root"/examples/evpn-vxlan-dc-groups/dc1/dc1-*leaf* \
-                 "$repo_root"/examples/evpn-vxlan-dc-groups/dc1/dc1-*spine* \
-                 "$repo_root"/examples/evpn-vxlan-dc-groups/dc2/dc2-*spine* \
         -t vqfx-evpn-vxlan-groups
 
 echo "Compiling groups-aware QFX provider..."
