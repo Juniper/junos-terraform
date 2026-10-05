@@ -644,7 +644,8 @@ def test_yang2go_passes_groups(tmp_path, monkeypatch):
 
     monkeypatch.setattr(subprocess, "Popen", _RecordingPopen)
     monkeypatch.setattr(sys, "argv",
-                        ["jtaf-yang2go", "-p", str(yang_file), "-t", "srx", "--groups"])
+                        ["jtaf-yang2go", "-p", str(yang_file), "-t", "srx",
+                         "--generic", "--groups"])
     runpy.run_path(str(JUNOS_DIR / "jtaf-yang2go"), run_name="__main__")
 
     provider = next(c for c in commands if c[0] == "jtaf-provider")
@@ -666,7 +667,7 @@ def test_yang2go_omits_groups_by_default(tmp_path, monkeypatch):
 
     monkeypatch.setattr(subprocess, "Popen", _RecordingPopen)
     monkeypatch.setattr(sys, "argv",
-                        ["jtaf-yang2go", "-p", str(yang_file), "-t", "srx"])
+                        ["jtaf-yang2go", "-p", str(yang_file), "-t", "srx", "--generic"])
     runpy.run_path(str(JUNOS_DIR / "jtaf-yang2go"), run_name="__main__")
 
     provider = next(c for c in commands if c[0] == "jtaf-provider")
@@ -692,6 +693,27 @@ def test_generic_generation_rejects_xml_filter(script_name, argv, monkeypatch, c
     assert "not allowed with argument" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize(
+    ("script_name", "argv"),
+    [
+        ("jtaf-yang2go", ["-p", "a.yang", "-t", "qfx"]),
+        ("jtaf-provider", ["-j", "-", "-t", "qfx"]),
+    ],
+    ids=["yang2go", "provider"],
+)
+def test_schema_scope_is_required(script_name, argv, monkeypatch, capsys):
+    """Omitting both must fail rather than quietly embedding the whole model."""
+    monkeypatch.setattr(sys, "argv", [script_name, *argv])
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_path(str(JUNOS_DIR / script_name), run_name="__main__")
+
+    assert exc_info.value.code == 2
+    err = capsys.readouterr().err
+    assert "one of the arguments" in err
+    assert "--generic" in err
+
+
 def test_provider_schema_scope_help(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["jtaf-provider", "--help"])
 
@@ -700,7 +722,8 @@ def test_provider_schema_scope_help(monkeypatch, capsys):
 
     assert exc_info.value.code == 0
     help_text = " ".join(capsys.readouterr().out.split())
-    assert "Embed the untrimmed model rather than trimming it to XML" in help_text
+    assert "Embed the whole untrimmed model." in help_text
+    assert "Exactly one of -x or --generic is required" in help_text
     assert "trim the embedded schema to" in help_text
 
 

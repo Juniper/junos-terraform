@@ -8,14 +8,15 @@ on:
 
 jobs:
   build-and-plan:
-    name: Terraform integration (${{ matrix.provider_implementation }})
+    name: Terraform integration (${{ matrix.schema_scope }} schema)
     runs-on: ubuntu-latest
     env:
       TF_APPLY_PARALLELISM: 3
     strategy:
       fail-fast: false
       matrix:
-        provider_implementation: [standard, generic]
+        # One provider implementation; these differ only in the schema it embeds.
+        schema_scope: [trimmed, full]
 
     steps:
     - uses: actions/checkout@v7
@@ -48,7 +49,7 @@ jobs:
     - name: Set up Terraform
       uses: hashicorp/setup-terraform@v4
 
-    - name: Generate ${{ matrix.provider_implementation }} provider with jtaf-yang2go
+    - name: Generate provider with ${{ matrix.schema_scope }} schema using jtaf-yang2go
       run: |
         set -euo pipefail
         rm -rf terraform-provider-junos-vqfx-evpn-vxlan
@@ -57,7 +58,7 @@ jobs:
           -p examples/yang/18.2/18.2R3/common
           examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang
         )
-        if [[ "${{ matrix.provider_implementation }}" == "generic" ]]; then
+        if [[ "${{ matrix.schema_scope }}" == "full" ]]; then
           provider_args+=(--generic)
         else
           provider_args+=(
@@ -76,7 +77,7 @@ jobs:
         provider_args+=(-t vqfx-evpn-vxlan)
         jtaf-yang2go "${provider_args[@]}"
 
-    - name: Build and test generated ${{ matrix.provider_implementation }} Terraform provider
+    - name: Build and test provider with ${{ matrix.schema_scope }} schema
       working-directory: terraform-provider-junos-vqfx-evpn-vxlan
       run: |
         go build -v ./...
@@ -174,7 +175,7 @@ jobs:
           echo "Neither ss nor netstat is available in this runner"
         fi
 
-    - name: Terraform validate ${{ matrix.provider_implementation }} provider configuration
+    - name: Terraform validate configuration against ${{ matrix.schema_scope }} schema
       working-directory: ci-evpn-vxlan-tf
       run: |
         set -euo pipefail
@@ -456,7 +457,7 @@ jobs:
       if: always() && env.ACTIONS_RUNTIME_TOKEN != ''
       uses: actions/upload-artifact@v7
       with:
-        name: netconf-integration-logs-${{ matrix.provider_implementation }}
+        name: netconf-integration-logs-${{ matrix.schema_scope }}
         path: |
           netconf-mock.log
           netconf-mock-state.json

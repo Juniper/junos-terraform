@@ -67,10 +67,10 @@ it writes, SHALL NOT sort references, and SHALL NOT carry references between res
 
 ```
 Terraform CLI
-    ↓ (Plugin Protocol)
-Provider (main.go → provider.go)
+    ↓ (Plugin Protocol, tfprotov6)
+Provider (main.go → generic.Serve)
     ↓
-Config Resource (resource_config_provider.go)
+Config Resource (generic/server.go, schema-driven)
     ↓ (uses patch engine for Update)
 NETCONF Client (netconf/client.go)
     ↓ (SSH:830)
@@ -149,7 +149,7 @@ provider "junos-{device-type}" {
 
 ## Config Resource — CRUD Lifecycle
 
-**Location:** `terraform_provider/resource_config_provider.go` (Jinja2-generated)
+**Location:** `terraform_provider/generic/` (schema-driven, no generated Go source)
 
 ### Behaviors
 

@@ -295,14 +295,14 @@ def main():
         help="Path to the JTAF JSON schema from pyang, plain or gzipped "
              "(e.g. trimmed_schema.json.gz), or '-' to read it from stdin.",
     )
-    schema_mode = parser.add_mutually_exclusive_group()
+    schema_mode = parser.add_mutually_exclusive_group(required=True)
     schema_mode.add_argument(
         '-x',
         '--xml-config',
         required=False,
         action='append',
         nargs="+",
-        help='Optional Junos XML config files to trim the embedded schema to; incompatible with --generic.',
+        help='Junos XML config files to trim the embedded schema to.',
     )
     parser.add_argument(
         '-t',
@@ -314,7 +314,9 @@ def main():
         '--generic',
         action='store_true',
         default=False,
-        help='Embed the untrimmed model rather than trimming it to XML; incompatible with -x.',
+        help='Embed the whole untrimmed model. Exactly one of -x or --generic '
+             'is required: a full model costs far more memory at plan time, so '
+             'it is opted into rather than defaulted to.',
     )
     parser.add_argument(
         '--exclude',
@@ -348,8 +350,7 @@ def main():
                   "trim it with -x, or --exclude paths inside groups",
                   file=sys.stderr)
 
-    # Step 1: Filter the schema only when XML config is supplied.
-    # Without -x, keep the schema as a direct copy of pyang JSON output.
+    # Step 1: -x trims the schema to the given XML; --generic embeds it whole.
     if args.xml_config:
         xml_files = [file for group in args.xml_config for file in group]
         xml_config = xml_files[0] if len(xml_files) == 1 else load_and_merge_xmls(xml_files)

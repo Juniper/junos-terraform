@@ -21,14 +21,14 @@ parser.add_argument(
     action='extend',
     help='YANG search paths and/or .yang files passed to pyang.',
 )
-schema_mode = parser.add_mutually_exclusive_group()
+schema_mode = parser.add_mutually_exclusive_group(required=True)
 schema_mode.add_argument(
     '-x',
     type=str,
     required=False,
     action='append',
     nargs="+",
-    help='Optional Junos XML config files for schema filtering; incompatible with --generic.',
+    help='Junos XML config files to trim the embedded schema to.',
 )
 parser.add_argument(
     '-t',
@@ -40,7 +40,9 @@ schema_mode.add_argument(
     '--generic',
     action='store_true',
     default=False,
-    help='Embed the untrimmed model rather than trimming it to XML; incompatible with -x.',
+    help='Embed the whole untrimmed model. Exactly one of -x or --generic '
+         'is required: a full model costs far more memory at plan time, so '
+         'it is opted into rather than defaulted to.',
 )
 parser.add_argument(
     '--exclude',
