@@ -480,6 +480,10 @@ def test_xml2tf_helpers_and_main(tmp_path, monkeypatch):
     mod = _load_script("jtaf-xml2tf", "jtaf_xml2tf_mod")
 
     assert mod.normalize_tag("host-name.v4") == "host_name_v4"
+    # The provider lower-cases attribute names, so these have to agree.
+    assert mod.normalize_tag("do-not-translate-AAAA-query-to-A-query") == \
+        "do_not_translate_aaaa_query_to_a_query"
+    assert mod.normalize_tag("AH_header") == "ah_header"
     assert mod.convert_to_hcl({"a": [1, True, "x"]}).startswith("{")
 
     type_map = mod.build_type_map(

@@ -496,5 +496,10 @@ def build_type_map(node, parent_path=""):
 
 
 def normalize_tag(tag: str) -> str:
-    """Prepare XML tag to be used as YAML key by replacing '-' and '.' with '_'."""
-    return tag.replace("-", "_").replace(".", "_")
+    """Prepare XML tag to be used as YAML key by replacing '-' and '.' with '_'.
+
+    Lower-cased to agree with the provider's SanitizeName: a few Junos names
+    carry capitals, and an attribute the provider names in lower case has to
+    be written that way in the Terraform files.
+    """
+    return tag.replace("-", "_").replace(".", "_").lower()
