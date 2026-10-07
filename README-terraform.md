@@ -6,10 +6,17 @@ This guide covers generating, building, testing, and using a custom Junos Terraf
 
 ## Generate Resource Provider
 
-Run the following command to generate a `resource provider`.
+Every provider is built from the same Go source. What differs between them is only the YANG model
+embedded in the binary, and **you must say which model you want**: `-x` to trim it to your
+configuration, or `--generic` to embed the whole thing. Passing neither is an error, and passing both
+is an error.
 
 ```bash
+# Trimmed to the configuration in the XML you give it
 jtaf-provider -j <json-file> -x <xml-configuration(s)> -t <device-type>
+
+# The whole model, no XML needed
+jtaf-provider -j <json-file> --generic -t <device-type>
 ```
 
 Example:
@@ -27,10 +34,14 @@ pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p examples/yang/18.2/18.2R3/c
 
 ### Single command to generate resource provider
 
-Use `jtaf-yang2go` command to generate a resource provider in a single step by supplying all YANG files with the `-p` option, the device XML configuration with `-x`, and the device type with `-t`.
+Use `jtaf-yang2go` command to generate a resource provider in a single step by supplying all YANG files with the `-p` option, the device XML configuration with `-x`, and the device type with `-t`. As with `jtaf-provider`, exactly one of `-x` or `--generic` is required.
 
 ```bash
+# Trimmed
 jtaf-yang2go -p <path-to-common> <path-to-yang-files> -x <xml-configuration(s)> -t <device-type>
+
+# Whole model
+jtaf-yang2go -p <path-to-common> <path-to-yang-files> --generic -t <device-type>
 ```
 
 Example:
@@ -45,6 +56,7 @@ NOTE: The examples in this README use the YANG files shipped in this repository 
 ### Schema scope
 
 The provider source is the same whichever way it is generated; only the model it embeds differs.
+Exactly one of `-x` or `--generic` is required.
 
 | Option | Embedded model |
 |--------|----------------|
@@ -52,11 +64,60 @@ The provider source is the same whichever way it is generated; only the model it
 | `--generic` | The whole model, untrimmed (mutually exclusive with `-x`) |
 | `--exclude PATH` | Leaves the subtree at PATH, relative to `configuration`, out. Repeatable |
 
+#### Which one should I use?
+
+The trade is **what you can write in your `.tf`** against **how much the provider costs to run**.
+
+| | `-x` (trimmed) | `--generic` (full model) |
+|---|---|---|
+| You can configure | Only stanzas present in the XML you trimmed against | Any stanza the device supports |
+| Adding a new stanza later | Re-generate and re-build the provider | Just write it in the `.tf` |
+| Memory at plan time | Lowest | Higher |
+| Best for | A stable, known configuration set | Exploring, or many devices with differing config |
+
+Start with `-x` if you know which stanzas you manage. Move to `--generic` when re-generating the
+provider every time you want a new stanza becomes the annoyance.
+
+#### What it costs
+
+Measured on an Apple M4 Pro against the QFX 18.2 model (`junos.json`, 268 MB of pyang JSON,
+593,402 nodes). Your numbers will differ with the model and machine, but the ratios hold.
+
+| | `-x` (one device XML) | `--generic` |
+|---|---|---|
+| `jtaf-provider` run | ~6 s | ~10 s |
+| `go build .` | ~2 s | ~2 s |
+| `schema.bin.gz` embedded | 1.8 KB | 883 KB |
+| Provider binary | 22 MB | 23 MB |
+
+The build does not get slower with the full model, because no Go source is generated from it — the
+schema is data the binary reads at startup, not code the compiler has to chew through.
+
+#### Why it is fast at runtime
+
+`jtaf-provider` compiles the schema into a fixed-size record table (`schema.bin.gz`) and the provider
+embeds that. At startup it is read straight into memory with no JSON parsing:
+
+| | Embedded as JSON | Embedded compiled |
+|---|---|---|
+| Size on disk | 267.7 MB (7.1 MB gzipped) | 11.4 MB (1.7 MB gzipped) |
+| Load time | 2.53 s | **4.7 ms** |
+
+That is ~538x faster to load. Terraform starts the provider several times for a single plan, so this
+is paid repeatedly. After loading, the full model occupies about **14 MB** of live heap.
+
 `--exclude` takes any configuration path, at any depth, naming the nodes a device would show:
 `logical-systems`, `system/services/web-management`, `routing-instances/instance/protocols`,
 `vlans/vlan/vlan-id`. YANG `choice` and `case` nodes group nodes in the model but are not
 configuration, so a path reaches through them and cannot name one. A path that does not exist is an
 error rather than a silent no-op, so a typo does not leave the subtree in place.
+
+Use it to trim a full model down without going back to `-x`:
+
+```bash
+jtaf-yang2go --generic -p <common> <yang-files> -t srx \
+  --exclude groups --exclude logical-systems --exclude tenants --exclude dynamic-profiles
+```
 
 ### Configuration groups
 
@@ -109,6 +170,39 @@ Example:
 cd terraform-provider-junos-vqfx
 go install .
 ```
+
+### What the generated directory contains
+
+```
+terraform-provider-junos-<type>/
+├── main.go                  ← entry point; calls generic.Serve
+├── embed_schema.go          ← go:embed of schema.bin.gz
+├── schema.bin.gz            ← the compiled schema the provider serves
+├── trimmed_schema.json.gz   ← the same schema as JSON, for jtaf-xml2tf
+├── go.mod / go.sum          ← copied; only the module name is rewritten
+├── generic/                 ← schema-driven provider
+├── patch/                   ← NETCONF patch engine
+├── netconf/                 ← NETCONF client
+└── cmd/                     ← compileschema
+```
+
+Only `main.go`, `embed_schema.go` and the two schema files are written per device type. Everything
+else is copied unchanged, so two providers for different devices differ only in their module name,
+provider type name and embedded schema.
+
+Generating a provider needs **Go on PATH**, because the schema is compiled with `cmd/compileschema`.
+
+### Upgrading from JTAF 2.x
+
+Go source is no longer rendered from Jinja2 templates. `resource_config_provider.go.j2`,
+`provider.go.j2` and `config.go.j2` are gone, and generated directories no longer contain
+`resource_config_provider.go`, `provider.go` or `config.go`. The resource type, provider block and
+attribute names are unchanged, so **existing `.tf` files and Terraform state keep working** — rebuild
+the provider binary to pick this up.
+
+The plain `trimmed_schema.json` is no longer written; pass the `.gz` file to `jtaf-xml2tf -j` and
+`jtaf-xml2yaml -j`. Both accept plain or gzipped JSON, detected by content, so directories generated
+before this change still load.
 
 ---
 
@@ -275,10 +369,16 @@ The generated Terraform provider communicates with Junos devices over **NETCONF*
 
 | Operation | What Happens |
 |-----------|-------------|
-| **Create** | Full configuration is pushed via `load-configuration` merge |
+| **Create** | Reconciles the device against the plan: reads the running configuration, computes the difference, and sends it as one `edit-config`. A device is not a blank slate, and a plain merge cannot remove configuration it already has. |
 | **Read** | Device state is fetched via `get-config` and compared to Terraform state |
-| **Update** | Only changed leaves are sent via minimal `edit-config` (patch engine) |
+| **Update** | Same reconcile as Create: only changed leaves are sent via minimal `edit-config` (patch engine) |
 | **Delete** | Targeted deletes are sent for each managed leaf/container |
+
+Create and Update return the **planned** value as the new state, not what the device reads back.
+Junos normalises what it is given and keeps configuration the plan never mentioned, so returning the
+read-back would differ from the plan and Terraform would fail the apply with "Provider produced
+inconsistent result after apply". Anything the device holds beyond the plan is drift, which Read
+reports on the next refresh.
 
 ### NETCONF Patch Engine
 
@@ -348,13 +448,26 @@ This prevents Junos candidate validation failures from referencing nodes that do
 
 #### Fallback Safety
 
-If the patch produces residual differences after verification (e.g., due to Junos auto-generated config not in the YANG schema), the provider:
+After the patch is committed the provider re-reads the device. If the configuration still differs
+from the plan — Junos auto-generates configuration that is not in the YANG schema, for instance — it
+merges the whole planned configuration with `load-configuration` and commits again, so an incomplete
+patch cannot leave the device half-configured.
 
-1. Emits a Terraform **warning** listing the unresolved leaves
-2. Falls back to full `load-configuration` replace (same as 1.1.0 behavior)
-3. Re-verifies the final state
+A load or commit the device rejects is treated as an error, and the candidate is discarded. The
+candidate is shared rather than per-session, so configuration left staged there would otherwise be
+picked up by the next commit from any source.
 
-The provider is never worse than the previous release — it's strictly better or equivalent.
+#### Schema mismatch warning
+
+The provider and your `.tf` files are produced by two separate commands, and only the `-j` path given
+to `jtaf-xml2tf` ties them together. Generating files from a trimmed schema and applying them with a
+full-model provider passes `terraform validate` and then fails at the device, because the two
+schemas describe the same configuration differently.
+
+Each provider records the schema it was built from — its scope plus the YANG modules' revision dates
+— and warns when a `.tf` file declares a different one, naming both. Files or providers generated
+before this carry no fingerprint and stay silent. Changing which paths are excluded does not
+invalidate existing files.
 
 ---
 
