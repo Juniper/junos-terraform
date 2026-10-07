@@ -753,7 +753,9 @@ def test_yang2go_and_yang2ansible_scripts(tmp_path, monkeypatch):
     )
     runpy.run_path(str(JUNOS_DIR / "jtaf-yang2ansible"), run_name="__main__")
 
-    # failure branch for pyang
+    # failure branch for pyang: the exit status has to reach the build scripts
     monkeypatch.setattr(subprocess, "Popen", _FailPopen)
     monkeypatch.setattr(sys, "argv", ["jtaf-yang2go", "-p", str(yang_file), "-x", str(xml_file), "-t", "qfx"])
-    runpy.run_path(str(JUNOS_DIR / "jtaf-yang2go"), run_name="__main__")
+    with pytest.raises(SystemExit) as excinfo:
+        runpy.run_path(str(JUNOS_DIR / "jtaf-yang2go"), run_name="__main__")
+    assert excinfo.value.code != 0

@@ -55,7 +55,8 @@ def parse_element(element, explicit_empty_tags, type_lookup, parent_path=""):
     if normalized_path not in type_lookup:
         if normalized_path not in missing_xpaths:
             missing_xpaths.add(normalized_path)
-            print(f"\t-- [WARN] XML config '{missing_xpaths}' not defined in YANG. Removing it from generating in this and subsequent .tf files\n\t\tTo enable configuration of this element, add it to a YANG augment file.\n\t\t - Regenerate the provider using jtaf-yang2go and include the cooresponding yang file using the -p option in addition to the existing YANG files.\n", file=sys.stderr)
+            print(f"\t-- [WARN] '{normalized_path}' is not in the YANG model; leaving it out of "
+                  f"this and subsequent .tf files.", file=sys.stderr)
         return None
         
     # Check if this element should be a leaf-list
@@ -842,6 +843,28 @@ def main():
                 with open(filename, "w") as f:
                     f.write(hcl_output)
                 print(f"   --->  DONE: Wrote output to {filename}\n")
+
+    report_missing_xpaths()
+
+
+def report_missing_xpaths():
+    """Summarise configuration the YANG model does not cover.
+
+    XML taken from a device running a different Junos release than the model
+    was built from carries paths the model has never heard of. They are left
+    out of the .tf, so without a summary the configuration silently differs
+    from the device it came from.
+    """
+    if not missing_xpaths:
+        return
+    print(f"\n[WARN] {len(missing_xpaths)} configuration path(s) in the XML are not in the "
+          f"YANG model and were left out:", file=sys.stderr)
+    for path in sorted(missing_xpaths):
+        print(f"   {path}", file=sys.stderr)
+    print("  The XML may come from a different Junos release than the YANG files the\n"
+          "  provider was built from. Build the provider from the release the devices run,\n"
+          "  or add the missing nodes with a YANG augment and pass it to jtaf-yang2go -p.",
+          file=sys.stderr)
 
 if __name__ == "__main__":
     main()

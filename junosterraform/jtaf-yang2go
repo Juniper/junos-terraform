@@ -108,6 +108,11 @@ if p1.returncode == 0 and pyang_out:
     output, error = p2.communicate(input=pyang_out)
     print(output.decode(), file=sys.stdout)
     if error:
-        print(error.decode(), file=sys.stdout)
+        print(error.decode(), file=sys.stderr)
+    # Without this a failed generation still exits 0, so `set -e` in the build
+    # scripts runs on over a provider that was never finished.
+    if p2.returncode != 0:
+        sys.exit(p2.returncode)
 else:
-    print('pyang failed or produced no output, skipping jtaf-provider.', file=sys.stdout)
+    print(pyang_err.decode(), file=sys.stderr)
+    sys.exit('pyang failed or produced no output, skipping jtaf-provider.')
