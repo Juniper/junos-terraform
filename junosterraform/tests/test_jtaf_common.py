@@ -1026,3 +1026,90 @@ def test_yang_release_id_tracks_module_revisions(tmp_path):
 
     # The scope is what tells a trimmed provider from a full one.
     assert schema_fingerprint("trimmed", first) != schema_fingerprint("full", first)
+
+
+def _choice_node():
+    """A node as the model declares a choice, before flattening."""
+    return {
+        "name": "then", "type": "container",
+        "children": [
+            {"name": "choice-ident", "type": "leaf",
+             "enums": [{"id": "add"}, {"id": "exact"}]},
+            {"name": "choice-value", "type": "leaf"},
+            {"name": "community-name", "type": "leaf"},
+        ],
+    }
+
+
+def test_flatten_choice_idents_replaces_the_pair_with_a_leaf_per_case():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = _choice_node()
+    assert flatten_choice_idents(node) == 1
+
+    names = [c["name"] for c in node["children"]]
+    assert "choice-ident" not in names
+    assert "choice-value" not in names
+    assert names == ["community-name", "add", "exact"]
+    for case in node["children"][1:]:
+        assert case["type"] == "leaf"
+        assert case["leaf-type"] == "string"
+
+
+def test_flatten_choice_idents_skips_a_case_that_is_already_a_sibling():
+    """martians carries an allow child and an allow case; they are one attribute."""
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = {
+        "name": "martians", "type": "container",
+        "children": [
+            {"name": "choice-ident", "type": "leaf",
+             "enums": [{"id": "allow"}, {"id": "exact"}]},
+            {"name": "choice-value", "type": "leaf"},
+            {"name": "allow", "type": "leaf"},
+        ],
+    }
+    assert flatten_choice_idents(node) == 1
+
+    names = [c["name"] for c in node["children"]]
+    assert names.count("allow") == 1
+    assert names == ["allow", "exact"]
+
+
+def test_flatten_choice_idents_skips_a_case_named_in_the_list_key():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = {
+        "name": "entry", "type": "list", "key": "allow",
+        "children": [
+            {"name": "choice-ident", "type": "leaf",
+             "enums": [{"id": "allow"}, {"id": "exact"}]},
+            {"name": "choice-value", "type": "leaf"},
+        ],
+    }
+    assert flatten_choice_idents(node) == 1
+    assert [c["name"] for c in node["children"]] == ["exact"]
+
+
+def test_flatten_choice_idents_recurses_into_nested_children():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    schema = {"root": {"children": [
+        {"name": "policy-options", "type": "container", "children": [
+            _choice_node(),
+            {"name": "inner", "type": "container", "children": [_choice_node()]},
+        ]},
+    ]}}
+
+    assert flatten_choice_idents(schema) == 2
+
+
+def test_flatten_choice_idents_leaves_a_node_without_a_choice_alone():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = {"name": "system", "type": "container",
+            "children": [{"name": "host-name", "type": "leaf"}]}
+    before = json.loads(json.dumps(node))
+
+    assert flatten_choice_idents(node) == 0
+    assert node == before
