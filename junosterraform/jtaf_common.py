@@ -233,6 +233,66 @@ def check_children(paths: list[str], elem: dict[str, Any], node_parent: list[Any
     return False
 
 
+def flatten_choice_idents(node: Any) -> int:
+    """Replace choice-ident/choice-value pairs with a leaf per choice case.
+
+    A device writes a YANG choice as an element naming the case -- <add/>,
+    <exact/> -- not as the choice-ident/choice-value pair the model declares.
+    Trimming already produces that form, through check_for_enums, for the cases
+    the XML uses. Doing the same here keeps a trimmed and an untrimmed schema
+    describing the same node the same way, so Terraform files generated against
+    one are valid against the other.
+
+    The list key is left alone: it still names choice-ident and choice-value,
+    and a key leaf that is absent is skipped when the entry is identified.
+
+    Returns the number of nodes rewritten.
+    """
+    rewritten = 0
+
+    if isinstance(node, list):
+        for item in node:
+            rewritten += flatten_choice_idents(item)
+        return rewritten
+
+    if not isinstance(node, dict):
+        return rewritten
+
+    children = node.get("children")
+    if isinstance(children, list):
+        ident = next(
+            (c for c in children
+             if isinstance(c, dict) and c.get("name") == "choice-ident"
+             and c.get("type") == "leaf" and c.get("enums")),
+            None,
+        )
+        if ident is not None:
+            key = node.get("key", "")
+            kept = [c for c in children
+                    if not (isinstance(c, dict)
+                            and c.get("name") in ("choice-ident", "choice-value"))]
+            # An enum that is already a sibling leaf, as community-name and
+            # martians' allow are, is that leaf rather than a case of the
+            # choice; emitting it twice collides on one attribute name.
+            taken = {c.get("name") for c in kept if isinstance(c, dict)}
+            cases = [e for e in ident["enums"]
+                     if e.get("id") not in key and e.get("id") not in taken]
+            kept.extend({"name": case["id"], "type": "leaf", "leaf-type": "string"}
+                        for case in cases)
+            node["children"] = kept
+            children = kept
+            rewritten += 1
+
+        for child in children:
+            rewritten += flatten_choice_idents(child)
+
+    for key, value in node.items():
+        if key != "children" and isinstance(value, (dict, list)):
+            rewritten += flatten_choice_idents(value)
+
+    return rewritten
+
+
 def remove_tags_by_name(root: ElementTree.Element, tag_names: list[str]) -> None:
     """Recursively remove all elements with specified tag names from tree.
 

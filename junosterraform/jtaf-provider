@@ -11,6 +11,7 @@ import os
 from importlib.resources import files, as_file
 from junosterraform.jtaf_common import (
     filter_json_using_xml,
+    flatten_choice_idents,
     load_and_merge_xmls,
     load_schema_json,
     write_schema_json_gz,
@@ -209,7 +210,7 @@ def _compile_schema(new_dir, json_name, compiled_name):
         subprocess.run(["go", "run", "./cmd/compileschema", json_name, compiled_name],
                        cwd=new_dir, check=True)
     except FileNotFoundError:
-        sys.exit("jtaf-provider: --generic needs Go on PATH to compile the schema")
+        sys.exit("jtaf-provider: needs Go on PATH to compile the schema")
     except subprocess.CalledProcessError as e:
         sys.exit(f"jtaf-provider: compiling the schema failed ({e})")
 
@@ -357,6 +358,10 @@ def main():
         resources = filter_json_using_xml(args.json_schema, xml_config, args.groups)
     else:
         resources = load_schema_json(args.json_schema)
+        # Trimming flattens choices as a side effect of matching them against
+        # the XML; without XML it has to be done explicitly, or the two scopes
+        # describe the same node differently.
+        flatten_choice_idents(resources)
 
     if args.exclude:
         try:
