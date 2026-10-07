@@ -1,8 +1,10 @@
 package netconf
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -196,21 +198,57 @@ func (s sshSession) close() error {
 	return s.s.Close(context.Background())
 }
 
+// collectRPCErrors returns every rpc-error in a reply, at any depth. Junos
+// reports a rejected load or commit inside <load-configuration-results> or
+// <commit-results>, so matching only direct children of <rpc-reply> reads a
+// refusal as a success.
+func collectRPCErrors(rawReply []byte) (netconf.RPCErrors, error) {
+	decoder := xml.NewDecoder(bytes.NewReader(rawReply))
+	var rpcErrors netconf.RPCErrors
+
+	for {
+		token, err := decoder.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		start, ok := token.(xml.StartElement)
+		if !ok || start.Name.Local != "rpc-error" {
+			continue
+		}
+
+		var rpcErr netconf.RPCError
+		if err := decoder.DecodeElement(&rpcErr, &start); err != nil {
+			return nil, err
+		}
+		rpcErrors = append(rpcErrors, rpcErr)
+	}
+
+	return rpcErrors, nil
+}
+
 // parseReply returns an rpc-reply's content, or its rpc-errors of severity
 // error as an error: the device answers a failed RPC (a load, edit or commit
 // it rejects) with an rpc-reply, not a transport error. Warnings are not
 // errors.
 func parseReply(rawReply []byte) (string, error) {
 	reply := struct {
-		XMLName   xml.Name          `xml:"rpc-reply"`
-		RPCErrors netconf.RPCErrors `xml:"rpc-error"`
-		Data      string            `xml:",innerxml"`
+		XMLName xml.Name `xml:"rpc-reply"`
+		Data    string   `xml:",innerxml"`
 	}{}
 
 	if err := xml.Unmarshal(rawReply, &reply); err != nil {
 		return "", fmt.Errorf("failed to decode rpc-reply: %w", err)
 	}
-	if errs := reply.RPCErrors.Filter(netconf.SevError); len(errs) > 0 {
+
+	rpcErrors, err := collectRPCErrors(rawReply)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode rpc-reply: %w", err)
+	}
+	if errs := rpcErrors.Filter(netconf.SevError); len(errs) > 0 {
 		return "", errs
 	}
 
@@ -225,11 +263,20 @@ func (g *GoNCClient) SendCommit() error {
 	defer g.Lock.Unlock()
 
 	if _, err := g.execute(context.Background(), commitStr); err != nil {
-		_, _ = g.execute(context.Background(), discardChanges)
-		return err
+		return g.discardAfter(err)
 	}
 
 	return nil
+}
+
+// discardAfter clears the candidate after a failed load or commit. The
+// candidate is shared, not per-session, so configuration left staged there is
+// picked up by the next commit from any source.
+func (g *GoNCClient) discardAfter(cause error) error {
+	if _, err := g.execute(context.Background(), discardChanges); err != nil {
+		return fmt.Errorf("%w (discarding the candidate also failed: %v)", cause, err)
+	}
+	return cause
 }
 
 // MarshalConfig fetches the full configuration and unmarshals XML into obj.
@@ -266,12 +313,12 @@ func (g *GoNCClient) SendUpdate(id string, diff string, commit bool) error {
 
 	patchPayload := fmt.Sprintf(patchEditConfigStr, diff)
 	if _, err := g.execute(context.Background(), patchPayload); err != nil {
-		return err
+		return g.discardAfter(err)
 	}
 
 	if commit {
 		if _, err := g.execute(context.Background(), commitStr); err != nil {
-			return err
+			return g.discardAfter(err)
 		}
 	}
 
@@ -285,12 +332,12 @@ func (g *GoNCClient) sendDirectRawConfig(netconfCall string, commit bool) (strin
 
 	reply, err := g.execute(context.Background(), fmt.Sprintf(loadConfigXML, netconfCall))
 	if err != nil {
-		return "", err
+		return "", g.discardAfter(err)
 	}
 
 	if commit {
 		if _, err = g.execute(context.Background(), commitStr); err != nil {
-			return "", err
+			return "", g.discardAfter(err)
 		}
 	}
 
