@@ -486,6 +486,19 @@ def test_xml2tf_helpers_and_main(tmp_path, monkeypatch):
     assert mod.normalize_tag("AH_header") == "ah_header"
     assert mod.convert_to_hcl({"a": [1, True, "x"]}).startswith("{")
 
+    # Characters Junos configuration holds that HCL reads as syntax.
+    assert mod.hcl_string("plain") == '"plain"'
+    assert mod.hcl_string("a\nb") == '"a\\nb"'
+    assert mod.hcl_string('say "hi"') == '"say \\"hi\\""'
+    assert mod.hcl_string("back\\slash") == '"back\\\\slash"'
+    assert mod.hcl_string("${var.x}") == '"$${var.x}"'
+    assert mod.hcl_string("%{if true}") == '"%%{if true}"'
+    assert mod.hcl_string("a\tb") == '"a\\tb"'
+    # A backslash is escaped before anything else, so a literal \n in the
+    # source stays two characters rather than becoming a newline.
+    assert mod.hcl_string("a\\nb") == '"a\\\\nb"'
+    assert mod.convert_to_hcl("a\nb") == '"a\\nb"'
+
     type_map = mod.build_type_map(
         {
             "name": "configuration",
