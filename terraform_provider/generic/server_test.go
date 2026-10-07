@@ -225,12 +225,12 @@ func apply(t *testing.T, s *Server, typ tftypes.Object, prior, planned tftypes.V
 }
 
 func TestApplyCreate(t *testing.T) {
-	f := &fakeDevice{}
+	f := &fakeDevice{onPatch: func(string) string { return hostA }}
 	s, typ := testServer(t, f)
 	planned := resourceValue(t, typ, "r", hostA)
 	state := apply(t, s, typ, tftypes.NewValue(typ, nil), planned)
-	if len(f.loads) != 1 || !strings.Contains(f.loads[0], "<host-name>a</host-name>") || f.commits != 1 {
-		t.Fatalf("loads %v, commits %d", f.loads, f.commits)
+	if len(f.patches) != 1 || !strings.Contains(f.patches[0], "<host-name") || f.commits != 1 {
+		t.Fatalf("patches %v, loads %v, commits %d", f.patches, f.loads, f.commits)
 	}
 	if !state.Equal(planned) {
 		t.Fatalf("state %s, want %s", state, planned)
@@ -264,8 +264,27 @@ func TestApplyUpdateFallback(t *testing.T) {
 	s, typ := testServer(t, f)
 	planned := resourceValue(t, typ, "r", hostB)
 	state := apply(t, s, typ, resourceValue(t, typ, "r", hostA), planned)
-	if len(f.patches) != 1 || len(f.loads) != 1 || f.commits != 2 || f.reads != 3 {
+	if len(f.patches) != 1 || len(f.loads) != 1 || f.commits != 2 || f.reads != 2 {
 		t.Fatalf("patches %v, loads %v, commits %d, reads %d", f.patches, f.loads, f.commits, f.reads)
+	}
+	if !state.Equal(planned) {
+		t.Fatalf("state %s, want %s", state, planned)
+	}
+}
+
+// A device is not a blank slate. Configuration it already has that the plan
+// does not want has to be removed, and a merge cannot express a removal, so
+// create reconciles with a patch rather than loading the plan over the top.
+func TestApplyCreateReconcilesExistingConfig(t *testing.T) {
+	f := &fakeDevice{config: hostB, onPatch: func(string) string { return hostA }}
+	s, typ := testServer(t, f)
+	planned := resourceValue(t, typ, "r", hostA)
+	state := apply(t, s, typ, tftypes.NewValue(typ, nil), planned)
+	if len(f.patches) != 1 || len(f.loads) != 0 || f.commits != 1 {
+		t.Fatalf("patches %v, loads %v, commits %d", f.patches, f.loads, f.commits)
+	}
+	if !strings.Contains(f.patches[0], `nc:operation="replace"`) {
+		t.Fatalf("patch %q does not replace the configuration already on the device", f.patches[0])
 	}
 	if !state.Equal(planned) {
 		t.Fatalf("state %s, want %s", state, planned)
