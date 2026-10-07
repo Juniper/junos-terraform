@@ -1009,3 +1009,20 @@ class TestIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_yang_release_id_tracks_module_revisions(tmp_path):
+    from junosterraform.jtaf_common import schema_fingerprint, yang_release_id
+
+    a = tmp_path / "a.yang"
+    a.write_text('module junos-conf-system {\n  revision 2019-01-01 { }\n}\n')
+    b = tmp_path / "b.yang"
+    b.write_text('module junos-conf-system {\n  revision 2021-06-01 { }\n}\n')
+
+    first = yang_release_id([str(a)])
+    assert first == yang_release_id([str(a)])          # stable
+    assert first != yang_release_id([str(b)])          # a newer revision differs
+    assert yang_release_id([]) == "unknown"
+
+    # The scope is what tells a trimmed provider from a full one.
+    assert schema_fingerprint("trimmed", first) != schema_fingerprint("full", first)

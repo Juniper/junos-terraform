@@ -1,5 +1,7 @@
 import gzip
+import hashlib
 import json
+import re
 import sys
 import xml.etree.ElementTree as ElementTree
 from typing import Any, Union
@@ -291,6 +293,45 @@ def flatten_choice_idents(node: Any) -> int:
             rewritten += flatten_choice_idents(value)
 
     return rewritten
+
+
+def yang_release_id(yang_files: list[str]) -> str:
+    """Return a short identifier for the YANG modules a provider was built from.
+
+    Derived from each module's name and newest revision date, so a provider
+    built from one Junos release can be told from a provider built from
+    another.
+
+    Junos reuses a revision date across releases: every module in 18.2R3 here
+    is revision 2019-01-01. Two releases that share revision dates therefore
+    produce the same identifier, and a mismatch between them is not detected.
+    Hashing the modules' contents would catch that, at the cost of changing
+    the identifier whenever a file is touched at all.
+    """
+    module = re.compile(r"^\s*(?:sub)?module\s+([\w.-]+)", re.MULTILINE)
+    revision = re.compile(r"^\s*revision\s+\"?(\d{4}-\d{2}-\d{2})\"?", re.MULTILINE)
+
+    seen: dict[str, str] = {}
+    for path in yang_files:
+        try:
+            text = open(path, encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        name = module.search(text)
+        if not name:
+            continue
+        revs = revision.findall(text)
+        seen[name.group(1)] = max(revs) if revs else "none"
+
+    if not seen:
+        return "unknown"
+    joined = ",".join(f"{name}@{rev}" for name, rev in sorted(seen.items()))
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:12]
+
+
+def schema_fingerprint(scope: str, release: str) -> str:
+    """Return the identifier a provider and its Terraform files have to share."""
+    return f"{scope}-{release}"
 
 
 def remove_tags_by_name(root: ElementTree.Element, tag_names: list[str]) -> None:

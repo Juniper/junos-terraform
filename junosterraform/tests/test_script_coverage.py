@@ -324,6 +324,12 @@ def test_trimmed_and_untrimmed_builds_share_provider_source(tmp_path, monkeypatc
     for rel in trimmed_go:
         a = (tmp_path / "trimmed" / rel).read_bytes()
         b = (tmp_path / "untrimmed" / rel).read_bytes()
+        if rel.name == "embed_schema.go":
+            # This file carries the schema and its fingerprint, which is what
+            # the two builds differ in; the provider source around it is shared.
+            assert b'generic.SchemaFingerprint = "trimmed-' in a
+            assert b'generic.SchemaFingerprint = "full-' in b
+            continue
         assert a == b, f"{rel} differs between the trimmed and untrimmed builds"
 
 
@@ -347,7 +353,11 @@ def test_jtaf_provider_generic_writes_gzipped_schema(tmp_path, monkeypatch):
     assert (out / "embed_schema.go").exists()
     assert (out / "trimmed_schema.json.gz").exists()
     assert not (out / "trimmed_schema.json").exists()
-    assert load_schema_json(str(out / "trimmed_schema.json.gz")) == resources
+    written = load_schema_json(str(out / "trimmed_schema.json.gz"))
+    # Recorded alongside the schema so jtaf-xml2tf can declare it in the
+    # provider blocks it generates.
+    assert written.pop("fingerprint").startswith("full-")
+    assert written == resources
 
 
 def test_xml2tf_build_type_map_flattens_choice_case_for_xml_path():

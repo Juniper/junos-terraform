@@ -14,6 +14,7 @@ from junosterraform.jtaf_common import (
     flatten_choice_idents,
     load_and_merge_xmls,
     load_schema_json,
+    schema_fingerprint,
     write_schema_json_gz,
 )
 
@@ -215,7 +216,7 @@ def _compile_schema(new_dir, json_name, compiled_name):
         sys.exit(f"jtaf-provider: compiling the schema failed ({e})")
 
 
-def _generate_generic_provider(resources, device_type):
+def _generate_generic_provider(resources, device_type, fingerprint):
     """Copy generic provider source, and emit the schema and its compiled form."""
     with as_file(files('terraform_provider').joinpath('__init__.py')) as init_py:
         go_dir = os.path.dirname(init_py)
@@ -252,19 +253,25 @@ def _generate_generic_provider(resources, device_type):
     # Write trimmed_schema.json.gz, compact and compressed (a full model is
     # hundreds of MB as indented JSON); it is compiled into schema.bin.gz below.
     schema_path = os.path.join(new_dir, "trimmed_schema.json.gz")
+    # Carried in the artifact so jtaf-xml2tf, which reads it to generate the
+    # Terraform files, writes the same identifier into the provider blocks.
+    if isinstance(resources, dict):
+        resources["fingerprint"] = fingerprint
     write_schema_json_gz(resources, schema_path)
     print(f"Schema written to {os.path.relpath(schema_path)}")
+
+    expected_module = f"terraform-provider-junos-{device_type}"
 
     # Generate embed_schema.go, which embeds the compiled schema via go:embed
     embed_go = os.path.join(new_dir, "embed_schema.go")
     with open(embed_go, "w") as f:
-        f.write('package main\n\nimport _ "embed"\n\n')
+        f.write('package main\n\nimport (\n\t_ "embed"\n\n')
+        f.write(f'\t"{expected_module}/generic"\n)\n\n')
         f.write('//go:embed schema.bin.gz\n')
         f.write('var compiledSchemaBytes []byte\n\n')
-        f.write('func init() { embeddedSchema = compiledSchemaBytes }\n')
+        f.write('func init() {\n\tembeddedSchema = compiledSchemaBytes\n')
+        f.write(f'\tgeneric.SchemaFingerprint = "{fingerprint}"\n}}\n')
     print(f"Created {os.path.relpath(embed_go)}")
-
-    expected_module = f"terraform-provider-junos-{device_type}"
 
     # go.mod and go.sum are the provider module's own, copied above; only the
     # module name changes.
@@ -336,6 +343,13 @@ def main():
              'provider manages configuration groups. Left out by default: in a '
              'full model groups is half the nodes.',
     )
+    parser.add_argument(
+        '--yang-release',
+        default='unknown',
+        help='Identifier for the YANG modules the provider is built from, used '
+             'with the schema scope to tell a provider and its Terraform files '
+             'were generated together.',
+    )
     args = parser.parse_args()
 
     if args.groups:
@@ -379,7 +393,11 @@ def main():
         validate_attribute_names(resources)
     except ValueError as e:
         sys.exit(f"jtaf-provider: {e}")
-    _generate_generic_provider(resources, args.type)
+    scope = "trimmed" if args.xml_config else "full"
+    if args.groups:
+        scope += "-groups"
+    _generate_generic_provider(resources, args.type,
+                               schema_fingerprint(scope, args.yang_release))
 
 # run main()
 if __name__ == "__main__":

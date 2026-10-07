@@ -97,13 +97,27 @@ func unsupported(what string) []*tfprotov6.Diagnostic {
 	return errorDiag("Unsupported", fmt.Errorf("%s is not supported by this provider", what))
 }
 
+// SchemaFingerprint names the schema scope and the YANG modules this provider
+// was generated from. embed_schema.go sets it; an empty value means the
+// provider was built without one.
+var SchemaFingerprint string
+
+func warningDiag(summary, detail string) *tfprotov6.Diagnostic {
+	return &tfprotov6.Diagnostic{
+		Severity: tfprotov6.DiagnosticSeverityWarning,
+		Summary:  summary,
+		Detail:   detail,
+	}
+}
+
 // providerType is the provider configuration's type.
 var providerType = tftypes.Object{AttributeTypes: map[string]tftypes.Type{
-	"host":     tftypes.String,
-	"username": tftypes.String,
-	"password": tftypes.String,
-	"port":     tftypes.Number,
-	"sshkey":   tftypes.String,
+	"host":               tftypes.String,
+	"username":           tftypes.String,
+	"password":           tftypes.String,
+	"port":               tftypes.Number,
+	"sshkey":             tftypes.String,
+	"schema_fingerprint": tftypes.String,
 }}
 
 var providerSchema = &tfprotov6.Schema{Block: &tfprotov6.SchemaBlock{Attributes: []*tfprotov6.SchemaAttribute{
@@ -112,6 +126,8 @@ var providerSchema = &tfprotov6.Schema{Block: &tfprotov6.SchemaBlock{Attributes:
 	{Name: "password", Type: tftypes.String, Optional: true, Sensitive: true},
 	{Name: "port", Type: tftypes.Number, Required: true},
 	{Name: "sshkey", Type: tftypes.String, Optional: true, Sensitive: true},
+	{Name: "schema_fingerprint", Type: tftypes.String, Optional: true,
+		Description: "Schema scope and YANG release the Terraform files were generated from."},
 }}}
 
 func (s *Server) GetMetadata(context.Context, *tfprotov6.GetMetadataRequest) (*tfprotov6.GetMetadataResponse, error) {
@@ -176,10 +192,29 @@ func (s *Server) ConfigureProvider(_ context.Context, req *tfprotov6.ConfigurePr
 		resp.Diagnostics = errorDiag("Failed to create NETCONF client", err)
 		return resp, nil
 	}
+	if d := fingerprintDiag(str("schema_fingerprint"), str("host")); d != nil {
+		resp.Diagnostics = append(resp.Diagnostics, d)
+	}
 	s.mu.Lock()
 	s.client = client
 	s.mu.Unlock()
 	return resp, nil
+}
+
+// fingerprintDiag reports Terraform files generated against a different schema
+// than the provider embeds. The two are produced by separate commands, and a
+// schema the provider does not share describes the same configuration
+// differently, which the device rejects rather than Terraform.
+func fingerprintDiag(configured, host string) *tfprotov6.Diagnostic {
+	if configured == "" || SchemaFingerprint == "" || configured == SchemaFingerprint {
+		return nil
+	}
+	return warningDiag(
+		"Terraform files were generated from a different schema",
+		fmt.Sprintf("The configuration for %s was generated from schema %q, but this "+
+			"provider embeds %q. Generate the Terraform files from the schema this "+
+			"provider was built with, or the device may reject the configuration.",
+			host, configured, SchemaFingerprint))
 }
 
 // StopProvider closes the NETCONF session.

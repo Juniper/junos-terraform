@@ -7,6 +7,8 @@ import glob
 import sys
 from importlib.resources import files, as_file
 
+from junosterraform.jtaf_common import yang_release_id
+
 with as_file(files('jtaf_pyang_plugin').joinpath('__init__.py')) as init_py:
     package_dir = os.path.dirname(init_py)
 
@@ -94,7 +96,10 @@ if p1.returncode == 0 and pyang_out:
     provider_args = [
         'jtaf-provider',
         '-j', '-',
-        '-t', device_type
+        '-t', device_type,
+        # yang2go is the only step that sees the modules, so it is where the
+        # release a provider was built from can be identified.
+        '--yang-release', yang_release_id(yang_files),
     ]
     if xml_files:
         provider_args.extend(['-x', *xml_files])

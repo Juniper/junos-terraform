@@ -183,11 +183,14 @@ def edit_provider_block(device_type, provider_block):
 
     return block
 
-def create_head_block(device_type, hostname, username, password):
+def create_head_block(device_type, hostname, username, password, fingerprint=""):
     """
     Generates a single Terraform-style resource block combining all top-level elements.
     """
     provider_block = ""
+    fingerprint_line = (
+        f"\n    schema_fingerprint = {hcl_string(fingerprint)}" if fingerprint else ""
+    )
 
     provider_block += f"""
 provider "junos-{device_type}" {{
@@ -195,7 +198,7 @@ provider "junos-{device_type}" {{
     port     = 22
     username = {hcl_string(username)}
     password = {hcl_string(password)}
-    alias    = "{hostname.replace("-", "_")}"
+    alias    = "{hostname.replace("-", "_")}"{fingerprint_line}
 }}
 """
     return provider_block
@@ -746,6 +749,10 @@ def main():
     if not config_node:
         raise ValueError("No configuration node found in JSON schema")
 
+    # Recorded by jtaf-provider so the Terraform files declare the schema
+    # they were generated from.
+    fingerprint = schema.get("fingerprint", "") if isinstance(schema, dict) else ""
+
     # Using the trimmed json schema, build map of path to its type
     type_lookup = build_type_map(config_node)
     
@@ -810,7 +817,7 @@ def main():
             hostname = hostname_by_file[file]
             print(f"\nProcessing XML file: {file}")
 
-            head_block = create_head_block(device_type, hostname, username, password)
+            head_block = create_head_block(device_type, hostname, username, password, fingerprint)
             if head_block:
                 with open(provider_file, "r") as f:
                     existing = f.read()
@@ -840,7 +847,7 @@ def main():
         for file in xml_files:
             print(f"\nProcessing XML file: {file}")
             hostname = file.split("/")[-1].split(".")[0]
-            head_block = create_head_block(device_type, hostname, username, password)
+            head_block = create_head_block(device_type, hostname, username, password, fingerprint)
             if head_block:
                 with open(provider_file, "r") as f:
                     existing = f.read()
