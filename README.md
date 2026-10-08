@@ -8,7 +8,7 @@ So what is JTAF? It's a framework, meaning, it's an opinionated set of tools and
 
 To use JTAF, you'll need machine that can run **Go, Python, Git and Terraform.** This can be Linux, OSX or Windows. Some easy to consume videos are below.
 
-### How it works, in one paragraph
+### How it works
 
 JTAF no longer generates Go source for your device. There is **one** provider, written once, that
 reads a YANG schema into memory at startup and builds its Terraform schema from it. `jtaf-provider`

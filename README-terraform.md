@@ -1,15 +1,63 @@
 # Junos Terraform Provider Guide
 
-This guide covers generating, building, testing, and using a custom Junos Terraform provider with JTAF. For initial setup and YANG → JSON conversion, see the [main README](README.md).
+This guide walks through building a custom Junos Terraform provider and using it, one command at a
+time. For installing the tools themselves, see the [main README](README.md).
+
+The path is six steps:
+
+| Step | Command | Produces |
+|------|---------|----------|
+| 1 | `pyang` | `junos.json` — the YANG models as JSON |
+| 2 | `jtaf-provider` | A provider source directory |
+| 3 | `go install .` | The provider binary |
+| 4 | `jtaf-xml2tf` | `.tf` files describing your devices |
+| 5 | edit `~/.terraformrc` | Terraform can find the binary |
+| 6 | `terraform plan` / `apply` | Configuration on the device |
+
+Steps 1 and 2 can be combined; see [Shortcut](#shortcut-run-steps-1-and-2-together).
 
 ---
 
-## Generate Resource Provider
+## Step 1 — Convert the YANG models to JSON
+
+Find the Junos version your device runs and locate the matching `yang` and `common` folders, then:
+
+```bash
+pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p <path-to-common> <path-to-yang-files> > junos.json
+```
+
+Example, for 18.2:
+
+```bash
+pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang > junos.json
+```
+
+This repository ships YANG examples under `examples/yang/18.2`.
+
+---
+
+## Step 2 — Generate the provider
 
 Every provider is built from the same Go source. What differs between them is only the YANG model
-embedded in the binary, and **you must say which model you want**: `-x` to trim it to your
-configuration, or `--generic` to embed the whole thing. Passing neither is an error, and passing both
-is an error.
+embedded in the binary — so before you run anything, you have one decision to make.
+
+### Decide the schema scope
+
+**You must pass exactly one of `-x` or `--generic`.** Passing neither is an error, and so is passing
+both.
+
+| | `-x <xml>` | `--generic` |
+|---|---|---|
+| Embeds | Only the paths your XML configuration uses | The whole model |
+| You can configure | Only stanzas present in that XML | Any stanza the device supports |
+| To manage a new stanza | Re-generate and re-build the provider | Just write it in the `.tf` |
+| Memory at plan time | Lowest | Higher |
+
+Start with `-x` if you know which stanzas you manage. Move to `--generic` when re-generating the
+provider every time you want a new stanza becomes the annoyance. Measured timings and sizes for both
+are in [What it costs](#what-it-costs).
+
+### Run jtaf-provider
 
 ```bash
 # Trimmed to the configuration in the XML you give it
@@ -20,21 +68,81 @@ jtaf-provider -j <json-file> --generic -t <device-type>
 ```
 
 Example:
+
 ```bash
 jtaf-provider -j junos.json -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx
 ```
-NOTE: If using multiple xml configurations (like the example above), ensure that the configurations are for the same device type
 
-All in one example (`-j` accepts `-` for `stdin` for `jtaf-provider`):
+| Flag | Required | Meaning |
+|------|----------|---------|
+| `-j` | yes | The JSON from step 1. `-` reads it from stdin |
+| `-x` | one of | XML configuration(s) to trim the schema to |
+| `--generic` | one of | Embed the whole model instead |
+| `-t` | yes | Device type; names the output directory |
+| `--exclude PATH` | no | Leave a subtree out. Repeatable |
+| `--groups` | no | Keep the `groups` subtree. See below |
+
+If you pass several XML files, they must all be for the same device type.
+
+Because `-j` accepts `-`, steps 1 and 2 can be piped together:
+
 ```bash
-pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang | jtaf-provider -j - -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml  -t vqfx
+pyang --plugindir $(jtaf-pyang-plugindir) -f jtaf -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang | jtaf-provider -j - -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml -t vqfx
 ```
 
----
+Generating a provider needs **Go on PATH**, because the schema is compiled during generation.
 
-### Single command to generate resource provider
+### Narrow a full model with --exclude
 
-Use `jtaf-yang2go` command to generate a resource provider in a single step by supplying all YANG files with the `-p` option, the device XML configuration with `-x`, and the device type with `-t`. As with `jtaf-provider`, exactly one of `-x` or `--generic` is required.
+`--exclude` takes any configuration path, at any depth, naming the nodes a device would show:
+`logical-systems`, `system/services/web-management`, `routing-instances/instance/protocols`,
+`vlans/vlan/vlan-id`. YANG `choice` and `case` nodes group nodes in the model but are not
+configuration, so a path reaches through them and cannot name one. A path that does not exist is an
+error rather than a silent no-op, so a typo does not leave the subtree in place.
+
+Use it to cut a full model down without going back to `-x`:
+
+```bash
+jtaf-provider -j junos.json --generic -t srx \
+  --exclude groups --exclude logical-systems --exclude tenants --exclude dynamic-profiles
+```
+
+### Keep configuration groups with --groups
+
+Junos configuration groups are left out by default: in a full model the `groups` subtree repeats the
+whole configuration hierarchy and is about half of its nodes. Pass `--groups` to keep it, along with
+the `apply-groups` leaf-list, so the provider manages groups as ordinary configuration:
+
+```bash
+jtaf-provider -j junos.json -x <xml-configuration(s)> -t <device-type> --groups
+```
+
+A group is then written as an entry of the `groups` list, keyed by its `name`, holding the same
+attributes it would have in the base hierarchy, and `apply_groups` is an ordered list of group names:
+
+```hcl
+resource "terraform-provider-junos-<device-type>" "dev1-base-config" {
+  resource_name = "base-config"
+  apply_groups  = ["base"]
+  groups = [
+    {
+      name   = "base"
+      system = [{ host_name = "from-group" }]
+    }
+  ]
+}
+```
+
+`jtaf-xml2tf` in step 4 takes the same flag, and the two must agree.
+
+NOTE: `--groups` with `--generic` makes the provider advertise the whole model twice over, which needs
+several GB of memory at plan time and warns when generated. Prefer trimming with `-x`, or use
+`--exclude` on paths inside `groups`.
+
+### Shortcut: run steps 1 and 2 together
+
+`jtaf-yang2go` runs `pyang` and `jtaf-provider` for you. It takes the YANG files with `-p` and passes
+`-x`, `--generic`, `--exclude` and `--groups` straight through, so the same scope rule applies:
 
 ```bash
 # Trimmed
@@ -49,34 +157,22 @@ Example:
 ```bash
 jtaf-yang2go -p examples/yang/18.2/18.2R3/common examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml -t vqfx
 ```
-NOTE: If using multiple xml configurations (like the example above), ensure that the configurations are for the same device type
 
-NOTE: The examples in this README use the YANG files shipped in this repository under `examples/yang/18.2`.
+---
 
-### Schema scope
+## Step 3 — Build and install the provider
 
-The provider source is the same whichever way it is generated; only the model it embeds differs.
-Exactly one of `-x` or `--generic` is required.
+`cd` into the directory just created — `terraform-provider-junos-` followed by your device type — and
+install it:
 
-| Option | Embedded model |
-|--------|----------------|
-| `-x <xml>` | Trimmed to the paths the XML configuration uses |
-| `--generic` | The whole model, untrimmed (mutually exclusive with `-x`) |
-| `--exclude PATH` | Leaves the subtree at PATH, relative to `configuration`, out. Repeatable |
+```bash
+cd terraform-provider-junos-vqfx
+go install .
+```
 
-#### Which one should I use?
+That puts the binary in `$(go env GOPATH)/bin`, which step 5 points Terraform at.
 
-The trade is **what you can write in your `.tf`** against **how much the provider costs to run**.
-
-| | `-x` (trimmed) | `--generic` (full model) |
-|---|---|---|
-| You can configure | Only stanzas present in the XML you trimmed against | Any stanza the device supports |
-| Adding a new stanza later | Re-generate and re-build the provider | Just write it in the `.tf` |
-| Memory at plan time | Lowest | Higher |
-| Best for | A stable, known configuration set | Exploring, or many devices with differing config |
-
-Start with `-x` if you know which stanzas you manage. Move to `--generic` when re-generating the
-provider every time you want a new stanza becomes the annoyance.
+---
 
 #### What it costs
 
