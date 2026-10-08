@@ -711,6 +711,61 @@ class TestWalkSchema(unittest.TestCase):
 class TestFilterJsonUsingXml(unittest.TestCase):
     """Tests for filter_json_using_xml function."""
 
+    GROUPS_SCHEMA = {
+        "root": {"name": "root", "children": [{
+            "name": "configuration", "type": "container", "children": [
+                {"name": "apply-groups", "type": "leaf-list", "leaf-type": "string",
+                 "ordered-by": "user"},
+                {"name": "groups", "type": "list", "key": "name", "children": [
+                    {"name": "name", "type": "leaf"},
+                    {"name": "system", "type": "container",
+                     "children": [{"name": "host-name", "type": "leaf"}]},
+                    {"name": "protocols", "type": "container", "children": [
+                        {"name": "lldp", "type": "container", "children": []}]},
+                ]},
+                {"name": "system", "type": "container",
+                 "children": [{"name": "host-name", "type": "leaf"}]},
+            ]}]}}
+
+    GROUPS_XML = """<configuration>
+        <apply-groups>base</apply-groups>
+        <groups>
+            <name>base</name>
+            <system><host-name>r1</host-name></system>
+        </groups>
+    </configuration>"""
+
+    def _filter_groups_xml(self, groups):
+        root = ElementTree.fromstring(self.GROUPS_XML)
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(self.GROUPS_SCHEMA, f)
+            schema_file = f.name
+        try:
+            result = jtaf_common.filter_json_using_xml(schema_file, root, groups)
+        finally:
+            os.remove(schema_file)
+        return next(c for c in result["root"]["children"]
+                    if c["name"] == "configuration")
+
+    def test_groups_trimmed_to_what_the_xml_uses(self):
+        """With groups kept, the group body is trimmed like any other subtree."""
+        config = self._filter_groups_xml(groups=True)
+        names = [c["name"] for c in config["children"]]
+        self.assertIn("groups", names)
+        self.assertIn("apply-groups", names)
+
+        groups = next(c for c in config["children"] if c["name"] == "groups")
+        kept = [c["name"] for c in groups["children"]]
+        self.assertIn("system", kept)
+        # protocols is in the model but not in the XML, so it is trimmed away
+        self.assertNotIn("protocols", kept)
+
+    def test_groups_left_out_by_default(self):
+        """Without groups, apply-groups is stripped before paths are derived."""
+        config = self._filter_groups_xml(groups=False)
+        names = [c["name"] for c in config["children"]]
+        self.assertNotIn("apply-groups", names)
+
     def test_filter_json_using_xml_with_element(self):
         """Test filter_json_using_xml with ElementTree element."""
         schema_dict = {
@@ -954,3 +1009,107 @@ class TestIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_yang_release_id_tracks_module_revisions(tmp_path):
+    from junosterraform.jtaf_common import schema_fingerprint, yang_release_id
+
+    a = tmp_path / "a.yang"
+    a.write_text('module junos-conf-system {\n  revision 2019-01-01 { }\n}\n')
+    b = tmp_path / "b.yang"
+    b.write_text('module junos-conf-system {\n  revision 2021-06-01 { }\n}\n')
+
+    first = yang_release_id([str(a)])
+    assert first == yang_release_id([str(a)])          # stable
+    assert first != yang_release_id([str(b)])          # a newer revision differs
+    assert yang_release_id([]) == "unknown"
+
+    # The scope is what tells a trimmed provider from a full one.
+    assert schema_fingerprint("trimmed", first) != schema_fingerprint("full", first)
+
+
+def _choice_node():
+    """A node as the model declares a choice, before flattening."""
+    return {
+        "name": "then", "type": "container",
+        "children": [
+            {"name": "choice-ident", "type": "leaf",
+             "enums": [{"id": "add"}, {"id": "exact"}]},
+            {"name": "choice-value", "type": "leaf"},
+            {"name": "community-name", "type": "leaf"},
+        ],
+    }
+
+
+def test_flatten_choice_idents_replaces_the_pair_with_a_leaf_per_case():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = _choice_node()
+    assert flatten_choice_idents(node) == 1
+
+    names = [c["name"] for c in node["children"]]
+    assert "choice-ident" not in names
+    assert "choice-value" not in names
+    assert names == ["community-name", "add", "exact"]
+    for case in node["children"][1:]:
+        assert case["type"] == "leaf"
+        assert case["leaf-type"] == "string"
+
+
+def test_flatten_choice_idents_skips_a_case_that_is_already_a_sibling():
+    """martians carries an allow child and an allow case; they are one attribute."""
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = {
+        "name": "martians", "type": "container",
+        "children": [
+            {"name": "choice-ident", "type": "leaf",
+             "enums": [{"id": "allow"}, {"id": "exact"}]},
+            {"name": "choice-value", "type": "leaf"},
+            {"name": "allow", "type": "leaf"},
+        ],
+    }
+    assert flatten_choice_idents(node) == 1
+
+    names = [c["name"] for c in node["children"]]
+    assert names.count("allow") == 1
+    assert names == ["allow", "exact"]
+
+
+def test_flatten_choice_idents_skips_a_case_named_in_the_list_key():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = {
+        "name": "entry", "type": "list", "key": "allow",
+        "children": [
+            {"name": "choice-ident", "type": "leaf",
+             "enums": [{"id": "allow"}, {"id": "exact"}]},
+            {"name": "choice-value", "type": "leaf"},
+        ],
+    }
+    assert flatten_choice_idents(node) == 1
+    assert [c["name"] for c in node["children"]] == ["exact"]
+
+
+def test_flatten_choice_idents_recurses_into_nested_children():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    schema = {"root": {"children": [
+        {"name": "policy-options", "type": "container", "children": [
+            _choice_node(),
+            {"name": "inner", "type": "container", "children": [_choice_node()]},
+        ]},
+    ]}}
+
+    assert flatten_choice_idents(schema) == 2
+
+
+def test_flatten_choice_idents_leaves_a_node_without_a_choice_alone():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = {"name": "system", "type": "container",
+            "children": [{"name": "host-name", "type": "leaf"}]}
+    before = json.loads(json.dumps(node))
+
+    assert flatten_choice_idents(node) == 0
+    assert node == before

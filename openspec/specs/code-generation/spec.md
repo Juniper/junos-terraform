@@ -1,90 +1,58 @@
 # Code Generation Specification
 
-Jinja2 templates that render YANG-derived JSON schema into Go Terraform provider source code. Lives at `junosterraform/templates/`.
+Turning a YANG-derived JSON schema into a buildable Go Terraform provider directory.
+
+## Purpose
+
+Define what provider generation produces for a given model and device type, so a generated directory builds and carries the schema downstream tools need.
 
 ## Architecture
 
 ```
-Filtered JSON schema (from filter_json_using_xml)
+JSON schema (trimmed to XML with -x, or the whole model with --generic)
     ↓
-Jinja2 template engine (Python)
+jtaf-provider
     ↓
-For each template:
-  - Render with schema data context
-  - Write to terraform-provider-junos-{type}/ directory
+  - Copy terraform_provider's Go sources (minus tests) into
+    terraform-provider-junos-{type}/
+  - Write main.go and embed_schema.go
+  - Write trimmed_schema.json.gz, and compile it to schema.bin.gz
     ↓
 Result: Complete, buildable Go provider
 ```
 
 ---
 
-## Templates
+## Generated Files
 
-| Template | Generates | Purpose |
-|----------|-----------|---------|
-| `resource_config_provider.go.j2` | `resource_config_provider.go` | Resource structs, CRUD methods, schema definitions |
-| `provider.go.j2` | `provider.go` | Provider struct, plugin framework integration |
-| `config.go.j2` | `config.go` | Config struct, NETCONF Client() factory |
-| `ansible.j2` | Ansible task files | Ansible role structure with tasks/templates |
+| File | Origin | Purpose |
+|------|--------|---------|
+| `generic/`, `patch/`, `netconf/`, `cmd/` | copied from `terraform_provider` | Provider source, identical for every device type |
+| `main.go` | written by `jtaf-provider` | Calls `generic.Serve` with the provider type name |
+| `embed_schema.go` | written by `jtaf-provider` | `go:embed` of `schema.bin.gz` |
+| `schema.bin.gz` | `cmd/compileschema` | The schema as `patch.Schema`'s binary form, read without parsing JSON |
+| `trimmed_schema.json.gz` | written by `jtaf-provider` | The same schema as compact JSON, for downstream tools |
 
-`go.mod` and `go.sum` are not templated: they are `terraform_provider`'s own, copied with the sources, and `ensure_go_module_name()` sets the module path. They match what the provider module is built and tested with, which Renovate keeps up to date.
+The copied sources' own top-level `.go` files are removed; `main.go` and `embed_schema.go` are the generated provider's whole main package.
+
+No Go source is rendered from a template. `ansible.j2` is the Jinja2 template behind `jtaf-ansible` and is unrelated to provider generation.
+
+`go.mod` and `go.sum` are not generated: they are `terraform_provider`'s own, copied with the sources, and `ensure_go_module_name()` sets the module path. They match what the provider module is built and tested with, which Renovate keeps up to date.
 
 ---
 
 ## Behaviors
 
-### Template Variable Context
+### Schema Scope
 
-- **Given** `data.device_type` is `"vmx-4-topo"`, **When** templates render, **Then** all references use `junos-vmx-4-topo` as provider name
-- **Given** `data['root']['children']` contains filtered YANG nodes, **When** `resource_config_provider.go.j2` renders, **Then** one Go struct is generated per top-level YANG container/list
+- **Given** `-x` names XML configuration files, **When** `jtaf-provider` runs, **Then** the embedded schema is trimmed to the paths those files use
+- **Given** `--generic` is passed instead, **When** `jtaf-provider` runs, **Then** the whole model is embedded
+- **Given** neither is passed, **When** `jtaf-provider` runs, **Then** it exits with an error: the scope is always explicit, because a full model costs far more memory at plan time
 
-### Resource Code Generation (`resource_config_provider.go.j2`)
+### Provider Source
 
-- **Given** a YANG container with leaf children, **When** rendered, **Then**:
-  - A Terraform schema attribute is generated per leaf
-  - String leaves → `schema.StringAttribute`
-  - Integer leaves → `schema.Int64Attribute`
-  - Boolean leaves → `schema.BoolAttribute`
-  - Empty type leaves → `schema.BoolAttribute` (presence semantics)
-
-- **Given** a YANG list with key field, **When** rendered, **Then**:
-  - List key becomes a required attribute
-  - Key change forces resource replacement
-
-- **Given** a YANG container with nested children, **When** rendered, **Then**:
-  - Nested struct type generated
-  - Parent attribute uses `schema.ListNestedAttribute` or `schema.SingleNestedAttribute`
-
-### Create Method Generation
-
-- **Given** the resource is being created, **When** rendered Create() runs, **Then**:
-  1. Extract all attribute values from Terraform plan
-  2. Build XML representation of the configuration
-  3. Wrap in `<configuration><groups><name>{resource_name}</name>...</groups></configuration>`
-  4. Call `client.SendRPC()` with `<load-configuration>` containing the XML
-  5. Call `client.SendRPC()` with `<commit/>`
-
-### Read Method Generation
-
-- **Given** the resource needs state refresh, **When** rendered Read() runs, **Then**:
-  1. Call `client.SendRPC()` with `<get-configuration>` for the group
-  2. Parse returned XML
-  3. Map XML values back to Terraform state attributes
-  4. If group not found on device, mark resource as gone
-
-### Update Method Generation
-
-- **Given** the resource has changes, **When** rendered Update() runs, **Then**:
-  1. Build current state XML and desired plan XML
-  2. Use patch engine: `LeafMapWithSchema` → `ComputeDiff` → `CreateDiffPatchWithSchema`
-  3. Send `<edit-config>` with the patch
-  4. Commit changes
-
-### Delete Method Generation
-
-- **Given** the resource is being destroyed, **When** rendered Delete() runs, **Then**:
-  1. Build delete XML: `<edit-config><configuration><groups><name>{name}</name></groups></configuration></edit-config>` with `operation="delete"`
-  2. Commit the deletion
+- **Given** any device type and model, **When** generation completes, **Then** the Go sources are the same apart from the module name in `go.mod` and the provider type name in `main.go`
+- **Given** `_test.go` files exist in `terraform_provider`, **When** the sources are copied, **Then** they are left out of the generated directory
 
 ---
 
@@ -92,7 +60,7 @@ Result: Complete, buildable Go provider
 
 ### Module Name Normalization
 
-- **Given** templates are rendered, **When** `ensure_go_module_name()` runs, **Then** `go.mod` directive set to `module terraform-provider-junos-{type}`
+- **Given** the sources are copied, **When** `ensure_go_module_name()` runs, **Then** `go.mod` directive set to `module terraform-provider-junos-{type}`
 
 ### Import Path Rewriting
 
@@ -101,18 +69,47 @@ Result: Complete, buildable Go provider
 ## Requirements
 
 ### Requirement: Generated providers carry a compressed schema
-Both Jinja2 and `--generic` provider generation paths SHALL write the trimmed schema as compact gzip-compressed JSON named `trimmed_schema.json.gz` and SHALL NOT write a plain `trimmed_schema.json`.
+Provider generation SHALL write the schema as compact gzip-compressed JSON named `trimmed_schema.json.gz` and SHALL
+NOT write a plain `trimmed_schema.json`, whether the schema was trimmed to XML or left untrimmed.
 
 #### Scenario: Schema is available to downstream tools
 - **WHEN** provider generation completes
-- **THEN** `trimmed_schema.json.gz` contains the filtered schema and `jtaf-xml2tf` can consume it to produce the same output as the equivalent plain JSON schema
+- **THEN** `trimmed_schema.json.gz` contains the schema and `jtaf-xml2tf` can consume it to produce the same output as
+  the equivalent plain JSON schema
 
-### Schema Emission
+### Requirement: Generic provider generation
+`jtaf-provider --generic` SHALL write the provider's main package (`main.go` calling `generic.Serve`, `embed_schema.go`), and the schema compiled into `patch.Schema`'s binary form and gzipped, which the provider embeds.
 
-- **Given** code generation completes, **When** finalization runs, **Then** `trimmed_schema.json.gz` (compact JSON, gzip-compressed) is written to the output directory; no plain `trimmed_schema.json` is written
-- This schema is read by the downstream tools (`jtaf-xml2tf`); the generated provider inlines the same schema in Go source for `ProcessSchema()` in the patch engine
+#### Scenario: Excluding subtrees
+- **WHEN** `--exclude PATH` is given (repeatable) to `jtaf-provider`, or to `jtaf-yang2go`, which passes it on
+- **THEN** the subtree at PATH, relative to `configuration`, SHALL be left out of the schema; a PATH that does not exist SHALL be an error
 
----
+#### Scenario: Top-level version
+- **WHEN** the schema has a top-level `version` leaf (the Junos release the configuration was committed with)
+- **THEN** it SHALL be left out, whether or not the schema is trimmed; nested leaves named `version` SHALL be kept
+
+### Requirement: One provider generator
+Provider generation SHALL produce a single schema-driven Go provider whose source does not depend on the contents of
+the YANG model. No Go source SHALL be rendered from a template. The generated output SHALL differ between device types
+only in the module name, the provider type name and the embedded schema.
+
+#### Scenario: No templated Go source
+- **WHEN** a provider is generated for any device type
+- **THEN** the output directory contains no file produced by template expansion of schema contents, and its size does
+  not grow with the number of nodes in the model
+
+#### Scenario: Equivalent providers across models
+- **WHEN** providers are generated for two different models
+- **THEN** their Go sources are identical apart from module name, provider type name and embedded schema
+
+### Requirement: Generated provider carries the group decision
+The embedded schema SHALL be the sole record of whether groups are managed. A provider built with groups SHALL expose
+them, and a provider built without groups SHALL NOT, with no runtime flag, environment variable or provider-block
+setting able to change that.
+
+#### Scenario: Behaviour follows the binary
+- **WHEN** a provider built without groups is used with a `.tf` file that declares a `groups` block
+- **THEN** Terraform reports an unsupported attribute, regardless of provider configuration
 
 ## Output Structure
 
@@ -120,14 +117,15 @@ Both Jinja2 and `--generic` provider generation paths SHALL write the trimmed sc
 
 ```
 terraform-provider-junos-vmx-4-topo/
-├── main.go                      ← Provider entry point (starts plugin server)
-├── provider.go                  ← Provider definition (schema, configure)
-├── config.go                    ← NETCONF config struct + Client() factory
-├── resource_config_provider.go  ← Generated resource with CRUD
+├── main.go                      ← Provider entry point (calls generic.Serve)
+├── embed_schema.go              ← go:embed of schema.bin.gz
+├── schema.bin.gz                ← Compiled schema the provider serves
 ├── go.mod                       ← Module: terraform-provider-junos-vmx-4-topo
-├── trimmed_schema.json.gz       ← Trimmed schema for downstream tools (jtaf-xml2tf)
+├── trimmed_schema.json.gz       ← Same schema as JSON, for downstream tools (jtaf-xml2tf)
+├── generic/                     ← Schema-driven provider (copied from terraform_provider/generic/)
 ├── patch/                       ← Patch engine package (copied from terraform_provider/patch/)
-└── netconf/                     ← NETCONF client package (copied from terraform_provider/netconf/)
+├── netconf/                     ← NETCONF client package (copied from terraform_provider/netconf/)
+└── cmd/                         ← compileschema (copied from terraform_provider/cmd/)
 ```
 
 ---

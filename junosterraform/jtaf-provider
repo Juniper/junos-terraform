@@ -4,7 +4,6 @@ from copy import copy
 import re
 import argparse
 import sys
-from jinja2 import Template
 import os
 import shutil
 import subprocess
@@ -12,21 +11,14 @@ import os
 from importlib.resources import files, as_file
 from junosterraform.jtaf_common import (
     filter_json_using_xml,
+    flatten_choice_idents,
     load_and_merge_xmls,
     load_schema_json,
+    schema_fingerprint,
     write_schema_json_gz,
 )
 
  
-def render_template_and_write(input_template: str, output_file: str, context: dict, description: str):
-    with open(input_template) as f:
-        tmpl = Template(f.read())
-    rendered = tmpl.render(data=context).lstrip()
-    with open(output_file, "w") as f:
-        f.write(rendered)
-    print(f"Updated {description}")
-
-
 def rewrite_import_prefixes(go_dir: str, old_prefix: str, new_prefix: str):
     """Replace module import prefixes across copied Go files in place."""
     for root, _, files in os.walk(go_dir):
@@ -99,6 +91,45 @@ def drop_version(resources):
     return resources
 
 
+GROUP_NODES = ("groups", "apply-groups")
+
+
+def drop_groups(resources):
+    """Remove the groups subtree and the apply-groups leaf-list. In a full
+    Junos model groups is a second copy of the whole configuration model —
+    half of its nodes — so it is left out unless --groups asks for it."""
+    for root in resources.get("root", {}).get("children", []):
+        if root.get("name") == "configuration":
+            root["children"] = [c for c in root.get("children") or []
+                                if c.get("name") not in GROUP_NODES]
+    return resources
+
+
+def _configuration_children(node):
+    """Yield (owner, children) for the lists holding node's configuration
+    children, looking through YANG choice and case nodes: those group nodes in
+    the model but do not appear in configuration, and the provider flattens
+    them away (patch.FlattenChoices)."""
+    stack = [node]
+    while stack:
+        n = stack.pop()
+        children = n.get("children") or []
+        yield n, children
+        for c in children:
+            if c.get("type") in ("choice", "case"):
+                stack.append(c)
+
+
+def _find_configuration_child(node, name):
+    """The child of node named name, and the node that holds it, which is node
+    itself unless the child sits inside a choice or case."""
+    for owner, children in _configuration_children(node):
+        for c in children:
+            if c.get("type") not in ("choice", "case") and c.get("name") == name:
+                return owner, c
+    return None, None
+
+
 def exclude_schema_paths(resources, paths):
     """Remove the subtrees at paths (relative to configuration, e.g.
     "logical-systems" or "system/services/web-management") from the schema.
@@ -113,14 +144,13 @@ def exclude_schema_paths(resources, paths):
             raise ValueError(f"--exclude {path!r}: empty path")
         node = config
         for part in parts[:-1]:
-            node = next((c for c in node.get("children") or [] if c.get("name") == part), None)
+            _, node = _find_configuration_child(node, part)
             if node is None:
                 raise ValueError(f"--exclude {path}: {part} not found")
-        children = node.get("children") or []
-        kept = [c for c in children if c.get("name") != parts[-1]]
-        if len(kept) == len(children):
+        owner, target = _find_configuration_child(node, parts[-1])
+        if target is None:
             raise ValueError(f"--exclude {path}: {parts[-1]} not found")
-        node["children"] = kept
+        owner["children"] = [c for c in owner["children"] if c is not target]
     return resources
 
 
@@ -181,12 +211,12 @@ def _compile_schema(new_dir, json_name, compiled_name):
         subprocess.run(["go", "run", "./cmd/compileschema", json_name, compiled_name],
                        cwd=new_dir, check=True)
     except FileNotFoundError:
-        sys.exit("jtaf-provider: --generic needs Go on PATH to compile the schema")
+        sys.exit("jtaf-provider: needs Go on PATH to compile the schema")
     except subprocess.CalledProcessError as e:
         sys.exit(f"jtaf-provider: compiling the schema failed ({e})")
 
 
-def _generate_generic_provider(resources, device_type):
+def _generate_generic_provider(resources, device_type, fingerprint):
     """Copy generic provider source, and emit the schema and its compiled form."""
     with as_file(files('terraform_provider').joinpath('__init__.py')) as init_py:
         go_dir = os.path.dirname(init_py)
@@ -223,19 +253,25 @@ def _generate_generic_provider(resources, device_type):
     # Write trimmed_schema.json.gz, compact and compressed (a full model is
     # hundreds of MB as indented JSON); it is compiled into schema.bin.gz below.
     schema_path = os.path.join(new_dir, "trimmed_schema.json.gz")
+    # Carried in the artifact so jtaf-xml2tf, which reads it to generate the
+    # Terraform files, writes the same identifier into the provider blocks.
+    if isinstance(resources, dict):
+        resources["fingerprint"] = fingerprint
     write_schema_json_gz(resources, schema_path)
     print(f"Schema written to {os.path.relpath(schema_path)}")
+
+    expected_module = f"terraform-provider-junos-{device_type}"
 
     # Generate embed_schema.go, which embeds the compiled schema via go:embed
     embed_go = os.path.join(new_dir, "embed_schema.go")
     with open(embed_go, "w") as f:
-        f.write('package main\n\nimport _ "embed"\n\n')
+        f.write('package main\n\nimport (\n\t_ "embed"\n\n')
+        f.write(f'\t"{expected_module}/generic"\n)\n\n')
         f.write('//go:embed schema.bin.gz\n')
         f.write('var compiledSchemaBytes []byte\n\n')
-        f.write('func init() { embeddedSchema = compiledSchemaBytes }\n')
+        f.write('func init() {\n\tembeddedSchema = compiledSchemaBytes\n')
+        f.write(f'\tgeneric.SchemaFingerprint = "{fingerprint}"\n}}\n')
     print(f"Created {os.path.relpath(embed_go)}")
-
-    expected_module = f"terraform-provider-junos-{device_type}"
 
     # go.mod and go.sum are the provider module's own, copied above; only the
     # module name changes.
@@ -249,7 +285,7 @@ def _generate_generic_provider(resources, device_type):
     _compile_schema(new_dir, "trimmed_schema.json.gz", "schema.bin.gz")
     print(f"Compiled schema written to {os.path.join(new_dir, 'schema.bin.gz')}")
 
-    print(f"\nGeneric provider created in {new_dir}/")
+    print(f"\nProvider created in {new_dir}/")
     print(f"Build with: cd {new_dir} && go build .")
 
 
@@ -257,7 +293,7 @@ def _generate_generic_provider(resources, device_type):
 def main():
     # other arguments
     parser = argparse.ArgumentParser(
-        description='Generate a Terraform provider from JTAF JSON and XML config.',
+        description='Generate a Terraform provider from JTAF JSON and optional XML config.',
         exit_on_error=True,
     )
     parser.add_argument(
@@ -267,13 +303,14 @@ def main():
         help="Path to the JTAF JSON schema from pyang, plain or gzipped "
              "(e.g. trimmed_schema.json.gz), or '-' to read it from stdin.",
     )
-    parser.add_argument(
+    schema_mode = parser.add_mutually_exclusive_group(required=True)
+    schema_mode.add_argument(
         '-x',
         '--xml-config',
         required=False,
         action='append',
         nargs="+",
-        help='Optional Junos XML config files to merge/filter against schema.',
+        help='Junos XML config files to trim the embedded schema to.',
     )
     parser.add_argument(
         '-t',
@@ -281,11 +318,13 @@ def main():
         required=True,
         help='Device type suffix used in output directory name.',
     )
-    parser.add_argument(
+    schema_mode.add_argument(
         '--generic',
         action='store_true',
         default=False,
-        help='Use generic schema-driven provider instead of Jinja2 code generation.',
+        help='Embed the whole untrimmed model. Exactly one of -x or --generic '
+             'is required: a full model costs far more memory at plan time, so '
+             'it is opted into rather than defaulted to.',
     )
     parser.add_argument(
         '--exclude',
@@ -296,16 +335,47 @@ def main():
              'logical-systems or system/services/web-management) out of the '
              'provider. Repeatable.',
     )
+    parser.add_argument(
+        '--groups',
+        action='store_true',
+        default=False,
+        help='Keep the groups subtree and the apply-groups leaf-list, so the '
+             'provider manages configuration groups. Left out by default: in a '
+             'full model groups is half the nodes.',
+    )
+    parser.add_argument(
+        '--yang-release',
+        default='unknown',
+        help='Identifier for the YANG modules the provider is built from, used '
+             'with the schema scope to tell a provider and its Terraform files '
+             'were generated together.',
+    )
     args = parser.parse_args()
 
-    # Step 1: Filter the schema only when XML config is supplied.
-    # Without -x, keep the schema as a direct copy of pyang JSON output.
+    if args.groups:
+        # Excluding a path inside groups is how a full model is trimmed down;
+        # only excluding the subtree itself contradicts --groups.
+        if any(p.strip('/') == 'groups' for p in args.exclude):
+            parser.error(
+                "--groups keeps the groups subtree, but --exclude groups "
+                "removes it; drop one of them")
+        if args.generic:
+            print("jtaf-provider: warning: --groups with --generic advertises the "
+                  "whole model twice over, which needs several GB at plan time; "
+                  "trim it with -x, or --exclude paths inside groups",
+                  file=sys.stderr)
+
+    # Step 1: -x trims the schema to the given XML; --generic embeds it whole.
     if args.xml_config:
         xml_files = [file for group in args.xml_config for file in group]
         xml_config = xml_files[0] if len(xml_files) == 1 else load_and_merge_xmls(xml_files)
-        resources = filter_json_using_xml(args.json_schema, xml_config)
+        resources = filter_json_using_xml(args.json_schema, xml_config, args.groups)
     else:
         resources = load_schema_json(args.json_schema)
+        # Trimming flattens choices as a side effect of matching them against
+        # the XML; without XML it has to be done explicitly, or the two scopes
+        # describe the same node differently.
+        flatten_choice_idents(resources)
 
     if args.exclude:
         try:
@@ -313,86 +383,21 @@ def main():
         except ValueError as e:
             parser.error(str(e))
     drop_version(resources)
+    if not args.groups:
+        drop_groups(resources)
 
-    # Step 2: Either use generic provider or Jinja2 template
-    if args.generic:
-        try:
-            validate_attribute_names(resources)
-        except ValueError as e:
-            sys.exit(f"jtaf-provider: {e}")
-        _generate_generic_provider(resources, args.type)
-        return
-
-    # Step 2 (legacy): Render the template into Go code
-    with as_file(files('junosterraform').joinpath('__init__.py')) as init_py:
-        package_dir = os.path.dirname(init_py)
-    templates_dir = f"{package_dir}/templates"
-    with open(f"{templates_dir}/resource_config_provider.go.j2") as f:
-        jinja2_source = f.read()
-    tmpl = Template(jinja2_source)
-    render_context = dict(resources)
-    render_context["device_type"] = args.type
-    resource_config_provider_go = tmpl.render(data=render_context).lstrip()
-
-    # Step 3: Prepare new output directory based on type
-    with as_file(files('terraform_provider').joinpath('__init__.py')) as init_py:
-        go_dir = os.path.dirname(init_py)
-    new_dir = f"terraform-provider-junos-{args.type}"
-
-    # Step 4: copy the template go files into place
-    if os.path.exists(new_dir):
-        shutil.rmtree(new_dir)
-    # Exclude directories that should not be in generated providers
-    def _ignore_dirs(directory, contents):
-        ignored = set()
-        if directory == go_dir:
-            for item in contents:
-                if item in ('tools', '__pycache__'):
-                    ignored.add(item)
-        return ignored
-    shutil.copytree(go_dir, new_dir, ignore=_ignore_dirs)
-    # if there is a terraform_provider executable left over from go testing, remove it
-    tp_exe = f"{new_dir}/terraform_provider"
-    if os.path.exists(tp_exe):
-        os.remove(tp_exe)
-
-    # Step 5: Save rendered Go file into new directory
-    resource_config_provider_go_fullpath = os.path.join(new_dir, "resource_config_provider.go")
-    with open(resource_config_provider_go_fullpath, "w") as f:
-        f.write(resource_config_provider_go)
-    print(f"Plugin created in {os.path.relpath(resource_config_provider_go_fullpath)}\n")
-
-    # Step 6-7: Update provider.go and config.go with correct type using a loop
-    files_to_update = [
-        ("provider.go.j2", "provider.go"),
-        ("config.go.j2", "config.go"),
-    ]
-    for template_name, output_name in files_to_update:
-        with open(f"{templates_dir}/{template_name}") as f:
-            jinja2_source = f.read()
-        tmpl = Template(jinja2_source)
-        rendered = tmpl.render(data={"device_type": args.type}).lstrip()
-        output_path = os.path.join(new_dir, output_name)
-        with open(output_path, "w") as f:
-            f.write(rendered)
-        print(f"Updated {output_name} with type junos-{args.type}")
-
-    # Step 8: go.mod and go.sum are the provider module's own, copied with the
-    # sources, so they match what the module is built and tested with; only the
-    # module name changes.
-    expected_module = f"terraform-provider-junos-{args.type}"
-    go_mod_path = os.path.join(new_dir, "go.mod")
-    ensure_go_module_name(go_mod_path, expected_module)
-    print(f"Updated go.mod with type junos-{args.type}")
-
-    # Step 8: Normalize import prefixes in copied Go files (including tests).
-    rewrite_import_prefixes(new_dir, "terraform_provider", expected_module)
-
-    # Step 7: Add trimmed_schema.json.gz to new directory, for the downstream
-    # tools (jtaf-xml2tf); the provider itself inlines the schema in Go source.
-    schema_path = os.path.join(new_dir, "trimmed_schema.json.gz")
-    write_schema_json_gz(resources, schema_path)
-    print(f"Schema written to {os.path.relpath(schema_path)}")
+    # Step 2: Generate the provider. Its source is the same either way; only the
+    # schema it embeds differs, trimmed to the XML given with -x or the whole
+    # model without it.
+    try:
+        validate_attribute_names(resources)
+    except ValueError as e:
+        sys.exit(f"jtaf-provider: {e}")
+    scope = "trimmed" if args.xml_config else "full"
+    if args.groups:
+        scope += "-groups"
+    _generate_generic_provider(resources, args.type,
+                               schema_fingerprint(scope, args.yang_release))
 
 # run main()
 if __name__ == "__main__":

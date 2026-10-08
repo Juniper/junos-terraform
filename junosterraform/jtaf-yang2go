@@ -7,11 +7,13 @@ import glob
 import sys
 from importlib.resources import files, as_file
 
+from junosterraform.jtaf_common import yang_release_id
+
 with as_file(files('jtaf_pyang_plugin').joinpath('__init__.py')) as init_py:
     package_dir = os.path.dirname(init_py)
 
 parser = argparse.ArgumentParser(
-    description='Generate a Terraform provider from YANG files and XML config.'
+    description='Generate a Terraform provider from YANG files and optional XML config.'
 )
 parser.add_argument(
     '-p',
@@ -21,13 +23,14 @@ parser.add_argument(
     action='extend',
     help='YANG search paths and/or .yang files passed to pyang.',
 )
-parser.add_argument(
+schema_mode = parser.add_mutually_exclusive_group(required=True)
+schema_mode.add_argument(
     '-x',
     type=str,
     required=False,
     action='append',
     nargs="+",
-    help='Optional Junos XML config files passed to jtaf-provider for schema filtering.',
+    help='Junos XML config files to trim the embedded schema to.',
 )
 parser.add_argument(
     '-t',
@@ -35,11 +38,13 @@ parser.add_argument(
     help='Device type suffix used in output directory name.',
     required=True,
 )
-parser.add_argument(
+schema_mode.add_argument(
     '--generic',
     action='store_true',
     default=False,
-    help='Use generic schema-driven provider instead of Jinja2 code generation.',
+    help='Embed the whole untrimmed model. Exactly one of -x or --generic '
+         'is required: a full model costs far more memory at plan time, so '
+         'it is opted into rather than defaulted to.',
 )
 parser.add_argument(
     '--exclude',
@@ -48,6 +53,13 @@ parser.add_argument(
     metavar='PATH',
     help='Passed to jtaf-provider: leave the schema subtree at PATH (relative to '
          'configuration) out of the provider. Repeatable.',
+)
+parser.add_argument(
+    '--groups',
+    action='store_true',
+    default=False,
+    help='Passed to jtaf-provider: keep the groups subtree and the apply-groups '
+         'leaf-list, so the provider manages configuration groups.',
 )
 
 args = parser.parse_args()
@@ -84,18 +96,28 @@ if p1.returncode == 0 and pyang_out:
     provider_args = [
         'jtaf-provider',
         '-j', '-',
-        '-t', device_type
+        '-t', device_type,
+        # yang2go is the only step that sees the modules, so it is where the
+        # release a provider was built from can be identified.
+        '--yang-release', yang_release_id(yang_files),
     ]
     if xml_files:
         provider_args.extend(['-x', *xml_files])
     if args.generic:
         provider_args.append('--generic')
+    if args.groups:
+        provider_args.append('--groups')
     for path in args.exclude:
         provider_args.extend(['--exclude', path])
     p2 = subprocess.Popen(provider_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, error = p2.communicate(input=pyang_out)
     print(output.decode(), file=sys.stdout)
     if error:
-        print(error.decode(), file=sys.stdout)
+        print(error.decode(), file=sys.stderr)
+    # Without this a failed generation still exits 0, so `set -e` in the build
+    # scripts runs on over a provider that was never finished.
+    if p2.returncode != 0:
+        sys.exit(p2.returncode)
 else:
-    print('pyang failed or produced no output, skipping jtaf-provider.', file=sys.stdout)
+    print(pyang_err.decode(), file=sys.stderr)
+    sys.exit('pyang failed or produced no output, skipping jtaf-provider.')

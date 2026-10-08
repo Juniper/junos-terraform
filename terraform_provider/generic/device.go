@@ -21,25 +21,24 @@ type device struct {
 	typ    tftypes.Object
 }
 
-// create loads the planned configuration (merge) and commits.
+// create brings the device to the planned configuration. A device is not a
+// blank slate: configuration it already has that the plan does not want has to
+// be removed, and a merge cannot express a removal, so this reconciles exactly
+// as update does.
 func (d *device) create(plan tftypes.Value) (tftypes.Value, error) {
-	root, err := ValueToConfig(plan, d.schema)
-	if err != nil {
-		return tftypes.Value{}, fmt.Errorf("building configuration: %w", err)
-	}
-	if err := d.load(root); err != nil {
-		return tftypes.Value{}, fmt.Errorf("applying configuration: %w", err)
-	}
-	if err := d.client.SendCommit(); err != nil {
-		return tftypes.Value{}, fmt.Errorf("committing configuration: %w", err)
-	}
-	return d.read(plan)
+	return d.reconcile(plan)
 }
 
 // update applies the difference between the device's configuration and the
 // plan as one patch and commits it. If the device still differs afterwards, it
 // loads the whole planned configuration (merge) and commits again.
 func (d *device) update(plan tftypes.Value) (tftypes.Value, error) {
+	return d.reconcile(plan)
+}
+
+// reconcile makes the device's configuration match plan and returns plan as
+// the new state.
+func (d *device) reconcile(plan tftypes.Value) (tftypes.Value, error) {
 	planRoot, err := ValueToConfig(plan, d.schema)
 	if err != nil {
 		return tftypes.Value{}, fmt.Errorf("building configuration: %w", err)
@@ -71,8 +70,7 @@ func (d *device) update(plan tftypes.Value) (tftypes.Value, error) {
 			return tftypes.Value{}, fmt.Errorf("reading patched configuration: %w", err)
 		}
 		if len(patch.ComputeDiff(patch.LeafMapWithSchema(verified, d.schema), planMap)) == 0 {
-			// The configuration just read is the new state.
-			return d.state(verified, plan)
+			return plan, nil
 		}
 		if err := d.load(planRoot); err != nil {
 			return tftypes.Value{}, fmt.Errorf("patch had no effect and fallback update failed: %w", err)
@@ -80,10 +78,13 @@ func (d *device) update(plan tftypes.Value) (tftypes.Value, error) {
 		if err := d.client.SendCommit(); err != nil {
 			return tftypes.Value{}, fmt.Errorf("committing fallback update: %w", err)
 		}
-		return d.read(plan)
+		return plan, nil
 	}
 
-	return d.state(current, plan)
+	// Terraform requires the value returned here to equal the planned value, so
+	// the device is not read back into state. What the device adds of its own
+	// accord is drift for read to report on the next refresh.
+	return plan, nil
 }
 
 // delete removes everything in the state from the device and commits.

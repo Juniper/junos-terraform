@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -66,8 +67,7 @@ def collect_state_metrics(state_data: dict) -> tuple[int, dict[str, str], dict[s
         history_count_by_device[device_name] = len(history)
         commit_count += sum(1 for entry in history if entry.get("op") == "commit")
 
-        running_groups = device.get("running_groups", {})
-        running_cfg_by_device[device_name] = "\n".join(str(v) for v in running_groups.values())
+        running_cfg_by_device[device_name] = str(device.get("running_config", ""))
 
     return commit_count, running_cfg_by_device, history_count_by_device
 
@@ -81,6 +81,25 @@ def assert_devices_have_rpc_history(
         raise RuntimeError(f"device(s) with no RPC history in selected scope: {', '.join(missing)}")
 
 
+def _group_from_config(running: str, group_name: str) -> tuple[str | None, str]:
+    """The named group's XML out of a device's configuration, and the names of
+    the groups it does have."""
+    try:
+        config = ET.fromstring(running) if running.strip() else None
+    except ET.ParseError:
+        return None, "<unparseable>"
+    if config is None:
+        return None, "<none>"
+
+    names: list[str] = []
+    for group in config.findall("groups"):
+        name = (group.findtext("name") or "").strip()
+        names.append(name)
+        if name == group_name:
+            return ET.tostring(group, encoding="unicode"), ", ".join(sorted(names))
+    return None, ", ".join(sorted(names)) if names else "<none>"
+
+
 def scope_running_config_by_group(
     state_data: dict,
     devices_to_check: list[str],
@@ -88,24 +107,24 @@ def scope_running_config_by_group(
 ) -> dict[str, str]:
     if not only_group:
         return {
-            name: "\n".join(str(v) for v in state_data[name].get("running_groups", {}).values())
+            name: str(state_data[name].get("running_config", ""))
             for name in devices_to_check
         }
 
     scoped: dict[str, str] = {}
     for name in devices_to_check:
-        groups = state_data[name].get("running_groups", {})
-        if only_group in groups:
-            scoped[name] = str(groups.get(only_group, ""))
+        running = str(state_data[name].get("running_config", ""))
+        group_xml, available = _group_from_config(running, only_group)
+        if group_xml is not None:
+            scoped[name] = group_xml
             continue
 
         # Fallback prevents false negatives if group naming differs in state dumps.
-        scoped[name] = "\n".join(str(v) for v in groups.values())
-        available = ", ".join(sorted(groups.keys())) if groups else "<none>"
+        scoped[name] = running
         print(
             (
                 f"warning: group '{only_group}' not found for device '{name}'; "
-                f"falling back to all running groups (available: {available})"
+                f"falling back to the whole running config (available: {available})"
             ),
             file=sys.stderr,
         )

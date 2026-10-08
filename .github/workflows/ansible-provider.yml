@@ -8,12 +8,15 @@ on:
 
 jobs:
   build-and-apply:
+    name: Ansible NETCONF integration (${{ matrix.schema_scope }} schema, Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: ${{ github.actor == 'nektos/act' && 1 || 2 }}
       matrix:
         python-version: ["3.10", "3.x"]
+        # One role generator; these differ only in the schema it is built from.
+        schema_scope: [trimmed, full]
 
     steps:
     - uses: actions/checkout@v7
@@ -22,6 +25,12 @@ jobs:
       uses: actions/setup-python@v7
       with:
         python-version: ${{ matrix.python-version }}
+
+    - name: Set up Go for full-model schema generation
+      if: matrix.schema_scope == 'full'
+      uses: actions/setup-go@v7
+      with:
+        go-version: stable
 
     - name: Install Python and Ansible test dependencies
       env:
@@ -60,13 +69,34 @@ jobs:
           examples/evpn-vxlan-dc/dc2/dc2-spine2.xml \
           -t vqfx-evpn-vxlan
 
+    - name: Generate full-model Terraform schema for Ansible comparison
+      if: matrix.schema_scope == 'full'
+      run: |
+        set -euo pipefail
+        mkdir -p ci-generic-provider
+        pushd ci-generic-provider
+        jtaf-yang2go --generic \
+          -p ../examples/yang/18.2/18.2R3/common \
+          ../examples/yang/18.2/18.2R3/junos-qfx/conf/*.yang \
+          -t vqfx-evpn-vxlan
+        popd
+        cp ci-generic-provider/terraform-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json.gz \
+          ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.generic.json.gz
+
     - name: Generate host YAML with jtaf-xml2yaml
       run: |
+        set -euo pipefail
         rm -rf ci-evpn-vxlan-ansible
+
+        schema_path=ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json.gz
+        if [[ "${{ matrix.schema_scope }}" == "full" ]]; then
+          schema_path=ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.generic.json.gz
+        fi
+        echo "Using ${{ matrix.schema_scope }} schema: $schema_path"
 
         jtaf-xml2yaml \
           -x examples/evpn-vxlan-dc/dc1/*{spine,leaf}*.xml examples/evpn-vxlan-dc/dc2/*spine*.xml \
-          -j ansible-provider-junos-vqfx-evpn-vxlan/trimmed_schema.json.gz \
+          -j "$schema_path" \
           -d ci-evpn-vxlan-ansible \
           --grouping-hosts-file .github/ansible/ci-switches-grouping.hosts
 
@@ -311,7 +341,7 @@ jobs:
       if: always() && env.ACT != 'true'
       uses: actions/upload-artifact@v7
       with:
-        name: ansible-netconf-integration-logs-${{ matrix.python-version }}
+        name: ansible-netconf-integration-logs-${{ matrix.schema_scope }}-${{ matrix.python-version }}
         path: |
           netconf-mock.log
           netconf-mock-state.json

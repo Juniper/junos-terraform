@@ -45,6 +45,64 @@ func TestParseReplyWarning(t *testing.T) {
 	}
 }
 
+// Junos answers a rejected commit with the rpc-errors inside commit-results,
+// not as direct children of rpc-reply. Captured from a QFX running 18.1R3.
+func TestParseReplyNestedCommitError(t *testing.T) {
+	_, err := parseReply([]byte(`<rpc-reply ` + replyNS + `>
+<commit-results>
+<rpc-error>
+<error-type>protocol</error-type>
+<error-tag>operation-failed</error-tag>
+<error-severity>error</error-severity>
+<error-path>[edit system services extension-service request-response]</error-path>
+<error-message>Missing mandatory statement: 'ssl'</error-message>
+</rpc-error>
+<rpc-error>
+<error-type>protocol</error-type>
+<error-tag>operation-failed</error-tag>
+<error-severity>error</error-severity>
+<error-message>configuration check-out failed: (missing mandatory statements)</error-message>
+</rpc-error>
+</commit-results>
+</rpc-reply>`))
+	var errs netconf.RPCErrors
+	if !errors.As(err, &errs) || len(errs) != 2 {
+		t.Fatalf("err %v", err)
+	}
+	if !strings.Contains(errs[0].Message, "Missing mandatory statement") {
+		t.Fatalf("first error %q", errs[0].Message)
+	}
+}
+
+// The same nesting applies to a rejected load.
+func TestParseReplyNestedLoadError(t *testing.T) {
+	_, err := parseReply([]byte(`<rpc-reply ` + replyNS + `>
+<load-configuration-results>
+<rpc-error>
+<error-severity>error</error-severity>
+<error-message>syntax error</error-message>
+</rpc-error>
+</load-configuration-results>
+</rpc-reply>`))
+	var errs netconf.RPCErrors
+	if !errors.As(err, &errs) || len(errs) != 1 {
+		t.Fatalf("err %v", err)
+	}
+}
+
+// A nested warning is still not an error.
+func TestParseReplyNestedWarning(t *testing.T) {
+	data, err := parseReply([]byte(`<rpc-reply ` + replyNS + `>
+<load-configuration-results>
+<rpc-error><error-severity>warning</error-severity><error-message>statement has no contents; ignored</error-message></rpc-error>
+<ok/>
+</load-configuration-results>
+</rpc-reply>`))
+	if err != nil || !strings.Contains(data, "ok") {
+		t.Fatalf("data %q, err %v", data, err)
+	}
+}
+
 // A missing statement on delete is reported so updateRawConfig and
 // DeleteConfig can ignore it.
 func TestParseReplyMissingDelete(t *testing.T) {

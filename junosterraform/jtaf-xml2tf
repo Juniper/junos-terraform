@@ -20,6 +20,23 @@ class HCLRef:
         self.ref = ref
 
 
+def hcl_string(value) -> str:
+    """Render value as a quoted HCL string.
+
+    Junos configuration holds characters HCL reads as syntax. A newline cannot
+    appear in a quoted string at all; a backslash or a quote ends or changes
+    the escape that follows; and ${ or %{ starts an interpolation that would be
+    evaluated instead of written to the device. Escaping is used rather than a
+    heredoc because a heredoc appends a trailing newline, which Junos strips
+    again, leaving the configuration permanently different from the device.
+    """
+    text = str(value)
+    text = text.replace("\\", "\\\\").replace('"', '\\"')
+    text = text.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+    text = text.replace("${", "$${").replace("%{", "%%{")
+    return f'"{text}"'
+
+
 def convert_to_hcl(value, indent=2):
     """
     Converts Python dictionary or list into Terraform-compatible HCL syntax.
@@ -36,7 +53,7 @@ def convert_to_hcl(value, indent=2):
     elif isinstance(value, (int, float)):
         return str(value)
     else:
-        return f'"{value}"'
+        return hcl_string(value)
 
 def parse_element(element, explicit_empty_tags, type_lookup, parent_path=""):
     """
@@ -55,7 +72,8 @@ def parse_element(element, explicit_empty_tags, type_lookup, parent_path=""):
     if normalized_path not in type_lookup:
         if normalized_path not in missing_xpaths:
             missing_xpaths.add(normalized_path)
-            print(f"\t-- [WARN] XML config '{missing_xpaths}' not defined in YANG. Removing it from generating in this and subsequent .tf files\n\t\tTo enable configuration of this element, add it to a YANG augment file.\n\t\t - Regenerate the provider using jtaf-yang2go and include the cooresponding yang file using the -p option in addition to the existing YANG files.\n", file=sys.stderr)
+            print(f"\t-- [WARN] '{normalized_path}' is not in the YANG model; leaving it out of "
+                  f"this and subsequent .tf files.", file=sys.stderr)
         return None
         
     # Check if this element should be a leaf-list
@@ -165,19 +183,22 @@ def edit_provider_block(device_type, provider_block):
 
     return block
 
-def create_head_block(device_type, hostname, username, password):
+def create_head_block(device_type, hostname, username, password, fingerprint=""):
     """
     Generates a single Terraform-style resource block combining all top-level elements.
     """
     provider_block = ""
+    fingerprint_line = (
+        f"\n    schema_fingerprint = {hcl_string(fingerprint)}" if fingerprint else ""
+    )
 
     provider_block += f"""
 provider "junos-{device_type}" {{
-    host     = "{hostname}"
+    host     = {hcl_string(hostname)}
     port     = 22
-    username = "{username}"
-    password = "{password}"
-    alias    = "{hostname.replace("-", "_")}"
+    username = {hcl_string(username)}
+    password = {hcl_string(password)}
+    alias    = "{hostname.replace("-", "_")}"{fingerprint_line}
 }}
 """
     return provider_block
@@ -297,7 +318,7 @@ def emit_hcl_value(value, path, hostname, extraction_points, indent=2):
         return "true" if value else "false"
     if isinstance(value, (int, float)):
         return str(value)
-    return f'"{value}"'
+    return hcl_string(value)
 
 
 # Generates a Terraform-style resource block for the given parsed data.
@@ -326,12 +347,15 @@ def generate_hcl_resources(parsed_data, device_type, hostname, extraction_points
     return resource_block
 
 
-def _parse_xml_to_dict(xml_file, type_lookup):
+def _parse_xml_to_dict(xml_file, type_lookup, groups=False):
     """
     Parse a Junos XML config file into a normalized Python dict.
 
-    Handles <rpc-reply>/<configuration> wrapping, <apply-groups>, <groups>,
-    and <version> removal. Returns the merged config dict or None on error.
+    Handles <rpc-reply>/<configuration> wrapping and <version> removal. By
+    default the configuration a device inherits through <apply-groups> is
+    merged into the base hierarchy and the groups themselves are dropped. With
+    groups, the hierarchy is kept as it is, so groups and apply-groups are
+    converted like any other configuration.
     """
     try:
         with open(xml_file, 'r') as file:
@@ -348,19 +372,20 @@ def _parse_xml_to_dict(xml_file, type_lookup):
         if config_node is not None:
             root = config_node
 
-        groups = {}
+        group_map = {}
         apply_groups = []
 
-        for ag in root.findall('./apply-groups'):
-            if ag.text:
-                apply_groups.append(ag.text.strip())
-            root.remove(ag)
+        if not groups:
+            for ag in root.findall('./apply-groups'):
+                if ag.text:
+                    apply_groups.append(ag.text.strip())
+                root.remove(ag)
 
-        for group in root.findall('./groups'):
-            group_name_elem = group.find('./name')
-            if group_name_elem is not None:
-                groups[group_name_elem.text.strip()] = group
-            root.remove(group)
+            for group in root.findall('./groups'):
+                group_name_elem = group.find('./name')
+                if group_name_elem is not None:
+                    group_map[group_name_elem.text.strip()] = group
+                root.remove(group)
 
         version_node = root.find("./version")
         if version_node is not None:
@@ -378,7 +403,7 @@ def _parse_xml_to_dict(xml_file, type_lookup):
         for group_name in apply_groups:
             if group_name == "base-config":
                 continue
-            group_node = groups.get(group_name)
+            group_node = group_map.get(group_name)
             if group_node is None:
                 continue
             group_data = {}
@@ -399,12 +424,12 @@ def _parse_xml_to_dict(xml_file, type_lookup):
         return None
 
 
-def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup):
+def parse_xml_to_hcl(xml_file, device_type, hostname, type_lookup, groups=False):
     """
     Parses an XML file and converts it to Terraform-style HCL resources.
     Starts from <configuration> if under <rpc-reply> and removes <version> if present.
     """
-    final_data = _parse_xml_to_dict(xml_file, type_lookup)
+    final_data = _parse_xml_to_dict(xml_file, type_lookup, groups)
     if final_data is None:
         return None
     return generate_hcl_resources(final_data, device_type, hostname)
@@ -686,6 +711,18 @@ def main():
             'per-device files.'
         ),
     )
+    parser.add_argument(
+        '--groups',
+        action='store_true',
+        default=False,
+        help=(
+            'Keep Junos configuration groups. By default the configuration a '
+            'device inherits through apply-groups is merged into the base '
+            'hierarchy and the groups are dropped; with this flag groups and '
+            'apply_groups are emitted as ordinary configuration, for a provider '
+            'generated with jtaf-provider --groups.'
+        ),
+    )
     args = parser.parse_args()
 
     trimmed_json_file = args.trimmed_json
@@ -711,6 +748,10 @@ def main():
             break
     if not config_node:
         raise ValueError("No configuration node found in JSON schema")
+
+    # Recorded by jtaf-provider so the Terraform files declare the schema
+    # they were generated from.
+    fingerprint = schema.get("fingerprint", "") if isinstance(schema, dict) else ""
 
     # Using the trimmed json schema, build map of path to its type
     type_lookup = build_type_map(config_node)
@@ -750,7 +791,7 @@ def main():
         for file in xml_files:
             hostname = file.split("/")[-1].split(".")[0]
             hostname_by_file[file] = hostname
-            parsed_dict = _parse_xml_to_dict(file, type_lookup)
+            parsed_dict = _parse_xml_to_dict(file, type_lookup, args.groups)
             if parsed_dict is not None:
                 parsed_by_host[hostname] = parsed_dict
 
@@ -776,7 +817,7 @@ def main():
             hostname = hostname_by_file[file]
             print(f"\nProcessing XML file: {file}")
 
-            head_block = create_head_block(device_type, hostname, username, password)
+            head_block = create_head_block(device_type, hostname, username, password, fingerprint)
             if head_block:
                 with open(provider_file, "r") as f:
                     existing = f.read()
@@ -806,7 +847,7 @@ def main():
         for file in xml_files:
             print(f"\nProcessing XML file: {file}")
             hostname = file.split("/")[-1].split(".")[0]
-            head_block = create_head_block(device_type, hostname, username, password)
+            head_block = create_head_block(device_type, hostname, username, password, fingerprint)
             if head_block:
                 with open(provider_file, "r") as f:
                     existing = f.read()
@@ -819,13 +860,35 @@ def main():
                     print(f"\n  -> Skipping provider block for hostname '{hostname}' (already exists).\n")
 
             # Write per-device .tf file (all values inline)
-            hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup)
+            hcl_output = parse_xml_to_hcl(file, device_type, hostname, type_lookup, args.groups)
             if hcl_output:
                 filename = f"{directory}/{hostname}.tf"
                 os.makedirs(os.path.dirname(filename), exist_ok=True)
                 with open(filename, "w") as f:
                     f.write(hcl_output)
                 print(f"   --->  DONE: Wrote output to {filename}\n")
+
+    report_missing_xpaths()
+
+
+def report_missing_xpaths():
+    """Summarise configuration the YANG model does not cover.
+
+    XML taken from a device running a different Junos release than the model
+    was built from carries paths the model has never heard of. They are left
+    out of the .tf, so without a summary the configuration silently differs
+    from the device it came from.
+    """
+    if not missing_xpaths:
+        return
+    print(f"\n[WARN] {len(missing_xpaths)} configuration path(s) in the XML are not in the "
+          f"YANG model and were left out:", file=sys.stderr)
+    for path in sorted(missing_xpaths):
+        print(f"   {path}", file=sys.stderr)
+    print("  The XML may come from a different Junos release than the YANG files the\n"
+          "  provider was built from. Build the provider from the release the devices run,\n"
+          "  or add the missing nodes with a YANG augment and pass it to jtaf-yang2go -p.",
+          file=sys.stderr)
 
 if __name__ == "__main__":
     main()

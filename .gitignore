@@ -17,3 +17,6 @@ __pycache__/
 /examples/providers/terraform-provider-junos-vqfx-evpn-vxlan/
 /examples/providers/terraform-provider-junos-vsrx-evpn-vxlan/
 /test-generic-provider/
+# Full-model pyang output, hundreds of MB; generated, never committed.
+/junos.json
+/*.json.gz

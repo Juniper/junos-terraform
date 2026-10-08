@@ -35,7 +35,9 @@ All CLI tools that accept a JTAF JSON schema with `-j` SHALL accept plain JSON o
 - **THEN** the tool exits with a non-zero status and an error naming the input
 
 ### Requirement: Provider and role generators write compressed schemas
-`jtaf-provider` and `jtaf-ansible` SHALL write their trimmed schema as compact gzip-compressed JSON named `trimmed_schema.json.gz` and SHALL NOT write `trimmed_schema.json`. This applies to both Terraform provider generation paths.
+`jtaf-provider` and `jtaf-ansible` SHALL write their trimmed schema as compact gzip-compressed JSON named
+`trimmed_schema.json.gz` and SHALL NOT write `trimmed_schema.json`. This applies whether the schema is trimmed to XML
+or embedded untrimmed.
 
 #### Scenario: Generated schema handoff
 - **WHEN** either generator completes
@@ -45,7 +47,59 @@ All CLI tools that accept a JTAF JSON schema with `-j` SHALL accept plain JSON o
 - **WHEN** a user checks the `-j` help text for any of the four tools
 - **THEN** it names `trimmed_schema.json.gz` and states that plain JSON is also accepted
 
+### Requirement: Generic provider generation excludes XML filtering
+The `jtaf-yang2go` and `jtaf-provider` commands SHALL reject invocations that combine `--generic` with `-x` or `--xml-config`. Generic provider generation SHALL consume the unfiltered YANG schema; XML files remain valid inputs to downstream configuration conversion tools.
+
+#### Scenario: End-to-end generic generation rejects XML filtering
+- **WHEN** `jtaf-yang2go` is invoked with both `--generic` and `-x`
+- **THEN** it exits with an argument error before invoking pyang or generating a provider
+
+#### Scenario: Direct generic provider generation rejects XML filtering
+- **WHEN** `jtaf-provider` is invoked with both `--generic` and `-x` or `--xml-config`
+- **THEN** it exits with an argument error before loading or generating a provider
+
+#### Scenario: Generic schema is converted using XML downstream
+- **WHEN** a full generic provider schema is passed to `jtaf-xml2tf` or `jtaf-xml2yaml` with XML configuration inputs
+- **THEN** the downstream tool uses those XML files for configuration conversion without applying provider-generation XML filtering
+
 ---
+
+### Requirement: Groups option on the Terraform tools
+`jtaf-provider` SHALL accept a `--groups` flag that keeps the `groups` subtree and the `apply-groups` leaf-list in the
+generated schema. `jtaf-yang2go` SHALL accept the same flag and pass it to `jtaf-provider`. `jtaf-xml2tf` SHALL accept
+a `--groups` flag that preserves the group hierarchy instead of flattening applied groups into the base configuration.
+Omitting the flag SHALL preserve today's behaviour in every tool. The Ansible tools SHALL NOT accept the flag.
+
+#### Scenario: Flag reaches the generator
+- **WHEN** `jtaf-yang2go --groups` runs
+- **THEN** it invokes `jtaf-provider` with `--groups`, and the resulting `trimmed_schema.json.gz` contains the `groups`
+  subtree and the `apply-groups` leaf-list
+
+#### Scenario: Flag is absent
+- **WHEN** any of the three tools runs without `--groups`
+- **THEN** its output is byte-identical to the output of the same invocation before this change
+
+#### Scenario: Conversion preserves groups
+- **WHEN** `jtaf-xml2tf --groups` converts an XML configuration containing `<groups>` and `<apply-groups>`
+- **THEN** the `.tf` output contains a `groups` block and an `apply_groups` list rather than the flattened result
+
+### Requirement: Schema scope flag
+`jtaf-provider` SHALL require exactly one of `-x` or `--generic`, which select the scope of the embedded schema rather
+than a provider implementation: `--generic` embeds the untrimmed model, `-x` trims it to the XML given. The two
+invocations SHALL produce the same provider source and SHALL differ only in the embedded schema.
+
+#### Scenario: Same source, different schema
+- **WHEN** a provider is generated with `--generic` and another is generated with `-x`
+- **THEN** their Go source files are identical and only the embedded schema differs
+
+#### Scenario: Trimming still requires XML
+- **WHEN** `--generic` is combined with `-x`
+- **THEN** the tool exits with a non-zero status and an error stating the two are mutually exclusive
+
+#### Scenario: Scope is never implied
+- **WHEN** neither `-x` nor `--generic` is given, to `jtaf-provider` or to `jtaf-yang2go`
+- **THEN** the tool exits with a non-zero status and an error naming both options, rather than defaulting to the
+  untrimmed model, which costs far more memory at plan time
 
 ## jtaf-provider
 
@@ -63,25 +117,27 @@ All CLI tools that accept a JTAF JSON schema with `-j` SHALL accept plain JSON o
 #### Processing Pipeline
 
 1. **When** schema JSON and XML configs are loaded, **Then** `filter_json_using_xml()` retains only schema paths that appear in the XML config
-2. **When** filtering completes, **Then** Jinja2 renders `resource_config_provider.go.j2` using the filtered resources
+2. **When** the schema is ready, **Then** `terraform_provider`'s Go sources are copied into the output directory and `main.go` and `embed_schema.go` are written
 3. **When** the output directory already exists, **Then** it is deleted via `shutil.rmtree()` and recreated via `shutil.copytree()`
 4. **When** the Go provider is created, **Then** `ensure_go_module_name()` sets `go.mod` to `module terraform-provider-junos-{type}`
 5. **When** module name is set, **Then** `rewrite_import_prefixes()` replaces all `"terraform_provider/"` imports with `"terraform-provider-junos-{type}/"`
-6. **When** code generation completes, **Then** `trimmed_schema.json.gz` (compact, gzipped JSON) is written to the output directory for the downstream tools; `-j` on all tools accepts plain or gzipped JSON, detected by content
+6. **When** code generation completes, **Then** `trimmed_schema.json.gz` (compact, gzipped JSON) is written to the output directory for the downstream tools, and compiled to `schema.bin.gz` for the provider to embed; `-j` on all tools accepts plain or gzipped JSON, detected by content
 
 #### Error Handling
 
-- **Given** `-j` or `-x` not provided, **When** the tool runs, **Then** argparse exits with error code 2
-- **Given** a Jinja2 template is missing, **When** rendering is attempted, **Then** `FileNotFoundError` is raised
-- **Given** invalid JSON is provided, **When** template rendering starts, **Then** `TemplateError` is raised and execution stops
+- **Given** `-j` or `-t` not provided, **When** the tool runs, **Then** argparse exits with error code 2
+- **Given** neither `-x` nor `--generic` is provided, **When** the tool runs, **Then** argparse exits with error code 2, because the schema scope is always explicit
+- **Given** a schema node name is not a valid Terraform attribute name, or two siblings collide, **When** the schema is validated, **Then** the tool exits naming the node's path
+- **Given** invalid JSON is provided, **When** the schema is loaded, **Then** the tool exits with the parse error
 
 #### Expected Output
 
 ```
-Plugin created in terraform-provider-junos-{type}/resource_config_provider.go
-Updated provider.go with type junos-{type}
-Updated config.go with type junos-{type}
+Schema written to terraform-provider-junos-{type}/trimmed_schema.json.gz
+Created terraform-provider-junos-{type}/embed_schema.go
+Created main.go with type junos-{type}
 Updated go.mod with type junos-{type}
+Compiled schema written to terraform-provider-junos-{type}/schema.bin.gz
 ```
 
 ---

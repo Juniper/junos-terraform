@@ -2,6 +2,48 @@
 
 Stateful multi-device NETCONF-over-SSH simulator for Terraform CI testing. Lives at `netconf_mock/`.
 
+## Purpose
+
+Define how the mock device behaves for tests: how it authenticates, which RPCs it answers, and how a configuration
+loaded into it is stored, patched, committed and read back.
+
+## Requirements
+
+### Requirement: A device's configuration is one tree
+The mock SHALL keep each device's committed and candidate configuration as a single configuration tree, not as a
+separate payload per configuration group. A loaded payload SHALL be stored as it was sent, including any `groups` and
+`apply-groups` it carries, and SHALL NOT be wrapped in, or keyed by, a group that the payload does not contain. A read
+SHALL return the committed tree in the same shape.
+
+#### Scenario: Groups alongside base hierarchy
+- **WHEN** a configuration holding both a `groups` entry and base-hierarchy configuration is loaded and committed
+- **THEN** a read returns both, with the group's configuration below its own `groups` element and the base
+  configuration at the top
+
+#### Scenario: More than one group
+- **WHEN** a configuration holding two groups is loaded and committed
+- **THEN** a read returns both groups, each identified by its own `name`
+
+#### Scenario: Configuration without groups
+- **WHEN** a configuration with no `groups` element is loaded and committed
+- **THEN** a read returns it unchanged, with no `groups` element introduced
+
+### Requirement: Edits apply inside the tree
+An `edit-config` patch SHALL be applied at the path it names, including paths below a `groups` entry, leaving every
+other part of the configuration as it was. A delete naming a group SHALL remove that group and nothing else.
+
+#### Scenario: Edit below a group
+- **WHEN** a patch replaces one leaf below a `groups` entry
+- **THEN** that leaf changes, and the rest of the group, the other groups and the base hierarchy are unchanged
+
+#### Scenario: Delete a group
+- **WHEN** a patch deletes a `groups` entry
+- **THEN** that group is gone from the committed configuration and any other group remains
+
+#### Scenario: Group references keep their order
+- **WHEN** a configuration carrying several `apply-groups` entries is committed
+- **THEN** a read returns them in the order they were sent
+
 ## Architecture
 
 ```
@@ -22,18 +64,17 @@ DeviceState (candidate/running config lifecycle)
 @dataclass
 class DeviceState:
     name: str
-    running_groups: dict[str, str]           # Committed config by group name
-    candidate_groups: dict[str, str]         # Staged config (load/edit-config target)
-    deleted_candidate_groups: set[str]       # Groups marked for deletion
-    submitted_xml_by_group: dict[str, str]   # Last submitted XML per group
+    running_config: str                      # Committed configuration
+    candidate_config: str                    # Staged config (load/edit-config target)
+    submitted_xml: str                       # Last configuration submitted
     rpc_log: list[str]                       # All received RPC payloads
     history: list[dict[str, str]]            # Structured operation log
 ```
 
 ### State Lifecycle
 
-- **Given** a device starts, **When** `__post_init__` runs, **Then** `candidate_groups` is deep-copied from `running_groups`
-- **Given** `running_groups` is empty at start, **When** device initializes, **Then** candidate is also empty
+- **Given** a device starts, **When** `__post_init__` runs, **Then** `candidate_config` is copied from `running_config`
+- **Given** `running_config` is empty at start, **When** device initializes, **Then** candidate is also empty
 - **Given** `snapshot()` is called, **When** serialized, **Then** returns JSON-serializable dict of all fields
 
 ---
@@ -84,13 +125,13 @@ Each incoming RPC is checked in this order:
 
 ### Behaviors
 
-- **Given** XML payload with `<configuration><groups><name>GROUP</name>...</groups></configuration>`, **When** `_handle_load_configuration()` runs, **Then** store under `candidate_groups["GROUP"]`
+- **Given** a `<configuration>` payload, **When** `_handle_load_configuration()` runs, **Then** it is merged into or replaces `candidate_config`, including any `groups` it carries
 - **Given** action is not specified (or "replace"), **When** groups extracted, **Then** overwrite group config entirely
 - **Given** `action="merge"`, **When** groups extracted, **Then** merge incoming elements into existing group config using `_merge_group_configuration()`
 - **Given** multiple groups in one payload, **When** processing, **Then** each group stored independently
 - **Given** `<configuration-set>` with `set groups X ...` lines, **When** XML groups not found, **Then** extract set-style commands and store per group
 - **Given** direct (non-group) configuration, **When** payload has `<configuration>` without `<groups>`, **Then** wrap in a groups structure using `_wrap_direct_configuration()`
-- **Given** group previously deleted, **When** new load-configuration arrives for it, **Then** discard from `deleted_candidate_groups` set
+- **Given** a group was deleted from the candidate, **When** a load-configuration brings it back, **Then** it is present again in `candidate_config`
 
 ---
 
@@ -143,7 +184,7 @@ Each incoming RPC is checked in this order:
 
 ### Behaviors
 
-- **Given** `<edit-config>` with `<groups operation="delete">`, **When** dispatched, **Then** add group name to `deleted_candidate_groups` and remove from `candidate_groups`
+- **Given** `<edit-config>` with `<groups operation="delete">`, **When** dispatched, **Then** that group is removed from `candidate_config` and the rest of the configuration is left as it was
 - **Given** `<apply-groups>` also present with `operation="delete"`, **When** processing, **Then** also record in history
 
 ---
@@ -153,9 +194,7 @@ Each incoming RPC is checked in this order:
 ### Behaviors
 
 - **Given** `<commit/>` received, **When** candidate has changes, **Then**:
-  1. Copy all `candidate_groups` to `running_groups`
-  2. For each group in `deleted_candidate_groups`, remove from `running_groups`
-  3. Clear `deleted_candidate_groups`
+  1. Copy `candidate_config` to `running_config`
   4. Reply `<ok/>`
 - **Given** `<commit/>` received, **When** candidate is unchanged, **Then** still reply `<ok/>` (idempotent)
 
@@ -166,8 +205,7 @@ Each incoming RPC is checked in this order:
 ### Behaviors
 
 - **Given** `<discard-changes/>` received, **When** candidate has modifications, **Then**:
-  1. Deep-copy `running_groups` back to `candidate_groups`
-  2. Clear `deleted_candidate_groups`
+  1. Copy `running_config` back to `candidate_config`
   3. Reply `<ok/>`
 
 ---
@@ -258,12 +296,11 @@ from netconf_mock.netconf_mock_server import DeviceState, DeviceSession
 
 def test_commit_promotes_candidate():
     state = DeviceState(name="test-dev")
-    state.candidate_groups["my-group"] = "<configuration><groups><name>my-group</name><interfaces/></groups></configuration>"
+    state.candidate_config = "<configuration><groups><name>my-group</name><interfaces/></groups></configuration>"
 
     # Simulate commit
-    state.running_groups = copy.deepcopy(state.candidate_groups)
-    state.deleted_candidate_groups.clear()
+    state.running_config = state.candidate_config
 
-    assert "my-group" in state.running_groups
-    assert state.running_groups["my-group"] == state.candidate_groups["my-group"]
+    assert "my-group" in state.running_config
+    assert state.running_config == state.candidate_config
 ```

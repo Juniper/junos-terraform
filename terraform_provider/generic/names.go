@@ -15,15 +15,13 @@ func SanitizeName(name string) string {
 
 // attributeNodes returns the children of a schema node that are Terraform
 // attributes, in schema order. The schema builder and the value converters
-// both use it, so they agree on what the resource holds.
+// both use it, so they agree on what the resource holds. Which nodes the
+// schema carries is decided when the provider is generated, so nothing is
+// filtered by name here.
 func attributeNodes(s *patch.Schema, parent patch.SchemaNodeID) []patch.SchemaNodeID {
 	out := make([]patch.SchemaNodeID, 0, s.NumChildren(parent))
 	for i := range s.NumChildren(parent) {
-		c := s.Child(parent, i)
-		if name := s.Name(c); name == "groups" || name == "apply-groups" {
-			continue
-		}
-		out = append(out, c)
+		out = append(out, s.Child(parent, i))
 	}
 	return out
 }
