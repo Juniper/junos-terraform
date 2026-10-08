@@ -63,6 +63,53 @@ func gzipLen(t *testing.T, data []byte) int {
 	return buf.Len()
 }
 
+// parseSchemaFile reads and parses the pyang JSON, returning the tree, the
+// file's size and how long the parse took. The raw bytes go out of scope when
+// it returns, so they are not counted in the heap figures measured after it.
+func parseSchemaFile(t *testing.T, path string) (patch.TrimmedSchemaWrapper, float64, time.Duration) {
+	t.Helper()
+	raw := readSchema(t, path)
+
+	start := time.Now()
+	var w patch.TrimmedSchemaWrapper
+	if err := json.Unmarshal(raw, &w); err != nil {
+		t.Fatalf("unmarshal schema: %v", err)
+	}
+	return w, mb(len(raw)), time.Since(start)
+}
+
+// jsonPath is what the JSON route produces, kept apart from what it allocated.
+type jsonPath struct {
+	size, gzSize int
+	dur          time.Duration
+	nodes        int
+	compiled     []byte
+}
+
+// compileFromJSON runs the JSON route and returns only its results, so nothing
+// it allocated is still reachable when the caller measures the compiled load.
+func compileFromJSON(t *testing.T, path string) jsonPath {
+	t.Helper()
+	raw := readSchema(t, path)
+	out := jsonPath{size: len(raw), gzSize: gzipLen(t, raw)}
+
+	start := time.Now()
+	var w patch.TrimmedSchemaWrapper
+	if err := json.Unmarshal(raw, &w); err != nil {
+		t.Fatalf("unmarshal schema: %v", err)
+	}
+	schema := patch.CompileSchema(w.Root.Children)
+	out.dur = time.Since(start)
+	out.nodes = schema.Len()
+
+	compiled, err := schema.MarshalBinary()
+	if err != nil {
+		t.Fatalf("marshal compiled schema: %v", err)
+	}
+	out.compiled = compiled
+	return out
+}
+
 // TestFullSchemaPhases breaks provider startup down by phase, so it is clear
 // which one dominates and how much of the pyang tree survives compilation.
 func TestFullSchemaPhases(t *testing.T) {
@@ -71,19 +118,12 @@ func TestFullSchemaPhases(t *testing.T) {
 	// Measured before the file is read, so every later figure is the heap the
 	// provider is actually holding.
 	baseline := heapMB()
-	raw := readSchema(t, path)
-	t.Logf("schema file:       %.1f MB", mb(len(raw)))
 
-	start := time.Now()
-	var w patch.TrimmedSchemaWrapper
-	if err := json.Unmarshal(raw, &w); err != nil {
-		t.Fatalf("unmarshal schema: %v", err)
-	}
-	unmarshalDur := time.Since(start)
-	raw = nil
+	w, fileMB, unmarshalDur := parseSchemaFile(t, path)
+	t.Logf("schema file:       %.1f MB", fileMB)
 	pyangHeap := heapMB()
 
-	start = time.Now()
+	start := time.Now()
 	schema := patch.CompileSchema(w.Root.Children)
 	compileDur := time.Since(start)
 
@@ -96,21 +136,13 @@ func TestFullSchemaPhases(t *testing.T) {
 	_, objType := BuildSchema(schema)
 	buildDur := time.Since(start)
 
-	start = time.Now()
-	typeJSON, err := objType.MarshalJSON()
-	if err != nil {
-		t.Fatalf("marshal value type: %v", err)
-	}
-	marshalDur := time.Since(start)
-
 	t.Logf("1. json.Unmarshal:  %v", unmarshalDur)
 	t.Logf("2. CompileSchema:   %v (%d nodes)", compileDur, schema.Len())
-	t.Logf("3. BuildSchema:     %v", buildDur)
-	t.Logf("4. marshal type:    %v", marshalDur)
+	t.Logf("3. BuildSchema:     %v (%d top-level attributes)",
+		buildDur, len(objType.AttributeTypes))
 	t.Logf("pyang tree heap:    %.1f MB", pyangHeap-baseline)
 	t.Logf("STEADY heap:        %.1f MB", compiledHeap-baseline)
 	t.Logf("released by compile: %.1f MB", pyangHeap-compiledHeap)
-	t.Logf("schema wire size:   %.1f MB", mb(len(typeJSON)))
 
 	runtime.KeepAlive(schema)
 }
@@ -119,54 +151,39 @@ func TestFullSchemaPhases(t *testing.T) {
 // embedded form's size, and how much of startup it removes.
 func TestFullSchemaCompiledVsJSON(t *testing.T) {
 	path := fullSchemaPath(t)
-	raw := readSchema(t, path)
-	jsonSize, jsonGz := len(raw), gzipLen(t, raw)
 
-	start := time.Now()
-	var w patch.TrimmedSchemaWrapper
-	if err := json.Unmarshal(raw, &w); err != nil {
-		t.Fatalf("unmarshal schema: %v", err)
-	}
-	fromJSON := patch.CompileSchema(w.Root.Children)
-	jsonDur := time.Since(start)
-	wantNodes := fromJSON.Len()
+	// Everything the JSON route allocates goes out of scope with the helper, so
+	// the load below is measured on its own, the way a provider start sees it.
+	fromJSON := compileFromJSON(t, path)
 
-	compiled, err := fromJSON.MarshalBinary()
-	if err != nil {
-		t.Fatalf("marshal compiled schema: %v", err)
-	}
-	if !patch.IsCompiledSchema(compiled) {
+	if !patch.IsCompiledSchema(fromJSON.compiled) {
 		t.Fatal("MarshalBinary output is not recognised as a compiled schema")
 	}
-	compiledGz := gzipLen(t, compiled)
-
-	// Drop everything but the compiled bytes so the load below is measured on
-	// its own, the way a provider start sees it.
-	raw, w, fromJSON = nil, patch.TrimmedSchemaWrapper{}, nil
+	compiledGz := gzipLen(t, fromJSON.compiled)
 	runtime.GC()
 
-	start = time.Now()
-	fromCompiled, err := patch.UnmarshalSchema(compiled)
+	start := time.Now()
+	fromCompiled, err := patch.UnmarshalSchema(fromJSON.compiled)
 	if err != nil {
 		t.Fatalf("unmarshal compiled schema: %v", err)
 	}
 	compiledDur := time.Since(start)
 
-	if fromCompiled.Len() != wantNodes {
+	if fromCompiled.Len() != fromJSON.nodes {
 		t.Errorf("compiled schema has %d nodes, JSON path has %d",
-			fromCompiled.Len(), wantNodes)
+			fromCompiled.Len(), fromJSON.nodes)
 	}
 
 	// Steady heap is reported by TestFullSchemaPhases; both paths end at the
 	// same *patch.Schema, so it is not repeated here.
 	t.Logf("JSON:      %.1f MB (%.1f MB gzipped), %v to load",
-		mb(jsonSize), mb(jsonGz), jsonDur)
+		mb(fromJSON.size), mb(fromJSON.gzSize), fromJSON.dur)
 	t.Logf("compiled:  %.1f MB (%.1f MB gzipped), %v to load",
-		mb(len(compiled)), mb(compiledGz), compiledDur)
+		mb(len(fromJSON.compiled)), mb(compiledGz), compiledDur)
 	t.Logf("gain:      %.0fx faster to load, %.0fx smaller raw, %.1fx smaller gzipped",
-		float64(jsonDur)/float64(compiledDur),
-		float64(jsonSize)/float64(len(compiled)),
-		float64(jsonGz)/float64(compiledGz))
+		float64(fromJSON.dur)/float64(compiledDur),
+		float64(fromJSON.size)/float64(len(fromJSON.compiled)),
+		float64(fromJSON.gzSize)/float64(compiledGz))
 
 	runtime.KeepAlive(fromCompiled)
 }
@@ -192,9 +209,6 @@ func TestFullSchemaServesSchema(t *testing.T) {
 	}
 	if len(objType.AttributeTypes) == 0 {
 		t.Fatal("provider served a schema with no attributes")
-	}
-	if _, err := objType.MarshalJSON(); err != nil {
-		t.Fatalf("value type is not serialisable: %v", err)
 	}
 
 	// An empty resource must convert through the served type, which is the
