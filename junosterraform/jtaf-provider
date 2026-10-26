@@ -336,6 +336,16 @@ def main():
              'provider. Repeatable.',
     )
     parser.add_argument(
+        '--yang-compliant',
+        action='store_true',
+        default=False,
+        help='Describe choices as the model declares them, a choice-ident and a '
+             'choice-value, which is what a device returns with `system services '
+             'netconf yang-compliant`. Without it a choice is an element named '
+             'after the case, <exact/>, as a device writes it otherwise. Only '
+             'affects --generic: trimming follows the XML it is given.',
+    )
+    parser.add_argument(
         '--groups',
         action='store_true',
         default=False,
@@ -374,8 +384,10 @@ def main():
         resources = load_schema_json(args.json_schema)
         # Trimming flattens choices as a side effect of matching them against
         # the XML; without XML it has to be done explicitly, or the two scopes
-        # describe the same node differently.
-        flatten_choice_idents(resources)
+        # describe the same node differently. A yang-compliant device returns
+        # the modelled form instead, so it is left alone.
+        if not args.yang_compliant:
+            flatten_choice_idents(resources)
 
     if args.exclude:
         try:
@@ -396,6 +408,8 @@ def main():
     scope = "trimmed" if args.xml_config else "full"
     if args.groups:
         scope += "-groups"
+    if args.yang_compliant and not args.xml_config:
+        scope += "-yang-compliant"
     _generate_generic_provider(resources, args.type,
                                schema_fingerprint(scope, args.yang_release))
 

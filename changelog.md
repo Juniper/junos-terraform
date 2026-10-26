@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `jtaf-provider --yang-compliant` keeps a choice as the model declares it, a `choice-ident` and a `choice-value`,
+  instead of flattening it to an element named after the case. A device with `system services netconf yang-compliant`
+  returns the modelled form, so a `--generic` provider that flattened it could not read the choice back and the device
+  rejected the whole-tree write with "syntax error, expecting <choice-ident>". The schema fingerprint records the
+  choice, so a mismatch with the Terraform files is warned about.
 - `jtaf-provider --groups`, passed on by `jtaf-yang2go`, keeps the `groups` subtree and the `apply-groups` leaf-list so
   the provider manages Junos configuration groups as ordinary hierarchy: a group is an entry of the `groups` list keyed
   by its `name`, and `apply_groups` is an ordered list of group names. With `--generic` it warns, because advertising
