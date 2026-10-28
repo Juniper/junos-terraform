@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- A `Makefile` at the repository root builds the full set of `--generic --groups` providers for a Junos OS and a Junos
+  OS Evolved release from a clone of the Juniper YANG repository, one per family (`junos-mx`, `-es`, `-ex`, `-nfx`,
+  `-qfx` and `junos-evo`), reading the modules out of the clone's git objects so its checkout does not matter. `make
+  latest` names the newest release of each branch; `make all` lays the binaries, schemas, a manifest and a
+  `dev_overrides` CLI configuration out under `dist/<release>/`, and rebuilds a provider only when its inputs change.
+  `make preflight` checks tools and disk before a build, the heavy steps run under `nice` with their temporary files
+  kept under `build/`, and `make clean-space` reclaims stopped containers, dangling images, unreferenced build cache
+  and stale build output without touching anything running (`DRY_RUN=1` previews; larger reclaims are opt-in). The
+  25.4R1 NFX model's `hash-function` choice has a `CRC16` leaf beside a `crc16` container, which the generator
+  refuses, so `EXCLUDE_nfx` leaves that choice out by default. See
+  [README-terraform.md](README-terraform.md#building-a-release-set-with-make).
 - `jtaf-provider --yang-compliant` keeps a choice as the model declares it, a `choice-ident` and a `choice-value`,
   instead of flattening it to an element named after the case. A device with `system services netconf yang-compliant`
   returns the modelled form, so a `--generic` provider that flattened it could not read the choice back and the device

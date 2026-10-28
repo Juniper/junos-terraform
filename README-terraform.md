@@ -19,7 +19,9 @@ The path is six steps:
 | 5 | edit `~/.terraformrc` | Terraform can find the binary |
 | 6 | `terraform plan` / `apply` | Configuration on the device |
 
-Steps 1 and 2 can be combined; see [Shortcut](#shortcut-run-steps-1-and-2-together).
+Steps 1 and 2 can be combined; see [Shortcut](#shortcut-run-steps-1-and-2-together). To build the
+providers for every family of a Junos release in one go, see
+[Building a release set with make](#building-a-release-set-with-make).
 
 ---
 
@@ -263,6 +265,135 @@ not an unreviewed deployment to production devices.
 
 The command walkthrough ends here. The following sections explain generated files,
 upgrade considerations, performance, and provider internals.
+
+---
+
+## Building a release set with make
+
+Steps 1–3 build one provider from one family of one release. The `Makefile` at the repository root
+builds the complete set for a Junos OS release and a Junos OS Evolved release — one provider per
+family, each embedding the whole model with configuration groups (`--generic --groups`) — straight
+from a clone of the [Juniper YANG repository](https://github.com/Juniper/yang):
+
+```bash
+git clone https://github.com/Juniper/yang ../yang     # once; YANG_REPO=<path> if elsewhere
+make latest                                            # which releases would be built, and from which commit
+make all                                               # everything -> dist/<release>/
+```
+
+`make latest` reads the clone's git objects at `YANG_REF` (default `HEAD`), so it does not matter
+what the clone has checked out. With the repository at the time of writing it reports:
+
+```
+junos:  25.4R1
+evo:    25.4R1-EVO
+commit: 96ad7badc2603aa1033476103aeded2632db9a9a
+```
+
+and `make all` builds six providers:
+
+| Release | Provider | Juniper family | Platforms |
+|---------|----------|----------------|-----------|
+| 25.4R1 | `junos-mx` | `junos` | MX, ACX, T, some EX |
+| 25.4R1 | `junos-es` | `junos-es` | SRX |
+| 25.4R1 | `junos-ex` | `junos-ex` | EX |
+| 25.4R1 | `junos-nfx` | `junos-nfx` | NFX |
+| 25.4R1 | `junos-qfx` | `junos-qfx` | QFX |
+| 25.4R1-EVO | `junos-evo` | (unified) | Junos OS Evolved |
+
+`make junos`, `make evo` or a single family (`make qfx`) build part of the set. A provider is only
+regenerated when its inputs change — the release, the YANG commit, `EXCLUDE`, or the JTAF generator
+and provider sources — so a second `make all` finishes in seconds.
+
+### What a release set contains
+
+```
+dist/
+  25.4R1/
+    bin/terraform-provider-junos-{mx,es,ex,nfx,qfx}
+    schemas/junos-{mx,es,ex,nfx,qfx}.trimmed_schema.json.gz
+    manifest.json          release, YANG commit, per-provider sha256, fingerprint, exclusions
+    terraformrc            dev_overrides for this release
+  25.4R1-EVO/
+    ...
+  terraformrc              every release; the newest provides each name
+```
+
+Provider names do not carry the release, so Terraform files written for `junos-qfx` keep working
+across releases; the release lives in the directory and in the schema fingerprint the provider
+checks (see [Schema mismatch warning](#schema-mismatch-warning)). Several releases can be built
+side by side.
+
+### Use a release set
+
+Point Terraform at a release's CLI configuration instead of editing `~/.terraformrc`, and generate
+the Terraform files from the schema shipped with that release:
+
+```bash
+jtaf-xml2tf -j dist/25.4R1/schemas/junos-qfx.trimmed_schema.json.gz --groups \
+  -x examples/evpn-vxlan-dc-groups/dc1/dc1-spine1.xml -t qfx -d testbed-25.4R1
+
+export TF_CLI_CONFIG_FILE=$PWD/dist/terraformrc      # or dist/25.4R1/terraformrc for one release
+cd testbed-25.4R1 && terraform validate && terraform plan
+```
+
+### Variables
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `YANG_REPO`, `YANG_REF` | `../yang`, `HEAD` | Clone of Juniper/yang and the reference to read |
+| `YANG_DIR` | — | A plain directory laid out like the repository, instead of git |
+| `JUNOS_RELEASE`, `EVO_RELEASE` | newest of each branch | Pin a release (`JUNOS_RELEASE=25.2R1`); empty skips the branch (`EVO_RELEASE=`) |
+| `FAMILIES` | every family in the release | Subset of the Junos families, e.g. `FAMILIES="qfx es"` |
+| `EXCLUDE` | — | Subtrees left out of every provider, e.g. `"logical-systems tenants dynamic-profiles"` |
+| `EXCLUDE_<type>` | NFX: see below | Subtrees left out of one provider only, e.g. `EXCLUDE_qfx="poe"`; added to `EXCLUDE` |
+| `YANG2GO_FLAGS` | — | Extra `jtaf-yang2go` flags, e.g. `--yang-compliant` |
+| `JOBS` | `2` | Providers generated at once |
+| `NICENESS` | `10` | `nice` level for pyang and `go build` (plus `ionice` best-effort when available) |
+| `MIN_FREE_GB` | `5` | Free space required under `BUILD_DIR` before building |
+| `BUILD_DIR`, `DIST_DIR` | `build/release`, `dist` | Both are ignored by git |
+| `PROVIDER_NAMESPACE` | `hashicorp` | Namespace in the `dev_overrides` addresses; `jtaf-xml2tf` writes `hashicorp` |
+
+### Build cost
+
+Generating one full-model provider with groups takes about three minutes and peaks at 6–8 GB
+(pyang, then the schema compiler); `go build` adds ten seconds. `JOBS=2` therefore wants about
+16 GB free; `make preflight` warns when `MemAvailable` is lower and fails when disk is short. The
+heavy steps run under `nice`, and every temporary file — including Go's work directories — goes
+under `BUILD_DIR/tmp`, not `/tmp`.
+
+Planning with a `--generic --groups` provider costs several GB of Terraform memory, because the
+`groups` subtree repeats the whole model (see [What it costs](#what-it-costs) below). If that is
+too much, `EXCLUDE="logical-systems tenants dynamic-profiles"` trims every provider in the set, and
+the manifest records what was excluded.
+
+### The NFX model and `hash-function`
+
+In the 25.4R1 NFX model the `hash-function` choice under `forwarding-options/enhanced-hash-key`
+(and the same choice under routing instances, logical systems and tenants) holds both a leaf
+`CRC16` and a container `crc16`. Terraform attribute names are lower-case, so both would become
+`crc16`, and `jtaf-provider` refuses the model rather than let one silently shadow the other. The
+other families have the leaf alone. Until the generator can tell the two apart, `EXCLUDE_nfx`
+defaults to leaving that choice out of the NFX provider at each of its eight places (four in the
+base hierarchy, four under `groups`); the ECMP hash function is the only configuration it affects,
+and the manifest lists the paths. `EXCLUDE_nfx=` clears the default for a release that does not
+need it.
+
+### Reclaim space on the build machine
+
+```bash
+make clean-space DRY_RUN=1     # list what would go
+make clean-space               # do it
+```
+
+By default this removes stale release build directories under `BUILD_DIR`, stopped containers that
+exited more than `PRUNE_UNTIL` (24h) ago, dangling images and unreferenced image build cache, and
+reports the space reclaimed. It never stops or removes a running container, and never touches
+volumes. Larger reclaims are opt-in because other work on the machine may depend on them:
+`PRUNE_UNUSED_IMAGES=1` (tagged images no container uses, `PRUNE_IMAGE_AGE=168h` by default),
+`CLEAN_GO_CACHE=1`, `CLEAN_GO_MODCACHE=1` (asks for confirmation unless `FORCE=1`) and `OWN_TMP=1`
+(this user's `/tmp` entries older than a week). `AUTO_CLEAN=1` lets `make all` run the default
+cleanup itself when preflight finds the disk short.
 
 ---
 
