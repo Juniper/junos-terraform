@@ -38,14 +38,14 @@ class Target:
 def load_inventory(path=None):
     """Load a device inventory JSON file.
 
-    Accepts the netlens/jmcp shape::
+    Accepts a nested shape::
 
-        {"r0": {"ip": "...", "port": 22, "username": "root",
-                "auth": {"type": "password", "password": "..."}}}
+        {"device1": {"ip": "...", "port": 22, "username": "...",
+                     "auth": {"type": "password", "password": "..."}}}
 
     and a flatter shape::
 
-        {"r0": {"host": "...", "username": "...", "password": "..."}}
+        {"device1": {"host": "...", "username": "...", "password": "..."}}
     """
     path = path or os.environ.get(ENV_DEVICES)
     if not path:
