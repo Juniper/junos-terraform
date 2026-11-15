@@ -3,6 +3,7 @@ import json
 import pathlib
 import runpy
 import sys
+from copy import deepcopy
 from importlib.machinery import SourceFileLoader
 
 import pytest
@@ -161,6 +162,95 @@ def test_template_filter_module_and_merge_function():
     assert filters_mod.jtaf_merge_with_directive({"a": 1}, {"b": 2}, "merge_recursive") == {"a": 1, "b": 2}
     with pytest.raises(Exception):
         filters_mod.jtaf_merge_with_directive(1, 2, "unknown")
+
+
+def test_keyed_filter_merge_preserves_esi_and_lacp_fields():
+    filters_mod = _load_script("templates/jtaf_filters.py", "jtaf_esi_filters_mod")
+    fm = filters_mod.FilterModule()
+    values = {
+        "interfaces": {
+            "_merge_list_directives": {
+                "interface": {"_merge_directive": "merge_by_key", "_merge_key": "name"},
+            },
+            "interface": [
+                {
+                    "name": "ae0",
+                    "esi": {"all_active": True},
+                    "aggregated_ether_options": {"lacp": {"active": True, "periodic": "fast"}},
+                },
+                {"name": "ae1", "esi": {"identifier": "second", "all_active": True}},
+                {
+                    "name": "ae0",
+                    "esi": {"identifier": "first"},
+                    "aggregated_ether_options": {"lacp": {"system_id": "00:00:00:00:01:00"}},
+                },
+            ],
+        },
+    }
+    original = deepcopy(values)
+    result = fm.remove_meta_keys(fm.apply_merge_directives(values))
+    interfaces = result["interfaces"]["interface"]
+    assert [item["name"] for item in interfaces] == ["ae0", "ae1"]
+    assert interfaces[0]["esi"] == {"all_active": True, "identifier": "first"}
+    assert interfaces[0]["aggregated_ether_options"]["lacp"] == {
+        "active": True, "periodic": "fast", "system_id": "00:00:00:00:01:00",
+    }
+    assert interfaces[1]["esi"] == {"identifier": "second", "all_active": True}
+    assert values == original
+
+
+def test_keyed_filter_merge_preserves_deep_lists_and_later_overrides():
+    filters_mod = _load_script("templates/jtaf_filters.py", "jtaf_nested_filters_mod")
+    items = [
+        {
+            "name": "ae0",
+            "unit": [{
+                "name": "0",
+                "family": {"inet": {"address": [
+                    {"name": "192.0.2.1/24", "primary": True},
+                ]}},
+            }],
+            "options": {"enabled": True, "description": "old", "retained": "yes"},
+            "type_change": {"old": True},
+        },
+        {
+            "name": "ae0",
+            "unit": [{
+                "name": "0",
+                "family": {"inet": {"address": [
+                    {"name": "192.0.2.1/24", "preferred": True},
+                    {"name": "192.0.2.2/24"},
+                ]}},
+            }],
+            "options": {"enabled": False, "description": None},
+            "type_change": [],
+        },
+    ]
+    original = deepcopy(items)
+    result = filters_mod.FilterModule._merge_list_by_key(items, "name")
+    assert len(result) == 1
+    assert result[0]["unit"][0]["family"]["inet"]["address"] == [
+        {"name": "192.0.2.1/24", "primary": True, "preferred": True},
+        {"name": "192.0.2.2/24"},
+    ]
+    assert result[0]["options"] == {"enabled": False, "description": None, "retained": "yes"}
+    assert result[0]["type_change"] == []
+    assert items == original
+
+
+def test_keyed_filter_merge_preserves_custom_keys_and_unkeyed_items():
+    filters_mod = _load_script("templates/jtaf_filters.py", "jtaf_custom_filters_mod")
+    items = [
+        {"id": 1, "settings": {"active": True}, "tags": ["first"]},
+        {"description": "unkeyed"},
+        {"id": 2, "settings": {"active": False}},
+        {"id": 1, "settings": {"label": "one"}, "tags": ["second"]},
+    ]
+    assert filters_mod.FilterModule._merge_list_by_key(items, "id") == [
+        {"id": 1, "settings": {"active": True, "label": "one"}, "tags": ["first", "second"]},
+        {"description": "unkeyed"},
+        {"id": 2, "settings": {"active": False}},
+    ]
 
 
 class _FakePopen:

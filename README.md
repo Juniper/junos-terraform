@@ -277,6 +277,15 @@ maps; undefined, null, or Boolean false presence containers are omitted. The pya
 JSON schema preserves the `presence` statement for this distinction. Regenerate
 schemas as well as roles if an older schema lacks presence metadata.
 
+The generated `jtaf_filters.py` recursively combines nested dictionaries when
+de-duplicating list entries with `merge_by_key`. Partial interface updates therefore
+retain ESI mode and LACP settings supplied by other groups. Later scalar values
+still take precedence, while nested lists use the same merge key and preserve
+first-seen order. Regenerate existing roles, or refresh their
+`filter_plugins/jtaf_filters.py` from `junosterraform/templates/jtaf_filters.py`,
+to receive this merge fix. Updating a workbook alone does not update the filter
+already packaged in a deployment project.
+
 Quick usage:
 ```
 jtaf-ansible -j <junos.json> -x <config1.xml> [-x <config2.xml> ...] -t <device-type>
