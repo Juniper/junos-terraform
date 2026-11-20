@@ -414,6 +414,27 @@ The generated playbook includes device-push tasks: `connection: local` means
 modules run on the control node, not that they cannot connect to devices.
 Use the operator-owned playbook above to make deployment choices explicit.
 
+Schema-defined `empty` leaves accept Boolean `true` or the case-insensitive
+string `"true"` and render as empty XML elements, such as `<mtu-discovery/>`.
+Boolean `false`, string `"false"`, and undefined values omit the statement.
+Other values retain the existing rendering behavior so invalid input is not
+silently discarded. String-valued and Boolean-valued schema leaves are not
+subject to this empty-leaf normalization.
+
+Non-presence containers are omitted when none of their supported descendants
+render XML, including nested empty dictionaries or omitted false empty leaves.
+YANG presence containers retain their meaning when explicitly supplied as
+empty maps; undefined, null, or Boolean false presence containers are omitted.
+Regenerate schemas if an older schema lacks the required `presence` metadata.
+
+The generated `jtaf_filters.py` recursively combines nested dictionaries when
+de-duplicating list entries with `merge_by_key`. Partial interface updates
+therefore retain ESI mode and LACP settings supplied by other groups. Later
+scalar values still take precedence, while nested lists use the same merge key
+and preserve first-seen order. Regenerate existing roles, or refresh their
+`filter_plugins/jtaf_filters.py`, to receive this behavior; updating a workbook
+alone does not update the filter packaged in a deployment project.
+
 ### Inventory and variable hierarchy
 
 `jtaf-xml2yaml` requires a grouping definition. `--grouping-hosts-file` supplies

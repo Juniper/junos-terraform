@@ -14,7 +14,7 @@
 {%- endmacro -%}
 
 {#####}
-{%- macro printleaf(path,name,level,indexvar) -%}
+{%- macro printleaf(path,name,level,indexvar,leaf_type) -%}
 {% if indexvar -%}
 {%- set var1 = indexvar -%}
 {%- else -%}
@@ -22,11 +22,19 @@
 {%- endif -%}
 {%- set name_prepared = preparename(name) -%}
 {{- '\n'+' '*4*level}}{{'{%-'}} if {{ path2variable(var1 + '.' + name_prepared) }} is defined {{'%}'}}
+{%- if leaf_type == 'empty' %}
+{{- '\n'+' '*4*level}}{{'{%-'}} if {{ path2variable(var1+'.'+name_prepared) }} is sameas true or ({{ path2variable(var1+'.'+name_prepared) }} is string and {{ path2variable(var1+'.'+name_prepared) }} | lower == 'true') {{'%}'}}
+{{' '*4*level}}<{{name}}/>
+{{' '*4*level}}{{'{%-'}} elif {{ path2variable(var1+'.'+name_prepared) }} is not sameas false and not ({{ path2variable(var1+'.'+name_prepared) }} is string and {{ path2variable(var1+'.'+name_prepared) }} | lower == 'false') {{'%}'}}
+{{' '*4*level}}<{{name}}>{{'{{'}}{{ path2variable(var1+'.'+name_prepared) }}{{'}}'}}</{{name}}>
+{{' '*4*level}}{{'{%-'}} endif {{'%}'}}
+{%- else %}
 {{- '\n'+' '*4*level}}{{'{%-'}} if {{ path2variable(var1+'.'+name_prepared) }} is boolean {{'%}'}}
 {{' '*4*level}}<{{name}}/>
 {{' '*4*level}}       {{'{%-'}} else {{'%}'}}
 {{' '*4*level}}<{{name}}>{{'{{'}}{{ path2variable(var1+'.'+name_prepared) }}{{'}}'}}</{{name}}>
 {{' '*4*level}}{{'{%-'}} endif {{'%}'}}
+{%- endif %}
 
 {# {{' '*4*(level+1)}} {{'{{'}} {{ path2variable(var1+'.'+name_prepared) }} {{'}}'}} #}
 {# {{' '*4*level}}</{{name}}> #}
@@ -37,7 +45,7 @@
 {%- macro expand_xml_recursive(ele,level,indexvar) -%}
     {# CHECKLEAF IF #}
     {%- if ele.type == 'leaf' -%}
-	  {{- printleaf(ele.path,ele.name,level,indexvar) -}}
+	  {{- printleaf(ele.path,ele.name,level,indexvar,ele.get('leaf-type')) -}}
 	
 	{# CHECKLEAF ELSE #}
     {%- else -%}
@@ -82,13 +90,17 @@
 		{%- else -%}	
 
 {%- if ele.type == 'container' -%}
+{%- if 'presence' in ele %}
+{{'\n'+' '*4*level}}{{'{%-'}} if {{ nodevar }} is defined and {{ nodevar }} is not sameas false and {{ nodevar }} is not none {{'%}'}}
+{%- else %}
 {{'\n'+' '*4*level}}{{'{%-'}} if {{ nodevar }} is defined and (({{ nodevar }} is mapping and ({{ nodevar }} | length > 0)) or ({{ nodevar }} is not mapping and ({{ nodevar }} or {{ nodevar }} == ''))) {{'%}'}}
+{%- endif %}
 {%- elif level>1 -%}
 {{'\n'+' '*4*level}}{{'{%-'}} if {{ nodevar }} is defined {{'%}'}}
 {%- else -%}
 {# no wrapper needed for non-container top-level nodes #}
 {%- endif -%}
-{% if ele.type != "leaf-list" %}
+{% if ele.type != "leaf-list" and ele.type != "container" %}
 {{'\n'+' '*4*level}}<{{ele.name}}>
 {% endif %}
         {# LIST ENDIF #}
@@ -115,10 +127,21 @@
 {{' '*4*level}}{{'{%-'}} endif {{'%}'}}
         {# LEAF-LIST ELSE #}
 		{% else %}
+        {%- if ele.type == 'container' %}
+{{'\n'+' '*4*level}}{{'{%-'}} set _jtaf_children_{{level}} {{'%}'}}
+        {%- endif %}
    
     	{%- for child in ele['children'] -%}
             {{ expand_xml_recursive(child,level+1,indexvar) }}
 	    {%- endfor -%}
+        {%- if ele.type == 'container' %}
+{{'\n'+' '*4*level}}{{'{%-'}} endset {{'%}'}}
+{{'\n'+' '*4*level}}{{'{%-'}} if _jtaf_children_{{level}} | trim{% if 'presence' in ele %} or true{% endif %} {{'%}'}}
+{{'\n'+' '*4*level}}<{{ele.name}}>
+{{'{{'}} _jtaf_children_{{level}} {{'}}'}}
+{{'\n'+' '*4*level}}</{{ele.name}}>
+{{'\n'+' '*4*level}}{{'{%-'}} endif {{'%}'}}
+        {%- endif %}
 
         {# LEAF-LIST ENDIF #}
 		{% endif %}
@@ -148,7 +171,7 @@
 {#{%- if level>1 -%}#}
 {#{{'\n'+' '*4*level}}{{'{%-'}} if {{pathvar+'.get("'+path2variable(preparename(ele.name))+'")' }} {{'%}'}}#}
 {#{%- endif %}#}
-{%- if ele.type != "leaf-list" -%}
+{%- if ele.type != "leaf-list" and ele.type != "container" -%}
 {{'\n'+' '*4*level}}</{{ele.name}}>
 {% endif %}
 {%- if ele.type == 'container' or level>1 -%}

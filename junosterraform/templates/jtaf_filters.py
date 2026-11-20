@@ -115,8 +115,8 @@ class FilterModule:
         """De-duplicate a list of dicts by a key field, merging duplicate entries.
 
         Later entries (higher priority) override earlier entries for scalar values.
-        Sub-lists in merged items are recursively merged by the same key to handle
-        nested duplicates (e.g. syslog file contents).
+        Nested dictionaries retain fields from both entries. Sub-lists at any depth
+        are recursively merged by the same key (e.g. syslog file contents).
         Items lacking the key field are appended unchanged.
         """
         seen: Dict[Any, Any] = {}
@@ -126,16 +126,7 @@ class FilterModule:
             if isinstance(item, dict) and key in item:
                 k = item[key]
                 if k in seen:
-                    # Merge: later values take precedence; sub-lists merged by key
-                    merged = deepcopy(seen[k])
-                    for mk, mv in item.items():
-                        if isinstance(mv, list) and isinstance(merged.get(mk), list):
-                            merged[mk] = FilterModule._merge_list_by_key(
-                                merged[mk] + mv, key
-                            )
-                        else:
-                            merged[mk] = deepcopy(mv)
-                    seen[k] = merged
+                    seen[k] = FilterModule._merge_dict_by_key(seen[k], item, key)
                 else:
                     seen[k] = deepcopy(item)
                     order.append(k)
@@ -145,6 +136,19 @@ class FilterModule:
                 seen[id(item)] = item
 
         return [seen[k] for k in order]
+
+    @staticmethod
+    def _merge_dict_by_key(base: dict, override: dict, key: str) -> dict:
+        merged = deepcopy(base)
+        for name, value in override.items():
+            previous = merged.get(name)
+            if isinstance(previous, dict) and isinstance(value, dict):
+                merged[name] = FilterModule._merge_dict_by_key(previous, value, key)
+            elif isinstance(previous, list) and isinstance(value, list):
+                merged[name] = FilterModule._merge_list_by_key(previous + value, key)
+            else:
+                merged[name] = deepcopy(value)
+        return merged
 
 
 def _dispatch_merge(base: Any, override: Any, directive: Optional[str] = None) -> Any:
