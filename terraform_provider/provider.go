@@ -40,6 +40,9 @@ type ProviderConfig struct {
 	Host string
 }
 
+func (p ProviderConfig) GetClient() netconf.Client { return p.Client }
+func (p ProviderConfig) GetHost() string           { return p.Host }
+
 // buildProviderConfig maps Terraform config values into ProviderConfig.
 func buildProviderConfig(config providerModel) (ProviderConfig, error) {
 	clientConfig := Config{

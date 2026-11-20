@@ -18,23 +18,23 @@
                             <encrypted-password>$1$a31gJmWG$h9ohikT1ajySf/tVH.gmv1</encrypted-password>
                         </authentication>
                     </user>
-                    <message>***********************************************************************\nThis system is restricted to __________, authorized users for legitimate\nbusiness purposes only. All activity on the system will be logged and\nis subject to monitoring. Unauthorized access, use or modification\nof computers, data therein or data in transit to or from the computers\nis a violation of state and federal laws. Unauthorized activity will\nbe reported to the law enforcement for investigation and possible\nprosecution. __________ reserves the right to investigate, refer for\nprosecution and pursue monetary damages in civil actions in the event\nof unauthorized access.\n***********************************************************************\n</message>
+                    <message>***********************************************************************
+This system is restricted to __________, authorized users for legitimate
+business purposes only. All activity on the system will be logged and
+is subject to monitoring. Unauthorized access, use or modification
+of computers, data therein or data in transit to or from the computers
+is a violation of state and federal laws. Unauthorized activity will
+be reported to the law enforcement for investigation and possible
+prosecution. __________ reserves the right to investigate, refer for
+prosecution and pursue monetary damages in civil actions in the event
+of unauthorized access.
+***********************************************************************</message>
                 </login>
                 <services>
                     <ssh>
                         <root-login>allow</root-login>
                     </ssh>
                     <extension-service>
-                        <request-response>
-                            <grpc>
-                                <undocumented><clear-text>
-                                    <address>0.0.0.0</address>
-                                    <port>32767</port>
-                                </clear-text></undocumented>
-                                <max-connections>30</max-connections>
-                                <undocumented><skip-authentication/></undocumented>
-                            </grpc>
-                        </request-response>
                         <notification>
                             <allow-clients>
                                 <address>0.0.0.0/0</address>

@@ -53,26 +53,24 @@ logger = logging.getLogger("netconf-mock")
 @dataclass
 class DeviceState:
     name: str
-    running_groups: dict[str, str] = field(default_factory=dict)
-    candidate_groups: dict[str, str] = field(default_factory=dict)
-    deleted_candidate_groups: set[str] = field(default_factory=set)
-    submitted_xml_by_group: dict[str, str] = field(default_factory=dict)
+    running_config: str = ""
+    candidate_config: str = ""
+    submitted_xml: str = ""
     rpc_log: list[str] = field(default_factory=list)
     history: list[dict[str, str]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Initialize candidate configuration from running state."""
         # Candidate starts as a copy of running, similar to Junos candidate model.
-        self.candidate_groups = copy.deepcopy(self.running_groups)
+        self.candidate_config = self.running_config
 
     def snapshot(self) -> dict:
         """Return a serializable point-in-time view of device state."""
         return {
             "name": self.name,
-            "running_groups": self.running_groups,
-            "candidate_groups": self.candidate_groups,
-            "deleted_candidate_groups": sorted(self.deleted_candidate_groups),
-            "submitted_xml_by_group": self.submitted_xml_by_group,
+            "running_config": self.running_config,
+            "candidate_config": self.candidate_config,
+            "submitted_xml": self.submitted_xml,
             "rpc_log": self.rpc_log,
             "history": self.history,
         }
@@ -194,27 +192,6 @@ class DeviceSession(asyncssh.SSHServerSession):
         return m.group(1).strip() if m else ""
 
     @staticmethod
-    def _extract_configuration(xml_text: str) -> str:
-        """Extract the first <configuration>...</configuration> fragment."""
-        m = re.search(r"(<configuration>.*?</configuration>)", xml_text, flags=re.DOTALL)
-        return m.group(1) if m else ""
-
-    @staticmethod
-    def _extract_direct_configuration(xml_text: str) -> str:
-        root = DeviceSession._parse_xml(xml_text)
-        if root is None:
-            return ""
-
-        config_elem = DeviceSession._find_first_configuration(root)
-        if config_elem is None:
-            return ""
-
-        if any(DeviceSession._local_name(child.tag) == "groups" for child in list(config_elem)):
-            return ""
-
-        return ET.tostring(config_elem, encoding="unicode")
-
-    @staticmethod
     def _parse_xml(xml_text: str) -> ET.Element | None:
         """Parse XML text to ElementTree root, returning None on parse errors."""
         try:
@@ -229,83 +206,6 @@ class DeviceSession(asyncssh.SSHServerSession):
             if DeviceSession._local_name(elem.tag) == "configuration":
                 return elem
         return None
-
-    @staticmethod
-    def _extract_group_name_from_groups_elem(groups_elem: ET.Element) -> str:
-        """Extract <name> value from a <groups> element."""
-        for child in list(groups_elem):
-            if DeviceSession._local_name(child.tag) == "name" and child.text:
-                return child.text.strip()
-        return ""
-
-    @staticmethod
-    def _extract_groups_configurations_regex(xml_text: str) -> dict[str, str]:
-        """Regex fallback to extract each groups block keyed by group name."""
-        groups_by_name: dict[str, str] = {}
-        for group_block in re.findall(r"(<groups>.*?</groups>)", xml_text, flags=re.DOTALL):
-            name_match = re.search(r"<name>\s*([^<]+?)\s*</name>", group_block)
-            if not name_match:
-                continue
-            group_name = name_match.group(1).strip()
-            if not group_name:
-                continue
-            groups_by_name[group_name] = f"<configuration>{group_block}</configuration>"
-        return groups_by_name
-
-    @staticmethod
-    def _extract_groups_from_configuration_set(xml_text: str) -> dict[str, str]:
-        """Extract per-group payload from set-style load-configuration RPCs.
-
-        Some client stacks send `<load-configuration format="text">` with
-        `<configuration-set>` commands instead of XML `<configuration><groups>`.
-        Capture `set groups <name> ...` lines so downstream assertions can still
-        validate expected rendered content.
-        """
-
-        m = re.search(
-            r"<configuration-set>\s*(.*?)\s*</configuration-set>",
-            xml_text,
-            flags=re.DOTALL,
-        )
-        if not m:
-            return {}
-
-        lines = [line.strip() for line in m.group(1).splitlines() if line.strip()]
-        groups_lines: dict[str, list[str]] = {}
-        for line in lines:
-            lm = re.match(r"^set\s+groups\s+(\S+)\s+(.+)$", line)
-            if not lm:
-                continue
-            group_name = lm.group(1)
-            groups_lines.setdefault(group_name, []).append(line)
-
-        return {name: "\n".join(group_lines) for name, group_lines in groups_lines.items()}
-
-    @staticmethod
-    def _extract_groups_configurations(xml_text: str) -> dict[str, str]:
-        """Extract per-group configuration blobs from a load-configuration RPC."""
-
-        groups_by_name: dict[str, str] = {}
-        root = DeviceSession._parse_xml(xml_text)
-        if root is None:
-            return DeviceSession._extract_groups_configurations_regex(xml_text)
-
-        config_elem = DeviceSession._find_first_configuration(root)
-        if config_elem is None:
-            return DeviceSession._extract_groups_configurations_regex(xml_text)
-
-        for child in list(config_elem):
-            if DeviceSession._local_name(child.tag) != "groups":
-                continue
-            group_name = DeviceSession._extract_group_name_from_groups_elem(child)
-            if not group_name:
-                continue
-            groups_xml = ET.tostring(child, encoding="unicode")
-            groups_by_name[group_name] = f"<configuration>{groups_xml}</configuration>"
-
-        if groups_by_name:
-            return groups_by_name
-        return DeviceSession._extract_groups_configurations_regex(xml_text)
 
     @staticmethod
     def _extract_operation(elem: ET.Element) -> str:
@@ -446,135 +346,58 @@ class DeviceSession(asyncssh.SSHServerSession):
         m = re.search(r'<load-configuration[^>]*\baction="([^"]+)"', xml_text)
         return m.group(1).strip().lower() if m else ""
 
-    def _merge_group_configuration(self, group_name: str, incoming_config: str) -> str:
-        existing_root = self._load_group_configuration_root(group_name)
-        incoming_root = self._parse_xml(incoming_config)
-        if incoming_root is None:
-            return incoming_config
+    def _candidate_root(self) -> ET.Element:
+        """The candidate configuration as a tree, empty if nothing is staged."""
+        parsed = self._parse_xml(self._state.candidate_config)
+        if parsed is not None:
+            return parsed
+        return ET.Element("configuration")
 
-        existing_groups = self._ensure_groups_elem(existing_root, group_name)
-        incoming_groups = self._find_child(incoming_root, "groups")
-        if incoming_groups is None:
-            return incoming_config
+    def _incoming_configuration(self, xml_text: str) -> ET.Element | None:
+        """The <configuration> element of an RPC. Some client stacks send
+        unbound namespace prefixes, which make the whole document unparseable,
+        so fall back to the configuration element on its own."""
+        root = self._parse_xml(xml_text)
+        if root is not None:
+            found = self._find_first_configuration(root)
+            if found is not None:
+                return found
 
-        for child in list(incoming_groups):
-            if self._local_name(child.tag) == "name":
-                continue
-            self._apply_patch_element(existing_groups, child)
+        m = re.search(r"(<configuration>.*</configuration>)", xml_text, flags=re.DOTALL)
+        return self._parse_xml(m.group(1)) if m else None
 
-        return ET.tostring(existing_root, encoding="unicode")
+    def _apply_children(self, parent: ET.Element, children: list[ET.Element]) -> None:
+        """Apply top-level patch children, counting repeated names so that a
+        leaf-list such as apply-groups keeps every entry rather than collapsing
+        into the first one."""
+        name_counts: dict[str, int] = {}
+        for child in children:
+            local_name = self._local_name(child.tag)
+            name_counts[local_name] = name_counts.get(local_name, 0) + 1
+        for child in children:
+            self._apply_patch_element(parent, child, name_counts)
 
-    def _resolve_patch_group_name(self) -> str:
-        known_groups = set(self._state.candidate_groups)
-        known_groups.update(self._state.running_groups)
-        known_groups.update(self._state.submitted_xml_by_group)
-
-        if "base-config" in known_groups:
-            return "base-config"
-        if len(known_groups) == 1:
-            return next(iter(known_groups))
-        if known_groups:
-            return sorted(known_groups)[0]
-        return "base-config"
-
-    def _load_group_configuration_root(self, group_name: str) -> ET.Element:
-        if group_name in self._state.deleted_candidate_groups:
-            configuration = ET.Element("configuration")
-            groups_elem = ET.SubElement(configuration, "groups")
-            name_elem = ET.SubElement(groups_elem, "name")
-            name_elem.text = group_name
-            return configuration
-
-        raw_config = (
-            self._state.candidate_groups.get(group_name)
-            or self._state.running_groups.get(group_name)
-            or self._state.submitted_xml_by_group.get(group_name)
-            or ""
-        )
-        if raw_config:
-            parsed = self._parse_xml(raw_config)
-            if parsed is not None:
-                return parsed
-
+    def _group_configuration(self, group_name: str) -> str:
+        """The committed configuration filtered to one group, as Junos returns
+        it for <get-configuration><configuration><groups><name>."""
+        parsed = self._parse_xml(self._state.running_config)
         configuration = ET.Element("configuration")
-        groups_elem = ET.SubElement(configuration, "groups")
-        name_elem = ET.SubElement(groups_elem, "name")
-        name_elem.text = group_name
-        return configuration
-
-    def _wrap_direct_configuration(self, group_name: str, config_xml: str) -> str:
-        parsed = self._parse_xml(config_xml)
         if parsed is None:
-            return config_xml
-
-        configuration = ET.Element("configuration")
-        groups_elem = ET.SubElement(configuration, "groups")
-        name_elem = ET.SubElement(groups_elem, "name")
-        name_elem.text = group_name
+            return ET.tostring(configuration, encoding="unicode")
 
         for child in list(parsed):
-            groups_elem.append(copy.deepcopy(child))
-
-        return ET.tostring(configuration, encoding="unicode")
-
-    def _full_configuration_for_group(self, group_name: str) -> str:
-        raw_config = self._state.running_groups.get(group_name) or ""
-        parsed = self._parse_xml(raw_config)
-        if parsed is None:
-            return "<configuration/>"
-
-        groups_elem = self._find_child(parsed, "groups")
-        if groups_elem is None:
-            return ET.tostring(parsed, encoding="unicode")
-
-        configuration = ET.Element("configuration")
-        for child in list(groups_elem):
-            if self._local_name(child.tag) == "name":
+            if self._local_name(child.tag) != "groups":
                 continue
-            configuration.append(copy.deepcopy(child))
+            name_elem = self._find_child(child, "name")
+            if name_elem is not None and (name_elem.text or "").strip() == group_name:
+                configuration.append(copy.deepcopy(child))
 
         return ET.tostring(configuration, encoding="unicode")
-
-    def _ensure_groups_elem(self, configuration: ET.Element, group_name: str) -> ET.Element:
-        groups_elem = self._find_child(configuration, "groups")
-        if groups_elem is None:
-            groups_elem = ET.SubElement(configuration, "groups")
-
-        name_elem = self._find_child(groups_elem, "name")
-        if name_elem is None:
-            name_elem = ET.Element("name")
-            groups_elem.insert(0, name_elem)
-        if not (name_elem.text or "").strip():
-            name_elem.text = group_name
-        return groups_elem
 
     def _iter_patch_children(self, patch_configuration: ET.Element) -> list[ET.Element]:
-        patch_children: list[ET.Element] = []
-        for child in list(patch_configuration):
-            if self._local_name(child.tag) != "groups":
-                patch_children.append(child)
-                continue
-
-            for groups_child in list(child):
-                if self._local_name(groups_child.tag) == "name":
-                    continue
-                patch_children.append(groups_child)
-
-        return patch_children
-
-    def _is_group_delete_rpc(self, patch_configuration: ET.Element) -> bool:
-        children = list(patch_configuration)
-        if not children:
-            return False
-
-        has_group_delete = any(
-            self._local_name(child.tag) == "groups" and self._extract_operation(child) == "delete"
-            for child in children
-        )
-        if not has_group_delete:
-            return False
-
-        return all(self._local_name(child.tag) in {"groups", "apply-groups"} for child in children)
+        # groups is configuration like any other node, so a patch below it is
+        # applied where it is sent rather than lifted to the top.
+        return list(patch_configuration)
 
     def _apply_patch_element(
         self,
@@ -634,9 +457,6 @@ class DeviceSession(asyncssh.SSHServerSession):
         if not any(self._extract_operation(elem) for elem in patch_configuration.iter()):
             return None
 
-        if self._is_group_delete_rpc(patch_configuration):
-            return None
-
         return patch_configuration
 
     def _apply_patch_configuration(self, patch_configuration: ET.Element) -> str | None:
@@ -644,28 +464,23 @@ class DeviceSession(asyncssh.SSHServerSession):
         if not patch_children:
             return None
 
-        group_name = self._resolve_patch_group_name()
-        configuration = self._load_group_configuration_root(group_name)
-        groups_elem = self._ensure_groups_elem(configuration, group_name)
-
-        for child in patch_children:
-            self._apply_patch_element(groups_elem, child)
+        configuration = self._candidate_root()
+        self._apply_children(configuration, patch_children)
 
         updated_config = ET.tostring(configuration, encoding="unicode")
-        self._state.candidate_groups[group_name] = updated_config
-        self._state.submitted_xml_by_group[group_name] = updated_config
-        return group_name
+        self._state.candidate_config = updated_config
+        self._state.submitted_xml = updated_config
+        return updated_config
 
     def _handle_edit_patch(self, xml_text: str, message_id: str) -> bool:
         patch_configuration = self._extract_patch_configuration(xml_text)
         if patch_configuration is None:
             return False
 
-        group_name = self._apply_patch_configuration(patch_configuration)
-        if group_name is None:
+        if self._apply_patch_configuration(patch_configuration) is None:
             return False
 
-        self._append_history("edit-config-patch", f"group={group_name}")
+        self._append_history("edit-config-patch", "candidate updated")
         self._send_frame(self._ok_reply(message_id))
         return True
 
@@ -687,52 +502,35 @@ class DeviceSession(asyncssh.SSHServerSession):
             return False
 
         action = self._extract_load_configuration_action(xml_text)
-        groups_cfg = self._extract_groups_configurations(xml_text)
-        if not groups_cfg:
-            groups_cfg = self._extract_groups_from_configuration_set(xml_text)
-        if groups_cfg:
-            for group_name, cfg in groups_cfg.items():
-                if action == "merge":
-                    cfg = self._merge_group_configuration(group_name, cfg)
-                self._state.candidate_groups[group_name] = cfg
-                self._state.deleted_candidate_groups.discard(group_name)
-                self._state.submitted_xml_by_group[group_name] = cfg
+        incoming = self._incoming_configuration(xml_text)
+        if incoming is not None and list(incoming):
+            if action == "merge":
+                configuration = self._candidate_root()
+                self._apply_children(configuration, list(incoming))
+            else:
+                configuration = copy.deepcopy(incoming)
+            cfg = ET.tostring(configuration, encoding="unicode")
+            self._state.candidate_config = cfg
+            self._state.submitted_xml = cfg
             self._append_history(
-                "load-configuration",
-                f"action={action or 'replace'} groups={','.join(sorted(groups_cfg.keys()))}",
+                "load-configuration", f"action={action or 'replace'}"
             )
-        else:
-            # Fallback for malformed/minimal payloads.
-            group_name = self._extract_group_name(xml_text)
-            cfg = self._extract_configuration(xml_text)
-            direct_cfg = self._extract_direct_configuration(xml_text)
-            if direct_cfg:
-                group_name = self._resolve_patch_group_name()
-                cfg = self._wrap_direct_configuration(group_name, direct_cfg)
-            if group_name and cfg:
-                if action == "merge":
-                    cfg = self._merge_group_configuration(group_name, cfg)
-                self._state.candidate_groups[group_name] = cfg
-                self._state.deleted_candidate_groups.discard(group_name)
-                self._state.submitted_xml_by_group[group_name] = cfg
-                self._append_history(
-                    "load-configuration",
-                    f"action={action or 'replace'} group={group_name}",
-                )
         self._send_frame(self._ok_reply(message_id))
         return True
 
     def _handle_edit_delete(self, xml_text: str, message_id: str) -> bool:
-        """Handle edit-config delete operations against candidate groups."""
+        """Handle an edit-config that deletes whole elements of the candidate."""
         if "<edit-config>" not in xml_text or 'operation="delete"' not in xml_text:
             return False
 
-        group_name = self._extract_group_name(xml_text)
-        if group_name:
-            self._state.candidate_groups.pop(group_name, None)
-            self._state.deleted_candidate_groups.add(group_name)
-            self._state.submitted_xml_by_group.pop(group_name, None)
-            self._append_history("edit-config-delete", f"group={group_name}")
+        incoming = self._incoming_configuration(xml_text)
+        if incoming is not None:
+            configuration = self._candidate_root()
+            self._apply_children(configuration, list(incoming))
+            cfg = ET.tostring(configuration, encoding="unicode")
+            self._state.candidate_config = cfg
+            self._state.submitted_xml = cfg
+            self._append_history("edit-config-delete", "candidate updated")
         self._send_frame(self._ok_reply(message_id))
         return True
 
@@ -741,8 +539,7 @@ class DeviceSession(asyncssh.SSHServerSession):
         if "<discard-changes" not in xml_text:
             return False
 
-        self._state.candidate_groups = copy.deepcopy(self._state.running_groups)
-        self._state.deleted_candidate_groups.clear()
+        self._state.candidate_config = self._state.running_config
         self._append_history("discard-changes", "candidate reset from running")
         self._send_frame(self._ok_reply(message_id))
         return True
@@ -752,30 +549,21 @@ class DeviceSession(asyncssh.SSHServerSession):
         if "<commit" not in xml_text:
             return False
 
-        self._state.running_groups = copy.deepcopy(self._state.candidate_groups)
-        for group_name in self._state.deleted_candidate_groups:
-            self._state.running_groups.pop(group_name, None)
-        self._state.deleted_candidate_groups.clear()
-        self._append_history("commit", f"groups={len(self._state.running_groups)}")
+        self._state.running_config = self._state.candidate_config
+        self._append_history("commit", f"bytes={len(self._state.running_config)}")
         self._send_frame(self._ok_reply(message_id))
         return True
 
     def _handle_get_configuration(self, xml_text: str, message_id: str) -> bool:
-        """Return running config for requested group, or a minimal fallback."""
+        """Return the committed configuration, or one group of it if asked."""
         if "<get-configuration>" not in xml_text:
             return False
 
         group_name = self._extract_group_name(xml_text)
-        if group_name and group_name in self._state.running_groups:
-            cfg = self._state.running_groups[group_name]
-        elif not group_name:
-            cfg = self._full_configuration_for_group(self._resolve_patch_group_name())
+        if group_name:
+            cfg = self._group_configuration(group_name)
         else:
-            cfg = (
-                "<configuration><groups>"
-                f"<name>{group_name}</name>"
-                "</groups></configuration>"
-            )
+            cfg = self._state.running_config or "<configuration/>"
         self._append_history("get-configuration", f"group={group_name}")
         reply = (
             '<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" '

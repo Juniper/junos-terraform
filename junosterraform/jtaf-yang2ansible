@@ -35,12 +35,19 @@ parser.add_argument(
     help='Device type suffix used in output directory name.',
     required=True,
 )
+parser.add_argument(
+    '--mode',
+    choices=['group', 'override'],
+    default='group',
+    help='Operating mode: "group" (default) or "override" (load override + commit confirmed).',
+)
 
 args = parser.parse_args()
 
 # Combine all XML file names into one string
 xml_files = [file for group in args.x for file in group]
 device_type = args.t
+mode = args.mode
 
 # Separate search paths and yang files (expand globs)
 search_paths = []
@@ -70,8 +77,9 @@ if p1.returncode == 0 and pyang_out:
     p2 = subprocess.Popen([
         'jtaf-ansible',
         '-j', '-',
-        '-x', *xml_files,
-        '-t', device_type
+        '-t', device_type,
+        '--mode', mode,
+        '-x', *xml_files
     ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, error = p2.communicate(input=pyang_out)
     print(output.decode(), file=sys.stdout)

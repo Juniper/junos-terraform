@@ -16,59 +16,28 @@ If input is not one of these forms, stop and ask user to choose one accepted for
 Example Execution rules:
 
 1. Resolve repo and dependencies
-- Required repo path: /Users/lnup/Projects/JTAF_MCP_new/junos-terraform
+- Required repo path: junos-terraform
 - If path is missing, stop and return blocking_error.
 - Verify commands exist: python3, go, terraform.
 - If already in repo venv and jtaf-yang2go is available, skip setup.
 - Otherwise run:
-  - cd /Users/lnup/Projects/JTAF_MCP_new/junos-terraform
+  - cd junos-terraform
   - python3 -m venv venv
   - . venv/bin/activate
   - pip install -e .
 - Verify jtaf-yang2go exists after setup.
 
-2. Generate provider artifacts for both device families
-- Go to providers path:
-  - cd /Users/lnup/Projects/JTAF_MCP_new/junos-terraform/examples/providers
-- Artifact checks:
-  - terraform-provider-junos-vqfx-evpn-vxlan/resource_config_provider.go
-  - terraform-provider-junos-vsrx-evpn-vxlan/resource_config_provider.go
-- Mode run:
-  - If either artifact is missing: run ./build.sh then ./convert.sh
-  - Else: skip generation
-- Mode run force:
-  - Always run ./build.sh then ./convert.sh
-
-3. Install both provider binaries
-- From examples/providers resolve dirs dynamically:
-  - vqfx_dir=$(find . -maxdepth 1 -type d -name 'terraform-provider-junos-vqfx*' | head -n 1)
-  - srx_dir=$(find . -maxdepth 1 -type d -name 'terraform-provider-junos-vsrx*' | head -n 1)
-- If any dir missing, stop and return blocking_error.
-- Install both:
-  - cd "$vqfx_dir" && go install .
-  - cd ../"$srx_dir" && go install .
-- Verify binaries are present in $(go env GOBIN) if set, else $(go env GOPATH)/bin.
-
-4. Run preview plan and save artifacts
-- Go to terraform files path:
-  - cd /Users/lnup/Projects/JTAF_MCP_new/junos-terraform/examples/terraform_files
-- Never run apply.
-- Run:
-  - terraform plan -no-color -out=preview.plan
-  - {
-      echo "# preview_metadata"
-      echo "generated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-      echo "mode=run-all"
-      echo "git_commit=$(git -C /Users/lnup/Projects/JTAF_MCP_new/junos-terraform rev-parse --short HEAD 2>/dev/null || echo unknown)"
-      echo
-      terraform show -no-color preview.plan
-    } | tee preview_full_config.txt
-
-5. Post-run checks
-- Verify files exist and are non-empty:
-  - /Users/lnup/Projects/JTAF_MCP_new/junos-terraform/examples/terraform_files/preview.plan
-  - /Users/lnup/Projects/JTAF_MCP_new/junos-terraform/examples/terraform_files/preview_full_config.txt
-- If checks fail, return blocking_error.
+2. Generate and exercise both provider implementations
+- Go to the providers path:
+  - cd junos-terraform/examples/providers
+- Always run `bash ./test-both-providers.sh`, for both accepted modes. It generates and builds standard and generic variants into isolated temporary directories, converts the Terraform scenario once, and runs the same plan first with standard then generic provider dev overrides.
+- The helper does not install either provider globally and never runs `terraform init` or `terraform apply`.
+- It saves per-variant outputs under `junos-terraform/examples/terraform_files/`:
+  - `preview_full_config.txt` for the standard provider
+  - `preview_generic_full_config.txt` for the generic provider
+  - `preview.plan` and `preview_generic.plan` when the corresponding plans succeed
+- If either plan fails, report both exit statuses and retain the per-variant output; do not stop before attempting the second plan.
+- Verify both text result files exist and are non-empty, and verify each binary plan file exists when its plan succeeded. If generation fails, return `blocking_error`.
 
 Required output contract (compact):
 - One short summary line and these fields:
@@ -76,11 +45,13 @@ Required output contract (compact):
   - exit_code
   - setup_summary
   - generation_summary
-  - install_summary
-  - plan_summary
+  - standard_plan_exit_code
+  - generic_plan_exit_code
   - terminal_output_shown
-  - plan_file
-  - full_output_file
+  - standard_plan_file
+  - standard_full_output_file
+  - generic_plan_file
+  - generic_full_output_file
 - Add warnings only if present.
 - Add blocking_error only if present.
 

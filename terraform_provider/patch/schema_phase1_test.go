@@ -135,12 +135,12 @@ func mustTree(t *testing.T, xmlStr string) *Node {
 	return tree
 }
 
-func mustIdx(t *testing.T) map[string]*NodeInfo {
+func mustIdx(t *testing.T) *Schema {
 	t.Helper()
 	return mustIdxFromSchema(t, testTrimmedSchema)
 }
 
-func mustIdxFromSchema(t *testing.T, schema string) map[string]*NodeInfo {
+func mustIdxFromSchema(t *testing.T, schema string) *Schema {
 	t.Helper()
 	idx, err := UnmarshalTrimmedSchemaIndex(schema)
 	if err != nil {

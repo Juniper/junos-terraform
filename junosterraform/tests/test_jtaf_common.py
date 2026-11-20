@@ -1,10 +1,84 @@
+import gzip
+import io
 import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 import xml.etree.ElementTree as ElementTree
 
 from junosterraform import jtaf_common
+
+
+class TestLoadSchemaJson(unittest.TestCase):
+    """Tests for load_schema_json and write_schema_json_gz."""
+
+    SCHEMA = {"root": {"children": [{"name": "configuration", "children": []}]}}
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def _path(self, name):
+        return os.path.join(self.tmp.name, name)
+
+    def test_plain_file(self):
+        p = self._path("s.json")
+        with open(p, "w") as f:
+            json.dump(self.SCHEMA, f, indent=2)
+        self.assertEqual(jtaf_common.load_schema_json(p), self.SCHEMA)
+
+    def test_gzipped_file(self):
+        p = self._path("s.json.gz")
+        with gzip.open(p, "wt") as f:
+            json.dump(self.SCHEMA, f)
+        self.assertEqual(jtaf_common.load_schema_json(p), self.SCHEMA)
+
+    def test_gzipped_file_without_gz_extension(self):
+        """Detection is by content, not extension."""
+        p = self._path("s.json")
+        with gzip.open(p, "wt") as f:
+            json.dump(self.SCHEMA, f)
+        self.assertEqual(jtaf_common.load_schema_json(p), self.SCHEMA)
+
+    def test_gzipped_stdin(self):
+        data = gzip.compress(json.dumps(self.SCHEMA).encode())
+        fake = mock.Mock()
+        fake.buffer = io.BytesIO(data)
+        with mock.patch.object(jtaf_common.sys, "stdin", fake):
+            self.assertEqual(jtaf_common.load_schema_json("-"), self.SCHEMA)
+
+    def test_plain_stdin(self):
+        fake = mock.Mock()
+        fake.buffer = io.BytesIO(json.dumps(self.SCHEMA).encode())
+        with mock.patch.object(jtaf_common.sys, "stdin", fake):
+            self.assertEqual(jtaf_common.load_schema_json("-"), self.SCHEMA)
+
+    def test_not_json_names_file(self):
+        p = self._path("bad.json")
+        with open(p, "w") as f:
+            f.write("<configuration/>")
+        with self.assertRaises(ValueError) as cm:
+            jtaf_common.load_schema_json(p)
+        self.assertIn(p, str(cm.exception))
+
+    def test_truncated_gzip_names_file(self):
+        p = self._path("bad.json.gz")
+        with open(p, "wb") as f:
+            f.write(gzip.compress(b"{}")[:6])
+        with self.assertRaises(ValueError) as cm:
+            jtaf_common.load_schema_json(p)
+        self.assertIn(p, str(cm.exception))
+
+    def test_write_round_trip(self):
+        p = self._path("trimmed_schema.json.gz")
+        jtaf_common.write_schema_json_gz(self.SCHEMA, p)
+        with open(p, "rb") as f:
+            self.assertEqual(f.read(2), jtaf_common.GZIP_MAGIC)
+        self.assertEqual(jtaf_common.load_schema_json(p), self.SCHEMA)
+        # compact: no indentation whitespace
+        with gzip.open(p, "rt") as f:
+            self.assertNotIn("\n", f.read())
 
 
 class TestGetXpaths(unittest.TestCase):
@@ -637,6 +711,61 @@ class TestWalkSchema(unittest.TestCase):
 class TestFilterJsonUsingXml(unittest.TestCase):
     """Tests for filter_json_using_xml function."""
 
+    GROUPS_SCHEMA = {
+        "root": {"name": "root", "children": [{
+            "name": "configuration", "type": "container", "children": [
+                {"name": "apply-groups", "type": "leaf-list", "leaf-type": "string",
+                 "ordered-by": "user"},
+                {"name": "groups", "type": "list", "key": "name", "children": [
+                    {"name": "name", "type": "leaf"},
+                    {"name": "system", "type": "container",
+                     "children": [{"name": "host-name", "type": "leaf"}]},
+                    {"name": "protocols", "type": "container", "children": [
+                        {"name": "lldp", "type": "container", "children": []}]},
+                ]},
+                {"name": "system", "type": "container",
+                 "children": [{"name": "host-name", "type": "leaf"}]},
+            ]}]}}
+
+    GROUPS_XML = """<configuration>
+        <apply-groups>base</apply-groups>
+        <groups>
+            <name>base</name>
+            <system><host-name>r1</host-name></system>
+        </groups>
+    </configuration>"""
+
+    def _filter_groups_xml(self, groups):
+        root = ElementTree.fromstring(self.GROUPS_XML)
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(self.GROUPS_SCHEMA, f)
+            schema_file = f.name
+        try:
+            result = jtaf_common.filter_json_using_xml(schema_file, root, groups)
+        finally:
+            os.remove(schema_file)
+        return next(c for c in result["root"]["children"]
+                    if c["name"] == "configuration")
+
+    def test_groups_trimmed_to_what_the_xml_uses(self):
+        """With groups kept, the group body is trimmed like any other subtree."""
+        config = self._filter_groups_xml(groups=True)
+        names = [c["name"] for c in config["children"]]
+        self.assertIn("groups", names)
+        self.assertIn("apply-groups", names)
+
+        groups = next(c for c in config["children"] if c["name"] == "groups")
+        kept = [c["name"] for c in groups["children"]]
+        self.assertIn("system", kept)
+        # protocols is in the model but not in the XML, so it is trimmed away
+        self.assertNotIn("protocols", kept)
+
+    def test_groups_left_out_by_default(self):
+        """Without groups, apply-groups is stripped before paths are derived."""
+        config = self._filter_groups_xml(groups=False)
+        names = [c["name"] for c in config["children"]]
+        self.assertNotIn("apply-groups", names)
+
     def test_filter_json_using_xml_with_element(self):
         """Test filter_json_using_xml with ElementTree element."""
         schema_dict = {
@@ -692,6 +821,50 @@ class TestFilterJsonUsingXml(unittest.TestCase):
 
             # The filtering should have removed version tag
             self.assertIsInstance(result, dict)
+        finally:
+            os.remove(schema_file)
+
+    def test_filter_json_using_xml_keeps_nested_version_leaves(self):
+        """Only the top-level version (the Junos release) is removed; a leaf
+        named version elsewhere is configuration."""
+        xml_string = """<root>
+            <configuration>
+                <version>26.2R1.7</version>
+                <system>
+                    <ntp>
+                        <server>
+                            <name>192.0.2.1</name>
+                            <version>4</version>
+                        </server>
+                    </ntp>
+                </system>
+            </configuration>
+        </root>"""
+
+        root = ElementTree.fromstring(xml_string)
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump({"name": "configuration", "children": {}}, f)
+            schema_file = f.name
+
+        try:
+            with mock.patch.object(jtaf_common, "walk_schema") as walk:
+                jtaf_common.filter_json_using_xml(schema_file, root)
+            paths = walk.call_args[0][0]
+            self.assertIn("system/ntp/server/version", paths)
+            self.assertNotIn("version", paths)
+        finally:
+            os.remove(schema_file)
+
+    def test_filter_json_using_xml_gzipped_schema(self):
+        """The schema may be given gzipped, as the generators now write it."""
+        root = ElementTree.fromstring("<configuration><system/></configuration>")
+        with tempfile.NamedTemporaryFile(suffix='.json.gz', delete=False) as f:
+            schema_file = f.name
+        try:
+            jtaf_common.write_schema_json_gz({"name": "configuration", "children": {}}, schema_file)
+            result = jtaf_common.filter_json_using_xml(schema_file, root)
+            self.assertEqual(result["name"], "configuration")
         finally:
             os.remove(schema_file)
 
@@ -836,3 +1009,107 @@ class TestIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_yang_release_id_tracks_module_revisions(tmp_path):
+    from junosterraform.jtaf_common import schema_fingerprint, yang_release_id
+
+    a = tmp_path / "a.yang"
+    a.write_text('module junos-conf-system {\n  revision 2019-01-01 { }\n}\n')
+    b = tmp_path / "b.yang"
+    b.write_text('module junos-conf-system {\n  revision 2021-06-01 { }\n}\n')
+
+    first = yang_release_id([str(a)])
+    assert first == yang_release_id([str(a)])          # stable
+    assert first != yang_release_id([str(b)])          # a newer revision differs
+    assert yang_release_id([]) == "unknown"
+
+    # The scope is what tells a trimmed provider from a full one.
+    assert schema_fingerprint("trimmed", first) != schema_fingerprint("full", first)
+
+
+def _choice_node():
+    """A node as the model declares a choice, before flattening."""
+    return {
+        "name": "then", "type": "container",
+        "children": [
+            {"name": "choice-ident", "type": "leaf",
+             "enums": [{"id": "add"}, {"id": "exact"}]},
+            {"name": "choice-value", "type": "leaf"},
+            {"name": "community-name", "type": "leaf"},
+        ],
+    }
+
+
+def test_flatten_choice_idents_replaces_the_pair_with_a_leaf_per_case():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = _choice_node()
+    assert flatten_choice_idents(node) == 1
+
+    names = [c["name"] for c in node["children"]]
+    assert "choice-ident" not in names
+    assert "choice-value" not in names
+    assert names == ["community-name", "add", "exact"]
+    for case in node["children"][1:]:
+        assert case["type"] == "leaf"
+        assert case["leaf-type"] == "string"
+
+
+def test_flatten_choice_idents_skips_a_case_that_is_already_a_sibling():
+    """martians carries an allow child and an allow case; they are one attribute."""
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = {
+        "name": "martians", "type": "container",
+        "children": [
+            {"name": "choice-ident", "type": "leaf",
+             "enums": [{"id": "allow"}, {"id": "exact"}]},
+            {"name": "choice-value", "type": "leaf"},
+            {"name": "allow", "type": "leaf"},
+        ],
+    }
+    assert flatten_choice_idents(node) == 1
+
+    names = [c["name"] for c in node["children"]]
+    assert names.count("allow") == 1
+    assert names == ["allow", "exact"]
+
+
+def test_flatten_choice_idents_skips_a_case_named_in_the_list_key():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = {
+        "name": "entry", "type": "list", "key": "allow",
+        "children": [
+            {"name": "choice-ident", "type": "leaf",
+             "enums": [{"id": "allow"}, {"id": "exact"}]},
+            {"name": "choice-value", "type": "leaf"},
+        ],
+    }
+    assert flatten_choice_idents(node) == 1
+    assert [c["name"] for c in node["children"]] == ["exact"]
+
+
+def test_flatten_choice_idents_recurses_into_nested_children():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    schema = {"root": {"children": [
+        {"name": "policy-options", "type": "container", "children": [
+            _choice_node(),
+            {"name": "inner", "type": "container", "children": [_choice_node()]},
+        ]},
+    ]}}
+
+    assert flatten_choice_idents(schema) == 2
+
+
+def test_flatten_choice_idents_leaves_a_node_without_a_choice_alone():
+    from junosterraform.jtaf_common import flatten_choice_idents
+
+    node = {"name": "system", "type": "container",
+            "children": [{"name": "host-name", "type": "leaf"}]}
+    before = json.loads(json.dumps(node))
+
+    assert flatten_choice_idents(node) == 0
+    assert node == before

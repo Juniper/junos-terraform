@@ -28,20 +28,24 @@ import (
 //	  </interfaces>
 //	</configuration>
 func CreateDiffPatch(diffMap map[string]Change, groupName string) ([]byte, error) {
-	return CreateDiffPatchWithSchema(diffMap, groupName, nil)
+	return CreateDiffPatchWithSchema(diffMap, nil, groupName, nil)
 }
 
-// CreateDiffPatchWithSchema is like CreateDiffPatch but accepts a schema index
-// for container delete coalescing.  When idx is non-nil and ALL leaves under a
-// schema container are being deleted (with no creates or replaces), they are
-// coalesced into a single container-level nc:operation="delete".
-func CreateDiffPatchWithSchema(diffMap map[string]Change, groupName string, idx map[string]*NodeInfo) ([]byte, error) {
+// CreateDiffPatchWithSchema is like CreateDiffPatch but accepts the plan's
+// leaf map and a schema index for container delete coalescing. When both are
+// non-nil and a schema container is being removed entirely — the plan keeps
+// nothing under it — its leaf deletes are coalesced into a single
+// container-level nc:operation="delete".
+func CreateDiffPatchWithSchema(diffMap map[string]Change, planMap map[string]string, groupName string, idx *Schema) ([]byte, error) {
 	_ = groupName
 
-	// Pre-pass: coalesce container deletes when schema is available.
-	if idx != nil {
-		diffMap = coalesceContainerDeletes(diffMap, idx)
+	// Pre-pass: coalesce container deletes when schema and plan are available.
+	if idx != nil && planMap != nil {
+		diffMap = coalesceContainerDeletes(diffMap, planMap, idx)
 	}
+
+	diffMap = mergeContainerChanges(diffMap)
+	diffMap = mergeEntryDeletes(diffMap)
 
 	// Root of the output tree
 	root := &Node{Tag: "configuration"}
@@ -70,12 +74,6 @@ func CreateDiffPatchWithSchema(diffMap map[string]Change, groupName string, idx 
 
 		if segments[0] == "configuration" {
 			segments = segments[1:]
-		}
-		if len(segments) > 0 {
-			firstTag, _, _ := parseSegment(segments[0])
-			if firstTag == "groups" {
-				segments = segments[1:]
-			}
 		}
 		if len(segments) == 0 {
 			continue
@@ -144,8 +142,19 @@ func CreateDiffPatchWithSchema(diffMap map[string]Change, groupName string, idx 
 			// a structural sibling — do NOT add an operation.  This is
 			// critical for Junos compound-key lists where choice-ident
 			// elements (e.g. <add/>) must appear WITHOUT an operation.
+			//
+			// When a whole entry is deleted, Junos only needs its key (for
+			// example a BGP neighbor's address). Its other settings, such as
+			// the neighbor's local-address, are removed along with it. If we
+			// sent those settings too, they would go out as empty tags like
+			// <local-address/>, and Junos would reject the whole change
+			// because an empty tag is not a valid address. So any setting
+			// that had a value is skipped. Settings with no value, like <add/>
+			// above, are still sent because Junos needs them to find the entry.
 			if p.parent.Operation == "delete" {
-				// structural child — no operation
+				if p.change.OldVal != "" {
+					continue
+				}
 			} else {
 				leaf.Operation = "delete"
 			}
@@ -162,17 +171,15 @@ func applyKeyedListEntryOperation(parent *Node, parentSegments []string, leafSeg
 		return false
 	}
 
-	_, parentKeyName, parentKeyValue := parseSegment(parentSegments[len(parentSegments)-1])
+	_, parentKeys := parseSegmentKeys(parentSegments[len(parentSegments)-1])
 	leafTag, _, _ := parseSegment(leafSegment)
-	if parentKeyName == "" || leafTag != parentKeyName {
-		return false
-	}
 
 	keyValue := change.NewVal
 	if change.Op == Delete {
 		keyValue = change.OldVal
 	}
-	if keyValue == "" || keyValue != parentKeyValue {
+
+	if !isEntryKey(parentKeys, leafTag, keyValue) {
 		return false
 	}
 
@@ -188,6 +195,65 @@ func applyKeyedListEntryOperation(parent *Node, parentSegments []string, leafSeg
 	}
 
 	return true
+}
+
+// isEntryKey reports whether a leaf is one of its list entry's keys, with the
+// entry's value for it. A single key must have a value; in a compound key one
+// may be empty (choice-value of route-filter ... exact), and is still the
+// entry's key.
+func isEntryKey(entryKeys []segmentKey, leafTag, value string) bool {
+	for _, k := range entryKeys {
+		if k.name == leafTag && k.value == value && (value != "" || len(entryKeys) > 1) {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeEntryDeletes drops the deletes below a deleted list entry's direct
+// children. The entry's key deletes delete it (applyKeyedListEntryOperation)
+// and its direct children go in without an operation, as a compound-key entry
+// needs its choice sibling (<add/>) to be identified; but a delete deeper in
+// it, in a term's from or then, keeps its operation, and Junos, having deleted
+// the entry, fails it with "statement not found".
+func mergeEntryDeletes(diffMap map[string]Change) map[string]Change {
+	entries := make(map[string]bool) // deleted entry paths
+	for path, change := range diffMap {
+		if change.Op != Delete {
+			continue
+		}
+		segments := splitPathRespectingQuotes(path)
+		if len(segments) < 2 {
+			continue
+		}
+		_, keys := parseSegmentKeys(segments[len(segments)-2])
+		leafTag, _, _ := parseSegment(segments[len(segments)-1])
+		if isEntryKey(keys, leafTag, change.OldVal) {
+			entries[strings.Join(segments[:len(segments)-1], "/")] = true
+		}
+	}
+	if len(entries) == 0 {
+		return diffMap
+	}
+
+	result := make(map[string]Change, len(diffMap))
+	for path, change := range diffMap {
+		if !belowDeletedEntry(path, entries) {
+			result[path] = change
+		}
+	}
+	return result
+}
+
+// belowDeletedEntry reports whether path lies below a direct child of a
+// deleted entry.
+func belowDeletedEntry(path string, entries map[string]bool) bool {
+	for entry := range entries {
+		if strings.HasPrefix(path, entry+"/") && len(splitPathRespectingQuotes(path[len(entry)+1:])) > 1 {
+			return true
+		}
+	}
+	return false
 }
 
 type orderedChange struct {
@@ -247,6 +313,11 @@ func pathDepth(path string) int {
 		return 0
 	}
 	return len(splitPathRespectingQuotes(path))
+}
+
+// MarshalTree serializes a *Node tree to indented XML bytes, escaping text.
+func MarshalTree(root *Node) ([]byte, error) {
+	return marshalNodeTree(root)
 }
 
 // marshalNodeTree serializes a *Node tree to indented XML bytes.
@@ -312,100 +383,138 @@ func xmlEscape(s string) string {
 	return s
 }
 
-// coalesceContainerDeletes detects when ALL leaves under a schema container are
-// Delete operations (no Creates or Replaces share that prefix), and replaces
-// them with a single synthetic Delete entry for the container path itself.
-// This produces a compact <container nc:operation="delete"/> instead of N
-// individual leaf deletes, which is both more efficient and avoids ordering
-// issues on Junos.
-func coalesceContainerDeletes(diffMap map[string]Change, idx map[string]*NodeInfo) map[string]Change {
-	// Build a set of all leaf paths grouped by their deepest container ancestor.
+// coalesceContainerDeletes replaces the leaf deletes under a schema container
+// that is being removed entirely with a single synthetic Delete of the
+// container itself. This produces a compact <container nc:operation="delete"/>
+// instead of N individual leaf deletes, which is both more efficient and avoids
+// ordering issues on Junos.
+//
+// A container instance is removed entirely when the plan keeps no leaf under
+// it; every change under it is then a Delete. The diff alone cannot tell: an
+// unchanged sibling is not in it, and a container holding one deleted list
+// entry and one kept one would otherwise be deleted with both. Containers are
+// identified by their instance path, keys included, so a delete of
+// policy-statement[name=a]/term[name=t]/from does not become one of every
+// term's from. Each leaf counts toward its deepest container ancestor; when a
+// container and one inside it are both removed, only the outer delete is kept.
+func coalesceContainerDeletes(diffMap map[string]Change, planMap map[string]string, idx *Schema) map[string]Change {
+	// Leaf paths grouped by their deepest container ancestor instance.
 	// A "container" here means a schema node of KindContainer (not KindList).
-	type containerStats struct {
-		allDelete bool
-		count     int
-		paths     []string
-	}
+	containers := make(map[string][]string)
 
-	containers := make(map[string]*containerStats)
-
-	for path, change := range diffMap {
+	for path := range diffMap {
 		segments := splitPathRespectingQuotes(path)
-		// Strip configuration prefix
-		if len(segments) > 0 && segments[0] == "configuration" {
-			segments = segments[1:]
-		}
 
-		// Find the deepest container ancestor in the schema
-		for depth := len(segments) - 1; depth >= 1; depth-- {
-			ancestorSegments := segments[:depth]
-			// Build schema path from segments (strip key predicates)
-			schemaPath := ""
-			for _, seg := range ancestorSegments {
-				tag, _, _ := parseSegment(seg)
-				if schemaPath == "" {
-					schemaPath = tag
-				} else {
-					schemaPath = schemaPath + "/" + tag
-				}
-			}
-
-			info, ok := idx[schemaPath]
+		// Find the deepest container ancestor in the schema. segments[0] is
+		// the configuration root and never a candidate.
+		for depth := len(segments) - 1; depth >= 2; depth-- {
+			instance := strings.Join(segments[:depth], "/")
+			info, ok := idx.Lookup(outputPathToSchemaPath(instance))
 			if !ok || info.Kind != KindContainer {
 				continue
 			}
-
-			// Found a container ancestor — record this path
-			if _, exists := containers[schemaPath]; !exists {
-				containers[schemaPath] = &containerStats{allDelete: true}
-			}
-			stat := containers[schemaPath]
-			stat.count++
-			stat.paths = append(stat.paths, path)
-			if change.Op != Delete {
-				stat.allDelete = false
-			}
+			containers[instance] = append(containers[instance], path)
 			break // only use the deepest container
 		}
 	}
 
-	// Identify containers where ALL children are Delete
-	coalesced := make(map[string]bool)
-	for _, stat := range containers {
-		if !stat.allDelete || stat.count < 2 {
-			continue
-		}
-		// Mark all child paths for removal
-		for _, p := range stat.paths {
-			coalesced[p] = true
+	removed := make(map[string]bool)
+	for instance, paths := range containers {
+		if len(paths) >= 2 && !planHasPathUnder(planMap, instance) {
+			removed[instance] = true
 		}
 	}
 
-	if len(coalesced) == 0 {
+	if len(removed) == 0 {
 		return diffMap
 	}
 
-	// Build new diffMap: remove coalesced leaves, add container-level deletes
+	// Build new diffMap: remove the coalesced leaves and add a delete for each
+	// removed container not inside another removed container.
 	result := make(map[string]Change, len(diffMap))
 	for path, change := range diffMap {
-		if !coalesced[path] {
+		if !underAny(path, removed) {
 			result[path] = change
 		}
 	}
-
-	// Add synthetic container deletes
-	added := make(map[string]bool)
-	for containerPath, stat := range containers {
-		if !stat.allDelete || stat.count < 2 {
-			continue
+	for instance := range removed {
+		if !underAny(instance, removed) {
+			result[instance] = Change{Op: Delete, OldVal: "", NewVal: ""}
 		}
-		if added[containerPath] {
-			continue
-		}
-		added[containerPath] = true
-		// The path needs "configuration/" prefix for CreateDiffPatch processing
-		result["configuration/"+containerPath] = Change{Op: Delete, OldVal: "", NewVal: ""}
 	}
 
 	return result
+}
+
+// mergeContainerChanges folds a changed presence container and the changes
+// under it into one element. Only a presence container is in the leaf map
+// with leaves under it, so a changed path with changes under it is one. A
+// deleted container's own delete removes its children, so their deletes are
+// dropped; a created one is created by creating its children, so its own
+// create is dropped. Kept, each would add a second element beside the one
+// holding the children.
+func mergeContainerChanges(diffMap map[string]Change) map[string]Change {
+	var deleted, created []string
+	for path, change := range diffMap {
+		if !hasChangeUnder(diffMap, path) {
+			continue
+		}
+		switch change.Op {
+		case Delete:
+			deleted = append(deleted, path)
+		case Create:
+			created = append(created, path)
+		}
+	}
+	if len(deleted)+len(created) == 0 {
+		return diffMap
+	}
+
+	result := make(map[string]Change, len(diffMap))
+	for path, change := range diffMap {
+		result[path] = change
+	}
+	for _, path := range created {
+		delete(result, path)
+	}
+	for _, container := range deleted {
+		for path := range diffMap {
+			if strings.HasPrefix(path, container+"/") {
+				delete(result, path)
+			}
+		}
+	}
+	return result
+}
+
+// hasChangeUnder reports whether the diff changes anything below path.
+func hasChangeUnder(diffMap map[string]Change, path string) bool {
+	prefix := path + "/"
+	for p := range diffMap {
+		if strings.HasPrefix(p, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// planHasPathUnder reports whether the plan keeps any leaf at or below path.
+func planHasPathUnder(planMap map[string]string, path string) bool {
+	prefix := path + "/"
+	for p := range planMap {
+		if p == path || strings.HasPrefix(p, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// underAny reports whether path lies strictly below one of the containers.
+func underAny(path string, containers map[string]bool) bool {
+	for c := range containers {
+		if strings.HasPrefix(path, c+"/") {
+			return true
+		}
+	}
+	return false
 }

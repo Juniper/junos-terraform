@@ -33,6 +33,11 @@ def parse_args() -> argparse.Namespace:
         default=8301,
         help="First mock listener port.",
     )
+    parser.add_argument(
+        "--provider-name",
+        default="junos-vqfx-evpn-vxlan",
+        help="Provider name in the generated blocks.",
+    )
     return parser.parse_args()
 
 
@@ -45,7 +50,7 @@ def main() -> int:
     text = providers_path.read_text(encoding="utf-8")
 
     block_re = re.compile(
-        r'provider\s+"junos-vqfx-evpn-vxlan"\s*\{.*?\}',
+        r'provider\s+"' + re.escape(args.provider_name) + r'"\s*\{.*?\}',
         re.DOTALL,
     )
     host_re = re.compile(r'host\s*=\s*"([^"]+)"')

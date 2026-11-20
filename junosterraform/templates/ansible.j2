@@ -187,13 +187,21 @@
 
 {################ COMMON MACROS #ENDS ################}
 #jinja2: trim_blocks: False, lstrip_blocks: False
+{% if jtaf_mode | default('group') == 'override' %}
+<configuration>
+{%- for parent in parent_list -%}
+  {{ expand_xml_recursive(parent,1,None) }}
+{%- endfor %}
+</configuration>
+{% else %}
 <configuration>
     <groups>
-        <name> JTAF_ANSIBLE </name>
+        <name> {{ jtaf_group_name | default('JTAF_ANSIBLE') }} </name>
 {%- for parent in parent_list -%}
   {{ expand_xml_recursive(parent,1,None) }}
 {%- endfor %}
     </groups>
-	<apply-groups> JTAF_ANSIBLE </apply-groups>
+	<apply-groups> {{ jtaf_group_name | default('JTAF_ANSIBLE') }} </apply-groups>
 </configuration>
+{% endif %}
 {################ STRUCT FROM XML # ENDS #############}

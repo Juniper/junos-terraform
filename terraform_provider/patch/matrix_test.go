@@ -199,7 +199,7 @@ const matrixSchema = `{
   }
 }`
 
-func matrixIdx(t *testing.T) map[string]*NodeInfo {
+func matrixIdx(t *testing.T) *Schema {
 	t.Helper()
 	return mustIdxFromSchema(t, matrixSchema)
 }

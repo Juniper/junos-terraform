@@ -2,6 +2,54 @@
 
 Go package that computes and applies minimal NETCONF `edit-config` operations between desired and actual Junos configuration state. Lives at `terraform_provider/patch/`.
 
+## Purpose
+
+Define how desired and actual configuration are compared and turned into the smallest set of NETCONF operations that reconciles them.
+
+## Requirements
+
+### Requirement: Schema lookups through a compact table
+The patch engine SHALL look schema nodes up in a `patch.Schema`: one record per node, children consecutive, names stored once, compiled from the pyang JSON.
+
+#### Scenario: Lookup by schema path
+- **WHEN** the engine looks up a path relative to `<configuration>`, without list predicates
+- **THEN** it SHALL get the node's kind, list key, presence and ordered-by-user, or not found
+
+#### Scenario: Same-named siblings
+- **WHEN** two siblings have the same name (the same node in two cases of a choice)
+- **THEN** they SHALL be one node, with the last one's kind and key, either one's flags, and the children of both
+
+### Requirement: Paths below configuration groups
+The diff engine SHALL treat configuration below a `groups` entry as ordinary configuration, keyed by the group's
+`name`, so that a change inside a group produces the same minimal edit as the equivalent change in the base hierarchy.
+Edits SHALL be scoped to the group they belong to and SHALL NOT affect identically named nodes in the base hierarchy or
+in another group.
+
+#### Scenario: Minimal edit inside a group
+- **WHEN** one leaf inside a group changes
+- **THEN** the emitted edit targets that leaf below its `<groups><name>…</name></groups>` element and contains no other
+  changed node
+
+#### Scenario: Same path in two groups
+- **WHEN** the same configuration path exists in two groups with different values
+- **THEN** each is tracked separately and changing one leaves the other untouched
+
+#### Scenario: Group removal
+- **WHEN** a managed group is removed from the configuration
+- **THEN** the emitted edit deletes that group as a single operation rather than one operation per leaf
+
+### Requirement: Ordered group references
+`apply-groups` SHALL be diffed as an order-sensitive leaf-list: a change of order SHALL produce a non-empty diff, and
+the emitted edit SHALL result in the declared order on the device.
+
+#### Scenario: Order change produces an edit
+- **WHEN** the entries of `apply-groups` are the same but in a different order
+- **THEN** the diff is non-empty and applying it leaves the device in the declared order
+
+#### Scenario: Identical order produces no edit
+- **WHEN** the entries and their order are unchanged
+- **THEN** the diff is empty
+
 ## Architecture
 
 ```
@@ -114,9 +162,11 @@ Desired XML (plan) ──┘
 
 #### Container Delete Coalescing
 
-- **Given** ALL leaves under a container are Deletes (no Creates or Replaces) AND schema info is available, **When** `coalesceContainerDeletes()` runs, **Then**:
-  - Emit single `<container nc:operation="delete"/>` instead of individual leaf deletes
+- **Given** a container instance is removed entirely — the plan keeps no leaf under it — AND at least two leaf deletes fall under it AND schema info and the plan leaf map are available, **When** `coalesceContainerDeletes()` runs, **Then**:
+  - Emit single `<container nc:operation="delete"/>` at the container's instance path (list keys included) instead of individual leaf deletes
   - Individual leaf delete entries are removed from the diff
+- **Given** every change under a container is a Delete but the plan keeps other content under it (an unchanged leaf, another list entry), **When** coalescing, **Then** the container is not deleted
+- **Given** a removed container lies inside another removed container, **When** coalescing, **Then** only the outer container delete is emitted
 
 ---
 

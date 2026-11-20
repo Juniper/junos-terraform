@@ -21,7 +21,7 @@ jobs:
     - uses: actions/checkout@v7
 
     - name: Set up Go ${{ matrix.go-version }}
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@v7
       with:
         go-version: ${{ matrix.go-version }}
 
@@ -42,7 +42,10 @@ jobs:
         path: terraform_provider/coverage.out
 
     - uses: golangci/golangci-lint-action@v9
+      # Lint once on the pinned toolchain: golangci-lint's type-checker cannot parse
+      # stdlib from newer Go releases than the one it was built with.
+      if: matrix.go-version == '1.25.6'
       with:
-        version: v2.12.2
+        version: v2.15.0
         working-directory: terraform_provider
 

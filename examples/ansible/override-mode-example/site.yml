@@ -1,0 +1,90 @@
+---
+# Example site.yml using override mode with commit confirmed safety.
+#
+# Override mode pushes the ENTIRE rendered config with `load override`.
+# Junos candidate config calculates the diff internally.
+# commit confirmed auto-rolls back if the device becomes unreachable.
+#
+# Prerequisites:
+#   - Your rendered XML MUST include: management IP, root-authentication, NETCONF SSH
+#   - Set NETCONF_USERNAME and NETCONF_PASSWORD environment variables
+#   - Ensure jtaf_mode: "override" in group_vars or role defaults
+#
+# Usage:
+#   export NETCONF_USERNAME='root'
+#   export NETCONF_PASSWORD='password'
+#   ansible-playbook -i inventory.ini site.yml
+
+- name: Render full configuration from JTAF role
+  hosts: all
+  gather_facts: false
+  connection: local
+  vars:
+    tmp_dir: ../ansible-provider-junos-vqfx-evpn-vxlan/configs
+    jtaf_vars_root: "{{ playbook_dir }}"
+    jtaf_mode: "override"
+  roles:
+    - role: vqfx-evpn-vxlan_role
+      delegate_to: localhost
+
+- name: Push config with load override + commit confirmed
+  hosts: all
+  gather_facts: false
+  connection: local
+  vars:
+    netconf_user: "{{ lookup('env', 'NETCONF_USERNAME') }}"
+    netconf_pass: "{{ lookup('env', 'NETCONF_PASSWORD') }}"
+    tmp_dir: ../ansible-provider-junos-vqfx-evpn-vxlan/configs
+    jtaf_mode: "override"
+    jtaf_commit_confirm_minutes: 2
+  tasks:
+    - name: Preview candidate diff (dry-run)
+      juniper.device.config:
+        host: "{{ ansible_host | default(inventory_hostname) }}"
+        port: "{{ ansible_port | default(830) }}"
+        user: "{{ netconf_user }}"
+        passwd: "{{ netconf_pass }}"
+        load: override
+        src: "{{ tmp_dir }}/{{ inventory_hostname }}.xml"
+        check: true
+        commit: false
+        diff: true
+      register: preview_result
+
+    - name: Show what will change
+      ansible.builtin.debug:
+        var: preview_result.diff_lines
+      when: preview_result.diff_lines | default([]) | length > 0
+
+    - name: Apply with commit confirmed (auto-rollback on failure)
+      juniper.device.config:
+        host: "{{ ansible_host | default(inventory_hostname) }}"
+        port: "{{ ansible_port | default(830) }}"
+        user: "{{ netconf_user }}"
+        passwd: "{{ netconf_pass }}"
+        load: override
+        src: "{{ tmp_dir }}/{{ inventory_hostname }}.xml"
+        confirmed: "{{ jtaf_commit_confirm_minutes }}"
+        diff: true
+        comment: "JTAF override mode - full config push"
+      register: override_result
+
+    - name: Verify device is still reachable
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host | default(inventory_hostname) }}"
+        port: "{{ ansible_port | default(830) }}"
+        timeout: "{{ (jtaf_commit_confirm_minutes * 60) - 10 }}"
+
+    - name: Confirm the commit (clear rollback timer)
+      juniper.device.config:
+        host: "{{ ansible_host | default(inventory_hostname) }}"
+        port: "{{ ansible_port | default(830) }}"
+        user: "{{ netconf_user }}"
+        passwd: "{{ netconf_pass }}"
+        check: true
+        diff: false
+        commit: false
+
+    - name: Report success
+      ansible.builtin.debug:
+        msg: "Override applied and confirmed on {{ inventory_hostname }}"
