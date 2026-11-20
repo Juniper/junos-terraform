@@ -48,9 +48,12 @@ def test_empty_leaf_true_renders_without_text(value, nested):
 
 
 @pytest.mark.parametrize("nested", [False, True])
-@pytest.mark.parametrize("values", [{}, {"mtu_discovery": False},
-                                   {"mtu_discovery": "false"},
-                                   {"mtu_discovery": "FALSE"}])
+@pytest.mark.parametrize(
+    "values",
+    [{}, {"mtu_discovery": False},
+     {"mtu_discovery": "false"},
+     {"mtu_discovery": "FALSE"}],
+)
 def test_empty_leaf_false_or_undefined_is_omitted(values, nested):
     root = render_configuration(values, nested)
     assert root.find(".//mtu-discovery") is None
