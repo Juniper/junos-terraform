@@ -1,0 +1,18 @@
+{
+  "_comment": "Copy to devices.json and fill in. devices.json is gitignored - never commit real credentials. Password may be omitted and supplied via JTAF_PROBE_PASSWORD or the interactive prompt.",
+  "vsrx1": {
+    "host": "10.0.0.11",
+    "username": "lab",
+    "password": ""
+  },
+  "vmx1": {
+    "host": "10.0.0.12",
+    "username": "lab",
+    "password": ""
+  },
+  "vptx1": {
+    "host": "10.0.0.13",
+    "username": "lab",
+    "password": ""
+  }
+}

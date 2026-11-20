@@ -1,0 +1,4 @@
+# Real device inventories hold credentials - never commit them.
+devices.json
+*-devices.json
+__pycache__/
